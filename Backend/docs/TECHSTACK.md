@@ -46,6 +46,7 @@
 
 - `Backend/Dockerfile`: Gradle `bootJar`를 실행하는 멀티 스테이지 빌드와 non-root 런타임 이미지
 - `Backend/compose.yaml`: 백엔드, PostgreSQL, Redis, Prometheus, Grafana, Loki, Alloy 컨테이너 정의
+- `.github/workflows/backend-ci.yml`: 이슈 브랜치에서 `develope`로 보내는 PR과 `develope` 푸시에서 PostgreSQL 기반 테스트와 Docker 이미지 빌드 검증
 - `.github/workflows/publish-backend.yml`: `main`의 Backend 변경 시 이미지를 빌드해 GHCR에 `latest`, 커밋 SHA 태그로 게시
 
 Compose에 정의된 Redis와 모니터링 컨테이너는 실행 틀만 마련된 상태다. 애플리케이션 연동과 Prometheus·Loki·Alloy 설정 파일은 해당 기능을 도입할 때 완성한다.
@@ -84,11 +85,23 @@ RDS와 S3를 기본 운영안으로 사용한다. 비용이나 운영 일정 때
 | Docker 이미지 빌드 | 완료 | `Backend/Dockerfile`에서 `bootJar`를 실행하고 non-root 런타임 이미지를 생성한다. |
 | GHCR 로그인·게시 | 완료 | GitHub Actions의 `GITHUB_TOKEN`으로 로그인하고 `latest`, `${{ github.sha }}` 태그를 게시한다. |
 | 빌드 캐시 | 완료 | GitHub Actions cache backend를 BuildKit 캐시로 사용한다. |
-| PR 검증 CI | 예정 | Pull Request에서 Gradle 테스트와 Docker 이미지 빌드 성공 여부를 검증한다. |
+| `develope` 통합 CI | 완료 | PR과 통합 후 푸시에서 PostgreSQL 서비스를 사용한 Gradle 테스트와 Docker 이미지 빌드를 검증한다. 이미지는 게시하지 않는다. |
 | EC2 자동 배포 | 예정 | GHCR 이미지를 내려받아 Docker Compose로 실행한다. |
 | Health Check·Blue/Green | 예정 | Actuator Health 확인 후 Nginx upstream을 전환한다. |
 
 현재 워크플로는 이미지 게시 파이프라인이며 운영 서버 자동 배포까지 수행하지 않는다. 단일 EC2 Blue/Green은 배포 중단 시간을 줄이는 전략일 뿐 EC2 자체 장애를 방지하는 고가용성 구성은 아니다.
+
+### 5.2 브랜치 통합 흐름
+
+```text
+이슈 브랜치 → Pull Request → develope → Pull Request → main
+                 Backend CI                    GHCR 게시
+```
+
+- 이슈 브랜치는 `develope`로 Pull Request를 생성한다.
+- `Backend CI / Test and build image`가 성공한 변경만 `develope`에 병합한다.
+- `develope`에서 통합 검증한 뒤 `main`에 병합하면 기존 게시 워크플로가 GHCR 이미지를 생성한다.
+- GitHub Branch Protection에서 위 CI job을 `develope`의 필수 체크로 지정한다.
 
 ## 6. Monitoring / Logging
 
