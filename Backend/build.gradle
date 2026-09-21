@@ -20,7 +20,7 @@ repositories {
 
 ext {
     set('datasourceMicrometerVersion', "2.3.0")
-    set('springAiVersion', "2.0.1")
+    // set('springAiVersion', "2.0.1")
 }
 
 dependencies {
@@ -34,8 +34,8 @@ dependencies {
     implementation 'net.ttddyy.observation:datasource-micrometer-spring-boot'
     implementation 'org.flywaydb:flyway-database-postgresql'
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0'
-    implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'
-    implementation 'org.springframework.ai:spring-ai-starter-model-google-genai-embedding'
+    // implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'
+    // implementation 'org.springframework.ai:spring-ai-starter-model-google-genai-embedding'
     compileOnly 'org.projectlombok:lombok'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
     runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
@@ -56,7 +56,7 @@ dependencies {
 dependencyManagement {
     imports {
         mavenBom "net.ttddyy.observation:datasource-micrometer-bom:${datasourceMicrometerVersion}"
-        mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+        // mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
     }
 }
 
