@@ -83,11 +83,11 @@ Authorization: Bearer {accessToken}
 
 | 역할 | 설명 |
 | --- | --- |
-| `USER` | 일반 회원 |
-| `SELLER` | 승인된 판매자 |
-| `ADMIN` | 운영자 |
+| `USER` | 모든 활성 회원에게 부여되는 기본 권한 |
+| `SELLER` | `sellers.status = APPROVED`일 때 파생되는 판매자 권한 |
+| `ADMIN` | `users.role = ADMIN`인 운영자 권한 |
 
-> 한 사용자가 여러 역할을 동시에 가질 수 있습니다.
+> API의 `roles`는 유효 권한 목록입니다. `SELLER`는 `users.role`에 중복 저장하지 않고 승인된 판매자 상태에서 계산합니다.
 
 ## 2.2 판매자 신청 상태
 
@@ -115,24 +115,25 @@ Authorization: Bearer {accessToken}
 | --- | --- |
 | `PAYMENT_PENDING` | 결제 대기 |
 | `PAID` | 결제 완료 |
-| `PREPARING_SHIPMENT` | 배송 준비 |
+| `PREPARING` | 배송 준비 |
 | `SHIPPED` | 배송 중 |
 | `DELIVERED` | 배송 완료 |
-| `CANCEL_REQUESTED` | 취소 처리 중 |
 | `CANCELED` | 취소 완료 |
-| `PAYMENT_FAILED` | 결제 실패 |
 | `EXPIRED` | 결제 기한 만료 |
+
+> 개별 결제 시도의 실패는 결제 상태로 기록하며 주문은 결제 마감 전까지 `PAYMENT_PENDING`을 유지할 수 있습니다.
 
 ## 2.5 결제 상태
 
 | 상태 | 설명 |
 | --- | --- |
-| `READY` | 결제 대기 |
-| `SUCCESS` | 결제 성공 |
+| `PENDING` | 결제 시도 중 |
+| `SUCCEEDED` | 결제 성공 |
 | `FAILED` | 결제 실패 |
-| `CANCELING` | 결제 취소 중 |
+| `UNKNOWN` | 외부 PG 결과 확인 필요 |
 | `CANCELED` | 결제 취소 완료 |
-| `RECONCILE` | 수동 보정 필요 |
+
+> 보정 필요 여부는 결제 상태와 분리된 `reconciliationStatus`(`NONE`, `REQUIRED`, `RESOLVED`)로 표현합니다.
 
 ---
 
@@ -152,7 +153,7 @@ POST /api/v1/auth/signup
 {
   "email": "user@example.com",
   "password": "Password123!",
-  "name": "홍길동",
+  "displayName": "홍길동",
   "phone": "01012345678"
 }
 ```
@@ -165,7 +166,7 @@ POST /api/v1/auth/signup
   "data": {
     "userId": 1,
     "email": "user@example.com",
-    "name": "홍길동",
+    "displayName": "홍길동",
     "roles": ["USER"],
     "createdAt": "2026-09-18T14:00:00+09:00"
   }
@@ -213,7 +214,7 @@ POST /api/v1/auth/login
     "user": {
       "userId": 1,
       "email": "user@example.com",
-      "name": "홍길동",
+      "displayName": "홍길동",
       "roles": ["USER"]
     }
   }
@@ -292,7 +293,7 @@ GET /api/v1/users/me
   "data": {
     "userId": 1,
     "email": "user@example.com",
-    "name": "홍길동",
+    "displayName": "홍길동",
     "phone": "01012345678",
     "roles": ["USER", "SELLER"],
     "profileImageUrl": "https://cdn.example.com/images/profile.jpg",
@@ -313,7 +314,7 @@ PATCH /api/v1/users/me
 
 ```json
 {
-  "name": "김길동",
+  "displayName": "김길동",
   "phone": "01098765432"
 }
 ```
@@ -326,7 +327,7 @@ PATCH /api/v1/users/me
   "data": {
     "userId": 1,
     "email": "user@example.com",
-    "name": "김길동",
+    "displayName": "김길동",
     "phone": "01098765432",
     "roles": ["USER", "SELLER"],
     "createdAt": "2026-09-18T14:00:00+09:00"
@@ -411,10 +412,8 @@ POST /api/v1/seller-applications
 
 ```json
 {
-  "businessName": "길동상점",
-  "representativeName": "홍길동",
-  "businessNumber": "1234567890",
-  "contactPhone": "0212345678",
+  "brandName": "길동상점",
+  "contactEmail": "seller@example.com",
   "description": "한정판 상품 판매점"
 }
 ```
@@ -426,6 +425,7 @@ POST /api/v1/seller-applications
   "success": true,
   "data": {
     "applicationId": 10,
+    "brandName": "길동상점",
     "status": "PENDING",
     "appliedAt": "2026-09-18T14:00:00+09:00"
   }
@@ -447,10 +447,8 @@ GET /api/v1/seller-applications/me
   "success": true,
   "data": {
     "applicationId": 10,
-    "businessName": "길동상점",
-    "representativeName": "홍길동",
-    "businessNumber": "1234567890",
-    "contactPhone": "0212345678",
+    "brandName": "길동상점",
+    "contactEmail": "seller@example.com",
     "description": "한정판 상품 판매점",
     "status": "PENDING",
     "appliedAt": "2026-09-18T14:00:00+09:00"
@@ -476,9 +474,8 @@ GET /api/v1/admin/seller-applications?status=PENDING&page=0&size=20
       {
         "applicationId": 10,
         "userId": 1,
-        "businessName": "길동상점",
-        "representativeName": "홍길동",
-        "businessNumber": "1234567890",
+        "brandName": "길동상점",
+        "contactEmail": "seller@example.com",
         "status": "PENDING",
         "appliedAt": "2026-09-18T14:00:00+09:00"
       }
@@ -500,7 +497,7 @@ POST /api/v1/admin/seller-applications/{applicationId}/approve
 
 - **인증**: `ADMIN`
 
-> 승인 시 사용자에게 `SELLER` 역할을 부여한다.
+> 승인 시 `sellers.status`를 `APPROVED`로 변경해 유효 `SELLER` 권한을 활성화한다.
 
 **응답:**
 
@@ -549,7 +546,32 @@ POST /api/v1/admin/seller-applications/{applicationId}/reject
 
 # 5. DROP 조회 API
 
-## 5.1 공개 DROP 목록 조회
+## 5.1 카테고리 목록 조회
+
+```http
+GET /api/v1/categories
+```
+
+- **인증**: 불필요
+
+**응답:**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "categoryId": 1,
+      "code": "FASHION",
+      "name": "패션"
+    }
+  ]
+}
+```
+
+> 활성 상태인 카테고리만 표시 순서대로 반환합니다.
+
+## 5.2 공개 DROP 목록 조회
 
 ```http
 GET /api/v1/drops
@@ -577,7 +599,7 @@ GET /api/v1/drops
         "dropId": 100,
         "name": "한정판 스니커즈",
         "thumbnailUrl": "https://example.com/image.jpg",
-        "price": 129000,
+        "minPrice": 129000,
         "category": {
           "categoryId": 1,
           "name": "패션"
@@ -585,8 +607,8 @@ GET /api/v1/drops
         "status": "WISH",
         "soldOut": false,
         "wishCount": 152,
-        "grabStartAt": "2026-09-20T10:00:00+09:00",
-        "grabEndAt": "2026-09-20T12:00:00+09:00"
+        "saleStartsAt": "2026-09-20T10:00:00+09:00",
+        "saleEndsAt": "2026-09-20T12:00:00+09:00"
       }
     ],
     "page": 0,
@@ -600,7 +622,7 @@ GET /api/v1/drops
 
 > `DRAFT`와 `CANCELED` DROP은 공개 목록에서 제외합니다.
 
-## 5.2 DROP 상세 조회
+## 5.3 DROP 상세 조회
 
 ```http
 GET /api/v1/drops/{dropId}
@@ -620,7 +642,7 @@ GET /api/v1/drops/{dropId}
     "imageUrls": [
       "https://example.com/image1.jpg"
     ],
-    "price": 129000,
+    "minPrice": 129000,
     "category": {
       "categoryId": 1,
       "name": "패션"
@@ -629,18 +651,40 @@ GET /api/v1/drops/{dropId}
     "soldOut": false,
     "wishCount": 152,
     "wishNotice": "WISH는 구매, 재고 예약 또는 구매 우선권을 보장하지 않습니다.",
-    "grabStartAt": "2026-09-20T10:00:00+09:00",
-    "grabEndAt": "2026-09-20T12:00:00+09:00",
+    "saleStartsAt": "2026-09-20T10:00:00+09:00",
+    "saleEndsAt": "2026-09-20T12:00:00+09:00",
     "shipping": {
       "shippingFee": 3000,
-      "shippingMethod": "택배",
-      "estimatedShippingDays": 3
+      "shippingNotice": "결제 완료 후 3~5 영업일 이내 출고"
     },
+    "optionGroups": [
+      {
+        "groupId": 11,
+        "name": "소재",
+        "sortOrder": 0,
+        "values": [
+          { "valueId": 111, "value": "코튼", "sortOrder": 0 },
+          { "valueId": 112, "value": "린넨", "sortOrder": 1 }
+        ]
+      },
+      {
+        "groupId": 12,
+        "name": "길이",
+        "sortOrder": 1,
+        "values": [
+          { "valueId": 121, "value": "숏", "sortOrder": 0 },
+          { "valueId": 122, "value": "롱", "sortOrder": 1 }
+        ]
+      }
+    ],
     "options": [
       {
         "optionId": 1001,
-        "name": "270mm",
-        "additionalPrice": 0,
+        "selections": [
+          { "groupId": 11, "valueId": 111 },
+          { "groupId": 12, "valueId": 122 }
+        ],
+        "unitPrice": 129000,
         "availableStock": 10,
         "soldOut": false
       }
@@ -654,6 +698,8 @@ GET /api/v1/drops/{dropId}
   }
 }
 ```
+
+> 옵션 그룹명과 값은 판매자가 자유롭게 정의합니다. 프론트엔드는 `optionGroups`를 순서대로 표시하고 선택된 값 조합과 일치하는 `options[].optionId`를 주문에 사용합니다.
 
 ---
 
@@ -678,25 +724,53 @@ POST /api/v1/seller/drops
   "imageUrls": [
     "https://example.com/image1.jpg"
   ],
-  "price": 129000,
   "categoryId": 1,
-  "grabStartAt": "2026-09-20T10:00:00+09:00",
-  "grabEndAt": "2026-09-20T12:00:00+09:00",
+  "saleStartsAt": "2026-09-20T10:00:00+09:00",
+  "saleEndsAt": "2026-09-20T12:00:00+09:00",
   "shipping": {
     "shippingFee": 3000,
-    "shippingMethod": "택배",
-    "estimatedShippingDays": 3
+    "shippingNotice": "결제 완료 후 3~5 영업일 이내 출고"
   },
-  "options": [
+  "optionGroups": [
     {
-      "name": "270mm",
-      "additionalPrice": 0,
-      "stock": 10
+      "key": "material",
+      "name": "소재",
+      "sortOrder": 0,
+      "values": [
+        { "key": "cotton", "value": "코튼", "sortOrder": 0 },
+        { "key": "linen", "value": "린넨", "sortOrder": 1 }
+      ]
     },
     {
-      "name": "275mm",
-      "additionalPrice": 0,
-      "stock": 10
+      "key": "length",
+      "name": "길이",
+      "sortOrder": 1,
+      "values": [
+        { "key": "short", "value": "숏", "sortOrder": 0 },
+        { "key": "long", "value": "롱", "sortOrder": 1 }
+      ]
+    }
+  ],
+  "options": [
+    {
+      "selections": [
+        { "groupKey": "material", "valueKey": "cotton" },
+        { "groupKey": "length", "valueKey": "short" }
+      ],
+      "unitPrice": 129000,
+      "totalQuantity": 10,
+      "active": true,
+      "sortOrder": 0
+    },
+    {
+      "selections": [
+        { "groupKey": "material", "valueKey": "linen" },
+        { "groupKey": "length", "valueKey": "long" }
+      ],
+      "unitPrice": 139000,
+      "totalQuantity": 10,
+      "active": true,
+      "sortOrder": 1
     }
   ]
 }
@@ -715,7 +789,7 @@ POST /api/v1/seller/drops
 }
 ```
 
-> 임시 저장은 일부 필수 정보가 없어도 허용할 수 있으나 공개 시 전체 항목을 검증합니다.
+> 임시 저장은 일부 필수 정보가 없어도 허용할 수 있으나 공개 시 전체 항목을 검증합니다. 요청의 `key`, `groupKey`, `valueKey`는 같은 요청 안에서 그룹·값·SKU를 연결하기 위한 클라이언트 키이며 저장 후 응답에서는 서버 ID를 사용합니다.
 
 ## 6.2 판매자 DROP 목록
 
@@ -736,7 +810,7 @@ GET /api/v1/seller/drops?status=DRAFT&page=0&size=20
         "dropId": 100,
         "name": "한정판 스니커즈",
         "status": "DRAFT",
-        "price": 129000,
+        "minPrice": 129000,
         "createdAt": "2026-09-18T14:00:00+09:00"
       }
     ],
@@ -769,22 +843,48 @@ GET /api/v1/seller/drops/{dropId}
     "imageUrls": [
       "https://example.com/image1.jpg"
     ],
-    "price": 129000,
+    "minPrice": 129000,
     "categoryId": 1,
     "status": "DRAFT",
-    "grabStartAt": "2026-09-20T10:00:00+09:00",
-    "grabEndAt": "2026-09-20T12:00:00+09:00",
+    "saleStartsAt": "2026-09-20T10:00:00+09:00",
+    "saleEndsAt": "2026-09-20T12:00:00+09:00",
     "shipping": {
       "shippingFee": 3000,
-      "shippingMethod": "택배",
-      "estimatedShippingDays": 3
+      "shippingNotice": "결제 완료 후 3~5 영업일 이내 출고"
     },
+    "optionGroups": [
+      {
+        "groupId": 11,
+        "name": "소재",
+        "sortOrder": 0,
+        "values": [
+          { "valueId": 111, "value": "코튼", "sortOrder": 0 },
+          { "valueId": 112, "value": "린넨", "sortOrder": 1 }
+        ]
+      },
+      {
+        "groupId": 12,
+        "name": "길이",
+        "sortOrder": 1,
+        "values": [
+          { "valueId": 121, "value": "숏", "sortOrder": 0 },
+          { "valueId": 122, "value": "롱", "sortOrder": 1 }
+        ]
+      }
+    ],
     "options": [
       {
         "optionId": 1001,
-        "name": "270mm",
-        "additionalPrice": 0,
-        "stock": 10
+        "selections": [
+          { "groupId": 11, "valueId": 111 },
+          { "groupId": 12, "valueId": 121 }
+        ],
+        "unitPrice": 129000,
+        "totalQuantity": 10,
+        "reservedQuantity": 0,
+        "soldQuantity": 0,
+        "active": true,
+        "sortOrder": 0
       }
     ]
   }
@@ -819,12 +919,17 @@ POST /api/v1/seller/drops/{dropId}/publish
 - `DRAFT` → `WISH`
 
 **공개 전 검증:**
-- 상품명, 설명, 이미지, 가격, 카테고리 필수
+- 상품명, 설명, 이미지, 카테고리, 배송 정보 필수
 - 판매 시작·종료 시각 필수
 - 시작 시각은 종료 시각보다 이전
-- 최소 1개 이상의 옵션 필요
-- 각 옵션에 이름과 0 이상의 재고 필요
-- 배송 정보 필수
+- 옵션 그룹명은 DROP 안에서 중복될 수 없음
+- 그룹 안의 옵션값은 중복될 수 없음
+- 각 SKU는 모든 그룹에서 정확히 하나의 값을 선택해야 함
+- 동일한 값 조합의 SKU는 중복될 수 없음
+- 각 SKU에 0 이상의 가격과 재고가 필요함
+- 활성 상태이며 재고가 1개 이상인 SKU가 최소 하나 필요함
+
+> 옵션이 없는 상품은 `optionGroups`를 빈 배열로 보내고 값 선택이 없는 `기본` SKU 한 개를 등록합니다.
 
 **응답:**
 
@@ -889,7 +994,7 @@ GET /api/v1/seller/drops/{dropId}/stocks
     "options": [
       {
         "optionId": 1001,
-        "optionName": "270mm",
+        "optionName": "코튼 / 롱",
         "totalStock": 10,
         "availableStock": 4,
         "reservedStock": 2,
@@ -964,7 +1069,7 @@ GET /api/v1/users/me/wishes?page=0&size=20
         "dropId": 100,
         "name": "한정판 스니커즈",
         "thumbnailUrl": "https://example.com/image.jpg",
-        "price": 129000,
+        "minPrice": 129000,
         "status": "WISH",
         "wishedAt": "2026-09-18T14:00:00+09:00"
       }
@@ -1053,13 +1158,13 @@ POST /api/v1/orders
       {
         "optionId": 1001,
         "productName": "한정판 스니커즈",
-        "optionName": "270mm",
+        "optionName": "코튼 / 롱",
         "unitPrice": 129000,
         "quantity": 2,
         "subtotal": 258000
       }
     ],
-    "productAmount": 258000,
+    "itemsAmount": 258000,
     "shippingFee": 3000,
     "totalAmount": 261000,
     "paymentExpiresAt": "2026-09-18T14:10:00+09:00"
@@ -1131,14 +1236,14 @@ GET /api/v1/orders/{orderId}
     "items": [
       {
         "productName": "한정판 스니커즈",
-        "optionName": "270mm",
+        "optionName": "코튼 / 롱",
         "unitPrice": 129000,
         "quantity": 2,
         "subtotal": 258000
       }
     ],
     "totalAmount": 261000,
-    "paymentStatus": "SUCCESS",
+    "paymentStatus": "SUCCEEDED",
     "shipping": {
       "status": null,
       "carrier": null,
@@ -1214,7 +1319,7 @@ POST /api/v1/orders/{orderId}/payments
     "orderId": 500,
     "orderNumber": "ORD-20260918-000500",
     "amount": 261000,
-    "status": "SUCCESS",
+    "status": "SUCCEEDED",
     "paidAt": "2026-09-18T14:03:00+09:00"
   }
 }
@@ -1242,7 +1347,7 @@ POST /api/v1/payments/mock/webhook
   "paymentKey": "mock-payment-key",
   "orderNumber": "ORD-20260918-000500",
   "amount": 261000,
-  "status": "SUCCESS",
+  "status": "SUCCEEDED",
   "occurredAt": "2026-09-18T14:03:00+09:00"
 }
 ```
@@ -1251,7 +1356,7 @@ POST /api/v1/payments/mock/webhook
 - `eventId` 또는 `paymentKey`로 중복 처리를 방지한다.
 - 결제 금액과 주문번호를 서버 데이터와 비교한다.
 - 결제 성공 시 확보 재고를 판매 완료 재고로 확정한다.
-- 만료 이후 성공 결과는 주문을 자동 완료하지 않고 `RECONCILE`로 기록한다.
+- 만료 이후 성공 결과는 주문을 자동 완료하지 않고 결제를 `UNKNOWN`, 보정 상태를 `REQUIRED`로 기록한다.
 
 ## 9.3 주문 결제 이력 조회
 
@@ -1272,7 +1377,7 @@ GET /api/v1/orders/{orderId}/payments
       "orderId": 500,
       "paymentMethod": "MOCK_CARD",
       "amount": 261000,
-      "status": "SUCCESS",
+      "status": "SUCCEEDED",
       "paidAt": "2026-09-18T14:03:00+09:00"
     }
   ]
@@ -1294,7 +1399,7 @@ GET /api/v1/seller/orders
 **쿼리 파라미터:**
 - `dropId`: DROP ID (예: `100`)
 - `orderStatus`: `PAID` 등
-- `paymentStatus`: `SUCCESS` 등
+- `paymentStatus`: `SUCCEEDED` 등
 - `page`: 페이지 번호
 - `size`: 페이지 크기
 
@@ -1319,7 +1424,7 @@ POST /api/v1/seller/orders/{orderId}/prepare-shipment
 - **인증**: `SELLER`
 
 **상태 전이:**
-- `PAID` → `PREPARING_SHIPMENT`
+- `PAID` → `PREPARING`
 
 **응답:**
 
@@ -1328,7 +1433,7 @@ POST /api/v1/seller/orders/{orderId}/prepare-shipment
   "success": true,
   "data": {
     "orderId": 500,
-    "status": "PREPARING_SHIPMENT"
+    "status": "PREPARING"
   }
 }
 ```
@@ -1340,6 +1445,7 @@ POST /api/v1/seller/orders/{orderId}/shipment
 ```
 
 - **인증**: `SELLER`
+- **헤더**: `Idempotency-Key: {UUID}`
 
 **요청:**
 
@@ -1352,7 +1458,7 @@ POST /api/v1/seller/orders/{orderId}/shipment
 ```
 
 **상태 전이:**
-- `PREPARING_SHIPMENT` → `SHIPPED`
+- `PREPARING` → `SHIPPED`
 
 > 취소 처리와 동시에 요청된 경우 하나의 상태 전이만 성공해야 합니다.
 
@@ -1411,15 +1517,16 @@ GET /api/v1/seller/dashboard/summary
     "orderCounts": {
       "PAYMENT_PENDING": 4,
       "PAID": 10,
-      "PREPARING_SHIPMENT": 3,
+      "PREPARING": 3,
       "SHIPPED": 7,
       "CANCELED": 2
     },
     "paymentCounts": {
-      "SUCCESS": 20,
+      "SUCCEEDED": 20,
       "FAILED": 3,
-      "RECONCILE": 1
+      "UNKNOWN": 1
     },
+    "reconciliationRequired": 1,
     "stockSummary": {
       "available": 100,
       "reserved": 10,
@@ -1477,9 +1584,11 @@ GET /api/v1/seller/dashboard/upcoming-drops?withinMinutes=60
 
 ---
 
-# 12. 실시간 재고 API
+# 12. 재고 조회 API
 
-## 12.1 SSE 재고 구독
+## 12.1 SSE 재고 구독 (MVP 이후)
+
+> MVP에서는 아래 SSE 엔드포인트를 구현하지 않습니다. 재고 재조회만으로 시작하고 실제 필요성과 부하를 확인한 뒤 도입합니다.
 
 ```http
 GET /api/v1/drops/{dropId}/stock-stream
@@ -1504,7 +1613,7 @@ id: 10002
 data: {"dropId":100,"soldOut":true,"occurredAt":"2026-09-20T10:05:00+09:00"}
 ```
 
-> 실시간 데이터는 사용자 표시용이며 실제 주문 가능 여부는 주문 API가 서버의 최신 재고를 기준으로 다시 판단합니다.
+> 도입 이후에도 실시간 데이터는 사용자 표시용이며 실제 주문 가능 여부는 주문 API가 서버의 최신 재고를 기준으로 다시 판단합니다.
 
 ## 12.2 현재 재고 재조회
 
@@ -1585,10 +1694,12 @@ POST /api/v1/uploads/images/presigned-url
 | `DROP_NOT_EDITABLE` | 409 | 수정할 수 없는 DROP |
 | `DROP_NOT_WISHABLE` | 409 | WISH 불가능 상태 |
 | `DROP_NOT_ON_SALE` | 409 | 판매 상태가 아님 |
+| `DUPLICATE_OPTION_COMBINATION` | 409 | 동일한 옵션값 조합의 SKU 중복 |
 | `ORDER_NOT_CANCELABLE` | 409 | 취소할 수 없는 주문 |
 | `ORDER_STATUS_CONFLICT` | 409 | 주문 상태 동시 변경 충돌 |
 | `PAYMENT_ALREADY_PROCESSED` | 409 | 이미 처리된 결제 |
 | `INSUFFICIENT_STOCK` | 422 | 재고 부족 |
+| `INVALID_OPTION_COMBINATION` | 422 | 옵션 그룹·값·SKU 조합 검증 실패 |
 | `PAYMENT_AMOUNT_MISMATCH` | 422 | 결제 금액 불일치 |
 | `PAYMENT_EXPIRED` | 422 | 결제 유효시간 만료 |
 | `INVALID_SCHEDULE` | 422 | 판매 일정 오류 |
@@ -1597,13 +1708,12 @@ POST /api/v1/uploads/images/presigned-url
 
 # 15. 백그라운드 처리 규칙
 
-1. 서버 시각이 `grabStartAt`에 도달하면 `WISH` → `GRAB`으로 전환한다.
-2. 서버 시각이 `grabEndAt`에 도달하면 `GRAB` → `ENDED`로 전환한다.
+1. 서버 시각이 `saleStartsAt`에 도달하면 `WISH` → `GRAB`으로 전환한다.
+2. 서버 시각이 `saleEndsAt`에 도달하면 `GRAB` → `ENDED`로 전환한다.
 3. 결제 대기 시간이 만료되면 주문을 `EXPIRED`로 전환한다.
 4. 만료된 주문의 확보 재고를 한 번만 반환한다.
 5. 모든 옵션의 `availableStock`이 0이면 `soldOut=true`로 처리한다.
-6. 상태 전환 알림 실패가 실제 상태 전환 트랜잭션을 방해하지 않도록 분리한다.
-7. 결제 성공 웹훅이 만료 후 도착하면 자동 완료하지 않고 보정 대상으로 기록한다.
+6. 결제 성공 웹훅이 만료 후 도착하면 자동 완료하지 않고 보정 대상으로 기록한다.
 
 ---
 
@@ -1614,10 +1724,11 @@ POST /api/v1/uploads/images/presigned-url
 - `POST /api/v1/orders`
 - `POST /api/v1/orders/{orderId}/payments`
 - `POST /api/v1/orders/{orderId}/cancel`
-- `POST /api/v1/payments/mock/webhook`
 - `POST /api/v1/seller/orders/{orderId}/shipment`
 
 > 동일 키와 동일 요청 본문이 다시 전달되면 최초 처리 결과를 반환합니다. 동일 키에 서로 다른 요청 본문이 전달되면 `409 Conflict`를 반환합니다.
+>
+> Mock PG 웹훅은 `Idempotency-Key` 헤더 대신 PG가 전달한 `eventId`를 고유 키로 사용합니다.
 
 ---
 
@@ -1644,17 +1755,19 @@ POST /api/v1/uploads/images/presigned-url
 | POST | `/api/v1/seller-applications` | USER | 일반 회원이 판매자 등록 신청 |
 | GET | `/api/v1/seller-applications/me` | USER | 본인의 판매자 신청 상태 조회 |
 | GET | `/api/v1/admin/seller-applications` | ADMIN | 판매자 신청 목록을 상태별로 조회 |
-| POST | `/api/v1/admin/seller-applications/{applicationId}/approve` | ADMIN | 판매자 신청 승인 및 SELLER 권한 부여 |
+| POST | `/api/v1/admin/seller-applications/{applicationId}/approve` | ADMIN | 판매자 신청 승인 및 SELLER 기능 활성화 |
 | POST | `/api/v1/admin/seller-applications/{applicationId}/reject` | ADMIN | 판매자 신청 반려 및 사유 기록 |
 
 ## 17.3 공개 DROP 탐색
 
 | Method | Endpoint | 인증 | 용도 |
 | --- | --- | --- | --- |
+| GET | `/api/v1/categories` | 불필요 | 활성 카테고리 목록 조회 |
 | GET | `/api/v1/drops` | 불필요 | 공개된 WISH·GRAB·ENDED DROP 목록 조회 |
 | GET | `/api/v1/drops/{dropId}` | 불필요 | DROP 상세, 옵션, 일정 및 배송 정보 조회 |
 | GET | `/api/v1/drops/{dropId}/stocks` | 불필요 | 옵션별 현재 가용 재고 조회 |
-| GET | `/api/v1/drops/{dropId}/stock-stream` | 불필요 | SSE를 이용한 옵션별 실시간 재고 구독 |
+
+> SSE 재고 구독 API는 MVP 이후 도입 후보이며 위 MVP API 수에는 포함하지 않습니다.
 
 **목록 API 지원 파라미터:**
 - 상태 필터: `status`
@@ -1751,7 +1864,7 @@ POST /api/v1/uploads/images/presigned-url
 | --- | --- | --- |
 | 회원 및 인증 | 9 | 가입, 로그인, 토큰, 회원 정보 및 프로필 이미지 관리 |
 | 판매자 등록 | 5 | 판매자 신청, 승인, 반려 |
-| 공개 DROP 탐색 | 4 | 목록, 상세, 재고, 실시간 구독 |
+| 공개 DROP 탐색 | 4 | 카테고리, 목록, 상세, 재고 조회 |
 | 판매자 DROP 관리 | 8 | 생성, 수정, 공개, 취소, 통계 |
 | WISH | 3 | 등록, 취소, 내 목록 |
 | 주문 | 4 | 주문 생성, 조회, 취소 |

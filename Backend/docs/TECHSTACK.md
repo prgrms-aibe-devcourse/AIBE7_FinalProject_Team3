@@ -9,12 +9,12 @@
 | --- | --- | --- | --- |
 | Language | Java | 17 | 팀의 학습 경험과 라이브러리 호환성이 안정적이며 Spring Boot 4.1의 최소 요구 버전을 충족한다. |
 | Framework | Spring Boot | 4.1.x | 웹, 보안, 데이터 접근, 모니터링 환경을 일관되게 구성한다. |
-| Web | Spring MVC | Boot 관리 | REST API와 SSE 구현에 사용하며 블로킹 방식의 JPA 환경에 적합하다. |
+| Web | Spring MVC | Boot 관리 | REST API 구현에 사용하며 블로킹 방식의 JPA 환경에 적합하다. SSE는 MVP 이후 필요할 때 추가한다. |
 | ORM | Spring Data JPA / Hibernate | Boot 관리 | 주문·옵션·결제 도메인의 관계 매핑과 트랜잭션을 관리한다. 복잡한 조회는 DTO Projection 또는 별도 쿼리로 처리한다. |
 | Security | Spring Security | Boot 관리 | 사용자 인증과 USER·SELLER·ADMIN 권한 및 리소스 소유권을 검증한다. |
 | Validation | Jakarta Bean Validation | Boot 관리 | 요청 DTO와 상태별 필수값을 검증한다. |
 | Build | Gradle Wrapper | 8.14+ 또는 9.x | 로컬과 CI에서 동일한 빌드 도구 버전을 사용한다. |
-| API Docs | SpringDoc OpenAPI / Swagger UI | 3.1.1 | Spring Boot 4 기반 API 명세를 자동 생성하고 프론트엔드와 공유한다. |
+| API Docs | SpringDoc OpenAPI / Swagger UI | 3.1.0 | Spring Boot 4 기반 API 명세를 자동 생성하고 프론트엔드와 공유한다. |
 | Monitoring Endpoint | Spring Boot Actuator | Boot 관리 | 상태 확인, 메트릭 노출 및 배포 성공 여부를 검증한다. |
 
 ## 2. Database
@@ -42,6 +42,16 @@
 
 ## 4. Infrastructure / Deployment
 
+### 4.1 현재 저장소에 반영된 구성
+
+- `Backend/Dockerfile`: Gradle `bootJar`를 실행하는 멀티 스테이지 빌드와 non-root 런타임 이미지
+- `Backend/compose.yaml`: 백엔드, PostgreSQL, Redis, Prometheus, Grafana, Loki, Alloy 컨테이너 정의
+- `.github/workflows/publish-backend.yml`: `main`의 Backend 변경 시 이미지를 빌드해 GHCR에 `latest`, 커밋 SHA 태그로 게시
+
+Compose에 정의된 Redis와 모니터링 컨테이너는 실행 틀만 마련된 상태다. 애플리케이션 연동과 Prometheus·Loki·Alloy 설정 파일은 해당 기능을 도입할 때 완성한다.
+
+### 4.2 목표 운영 구성
+
 | 구분 | 기술 | 용도 | 선정 이유 |
 | --- | --- | --- | --- |
 | Cloud | AWS | 인프라 환경 | EC2·RDS·S3 등 운영 자원을 한 환경에서 관리한다. |
@@ -67,7 +77,18 @@ RDS와 S3를 기본 운영안으로 사용한다. 비용이나 운영 일정 때
 | Health Check | Actuator Health | 배포 성공 검증 | 신규 인스턴스가 정상 상태일 때만 트래픽을 전환한다. |
 | Registry | GHCR | 이미지 버전 관리 | 커밋 SHA 또는 릴리스 태그로 배포 버전을 추적한다. |
 
-단일 EC2에서 수행하는 Blue/Green은 배포 중단 시간을 줄이는 전략이며, EC2 자체 장애까지 방지하는 고가용성 구성은 아니다.
+### 5.1 구현 상태
+
+| 단계 | 상태 | 내용 |
+| --- | --- | --- |
+| Docker 이미지 빌드 | 완료 | `Backend/Dockerfile`에서 `bootJar`를 실행하고 non-root 런타임 이미지를 생성한다. |
+| GHCR 로그인·게시 | 완료 | GitHub Actions의 `GITHUB_TOKEN`으로 로그인하고 `latest`, `${{ github.sha }}` 태그를 게시한다. |
+| 빌드 캐시 | 완료 | GitHub Actions cache backend를 BuildKit 캐시로 사용한다. |
+| PR 검증 CI | 예정 | Pull Request에서 Gradle 테스트와 Docker 이미지 빌드 성공 여부를 검증한다. |
+| EC2 자동 배포 | 예정 | GHCR 이미지를 내려받아 Docker Compose로 실행한다. |
+| Health Check·Blue/Green | 예정 | Actuator Health 확인 후 Nginx upstream을 전환한다. |
+
+현재 워크플로는 이미지 게시 파이프라인이며 운영 서버 자동 배포까지 수행하지 않는다. 단일 EC2 Blue/Green은 배포 중단 시간을 줄이는 전략일 뿐 EC2 자체 장애를 방지하는 고가용성 구성은 아니다.
 
 ## 6. Monitoring / Logging
 
@@ -79,7 +100,7 @@ RDS와 S3를 기본 운영안으로 사용한다. 비용이나 운영 일정 때
 | Log Collection | Grafana Alloy | Docker 로그 수집 | 애플리케이션 로그를 수집해 Loki로 전달한다. |
 | Log Storage | Loki | 중앙 로그 저장·조회 | Grafana에서 메트릭과 로그를 함께 조회한다. |
 
-MVP 초기에는 Actuator, 구조화 로그 및 Docker 로그 확인부터 적용한다. Prometheus·Grafana·Alloy·Loki는 배포 환경과 핵심 API가 안정된 뒤 단계적으로 연결한다.
+MVP 초기에는 Actuator, 구조화 로그 및 Docker 로그 확인부터 적용한다. Compose에는 Prometheus·Grafana·Alloy·Loki 컨테이너가 정의되어 있지만, 수집 설정과 대시보드 연결은 배포 환경과 핵심 API가 안정된 뒤 단계적으로 완성한다.
 
 ## 7. Testing
 
@@ -118,6 +139,7 @@ MVP 초기에는 Actuator, 구조화 로그 및 Docker 로그 확인부터 적�
 - PostgreSQL, Flyway
 - React, TypeScript, Vite, Tailwind CSS, Axios, React Router
 - Docker, Docker Compose, GitHub Actions
+- GHCR 이미지 게시(`latest`, 커밋 SHA 태그)
 - JUnit 기반 테스트와 핵심 API 통합 테스트
 - Actuator Health와 구조화된 애플리케이션 로그
 
@@ -126,6 +148,7 @@ MVP 초기에는 Actuator, 구조화 로그 및 Docker 로그 확인부터 적�
 - Redis 캐시와 분산 환경 보조 기능
 - SSE 실시간 재고 전달
 - Prometheus, Grafana, Alloy, Loki 전체 구성
+- EC2 자동 배포와 Blue/Green 전환
 - 고부하 상황의 재고 처리 최적화
 - pgvector 기반 개인화 추천
 
