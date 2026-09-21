@@ -7,11 +7,18 @@ type Props = {
   page?: boolean
 }
 
-export default function EmptyState({ title, link, label, page = false }: Props) {
+export default function EmptyState({
+  title,
+  link,
+  label,
+  page = false,
+}: Props) {
   return (
     <div className={`empty-state ${page ? 'page' : 'compact'}`}>
       <strong>{title}</strong>
-      <Link className={page ? 'primary-button' : 'secondary-button'} to={link}>{label}</Link>
+      <Link className={page ? 'primary-button' : 'secondary-button'} to={link}>
+        {label}
+      </Link>
     </div>
   )
 }

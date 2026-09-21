@@ -1,6 +1,9 @@
 import { useState } from 'react'
 
-export default function useWish(authenticated: boolean, notify: (message: string) => void) {
+export default function useWish(
+  authenticated: boolean,
+  notify: (message: string) => void,
+) {
   const [wishes, setWishes] = useState(() => new Set([101]))
 
   const toggleWish = (id: number) => {
@@ -10,7 +13,11 @@ export default function useWish(authenticated: boolean, notify: (message: string
     }
     setWishes((current) => {
       const next = new Set(current)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
       return next
     })
     return true
