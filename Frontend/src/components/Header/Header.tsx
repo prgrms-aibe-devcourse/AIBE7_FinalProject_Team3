@@ -1,5 +1,5 @@
 import { Link, NavLink, useLocation } from 'react-router-dom'
-import logo from '../../../asset/Logo.png'
+import wordmark from '../../assets/images/grab-wordmark.png'
 
 export default function Header({ authenticated }: { authenticated: boolean }) {
   const location = useLocation()
@@ -7,9 +7,8 @@ export default function Header({ authenticated }: { authenticated: boolean }) {
 
   return (
     <header className="site-header">
-      <Link className="brand" to={sellerMode ? '/seller' : '/wish'} aria-label="GRAB 홈">
-        <img src={logo} alt="" />
-        <span>GRAB</span>
+      <Link className="header-brand" to={sellerMode ? '/seller' : '/wish'} aria-label="GRAB 홈">
+        <img className="header-wordmark" src={wordmark} alt="GRAB" />
       </Link>
       <nav aria-label="주요 메뉴">
         {sellerMode ? (
