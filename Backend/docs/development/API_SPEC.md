@@ -1,6 +1,8 @@
-# 1. 공통 규칙
+# GRAB API 명세서
 
-## 1.1 기본 정보
+## 1. 공통 규칙
+
+### 1.1 기본 정보
 
 ```yaml
 Base URL: /api/v1
@@ -11,13 +13,13 @@ Content-Type: application/json
 페이지 번호: 0부터 시작
 ```
 
-## 1.2 인증 헤더
+### 1.2 인증 헤더
 
 ```http
 Authorization: Bearer {accessToken}
 ```
 
-## 1.3 공통 성공 응답
+### 1.3 공통 성공 응답
 
 ```json
 {
@@ -27,7 +29,7 @@ Authorization: Bearer {accessToken}
 }
 ```
 
-## 1.4 공통 오류 응답
+### 1.4 공통 오류 응답
 
 ```json
 {
@@ -46,7 +48,7 @@ Authorization: Bearer {accessToken}
 }
 ```
 
-## 1.5 공통 HTTP 상태 코드
+### 1.5 공통 HTTP 상태 코드
 
 | 상태 코드 | 의미 |
 | --- | --- |
@@ -62,7 +64,7 @@ Authorization: Bearer {accessToken}
 | 429 | 요청 횟수 제한 초과 |
 | 500 | 서버 내부 오류 |
 
-## 1.6 페이지 응답
+### 1.6 페이지 응답
 
 ```json
 {
@@ -77,9 +79,9 @@ Authorization: Bearer {accessToken}
 
 ---
 
-# 2. 주요 상태 정의
+## 2. 주요 상태 정의
 
-## 2.1 회원 역할
+### 2.1 회원 역할
 
 | 역할 | 설명 |
 | --- | --- |
@@ -89,7 +91,7 @@ Authorization: Bearer {accessToken}
 
 > API의 `roles`는 유효 권한 목록입니다. `SELLER`는 `users.role`에 중복 저장하지 않고 승인된 판매자 상태에서 계산합니다.
 
-## 2.2 판매자 신청 상태
+### 2.2 판매자 신청 상태
 
 | 상태 | 설명 |
 | --- | --- |
@@ -97,7 +99,7 @@ Authorization: Bearer {accessToken}
 | `APPROVED` | 승인 |
 | `REJECTED` | 반려 |
 
-## 2.3 DROP 상태
+### 2.3 DROP 상태
 
 | 상태 | 설명 |
 | --- | --- |
@@ -109,7 +111,7 @@ Authorization: Bearer {accessToken}
 
 > 품절 여부는 DROP 상태와 별개인 `soldOut` 값으로 표현합니다.
 
-## 2.4 주문 상태
+### 2.4 주문 상태
 
 | 상태 | 설명 |
 | --- | --- |
@@ -123,7 +125,7 @@ Authorization: Bearer {accessToken}
 
 > 개별 결제 시도의 실패는 결제 상태로 기록하며 주문은 결제 마감 전까지 `PAYMENT_PENDING`을 유지할 수 있습니다.
 
-## 2.5 결제 상태
+### 2.5 결제 상태
 
 | 상태 | 설명 |
 | --- | --- |
@@ -137,9 +139,9 @@ Authorization: Bearer {accessToken}
 
 ---
 
-# 3. 회원 및 인증 API
+## 3. 회원 및 인증 API
 
-## 3.1 회원가입
+### 3.1 회원가입
 
 ```http
 POST /api/v1/auth/signup
@@ -184,7 +186,7 @@ POST /api/v1/auth/signup
 - `DUPLICATE_EMAIL`
 - `INVALID_PASSWORD`
 
-## 3.2 로그인
+### 3.2 로그인
 
 ```http
 POST /api/v1/auth/login
@@ -225,7 +227,7 @@ POST /api/v1/auth/login
 - `INVALID_CREDENTIALS`
 - `ACCOUNT_DISABLED`
 
-## 3.3 토큰 재발급
+### 3.3 토큰 재발급
 
 ```http
 POST /api/v1/auth/refresh
@@ -259,7 +261,7 @@ POST /api/v1/auth/refresh
 - `INVALID_TOKEN`
 - `TOKEN_EXPIRED`
 
-## 3.4 로그아웃
+### 3.4 로그아웃
 
 ```http
 POST /api/v1/auth/logout
@@ -277,7 +279,7 @@ POST /api/v1/auth/logout
 
 **응답:** `204 No Content`
 
-## 3.5 내 정보 조회
+### 3.5 내 정보 조회
 
 ```http
 GET /api/v1/users/me
@@ -302,7 +304,7 @@ GET /api/v1/users/me
 }
 ```
 
-## 3.6 내 정보 수정
+### 3.6 내 정보 수정
 
 ```http
 PATCH /api/v1/users/me
@@ -335,7 +337,7 @@ PATCH /api/v1/users/me
 }
 ```
 
-## 3.7 비밀번호 변경
+### 3.7 비밀번호 변경
 
 ```http
 PATCH /api/v1/users/me/password
@@ -358,7 +360,7 @@ PATCH /api/v1/users/me/password
 - `INVALID_PASSWORD`
 - `PASSWORD_MISMATCH`
 
-## 3.8 내 프로필 이미지 등록/수정
+### 3.8 내 프로필 이미지 등록/수정
 
 ```http
 PUT /api/v1/users/me/profile-image
@@ -386,7 +388,7 @@ PUT /api/v1/users/me/profile-image
 }
 ```
 
-## 3.9 내 프로필 이미지 삭제
+### 3.9 내 프로필 이미지 삭제
 
 ```http
 DELETE /api/v1/users/me/profile-image
@@ -398,9 +400,9 @@ DELETE /api/v1/users/me/profile-image
 
 ---
 
-# 4. 판매자 API
+## 4. 판매자 API
 
-## 4.1 판매자 등록 신청
+### 4.1 판매자 등록 신청
 
 ```http
 POST /api/v1/seller-applications
@@ -432,7 +434,7 @@ POST /api/v1/seller-applications
 }
 ```
 
-## 4.2 내 판매자 신청 조회
+### 4.2 내 판매자 신청 조회
 
 ```http
 GET /api/v1/seller-applications/me
@@ -456,7 +458,7 @@ GET /api/v1/seller-applications/me
 }
 ```
 
-## 4.3 판매자 신청 목록 조회
+### 4.3 판매자 신청 목록 조회
 
 ```http
 GET /api/v1/admin/seller-applications?status=PENDING&page=0&size=20
@@ -489,7 +491,7 @@ GET /api/v1/admin/seller-applications?status=PENDING&page=0&size=20
 }
 ```
 
-## 4.4 판매자 신청 승인
+### 4.4 판매자 신청 승인
 
 ```http
 POST /api/v1/admin/seller-applications/{applicationId}/approve
@@ -512,7 +514,7 @@ POST /api/v1/admin/seller-applications/{applicationId}/approve
 }
 ```
 
-## 4.5 판매자 신청 반려
+### 4.5 판매자 신청 반려
 
 ```http
 POST /api/v1/admin/seller-applications/{applicationId}/reject
@@ -544,9 +546,9 @@ POST /api/v1/admin/seller-applications/{applicationId}/reject
 
 ---
 
-# 5. DROP 조회 API
+## 5. DROP 조회 API
 
-## 5.1 카테고리 목록 조회
+### 5.1 카테고리 목록 조회
 
 ```http
 GET /api/v1/categories
@@ -571,7 +573,7 @@ GET /api/v1/categories
 
 > 활성 상태인 카테고리만 표시 순서대로 반환합니다.
 
-## 5.2 공개 DROP 목록 조회
+### 5.2 공개 DROP 목록 조회
 
 ```http
 GET /api/v1/drops
@@ -622,7 +624,7 @@ GET /api/v1/drops
 
 > `DRAFT`와 `CANCELED` DROP은 공개 목록에서 제외합니다.
 
-## 5.3 DROP 상세 조회
+### 5.3 DROP 상세 조회
 
 ```http
 GET /api/v1/drops/{dropId}
@@ -703,11 +705,11 @@ GET /api/v1/drops/{dropId}
 
 ---
 
-# 6. 판매자 DROP 관리 API
+## 6. 판매자 DROP 관리 API
 
 > 모든 API는 `SELLER` 인증과 DROP 소유권 검증이 필요합니다.
 
-## 6.1 DROP 임시 저장
+### 6.1 DROP 임시 저장
 
 ```http
 POST /api/v1/seller/drops
@@ -791,7 +793,7 @@ POST /api/v1/seller/drops
 
 > 임시 저장은 일부 필수 정보가 없어도 허용할 수 있으나 공개 시 전체 항목을 검증합니다. 요청의 `key`, `groupKey`, `valueKey`는 같은 요청 안에서 그룹·값·SKU를 연결하기 위한 클라이언트 키이며 저장 후 응답에서는 서버 ID를 사용합니다.
 
-## 6.2 판매자 DROP 목록
+### 6.2 판매자 DROP 목록
 
 ```http
 GET /api/v1/seller/drops?status=DRAFT&page=0&size=20
@@ -823,7 +825,7 @@ GET /api/v1/seller/drops?status=DRAFT&page=0&size=20
 }
 ```
 
-## 6.3 판매자 DROP 상세
+### 6.3 판매자 DROP 상세
 
 ```http
 GET /api/v1/seller/drops/{dropId}
@@ -891,7 +893,7 @@ GET /api/v1/seller/drops/{dropId}
 }
 ```
 
-## 6.4 DRAFT DROP 수정
+### 6.4 DRAFT DROP 수정
 
 ```http
 PATCH /api/v1/seller/drops/{dropId}
@@ -907,7 +909,7 @@ PATCH /api/v1/seller/drops/{dropId}
 - `DROP_NOT_EDITABLE`
 - `INVALID_SCHEDULE`
 
-## 6.5 DROP 공개
+### 6.5 DROP 공개
 
 ```http
 POST /api/v1/seller/drops/{dropId}/publish
@@ -944,7 +946,7 @@ POST /api/v1/seller/drops/{dropId}/publish
 }
 ```
 
-## 6.6 WISH DROP 취소
+### 6.6 WISH DROP 취소
 
 ```http
 POST /api/v1/seller/drops/{dropId}/cancel
@@ -976,7 +978,7 @@ POST /api/v1/seller/drops/{dropId}/cancel
 }
 ```
 
-## 6.7 판매자 재고 현황 조회
+### 6.7 판매자 재고 현황 조회
 
 ```http
 GET /api/v1/seller/drops/{dropId}/stocks
@@ -1007,9 +1009,9 @@ GET /api/v1/seller/drops/{dropId}/stocks
 
 ---
 
-# 7. WISH API
+## 7. WISH API
 
-## 7.1 WISH 등록
+### 7.1 WISH 등록
 
 ```http
 PUT /api/v1/drops/{dropId}/wish
@@ -1038,7 +1040,7 @@ PUT /api/v1/drops/{dropId}/wish
 - `DROP_NOT_WISHABLE`
 - `GRAB_ALREADY_STARTED`
 
-## 7.2 WISH 취소
+### 7.2 WISH 취소
 
 ```http
 DELETE /api/v1/drops/{dropId}/wish
@@ -1050,7 +1052,7 @@ DELETE /api/v1/drops/{dropId}/wish
 
 > GRAB 시작 이후에는 취소할 수 없습니다.
 
-## 7.3 내 WISH 목록
+### 7.3 내 WISH 목록
 
 ```http
 GET /api/v1/users/me/wishes?page=0&size=20
@@ -1083,7 +1085,7 @@ GET /api/v1/users/me/wishes?page=0&size=20
 }
 ```
 
-## 7.4 DROP 활성 WISH 수 조회
+### 7.4 DROP 활성 WISH 수 조회
 
 ```http
 GET /api/v1/seller/drops/{dropId}/wish-count
@@ -1105,9 +1107,9 @@ GET /api/v1/seller/drops/{dropId}/wish-count
 
 ---
 
-# 8. 주문 API
+## 8. 주문 API
 
-## 8.1 주문 생성 및 재고 확보
+### 8.1 주문 생성 및 재고 확보
 
 ```http
 POST /api/v1/orders
@@ -1180,7 +1182,7 @@ POST /api/v1/orders
 - `INSUFFICIENT_STOCK`
 - `DUPLICATE_IDEMPOTENCY_KEY`
 
-## 8.2 내 주문 목록
+### 8.2 내 주문 목록
 
 ```http
 GET /api/v1/orders?status=PAID&page=0&size=20
@@ -1214,7 +1216,7 @@ GET /api/v1/orders?status=PAID&page=0&size=20
 }
 ```
 
-## 8.3 내 주문 상세
+### 8.3 내 주문 상세
 
 ```http
 GET /api/v1/orders/{orderId}
@@ -1254,7 +1256,7 @@ GET /api/v1/orders/{orderId}
 }
 ```
 
-## 8.4 주문 취소
+### 8.4 주문 취소
 
 ```http
 POST /api/v1/orders/{orderId}/cancel
@@ -1287,9 +1289,9 @@ POST /api/v1/orders/{orderId}/cancel
 
 ---
 
-# 9. 결제 API
+## 9. 결제 API
 
-## 9.1 Mock 결제 요청
+### 9.1 Mock 결제 요청
 
 ```http
 POST /api/v1/orders/{orderId}/payments
@@ -1331,7 +1333,7 @@ POST /api/v1/orders/{orderId}/payments
 - 주문이 `PAYMENT_PENDING` 상태인지 여부
 - 결제 유효시간이 지나지 않았는지 여부
 
-## 9.2 Mock PG 결제 결과 수신
+### 9.2 Mock PG 결제 결과 수신
 
 ```http
 POST /api/v1/payments/mock/webhook
@@ -1358,7 +1360,7 @@ POST /api/v1/payments/mock/webhook
 - 결제 성공 시 확보 재고를 판매 완료 재고로 확정한다.
 - 만료 이후 성공 결과는 주문을 자동 완료하지 않고 결제를 `UNKNOWN`, 보정 상태를 `REQUIRED`로 기록한다.
 
-## 9.3 주문 결제 이력 조회
+### 9.3 주문 결제 이력 조회
 
 ```http
 GET /api/v1/orders/{orderId}/payments
@@ -1386,9 +1388,9 @@ GET /api/v1/orders/{orderId}/payments
 
 ---
 
-# 10. 판매자 주문 및 배송 API
+## 10. 판매자 주문 및 배송 API
 
-## 10.1 판매자 주문 목록 조회
+### 10.1 판매자 주문 목록 조회
 
 ```http
 GET /api/v1/seller/orders
@@ -1405,7 +1407,7 @@ GET /api/v1/seller/orders
 
 > 자신이 등록한 DROP의 주문만 반환합니다.
 
-## 10.2 판매자 주문 상세 조회
+### 10.2 판매자 주문 상세 조회
 
 ```http
 GET /api/v1/seller/orders/{orderId}
@@ -1415,7 +1417,7 @@ GET /api/v1/seller/orders/{orderId}
 
 > 해당 주문에 포함된 DROP의 소유권을 검증합니다.
 
-## 10.3 배송 준비 처리
+### 10.3 배송 준비 처리
 
 ```http
 POST /api/v1/seller/orders/{orderId}/prepare-shipment
@@ -1438,7 +1440,7 @@ POST /api/v1/seller/orders/{orderId}/prepare-shipment
 }
 ```
 
-## 10.4 배송 정보 등록 및 발송 처리
+### 10.4 배송 정보 등록 및 발송 처리
 
 ```http
 POST /api/v1/seller/orders/{orderId}/shipment
@@ -1462,7 +1464,7 @@ POST /api/v1/seller/orders/{orderId}/shipment
 
 > 취소 처리와 동시에 요청된 경우 하나의 상태 전이만 성공해야 합니다.
 
-## 10.5 배송 완료 처리
+### 10.5 배송 완료 처리
 
 ```http
 POST /api/v1/seller/orders/{orderId}/delivery-complete
@@ -1487,9 +1489,9 @@ POST /api/v1/seller/orders/{orderId}/delivery-complete
 
 ---
 
-# 11. 판매자 대시보드 API
+## 11. 판매자 대시보드 API
 
-## 11.1 대시보드 요약
+### 11.1 대시보드 요약
 
 ```http
 GET /api/v1/seller/dashboard/summary
@@ -1536,7 +1538,7 @@ GET /api/v1/seller/dashboard/summary
 }
 ```
 
-## 11.2 DROP별 통계
+### 11.2 DROP별 통계
 
 ```http
 GET /api/v1/seller/dashboard/drops?page=0&size=20
@@ -1572,7 +1574,7 @@ GET /api/v1/seller/dashboard/drops?page=0&size=20
 }
 ```
 
-## 11.3 임박 DROP 조회
+### 11.3 임박 DROP 조회
 
 ```http
 GET /api/v1/seller/dashboard/upcoming-drops?withinMinutes=60
@@ -1584,9 +1586,9 @@ GET /api/v1/seller/dashboard/upcoming-drops?withinMinutes=60
 
 ---
 
-# 12. 재고 조회 API
+## 12. 재고 조회 API
 
-## 12.1 SSE 재고 구독 (MVP 이후)
+### 12.1 SSE 재고 구독 (MVP 이후)
 
 > MVP에서는 아래 SSE 엔드포인트를 구현하지 않습니다. 재고 재조회만으로 시작하고 실제 필요성과 부하를 확인한 뒤 도입합니다.
 
@@ -1615,7 +1617,7 @@ data: {"dropId":100,"soldOut":true,"occurredAt":"2026-09-20T10:05:00+09:00"}
 
 > 도입 이후에도 실시간 데이터는 사용자 표시용이며 실제 주문 가능 여부는 주문 API가 서버의 최신 재고를 기준으로 다시 판단합니다.
 
-## 12.2 현재 재고 재조회
+### 12.2 현재 재고 재조회
 
 ```http
 GET /api/v1/drops/{dropId}/stocks
@@ -1644,9 +1646,9 @@ GET /api/v1/drops/{dropId}/stocks
 
 ---
 
-# 13. 이미지 업로드 API
+## 13. 이미지 업로드 API
 
-## 13.1 이미지 업로드 URL 발급
+### 13.1 이미지 업로드 URL 발급
 
 ```http
 POST /api/v1/uploads/images/presigned-url
@@ -1679,7 +1681,7 @@ POST /api/v1/uploads/images/presigned-url
 
 ---
 
-# 14. 주요 오류 코드
+## 14. 주요 오류 코드
 
 | 오류 코드 | HTTP 상태 | 설명 |
 | --- | --- | --- |
@@ -1706,7 +1708,7 @@ POST /api/v1/uploads/images/presigned-url
 
 ---
 
-# 15. 백그라운드 처리 규칙
+## 15. 백그라운드 처리 규칙
 
 1. 서버 시각이 `saleStartsAt`에 도달하면 `WISH` → `GRAB`으로 전환한다.
 2. 서버 시각이 `saleEndsAt`에 도달하면 `GRAB` → `ENDED`로 전환한다.
@@ -1717,7 +1719,7 @@ POST /api/v1/uploads/images/presigned-url
 
 ---
 
-# 16. 멱등성 적용 대상
+## 16. 멱등성 적용 대상
 
 다음 요청은 `Idempotency-Key`를 지원합니다.
 
@@ -1732,9 +1734,9 @@ POST /api/v1/uploads/images/presigned-url
 
 ---
 
-# 17. 전체 API 목록 요약
+## 17. 전체 API 목록 요약
 
-## 17.1 회원 및 인증
+### 17.1 회원 및 인증
 
 | Method | Endpoint | 인증 | 용도 |
 | --- | --- | --- | --- |
@@ -1748,7 +1750,7 @@ POST /api/v1/uploads/images/presigned-url
 | PUT | `/api/v1/users/me/profile-image` | USER | 본인 프로필 이미지 등록 또는 변경 |
 | DELETE | `/api/v1/users/me/profile-image` | USER | 본인 프로필 이미지 삭제 |
 
-## 17.2 판매자 등록 및 승인
+### 17.2 판매자 등록 및 승인
 
 | Method | Endpoint | 인증 | 용도 |
 | --- | --- | --- | --- |
@@ -1758,7 +1760,7 @@ POST /api/v1/uploads/images/presigned-url
 | POST | `/api/v1/admin/seller-applications/{applicationId}/approve` | ADMIN | 판매자 신청 승인 및 SELLER 기능 활성화 |
 | POST | `/api/v1/admin/seller-applications/{applicationId}/reject` | ADMIN | 판매자 신청 반려 및 사유 기록 |
 
-## 17.3 공개 DROP 탐색
+### 17.3 공개 DROP 탐색
 
 | Method | Endpoint | 인증 | 용도 |
 | --- | --- | --- | --- |
@@ -1777,7 +1779,7 @@ POST /api/v1/uploads/images/presigned-url
 - 정렬: `sort`
 - 페이지: `page`, `size`
 
-## 17.4 판매자 DROP 관리
+### 17.4 판매자 DROP 관리
 
 | Method | Endpoint | 인증 | 용도 |
 | --- | --- | --- | --- |
@@ -1792,7 +1794,7 @@ POST /api/v1/uploads/images/presigned-url
 
 > 모든 판매자 DROP API는 `SELLER` 권한과 리소스 소유권을 함께 검사합니다.
 
-## 17.5 WISH
+### 17.5 WISH
 
 | Method | Endpoint | 인증 | 용도 |
 | --- | --- | --- | --- |
@@ -1802,7 +1804,7 @@ POST /api/v1/uploads/images/presigned-url
 
 > `PUT` 방식을 사용하므로 같은 사용자가 동일 DROP에 요청을 반복해도 활성 WISH는 한 개만 유지합니다.
 
-## 17.6 주문 및 소비자 마이페이지
+### 17.6 주문 및 소비자 마이페이지
 
 | Method | Endpoint | 인증 | 용도 |
 | --- | --- | --- | --- |
@@ -1818,7 +1820,7 @@ POST /api/v1/uploads/images/presigned-url
 - 서버에 저장된 상품 가격
 - 배송비 및 최종 결제 금액
 
-## 17.7 결제
+### 17.7 결제
 
 | Method | Endpoint | 인증 | 용도 |
 | --- | --- | --- | --- |
@@ -1828,7 +1830,7 @@ POST /api/v1/uploads/images/presigned-url
 
 > 결제 결과 수신 시 주문번호, 금액, 결제 상태, 결제 유효시간을 검증합니다. 중복 통지가 도착해도 주문과 재고는 한 번만 변경합니다.
 
-## 17.8 판매자 주문 및 배송 관리
+### 17.8 판매자 주문 및 배송 관리
 
 | Method | Endpoint | 인증 | 용도 |
 | --- | --- | --- | --- |
@@ -1840,7 +1842,7 @@ POST /api/v1/uploads/images/presigned-url
 
 > 판매자는 자신이 생성한 DROP의 주문만 조회하거나 변경할 수 있습니다.
 
-## 17.9 판매자 대시보드
+### 17.9 판매자 대시보드
 
 | Method | Endpoint | 인증 | 용도 |
 | --- | --- | --- | --- |
@@ -1848,7 +1850,7 @@ POST /api/v1/uploads/images/presigned-url
 | GET | `/api/v1/seller/dashboard/drops` | SELLER | DROP별 WISH·주문·판매·재고 통계 조회 |
 | GET | `/api/v1/seller/dashboard/upcoming-drops` | SELLER | 시작 또는 종료가 임박한 DROP 조회 |
 
-## 17.10 이미지 업로드
+### 17.10 이미지 업로드
 
 | Method | Endpoint | 인증 | 용도 |
 | --- | --- | --- | --- |
@@ -1858,7 +1860,7 @@ POST /api/v1/uploads/images/presigned-url
 
 ---
 
-# 18. 전체 API 간단 요약
+## 18. 전체 API 간단 요약
 
 | 영역 | API 수 | 주요 용도 |
 | --- | --- | --- |
@@ -1876,7 +1878,7 @@ POST /api/v1/uploads/images/presigned-url
 
 ---
 
-# 19. 권한 표기 기준
+## 19. 권한 표기 기준
 
 | 표기 | 설명 |
 | --- | --- |
