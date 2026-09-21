@@ -33,5 +33,9 @@ out/
 /nbdist/
 /.nb-gradle/
 
+### Frontend ###
+node_modules/
+Frontend/dist/
+
 ### VS Code ###
 .vscode/
