@@ -2,6 +2,14 @@
 
 ![GRAB MVP ERD](mermaid-diagram.png)
 
+> 위 이미지는 핵심 업무 관계를 요약한 개념도이며, 공통 시각 컬럼과 Refresh Token 등 인증 보조 테이블은 아래 테이블 정의를 기준으로 한다.
+
+## 0. 공통 규칙
+
+- 주요 업무 테이블은 `created_at`, `updated_at`을 `TIMESTAMPTZ`로 가진다.
+- 판매 가능 여부, 예약 만료 및 상태 전이는 서버 시각을 기준으로 판단한다.
+- API가 반환하는 `SELLER` 권한은 별도 회원 역할 컬럼이 아니라 `sellers.status = APPROVED`에서 파생한다.
+- 알림 기능은 MVP 범위에서 제외하며 알림 테이블을 생성하지 않는다.
 
 ## 1. 테이블 정의
 
@@ -15,12 +23,27 @@
 | `email` | VARCHAR(254) | O | UQ, 정규화 후 저장 |
 | `password_hash` | VARCHAR(255) | 조건부 | LOCAL 회원만 필수 |
 | `display_name` | VARCHAR(100) | O | 표시 이름 |
+| `phone` | VARCHAR(30) | O | 회원 연락처 |
 | `profile_image_url` | VARCHAR(500) | X | 이미지 객체 키 또는 영속 URL |
 | `role` | VARCHAR(20) | O | `USER`, `ADMIN` |
 | `status` | VARCHAR(20) | O | `ACTIVE`, `SUSPENDED`, `WITHDRAWN` |
 | `provider` | VARCHAR(20) | O | `LOCAL`, `KAKAO`, `GOOGLE` |
 
 판매자는 회원의 배타적인 역할이 아니다. `sellers.status = APPROVED`인 회원에게 판매자 기능을 허용한다.
+
+MVP 회원가입은 `LOCAL` 방식만 제공한다. `KAKAO`, `GOOGLE` 값은 소셜 로그인을 도입할 때 사용한다.
+
+#### `refresh_tokens`
+
+| 컬럼 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `id` | BIGINT | O | PK |
+| `user_id` | BIGINT | O | FK users |
+| `token_hash` | VARCHAR(255) | O | 원문 대신 해시 저장, UQ |
+| `expires_at` | TIMESTAMPTZ | O | 만료 시각 |
+| `revoked_at` | TIMESTAMPTZ | X | 로그아웃·재발급으로 무효화된 시각 |
+
+Access Token은 짧게 유지하고 Refresh Token은 재발급 시 교체한다. 로그아웃 시 해당 Refresh Token을 폐기한다.
 
 #### `sellers`
 
@@ -30,6 +53,7 @@
 | `user_id` | BIGINT | O | FK users, UQ |
 | `brand_name` | VARCHAR(100) | O | 브랜드명 |
 | `contact_email` | VARCHAR(254) | O | 판매자 연락 이메일 |
+| `description` | TEXT | X | 브랜드 소개 |
 | `status` | VARCHAR(20) | O | `PENDING`, `APPROVED`, `REJECTED` |
 | `submitted_at` | TIMESTAMPTZ | O | 신청 시각 |
 | `reviewed_by` | BIGINT | X | FK users, 관리자 심사자 |
@@ -89,6 +113,8 @@ MVP에서는 판매자 신청과 프로필을 한 테이블에서 관리한다. 
 
 #### `drop_option_groups`
 
+판매자가 상품 특성에 맞게 자유롭게 정의하는 옵션 축이다. 그룹명은 색상·사이즈 등으로 고정하지 않는다.
+
 | 컬럼 | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |
 | `id` | BIGINT | O | PK |
@@ -99,6 +125,8 @@ MVP에서는 판매자 신청과 프로필을 한 테이블에서 관리한다. 
 UQ(`drop_id`, `name`)를 둔다.
 
 #### `drop_option_values`
+
+판매자가 각 옵션 그룹에 자유롭게 추가하는 선택값이다.
 
 | 컬럼 | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |
@@ -111,7 +139,7 @@ UQ(`group_id`, `value`)를 둔다.
 
 #### `drop_options`
 
-실제로 구매하고 재고를 관리하는 옵션 조합(SKU)이다. 예를 들어 `블랙 / M`이 하나의 행이다.
+실제로 구매하고 재고를 관리하는 옵션 조합(SKU)이다. 예를 들어 판매자가 `소재`, `길이` 그룹을 만들었다면 `코튼 / 롱`이 하나의 행이다.
 
 | 컬럼 | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |
@@ -143,7 +171,9 @@ available_quantity
 | `value_id` | BIGINT | O | FK drop_option_values |
 | `drop_id` | BIGINT | O | 동일 DROP 강제용 |
 
-PK(`option_id`, `group_id`)로 옵션 조합에서 그룹별 값을 하나만 선택하게 한다. 옵션 없는 상품도 재고 관리를 위해 `기본` 옵션 행 하나를 생성한다.
+PK(`option_id`, `group_id`)로 옵션 조합에서 그룹별 값을 하나만 선택하게 한다. 옵션 없는 상품도 재고 관리를 위해 값 매핑이 없는 `기본` 옵션 행 하나를 생성한다.
+
+애플리케이션은 공개 전에 각 SKU가 모든 옵션 그룹에서 정확히 한 값을 선택했는지, 동일한 값 조합의 SKU가 중복되지 않는지 검증한다.
 
 ### 1.3 WISH
 
@@ -366,6 +396,7 @@ PK와 UQ에서 자동 생성되는 인덱스는 중복 생성하지 않는다.
 
 | 테이블 | 인덱스 | 용도 |
 | --- | --- | --- |
+| `refresh_tokens` | (`user_id`, `revoked_at`, `expires_at`) | 사용자별 유효 Refresh Token 조회 |
 | `sellers` | (`status`, `submitted_at`, `id`) | 판매자 신청 심사 |
 | `drops` | (`status`, `category_id`, `published_at`, `id`) | 공개 DROP 목록 |
 | `drops` | (`seller_id`, `status`, `id`) | 판매자 DROP 관리 |

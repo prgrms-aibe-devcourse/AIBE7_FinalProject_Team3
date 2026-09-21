@@ -1,0 +1,81 @@
+name: Backend CI
+
+on:
+  pull_request:
+    branches: [develope]
+    paths:
+      - Backend/**
+      - .github/workflows/backend-ci.yml
+  push:
+    branches: [develope]
+    paths:
+      - Backend/**
+      - .github/workflows/backend-ci.yml
+  workflow_dispatch:
+
+concurrency:
+  group: backend-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Test and build image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: grab
+          POSTGRES_USER: grab
+          POSTGRES_PASSWORD: grab
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U grab -d grab"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DB_URL: jdbc:postgresql://localhost:5432/grab
+      DB_USERNAME: grab
+      DB_PASSWORD: grab
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+          cache-dependency-path: |
+            Backend/*.gradle*
+            Backend/gradle/wrapper/gradle-wrapper.properties
+
+      - name: Grant execute permission for Gradle
+        run: chmod +x Backend/gradlew
+
+      - name: Run backend tests
+        working-directory: Backend
+        run: ./gradlew test --no-daemon
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build backend image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./Backend
+          file: ./Backend/Dockerfile
+          push: false
+          tags: grab-backend:ci-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
