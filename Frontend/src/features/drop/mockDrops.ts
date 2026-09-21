@@ -1,0 +1,299 @@
+import type { Drop } from '../../types/drop'
+
+const day = 86_400_000
+const dateFromNow = (days: number) =>
+  new Date(Date.now() + days * day).toISOString()
+
+export const drops: Drop[] = [
+  {
+    id: 101,
+    name: '매일을 담는 캔버스 토트',
+    brand: 'SLOW OBJECT',
+    description:
+      '가볍게 들고 오래 쓰는 데일리 백. 취향에 맞는 소재와 스트랩 길이를 골라보세요.',
+    image:
+      'https://bojashop.com/cdn/shop/files/SHPH8541.jpg?v=1718237431&width=1400',
+    category: '패션',
+    status: 'WISH',
+    wishCount: 248,
+    saleStartsAt: dateFromNow(3),
+    saleEndsAt: dateFromNow(10),
+    shippingFee: 3000,
+    shippingNotice: '결제 완료 후 3~5 영업일 이내 출고',
+    optionGroups: [
+      {
+        id: 'material',
+        name: '소재',
+        values: [
+          { id: 'canvas', label: '캔버스' },
+          { id: 'washed', label: '워시드 코튼' },
+        ],
+      },
+      {
+        id: 'strap',
+        name: '스트랩 길이',
+        values: [
+          { id: 'standard', label: '스탠다드' },
+          { id: 'long', label: '롱' },
+        ],
+      },
+    ],
+    skus: [
+      {
+        id: 1011,
+        selections: { material: 'canvas', strap: 'standard' },
+        price: 29000,
+        stock: 20,
+      },
+      {
+        id: 1012,
+        selections: { material: 'canvas', strap: 'long' },
+        price: 31000,
+        stock: 12,
+      },
+      {
+        id: 1013,
+        selections: { material: 'washed', strap: 'standard' },
+        price: 32000,
+        stock: 8,
+      },
+      {
+        id: 1014,
+        selections: { material: 'washed', strap: 'long' },
+        price: 34000,
+        stock: 6,
+      },
+    ],
+  },
+  {
+    id: 102,
+    name: '나의 작은 휴식, 데일리 머그',
+    brand: 'ROOM FOR REST',
+    description:
+      '손에 편안하게 감기는 머그와 선물 포장을 자유롭게 조합할 수 있어요.',
+    image:
+      'https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?auto=format&fit=crop&w=1200&q=85',
+    category: '리빙',
+    status: 'WISH',
+    wishCount: 186,
+    saleStartsAt: dateFromNow(5),
+    saleEndsAt: dateFromNow(12),
+    shippingFee: 3000,
+    shippingNotice: '주문 후 순차 제작, 5영업일 이내 출고',
+    optionGroups: [
+      {
+        id: 'glaze',
+        name: '유약',
+        values: [
+          { id: 'milk', label: '밀크 화이트' },
+          { id: 'sand', label: '샌드 베이지' },
+        ],
+      },
+      {
+        id: 'package',
+        name: '포장',
+        values: [
+          { id: 'simple', label: '간단 포장' },
+          { id: 'gift', label: '선물 상자' },
+        ],
+      },
+    ],
+    skus: [
+      {
+        id: 1021,
+        selections: { glaze: 'milk', package: 'simple' },
+        price: 24000,
+        stock: 18,
+      },
+      {
+        id: 1022,
+        selections: { glaze: 'milk', package: 'gift' },
+        price: 27000,
+        stock: 8,
+      },
+      {
+        id: 1023,
+        selections: { glaze: 'sand', package: 'simple' },
+        price: 24000,
+        stock: 14,
+      },
+      {
+        id: 1024,
+        selections: { glaze: 'sand', package: 'gift' },
+        price: 27000,
+        stock: 6,
+      },
+    ],
+  },
+  {
+    id: 103,
+    name: '플레이리스트 그래픽 티셔츠',
+    brand: 'OFF THE RECORD',
+    description:
+      '좋아하는 음악을 입는 방법. 핏과 프린트 조합을 직접 선택해보세요.',
+    image:
+      'https://images.unsplash.com/photo-1678951564425-ae20e499c48f?auto=format&fit=crop&w=1200&q=85',
+    category: '패션',
+    status: 'WISH',
+    wishCount: 312,
+    saleStartsAt: dateFromNow(2),
+    saleEndsAt: dateFromNow(9),
+    shippingFee: 3000,
+    shippingNotice: '결제 완료 후 3~5 영업일 이내 출고',
+    optionGroups: [
+      {
+        id: 'fit',
+        name: '핏',
+        values: [
+          { id: 'regular', label: '레귤러' },
+          { id: 'oversized', label: '오버사이즈' },
+        ],
+      },
+      {
+        id: 'print',
+        name: '프린트',
+        values: [
+          { id: 'green', label: '그린 믹스' },
+          { id: 'blue', label: '블루 믹스' },
+        ],
+      },
+    ],
+    skus: [
+      {
+        id: 1031,
+        selections: { fit: 'regular', print: 'green' },
+        price: 39000,
+        stock: 10,
+      },
+      {
+        id: 1032,
+        selections: { fit: 'regular', print: 'blue' },
+        price: 39000,
+        stock: 12,
+      },
+      {
+        id: 1033,
+        selections: { fit: 'oversized', print: 'green' },
+        price: 42000,
+        stock: 8,
+      },
+      {
+        id: 1034,
+        selections: { fit: 'oversized', print: 'blue' },
+        price: 42000,
+        stock: 4,
+      },
+    ],
+  },
+  {
+    id: 201,
+    name: '뮤직 클럽 티셔츠 · 리미티드',
+    brand: 'OFF THE RECORD',
+    description: '이번 시즌, 음악을 좋아하는 우리를 위한 한정 컬렉션입니다.',
+    image:
+      'https://images.unsplash.com/photo-1576566588028-4147f3842f27?auto=format&fit=crop&w=1200&q=85',
+    category: '패션',
+    status: 'GRAB',
+    wishCount: 210,
+    saleStartsAt: dateFromNow(-1),
+    saleEndsAt: dateFromNow(6),
+    shippingFee: 3000,
+    shippingNotice: '결제 완료 후 3~5 영업일 이내 출고',
+    optionGroups: [
+      {
+        id: 'size',
+        name: '착용감',
+        values: [
+          { id: 'relaxed', label: '릴랙스' },
+          { id: 'wide', label: '와이드' },
+        ],
+      },
+      {
+        id: 'sleeve',
+        name: '소매',
+        values: [
+          { id: 'short', label: '하프' },
+          { id: 'long', label: '롱' },
+        ],
+      },
+    ],
+    skus: [
+      {
+        id: 2011,
+        selections: { size: 'relaxed', sleeve: 'short' },
+        price: 39000,
+        stock: 8,
+      },
+      {
+        id: 2012,
+        selections: { size: 'relaxed', sleeve: 'long' },
+        price: 43000,
+        stock: 5,
+      },
+      {
+        id: 2013,
+        selections: { size: 'wide', sleeve: 'short' },
+        price: 41000,
+        stock: 6,
+      },
+      {
+        id: 2014,
+        selections: { size: 'wide', sleeve: 'long' },
+        price: 45000,
+        stock: 0,
+      },
+    ],
+  },
+  {
+    id: 202,
+    name: '슬로우 모닝 머그',
+    brand: 'ROOM FOR REST',
+    description:
+      '조용한 아침, 좋아하는 음료와 함께 나만의 시간을 만들어보세요.',
+    image:
+      'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1200&q=85',
+    category: '리빙',
+    status: 'GRAB',
+    wishCount: 142,
+    saleStartsAt: dateFromNow(-1),
+    saleEndsAt: dateFromNow(7),
+    shippingFee: 3000,
+    shippingNotice: '주문 후 순차 제작, 5영업일 이내 출고',
+    optionGroups: [
+      {
+        id: 'shape',
+        name: '손잡이 형태',
+        values: [
+          { id: 'round', label: '라운드' },
+          { id: 'square', label: '스퀘어' },
+        ],
+      },
+    ],
+    skus: [
+      { id: 2021, selections: { shape: 'round' }, price: 24000, stock: 20 },
+      { id: 2022, selections: { shape: 'square' }, price: 26000, stock: 12 },
+    ],
+  },
+  {
+    id: 203,
+    name: '에브리데이 캔버스 백',
+    brand: 'SLOW OBJECT',
+    description: '어떤 하루에도 자연스럽게 어울리는 담백한 캔버스 백입니다.',
+    image:
+      'https://images.unsplash.com/photo-1594223274512-ad4803739b7c?auto=format&fit=crop&w=1200&q=85',
+    category: '패션',
+    status: 'GRAB',
+    wishCount: 175,
+    saleStartsAt: dateFromNow(-2),
+    saleEndsAt: dateFromNow(4),
+    shippingFee: 3000,
+    shippingNotice: '결제 완료 후 3~5 영업일 이내 출고',
+    optionGroups: [],
+    skus: [{ id: 2031, selections: {}, price: 29000, stock: 10 }],
+  },
+]
+
+export const categories = [
+  '전체',
+  ...new Set(drops.map((drop) => drop.category)),
+]
