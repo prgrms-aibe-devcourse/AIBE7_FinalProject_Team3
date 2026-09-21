@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { findMatchingSku, optionCombinations, type OptionGroup } from './domain'
+import type { OptionGroup } from '../../types/drop'
+import { findMatchingSku, optionCombinations } from './option'
 
 const groups: OptionGroup[] = [
   { id: 'material', name: '소재', values: [{ id: 'cotton', label: '코튼' }, { id: 'linen', label: '린넨' }] },

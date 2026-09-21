@@ -1,23 +1,4 @@
-import type { OptionGroup, Sku } from './domain'
-
-export type DropStatus = 'WISH' | 'GRAB' | 'ENDED'
-
-export type Drop = {
-  id: number
-  name: string
-  brand: string
-  description: string
-  image: string
-  category: string
-  status: DropStatus
-  wishCount: number
-  saleStartsAt: string
-  saleEndsAt: string
-  shippingFee: number
-  shippingNotice: string
-  optionGroups: OptionGroup[]
-  skus: Sku[]
-}
+import type { Drop } from '../../types/drop'
 
 const day = 86_400_000
 const dateFromNow = (days: number) => new Date(Date.now() + days * day).toISOString()
@@ -159,9 +140,3 @@ export const drops: Drop[] = [
 ]
 
 export const categories = ['전체', ...new Set(drops.map((drop) => drop.category))]
-
-export const won = (value: number) => `${value.toLocaleString('ko-KR')}원`
-export const dateLabel = (value: string) =>
-  new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(
-    new Date(value),
-  )

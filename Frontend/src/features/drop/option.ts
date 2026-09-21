@@ -1,15 +1,4 @@
-export type OptionGroup = {
-  id: string
-  name: string
-  values: { id: string; label: string }[]
-}
-
-export type Sku = {
-  id: number
-  selections: Record<string, string>
-  price: number
-  stock: number
-}
+import type { OptionGroup, Sku } from '../../types/drop'
 
 export function findMatchingSku(skus: Sku[], selected: Record<string, string>) {
   return skus.find((sku) =>

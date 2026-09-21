@@ -24,3 +24,14 @@ npm run build
 - 판매자가 자유롭게 정의하는 옵션 그룹·옵션값·SKU 조합
 
 알림 기능은 MVP 범위에서 제외했습니다.
+
+## 코드 구조
+
+- `src/components`: 도메인에 의존하지 않는 공통 UI
+- `src/pages`: 라우트 단위 화면
+- `src/features`: 인증, DROP, WISH, 주문, 판매자 기능
+- `src/types`: API 계약에 사용할 타입
+- `src/utils`: 날짜와 가격 표시 함수
+- `src/styles`: 전역 스타일
+
+`api` 폴더는 실제 백엔드 연동과 OpenAPI 코드 생성을 도입할 때 추가합니다.
