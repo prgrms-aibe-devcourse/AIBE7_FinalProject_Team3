@@ -1,6 +1,6 @@
-관계 ERD
+# GRAB ERD
 
-![GRAB MVP ERD](mermaid-diagram.png)
+![GRAB MVP ERD](../assets/erd.png)
 
 > 위 이미지는 핵심 업무 관계를 요약한 개념도이며, 공통 시각 컬럼과 Refresh Token 등 인증 보조 테이블은 아래 테이블 정의를 기준으로 한다.
 
