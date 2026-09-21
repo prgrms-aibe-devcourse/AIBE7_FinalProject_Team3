@@ -1,6 +1,6 @@
 import type { FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import logo from '../../../asset/Logo.png'
+import logo from '../../assets/images/grab-symbol.png'
 
 type Props = {
   mode: 'login' | 'signup'
