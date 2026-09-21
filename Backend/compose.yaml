@@ -1,0 +1,73 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: grab-backend:local
+    ports:
+      - "8080:8080"
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/grab
+      DB_USERNAME: grab
+      DB_PASSWORD: ${DB_PASSWORD:-grab}
+    depends_on:
+      - postgres
+      - redis
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: grab
+      POSTGRES_USER: grab
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-grab}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+
+  redis:
+    image: redis:8-alpine
+    ports:
+      - 127.0.0.1:6379:6379
+    volumes:
+      - redis-data:/data
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+
+  loki:
+    image: grafana/loki:latest
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki-data:/tmp/loki
+
+  prometheus:
+    image: prom/prometheus:v3.14.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - prometheus-data:/prometheus
+
+  alloy:
+    image: grafana/alloy:latest
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+    ports:
+      - "12345:12345"
+    volumes:
+      - alloy-data:/var/lib/alloy/data
+
+volumes:
+  postgres-data:
+  redis-data:
+  grafana-data:
+  loki-data:
+  prometheus-data:
+  alloy-data:
