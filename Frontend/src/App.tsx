@@ -40,19 +40,45 @@ export default function App() {
       <main>
         <Routes>
           <Route path="/" element={<Navigate to="/wish" replace />} />
-          <Route path="/wish" element={<DropListPage status="WISH" {...shared} />} />
-          <Route path="/grab" element={<DropListPage status="GRAB" {...shared} />} />
-          <Route path="/drops/:dropId" element={<DropDetailPage {...shared} />} />
+          <Route
+            path="/wish"
+            element={<DropListPage status="WISH" {...shared} />}
+          />
+          <Route
+            path="/grab"
+            element={<DropListPage status="GRAB" {...shared} />}
+          />
+          <Route
+            path="/drops/:dropId"
+            element={<DropDetailPage {...shared} />}
+          />
           <Route path="/my" element={<MyPage {...shared} />} />
-          <Route path="/login" element={<LoginPage mode="login" onLogin={login} notify={notify} />} />
-          <Route path="/signup" element={<LoginPage mode="signup" onLogin={login} notify={notify} />} />
+          <Route
+            path="/login"
+            element={<LoginPage mode="login" onLogin={login} notify={notify} />}
+          />
+          <Route
+            path="/signup"
+            element={
+              <LoginPage mode="signup" onLogin={login} notify={notify} />
+            }
+          />
           <Route path="/seller" element={<SellerDashboardPage />} />
-          <Route path="/seller/drops/new" element={<SellerDropFormPage notify={notify} />} />
+          <Route
+            path="/seller/drops/new"
+            element={<SellerDropFormPage notify={notify} />}
+          />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>
       <Footer />
-      <div className={`toast ${toast ? 'is-visible' : ''}`} role="status" aria-live="polite">{toast}</div>
+      <div
+        className={`toast ${toast ? 'is-visible' : ''}`}
+        role="status"
+        aria-live="polite"
+      >
+        {toast}
+      </div>
     </div>
   )
 }
