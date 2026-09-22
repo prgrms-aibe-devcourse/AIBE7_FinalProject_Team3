@@ -7,6 +7,12 @@ spring:
     username: ${DB_USERNAME:grab}
     password: ${DB_PASSWORD:grab}
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -15,3 +21,4 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+
