@@ -11,7 +11,7 @@
 | Framework | Spring Boot | 4.1.x | 웹, 보안, 데이터 접근, 모니터링 환경을 일관되게 구성한다. |
 | Web | Spring MVC | Boot 관리 | REST API 구현에 사용하며 블로킹 방식의 JPA 환경에 적합하다. SSE는 MVP 이후 필요할 때 추가한다. |
 | ORM | Spring Data JPA / Hibernate | Boot 관리 | 주문·옵션·결제 도메인의 관계 매핑과 트랜잭션을 관리한다. 복잡한 조회는 DTO Projection 또는 별도 쿼리로 처리한다. |
-| Security | Spring Security | Boot 관리 | 사용자 인증과 USER·SELLER·ADMIN 권한 및 리소스 소유권을 검증한다. |
+| Security | Spring Security | Boot 관리 | JWT 인증, Argon2id 비밀번호 해시, USER·SELLER·ADMIN 권한 및 리소스 소유권을 검증한다. |
 | Validation | Jakarta Bean Validation | Boot 관리 | 요청 DTO와 상태별 필수값을 검증한다. |
 | Build | Gradle Wrapper | 8.14+ 또는 9.x | 로컬과 CI에서 동일한 빌드 도구 버전을 사용한다. |
 | API Docs | SpringDoc OpenAPI / Swagger UI | 3.1.0 | Spring Boot 4 기반 API 명세를 자동 생성하고 프론트엔드와 공유한다. |
@@ -22,10 +22,10 @@
 | 구분 | 기술 | 도입 시점 | 용도 및 선정 이유 |
 | --- | --- | --- | --- |
 | RDBMS | PostgreSQL | MVP | 회원·DROP·주문·재고·결제 데이터를 저장하는 영속 원장이다. 트랜잭션, 행 잠금, 인덱스 및 향후 pgvector 확장이 가능하다. |
-| Cache | Redis | 병목 확인 후 | 조회 캐시, 임시 데이터, 분산 환경의 보조 기능에 사용한다. 주문과 재고의 최종 원장으로 사용하지 않는다. |
+| In-memory Store | Redis | MVP | Refresh Token 해시를 TTL과 함께 저장한다. 조회 캐시는 병목 확인 후 도입하며 주문과 재고의 최종 원장으로 사용하지 않는다. |
 | Migration | Flyway | MVP | ERD 변경 이력을 SQL 마이그레이션으로 관리하고 환경별 스키마를 일치시킨다. |
 
-재고 정합성은 PostgreSQL 트랜잭션과 행 잠금으로 먼저 보장한다. Redis는 부하 테스트를 통해 병목이 확인된 후 캐시 또는 보조 저장소로 도입한다.
+재고 정합성은 PostgreSQL 트랜잭션과 행 잠금으로 먼저 보장한다. Redis는 MVP에서 Refresh Token 저장에만 사용하고 조회 캐시는 부하 테스트로 병목이 확인된 후 도입한다.
 
 ## 3. Frontend
 
@@ -49,7 +49,7 @@
 - `.github/workflows/backend-ci.yml`: 이슈 브랜치에서 `develope`로 보내는 PR과 `develope` 푸시에서 PostgreSQL 기반 테스트와 Docker 이미지 빌드 검증
 - `.github/workflows/publish-backend.yml`: `main`의 Backend 변경 시 이미지를 빌드해 GHCR에 `latest`, 커밋 SHA 태그로 게시
 
-Actuator와 Prometheus의 로컬 메트릭 수집 연결은 완료됐다. Redis와 Grafana·Loki·Alloy는 실행 틀만 마련된 상태이며 해당 기능을 도입할 때 연동 설정을 완성한다.
+Actuator와 Prometheus의 로컬 메트릭 수집 연결은 완료됐다. Redis 컨테이너는 마련됐으며 애플리케이션 인증 연동은 구현 예정이다. Grafana·Loki·Alloy는 실행 틀만 마련된 상태다.
 
 ### 4.2 목표 운영 구성
 
@@ -149,7 +149,7 @@ MVP 초기에는 Actuator와 Prometheus를 연결해 JVM·HTTP·DB Connection Po
 ### MVP에 바로 적용
 
 - Java, Spring Boot, Spring MVC, JPA, Security, Validation
-- PostgreSQL, Flyway
+- PostgreSQL, Flyway, Refresh Token 저장용 Redis
 - React, TypeScript, Vite, Tailwind CSS, Axios, React Router
 - Docker, Docker Compose, GitHub Actions
 - GHCR 이미지 게시(`latest`, 커밋 SHA 태그)
@@ -158,7 +158,7 @@ MVP 초기에는 Actuator와 Prometheus를 연결해 JVM·HTTP·DB Connection Po
 
 ### 문제를 확인한 뒤 적용
 
-- Redis 캐시와 분산 환경 보조 기능
+- Redis 조회 캐시와 분산 환경 보조 기능
 - SSE 실시간 재고 전달
 - Grafana 대시보드와 Alloy·Loki 로그 파이프라인
 - EC2 자동 배포와 Blue/Green 전환

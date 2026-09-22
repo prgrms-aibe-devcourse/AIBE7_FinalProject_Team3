@@ -180,6 +180,7 @@ POST /api/v1/auth/signup
 - 이메일은 중복될 수 없다.
 - 비밀번호는 최소 8자 이상이어야 한다.
 - 비밀번호는 영문, 숫자, 특수문자를 포함해야 한다.
+- 비밀번호는 Argon2id로 해시해 저장한다.
 
 **오류 코드:**
 - `INVALID_EMAIL`
@@ -205,13 +206,18 @@ POST /api/v1/auth/login
 
 **응답:**
 
+Refresh Token은 응답 본문에 포함하지 않고 Redis에는 해시만 TTL과 함께 저장한다.
+
+```http
+Set-Cookie: refresh_token=<token>; HttpOnly; Secure; SameSite=Lax; Path=/api/v1/auth; Max-Age=<ttl>
+```
+
 ```json
 {
   "success": true,
   "data": {
     "tokenType": "Bearer",
     "accessToken": "access-token",
-    "refreshToken": "refresh-token",
     "expiresIn": 3600,
     "user": {
       "userId": 1,
@@ -233,14 +239,16 @@ POST /api/v1/auth/login
 POST /api/v1/auth/refresh
 ```
 
-- **인증**: Refresh Token
+- **인증**: `refresh_token` HttpOnly 쿠키
 
 **요청:**
 
-```json
-{
-  "refreshToken": "refresh-token"
-}
+요청 본문 없음
+
+유효한 Refresh Token은 한 번 사용한 뒤 폐기하고 새 토큰으로 교체한다.
+
+```http
+Set-Cookie: refresh_token=<new-token>; HttpOnly; Secure; SameSite=Lax; Path=/api/v1/auth; Max-Age=<ttl>
 ```
 
 **응답:**
@@ -251,7 +259,6 @@ POST /api/v1/auth/refresh
   "data": {
     "tokenType": "Bearer",
     "accessToken": "new-access-token",
-    "refreshToken": "new-refresh-token",
     "expiresIn": 3600
   }
 }
@@ -267,17 +274,19 @@ POST /api/v1/auth/refresh
 POST /api/v1/auth/logout
 ```
 
-- **인증**: 필요
+- **인증**: `refresh_token` HttpOnly 쿠키
 
 **요청:**
 
-```json
-{
-  "refreshToken": "refresh-token"
-}
-```
+요청 본문 없음
 
 **응답:** `204 No Content`
+
+Redis의 Refresh Token을 삭제하고 쿠키를 즉시 만료시킨다.
+
+```http
+Set-Cookie: refresh_token=; HttpOnly; Secure; SameSite=Lax; Path=/api/v1/auth; Max-Age=0
+```
 
 ### 3.5 내 정보 조회
 
@@ -1742,8 +1751,8 @@ POST /api/v1/uploads/images/presigned-url
 | --- | --- | --- | --- |
 | POST | `/api/v1/auth/signup` | 불필요 | 이메일과 비밀번호로 회원가입 |
 | POST | `/api/v1/auth/login` | 불필요 | 로그인 및 Access/Refresh Token 발급 |
-| POST | `/api/v1/auth/refresh` | Refresh Token | Access Token 재발급 |
-| POST | `/api/v1/auth/logout` | 필요 | 로그아웃 및 Refresh Token 무효화 |
+| POST | `/api/v1/auth/refresh` | Refresh Token 쿠키 | Access Token 재발급 및 Refresh Token 교체 |
+| POST | `/api/v1/auth/logout` | Refresh Token 쿠키 | 로그아웃 및 Refresh Token 삭제 |
 | GET | `/api/v1/users/me` | USER | 로그인한 사용자의 회원 정보 조회 |
 | PATCH | `/api/v1/users/me` | USER | 이름, 연락처 등 본인 회원 정보 수정 |
 | PATCH | `/api/v1/users/me/password` | USER | 본인 비밀번호 변경 |
