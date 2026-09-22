@@ -5,3 +5,9 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/grab}
     username: ${DB_USERNAME:grab}
     password: ${DB_PASSWORD:grab}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
