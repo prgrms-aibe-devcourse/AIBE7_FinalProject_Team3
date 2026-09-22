@@ -248,6 +248,19 @@ UQ(`order_id`, `option_id`)를 둔다. `drop_id`를 포함한 복합 FK로 다�
 
 예약 수량과 옵션은 변경 불가능한 `order_items`에서 조회한다. 반환한 예약 행은 삭제하거나 재사용하지 않는다.
 
+#### `order_cancellation_requests`
+
+결제 전 주문 취소를 포함한 취소 API의 멱등 요청을 기록한다.
+
+| 컬럼 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `id` | BIGINT | O | PK |
+| `order_id` | BIGINT | O | FK orders |
+| `buyer_id` | BIGINT | O | FK users |
+| `idempotency_key` | VARCHAR(100) | O | UQ(buyer_id, idempotency_key) |
+| `request_hash` | VARCHAR(64) | O | 같은 키의 다른 요청 탐지 |
+| `reason` | VARCHAR(300) | O | 취소 사유 |
+
 ### 1.5 결제 및 취소
 
 #### `payments`
@@ -258,6 +271,7 @@ UQ(`order_id`, `option_id`)를 둔다. `drop_id`를 포함한 복합 FK로 다�
 | `order_id` | BIGINT | O | FK orders, 주문당 여러 결제 시도 가능 |
 | `provider` | VARCHAR(30) | O | `MOCK`, `TOSS` |
 | `idempotency_key` | VARCHAR(100) | O | UQ(provider, idempotency_key) |
+| `request_hash` | VARCHAR(64) | O | 같은 키의 다른 요청 탐지 |
 | `provider_payment_id` | VARCHAR(200) | X | PG 결제 식별자 |
 | `amount` | BIGINT | O | 승인 요청 금액 |
 | `status` | VARCHAR(30) | O | `PENDING`, `SUCCEEDED`, `FAILED`, `UNKNOWN`, `CANCELED` |
@@ -292,6 +306,7 @@ UQ(`order_id`, `option_id`)를 둔다. `drop_id`를 포함한 복합 FK로 다�
 | `requested_by` | BIGINT | X | FK users, 시스템 보정은 NULL |
 | `purpose` | VARCHAR(30) | O | `ORDER_CANCEL`, `LATE_APPROVAL_COMPENSATION` |
 | `idempotency_key` | VARCHAR(100) | O | UQ |
+| `request_hash` | VARCHAR(64) | O | 같은 키의 다른 요청 탐지 |
 | `amount` | BIGINT | O | MVP는 전액 취소만 지원 |
 | `reason` | TEXT | O | 취소 사유 |
 | `status` | VARCHAR(20) | O | `REQUESTED`, `UNKNOWN`, `SUCCEEDED`, `FAILED` |
@@ -309,6 +324,8 @@ UQ(`order_id`, `option_id`)를 둔다. `drop_id`를 포함한 복합 FK로 다�
 | --- | --- | --- | --- |
 | `id` | BIGINT | O | PK |
 | `order_id` | BIGINT | O | FK orders, UQ |
+| `idempotency_key` | VARCHAR(100) | O | UQ, 배송 등록 요청 멱등 키 |
+| `request_hash` | VARCHAR(64) | O | 같은 키의 다른 요청 탐지 |
 | `carrier_code` | VARCHAR(50) | O | 택배사 코드 |
 | `tracking_number` | VARCHAR(100) | O | 송장번호 |
 | `shipped_at` | TIMESTAMPTZ | X | 출고 시각 |
@@ -418,12 +435,12 @@ PK와 UQ에서 자동 생성되는 인덱스는 중복 생성하지 않는다.
 | 항목 | 현재 초안 | 확정할 내용 |
 | --- | --- | --- |
 | 판매자 신청 정보 | 브랜드명·연락 이메일 | 사업자 정보와 증빙 필수 여부 |
-| 결제 대기 시간 | DB에 절대 만료 시각 저장 | 구체적인 만료 시간 |
+| 결제 대기 시간 | 주문 생성 시점부터 10분 | 확정 |
 | 결제 재시도 | 결제 마감 전 허용 | 최대 횟수 또는 제한 없음 여부 |
 | 판매 종료 후 결제 | 선점 주문은 결제 마감까지 허용 | 최종 허용 여부 |
 | 구매 제한 | 재고 범위만 검증 | 주문별·회원 누적 제한 |
-| 주문 취소 | PAID까지 허용 | 시간 제한과 PREPARING 취소 여부 |
-| 취소 재고 | AVAILABLE 또는 WITHHELD | 기본 반환 목적지 |
+| 주문 취소 | `PAYMENT_PENDING`, `PAID`에서 허용 | `PREPARING`부터 소비자 직접 취소 제한 |
+| 취소 재고 | `AVAILABLE` | 취소·만료 재고는 즉시 가용 재고로 반환 |
 | 배송비 | DROP별 고정 배송비 | 무료배송·지역 추가금 정책 |
 | GRAB 중 수정 | 가격·옵션·재고 구조 변경 금지 | 설명·이미지·배송 안내 수정 범위 |
 | 개인정보 | 주문 배송지 스냅샷 저장 | 보존 기간·암호화·익명화 정책 |

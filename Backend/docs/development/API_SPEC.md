@@ -1146,6 +1146,7 @@ POST /api/v1/orders
 - 판매 시작 이후, 종료 이전이어야 한다.
 - 요청한 모든 옵션에 충분한 가용 재고가 있어야 한다.
 - 재고 확보와 주문 생성은 하나의 트랜잭션으로 처리한다.
+- 결제 마감 시각은 주문 생성 시점부터 10분으로 설정한다.
 
 **응답:** `201 Created`
 
@@ -1277,8 +1278,9 @@ POST /api/v1/orders/{orderId}/cancel
 - 본인 주문만 취소할 수 있다.
 - `PAYMENT_PENDING` 주문은 즉시 취소하고 확보 재고를 반환한다.
 - `PAID` 주문은 PG 결제 취소 성공 후 `CANCELED`로 전환한다.
-- 배송이 시작된 주문은 취소할 수 없다.
+- `PREPARING` 이후 주문은 소비자가 직접 취소할 수 없다.
 - 재고 반환은 한 번만 수행한다.
+- 반환 재고는 가용 재고(`AVAILABLE`)로 복구한다.
 
 **오류 코드:**
 - `ORDER_NOT_FOUND`
@@ -1729,6 +1731,7 @@ POST /api/v1/uploads/images/presigned-url
 - `POST /api/v1/seller/orders/{orderId}/shipment`
 
 > 동일 키와 동일 요청 본문이 다시 전달되면 최초 처리 결과를 반환합니다. 동일 키에 서로 다른 요청 본문이 전달되면 `409 Conflict`를 반환합니다.
+> 요청 본문이 있는 멱등 요청은 SHA-256 `request_hash`를 함께 저장합니다.
 >
 > Mock PG 웹훅은 `Idempotency-Key` 헤더 대신 PG가 전달한 `eventId`를 고유 키로 사용합니다.
 
