@@ -50,8 +50,9 @@ export default function DropDetailPage({
       optionLabel,
       quantity,
       total: selectedSku.price * quantity + drop.shippingFee,
+      status: 'PAYMENT_PENDING',
     })
-    notify('주문이 생성됐어요. 결제는 데모에서 생략합니다.')
+    notify('주문이 생성됐어요. 마이페이지에서 결제해주세요.')
     navigate('/my')
   }
 

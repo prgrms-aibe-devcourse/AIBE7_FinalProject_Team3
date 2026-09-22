@@ -6,5 +6,11 @@ export default function useOrders() {
   return {
     orders,
     addOrder: (order: Order) => setOrders((current) => [order, ...current]),
+    updateOrder: (id: string, changes: Partial<Order>) =>
+      setOrders((current) =>
+        current.map((order) =>
+          order.id === id ? { ...order, ...changes } : order,
+        ),
+      ),
   }
 }

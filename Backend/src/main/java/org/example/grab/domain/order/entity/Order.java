@@ -173,6 +173,14 @@ public class Order extends BaseTimeEntity {
         this.canceledAt = Objects.requireNonNull(canceledAt);
     }
 
+    public void markPaid(OffsetDateTime paidAt) {
+        if (status != OrderStatus.PAYMENT_PENDING) {
+            throw new IllegalStateException("결제를 확정할 수 없는 주문 상태입니다.");
+        }
+        status = OrderStatus.PAID;
+        this.paidAt = Objects.requireNonNull(paidAt);
+    }
+
     public void prepareShipment() {
         if (status != OrderStatus.PAID) {
             throw new IllegalStateException("배송 준비로 변경할 수 없는 주문 상태입니다.");

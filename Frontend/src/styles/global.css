@@ -795,6 +795,38 @@ main {
 .compact-item.order > b {
   font-size: 12px;
 }
+.order-payment {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+.payment-action {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.payment-action select {
+  min-width: 112px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+.payment-action .primary-button {
+  padding: 10px 14px;
+  white-space: nowrap;
+}
+.payment-complete,
+.payment-pending {
+  font-size: 13px;
+  font-weight: 700;
+}
+.payment-complete {
+  color: #4d7800;
+}
+.payment-pending {
+  color: #9a6500;
+}
 .empty-state {
   display: grid;
   place-items: center;

@@ -16,6 +16,9 @@ public enum ErrorCode {
     ORDER_NOT_CANCELABLE(HttpStatus.CONFLICT, "취소할 수 없는 주문입니다."),
     ORDER_STATUS_CONFLICT(HttpStatus.CONFLICT, "주문 상태가 이미 변경되었습니다."),
     PAYMENT_CANCEL_FAILED(HttpStatus.CONFLICT, "결제 취소에 실패했습니다."),
+    PAYMENT_ALREADY_PROCESSED(HttpStatus.CONFLICT, "이미 처리된 결제입니다."),
+    PAYMENT_AMOUNT_MISMATCH(HttpStatus.UNPROCESSABLE_ENTITY, "결제 금액이 일치하지 않습니다."),
+    PAYMENT_EXPIRED(HttpStatus.UNPROCESSABLE_ENTITY, "결제 유효시간이 만료되었습니다."),
     DUPLICATE_IDEMPOTENCY_KEY(HttpStatus.CONFLICT, "동일한 멱등 키가 다른 요청에 사용되었습니다."),
     INSUFFICIENT_STOCK(HttpStatus.UNPROCESSABLE_ENTITY, "재고가 부족합니다.");
 

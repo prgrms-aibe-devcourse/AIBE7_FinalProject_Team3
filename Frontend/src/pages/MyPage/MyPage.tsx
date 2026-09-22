@@ -1,5 +1,6 @@
 import { Link, Navigate } from 'react-router-dom'
 import EmptyState from '../../components/EmptyState/EmptyState'
+import PaymentAction from '../../features/payment/PaymentAction'
 import { drops } from '../../features/drop/mockDrops'
 import type { SharedProps } from '../../types/store'
 import { dateLabel } from '../../utils/date'
@@ -11,6 +12,7 @@ export default function MyPage({
   orders,
   toggleWish,
   notify,
+  updateOrder,
 }: SharedProps) {
   if (!authenticated) return <Navigate to="/login" replace />
   const wishedDrops = drops.filter((drop) => wishes.has(drop.id))
@@ -62,13 +64,29 @@ export default function MyPage({
               <div className="compact-item order" key={order.id}>
                 <img src={order.drop.image} alt="" />
                 <div>
-                  <small>{order.id} · 결제 대기</small>
+                  <small>
+                    {order.id} ·{' '}
+                    {order.status === 'PAID'
+                      ? '결제 완료'
+                      : order.status === 'PAYMENT_FAILED'
+                        ? '결제 실패'
+                        : order.status === 'PAYMENT_UNKNOWN'
+                          ? '결제 확인 중'
+                          : '결제 대기'}
+                  </small>
                   <strong>{order.drop.name}</strong>
                   <small>
                     {order.optionLabel} · {order.quantity}개
                   </small>
                 </div>
-                <b>{won(order.total)}</b>
+                <div className="order-payment">
+                  <b>{won(order.total)}</b>
+                  <PaymentAction
+                    order={order}
+                    updateOrder={updateOrder}
+                    notify={notify}
+                  />
+                </div>
               </div>
             ))
           ) : (

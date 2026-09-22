@@ -23,7 +23,7 @@ export default function App() {
   }
   const { authenticated, login } = useAuth()
   const { wishes, toggleWish } = useWish(authenticated, notify)
-  const { orders, addOrder } = useOrders()
+  const { orders, addOrder, updateOrder } = useOrders()
 
   const shared: SharedProps = {
     authenticated,
@@ -32,6 +32,7 @@ export default function App() {
     notify,
     toggleWish,
     addOrder,
+    updateOrder,
   }
 
   return (

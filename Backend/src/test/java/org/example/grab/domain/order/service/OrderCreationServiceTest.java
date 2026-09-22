@@ -7,6 +7,8 @@ import org.example.grab.domain.order.dto.OrderCreateResponse;
 import org.example.grab.domain.order.dto.ShipmentCreateRequest;
 import org.example.grab.domain.order.entity.OrderStatus;
 import org.example.grab.domain.order.repository.OrderRepository;
+import org.example.grab.domain.payment.dto.PaymentRequest;
+import org.example.grab.domain.payment.service.PaymentService;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
@@ -44,6 +46,9 @@ class OrderCreationServiceTest {
 
     @Autowired
     private OrderQueryService orderQueryService;
+
+    @Autowired
+    private PaymentService paymentService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -210,6 +215,65 @@ class OrderCreationServiceTest {
                 "SELECT delivered_at IS NOT NULL FROM shipments WHERE order_id = ?",
                 Boolean.class, created.orderId()
         )).isTrue();
+    }
+
+    @Test
+    @DisplayName("Mock 결제 성공 시 주문과 예약 재고를 결제 완료로 확정한다")
+    void completesMockPayment() {
+        // given
+        Fixture fixture = createFixture(5);
+        OrderCreateResponse created = orderCreationService.create(
+                fixture.buyerId(), UUID.randomUUID().toString(),
+                createRequest(fixture.dropId(), fixture.optionId(), 2)
+        );
+        String paymentKey = UUID.randomUUID().toString();
+        PaymentRequest request = new PaymentRequest(
+                PaymentRequest.PaymentMethod.MOCK_CARD,
+                PaymentRequest.MockResult.SUCCESS
+        );
+
+        // when
+        var first = paymentService.pay(fixture.buyerId(), created.orderId(), paymentKey, request);
+        var second = paymentService.pay(fixture.buyerId(), created.orderId(), paymentKey, request);
+
+        // then
+        assertThat(first.status()).isEqualTo("SUCCEEDED");
+        assertThat(second.paymentId()).isEqualTo(first.paymentId());
+        assertThat(queryOrderStatus(created.orderId())).isEqualTo("PAID");
+        assertThat(queryReservedQuantity(fixture.optionId())).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT sold_quantity FROM drop_options WHERE id = ?", Integer.class, fixture.optionId()
+        )).isEqualTo(2);
+        assertThat(queryReservationStatus(created.orderId())).isEqualTo("COMMITTED");
+        assertThat(paymentService.findHistory(fixture.buyerId(), created.orderId())).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Mock 결제 실패와 타임아웃은 주문 재고를 확정하지 않는다")
+    void keepsReservationForFailedOrUnknownPayment() {
+        // given
+        Fixture fixture = createFixture(5);
+        OrderCreateResponse created = orderCreationService.create(
+                fixture.buyerId(), UUID.randomUUID().toString(),
+                createRequest(fixture.dropId(), fixture.optionId(), 1)
+        );
+
+        // when
+        var failed = paymentService.pay(
+                fixture.buyerId(), created.orderId(), UUID.randomUUID().toString(),
+                new PaymentRequest(PaymentRequest.PaymentMethod.MOCK_CARD, PaymentRequest.MockResult.FAILURE)
+        );
+        var unknown = paymentService.pay(
+                fixture.buyerId(), created.orderId(), UUID.randomUUID().toString(),
+                new PaymentRequest(PaymentRequest.PaymentMethod.MOCK_CARD, PaymentRequest.MockResult.TIMEOUT)
+        );
+
+        // then
+        assertThat(failed.status()).isEqualTo("FAILED");
+        assertThat(unknown.status()).isEqualTo("UNKNOWN");
+        assertThat(queryOrderStatus(created.orderId())).isEqualTo("PAYMENT_PENDING");
+        assertThat(queryReservedQuantity(fixture.optionId())).isEqualTo(1);
+        assertThat(queryReservationStatus(created.orderId())).isEqualTo("HELD");
     }
 
     private OrderCreateRequest createRequest(Long dropId, Long optionId, int quantity) {
