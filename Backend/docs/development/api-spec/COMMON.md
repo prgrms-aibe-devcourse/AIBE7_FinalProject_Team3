@@ -7,19 +7,33 @@
 ```yaml
 Base URL: /api/v1
 Content-Type: application/json
-인증 방식: Bearer Access Token
+인증 방식: HttpOnly Access Token 쿠키
 시간 형식: ISO 8601 (예: 2026-09-18T14:00:00+09:00)
 금액 단위: KRW, 정수
 페이지 번호: 0부터 시작
 ```
 
-### 1.2 인증 헤더
+### 1.2 인증 쿠키
 
 ```http
-Authorization: Bearer {accessToken}
+Set-Cookie: access_token=<jwt>; HttpOnly; Secure; SameSite=Lax; Path=/api; Max-Age=<access-ttl>
+Set-Cookie: refresh_token=<token>; HttpOnly; Secure; SameSite=Lax; Path=/api/v1/auth; Max-Age=<refresh-ttl>
 ```
 
-### 1.3 공통 성공 응답
+Access Token과 Refresh Token은 응답 본문 및 브라우저 저장소에 노출하지 않는다. 브라우저 요청은 쿠키를 포함하도록 설정한다.
+
+### 1.3 CSRF 보호
+
+`POST`, `PUT`, `PATCH`, `DELETE` 요청은 CSRF 토큰을 헤더로 전달한다. 프론트엔드는 인증 요청 전에 `GET /api/v1/auth/csrf`를 호출해 `XSRF-TOKEN` 쿠키를 발급받고 같은 값을 헤더에 넣는다. 이 쿠키는 인증 토큰이 아니므로 JavaScript에서 읽을 수 있다.
+
+```http
+Cookie: XSRF-TOKEN=<csrf-token>
+X-XSRF-TOKEN: <csrf-token>
+```
+
+CORS는 허용된 프론트엔드 Origin만 등록하고 Credential 요청을 허용한다.
+
+### 1.4 공통 성공 응답
 
 ```json
 {
@@ -29,7 +43,7 @@ Authorization: Bearer {accessToken}
 }
 ```
 
-### 1.4 공통 오류 응답
+### 1.5 공통 오류 응답
 
 ```json
 {
@@ -48,7 +62,7 @@ Authorization: Bearer {accessToken}
 }
 ```
 
-### 1.5 공통 HTTP 상태 코드
+### 1.6 공통 HTTP 상태 코드
 
 | 상태 코드 | 의미 |
 | --- | --- |
@@ -64,7 +78,7 @@ Authorization: Bearer {accessToken}
 | 429 | 요청 횟수 제한 초과 |
 | 500 | 서버 내부 오류 |
 
-### 1.6 페이지 응답
+### 1.7 페이지 응답
 
 ```json
 {
@@ -77,7 +91,7 @@ Authorization: Bearer {accessToken}
 }
 ```
 
-### 1.7 리소스 식별자
+### 1.8 리소스 식별자
 
 외부에 노출하는 리소스는 DB의 자동 증가 PK 대신 UUID 형식의 공개 식별자(`public_id`)를 사용합니다.
 경로 변수와 응답 필드 모두 이 값을 문자열로 주고받습니다.

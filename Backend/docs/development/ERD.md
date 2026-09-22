@@ -41,7 +41,7 @@ MVP 회원가입은 `LOCAL` 방식만 제공한다. `KAKAO`, `GOOGLE` 값은 소
 
 #### 인증 토큰 저장 정책
 
-Access Token은 짧은 수명의 JWT로 발급해 서버에 저장하지 않는다. Refresh Token은 무작위 문자열로 발급해 해시만 Redis에 TTL과 함께 저장한다. 재발급 시 기존 토큰을 교체하고 로그아웃 시 삭제한다.
+Access Token은 짧은 수명의 JWT로 발급해 서버에 저장하지 않고 HttpOnly 쿠키로 전달한다. Refresh Token은 무작위 문자열로 발급해 HttpOnly 쿠키로 전달하고 해시만 Redis에 TTL과 함께 저장한다. 재발급 시 두 쿠키를 교체하고 로그아웃 시 Redis의 Refresh Token과 두 쿠키를 삭제한다.
 
 #### `sellers`
 

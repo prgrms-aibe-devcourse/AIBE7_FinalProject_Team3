@@ -11,7 +11,7 @@
 | Framework | Spring Boot | 4.1.x | 웹, 보안, 데이터 접근, 모니터링 환경을 일관되게 구성한다. |
 | Web | Spring MVC | Boot 관리 | REST API 구현에 사용하며 블로킹 방식의 JPA 환경에 적합하다. SSE는 MVP 이후 필요할 때 추가한다. |
 | ORM | Spring Data JPA / Hibernate | Boot 관리 | 주문·옵션·결제 도메인의 관계 매핑과 트랜잭션을 관리한다. 복잡한 조회는 DTO Projection 또는 별도 쿼리로 처리한다. |
-| Security | Spring Security | Boot 관리 | JWT 인증, Argon2id 비밀번호 해시, USER·SELLER·ADMIN 권한 및 리소스 소유권을 검증한다. |
+| Security | Spring Security | Boot 관리 | HttpOnly 쿠키 기반 JWT 인증, CSRF 보호, Argon2id 비밀번호 해시, USER·SELLER·ADMIN 권한 및 리소스 소유권을 검증한다. |
 | Validation | Jakarta Bean Validation | Boot 관리 | 요청 DTO와 상태별 필수값을 검증한다. |
 | Build | Gradle Wrapper | 8.14+ 또는 9.x | 로컬과 CI에서 동일한 빌드 도구 버전을 사용한다. |
 | API Docs | SpringDoc OpenAPI / Swagger UI | 3.1.0 | Spring Boot 4 기반 API 명세를 자동 생성하고 프론트엔드와 공유한다. |
@@ -35,7 +35,7 @@
 | Framework | React | 19.x | 컴포넌트 기반으로 소비자·판매자·관리자 화면을 구성한다. |
 | Build Tool | Vite | 8.x | 빠른 개발 서버와 단순한 SPA 빌드 환경을 제공한다. |
 | Styling | Tailwind CSS | 4.x | 짧은 MVP 기간에 일관된 반응형 UI를 구현한다. |
-| HTTP Client | Axios | 1.x | 공통 오류 처리와 인증 헤더 및 토큰 재발급 인터셉터를 구성한다. |
+| HTTP Client | Axios | 1.x | Credential·CSRF 헤더, 공통 오류 처리 및 쿠키 기반 토큰 재발급 흐름을 구성한다. |
 | Routing | React Router | 7.x | 소비자·판매자·관리자 라우팅과 권한별 화면을 분리한다. |
 | Server State | TanStack Query | 5.x | API 데이터 캐싱, 재조회, 로딩·오류 상태를 관리한다. |
 | Client State | React Context 또는 Zustand | 필요 시 확정 | 로그인 사용자 정보 등 작은 전역 상태만 관리한다. 서버 응답 데이터는 TanStack Query에서 관리한다. |
