@@ -1,5 +1,6 @@
 services:
   backend:
+    profiles: ["app"]
     build:
       context: .
       dockerfile: Dockerfile
@@ -11,8 +12,9 @@ services:
       DB_USERNAME: grab
       DB_PASSWORD: ${DB_PASSWORD:-grab}
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+
   postgres:
     image: postgres:18
     environment:
@@ -23,15 +25,22 @@ services:
       - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U grab -d grab"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   redis:
+    profiles: ["cache"]
     image: redis:8-alpine
     ports:
-      - 127.0.0.1:6379:6379
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis-data:/data
 
   grafana:
+    profiles: ["observability"]
     image: grafana/grafana:latest
     ports:
       - "3000:3000"
@@ -39,6 +48,7 @@ services:
       - grafana-data:/var/lib/grafana
 
   loki:
+    profiles: ["observability"]
     image: grafana/loki:latest
     ports:
       - "3100:3100"
@@ -46,6 +56,7 @@ services:
       - loki-data:/tmp/loki
 
   prometheus:
+    profiles: ["observability"]
     image: prom/prometheus:v3.14.0
     ports:
       - "9090:9090"
@@ -53,6 +64,7 @@ services:
       - prometheus-data:/prometheus
 
   alloy:
+    profiles: ["observability"]
     image: grafana/alloy:latest
     command:
       - run
