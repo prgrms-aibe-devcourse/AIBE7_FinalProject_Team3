@@ -22,20 +22,20 @@
 
 #### `users`
 
-| 컬럼                  | 타입           | 필수 | 설명                                 |
-|---------------------|--------------| --- |------------------------------------|
-| `id`                | BIGINT       | O | PK                                 |
-| `public_id`         | UUID         | O | UQ, 외부 노출 식별자                      |
-| `email`             | VARCHAR(254) | O | UQ, 정규화 후 저장                       |
+| 컬럼                  | 타입           | 필수  | 설명                                 |
+|---------------------|--------------|-----|------------------------------------|
+| `id`                | BIGINT       | O   | PK                                 |
+| `public_id`         | UUID         | O   | UQ, 외부 노출 식별자                      |
+| `email`             | VARCHAR(254) | O   | UQ, 정규화 후 저장                       |
 | `password_hash`     | VARCHAR(255) | 조건부 | LOCAL 회원만 필수, Argon2id 해시 저장       |
-| `display_name`      | VARCHAR(100) | O | 표시 이름                              |
-| `phone`             | VARCHAR(30)  | O | 회원 연락처                             |
-| `profile_image_url` | VARCHAR(500) | X | 이미지 객체 키 또는 영속 URL                 |
-| `role`              | VARCHAR(20)  | O | `USER`, `ADMIN`                    |
-| `status`            | VARCHAR(20)  | O | `ACTIVE`, `SUSPENDED`, `WITHDRAWN` |
-| `provider`          | VARCHAR(20)  | O | `LOCAL`, `KAKAO`, `GOOGLE`         |
-| `updated_at`        | TIMESTAMPZ   | O | 최초 회원 생성 시간                        |
-| `created_at`        | TIMESTAMPZ   | O | 최신 회원 업데이트 시간                      |
+| `display_name`      | VARCHAR(100) | O   | 표시 이름                              |
+| `phone`             | VARCHAR(30)  | X   | 회원 연락처                             |
+| `profile_image_url` | VARCHAR(500) | X   | 이미지 객체 키 또는 영속 URL                 |
+| `role`              | VARCHAR(20)  | O   | `USER`, `ADMIN`                    |
+| `status`            | VARCHAR(20)  | O   | `ACTIVE`, `SUSPENDED`, `WITHDRAWN` |
+| `provider`          | VARCHAR(20)  | O   | `LOCAL`, `KAKAO`, `GOOGLE`         |
+| `updated_at`        | TIMESTAMPZ   | O   | 최초 회원 생성 시간                        |
+| `created_at`        | TIMESTAMPZ   | O   | 최신 회원 업데이트 시간                      |
 
 
 판매자는 회원의 배타적인 역할이 아니다. `sellers.status = APPROVED`인 회원에게 판매자 기능을 허용한다.
@@ -63,6 +63,8 @@ Access Token은 짧은 수명의 JWT로 발급해 서버에 저장하지 않고 
 | `rejection_reason` | TEXT | X | 반려 시 필수 |
 
 MVP에서는 판매자 신청과 프로필을 한 테이블에서 관리한다. 신청 이력 보존이 필요해지면 `seller_applications`를 별도 분리한다.
+
+소셜 로그인 시 휴대폰 번호를 받지 않는다.
 
 ### 1.2 DROP 및 옵션
 
