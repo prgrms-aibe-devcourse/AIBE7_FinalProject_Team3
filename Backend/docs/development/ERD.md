@@ -22,22 +22,25 @@
 
 #### `users`
 
-| 컬럼 | 타입 | 필수 | 설명 |
-| --- | --- | --- | --- |
-| `id` | BIGINT | O | PK |
-| `public_id` | UUID | O | UQ, 외부 노출 식별자 |
-| `email` | VARCHAR(254) | O | UQ, 정규화 후 저장 |
-| `password_hash` | VARCHAR(255) | 조건부 | LOCAL 회원만 필수, Argon2id 해시 저장 |
-| `display_name` | VARCHAR(100) | O | 표시 이름 |
-| `phone` | VARCHAR(30) | O | 회원 연락처 |
-| `profile_image_url` | VARCHAR(500) | X | 이미지 객체 키 또는 영속 URL |
-| `role` | VARCHAR(20) | O | `USER`, `ADMIN` |
-| `status` | VARCHAR(20) | O | `ACTIVE`, `SUSPENDED`, `WITHDRAWN` |
-| `provider` | VARCHAR(20) | O | `LOCAL`, `KAKAO`, `GOOGLE` |
+| 컬럼                  | 타입           | 필수 | 설명                                 |
+|---------------------|--------------| --- |------------------------------------|
+| `id`                | BIGINT       | O | PK                                 |
+| `public_id`         | UUID         | O | UQ, 외부 노출 식별자                      |
+| `email`             | VARCHAR(254) | O | UQ, 정규화 후 저장                       |
+| `password_hash`     | VARCHAR(255) | 조건부 | LOCAL 회원만 필수, Argon2id 해시 저장       |
+| `display_name`      | VARCHAR(100) | O | 표시 이름                              |
+| `phone`             | VARCHAR(30)  | O | 회원 연락처                             |
+| `profile_image_url` | VARCHAR(500) | X | 이미지 객체 키 또는 영속 URL                 |
+| `role`              | VARCHAR(20)  | O | `USER`, `ADMIN`                    |
+| `status`            | VARCHAR(20)  | O | `ACTIVE`, `SUSPENDED`, `WITHDRAWN` |
+| `provider`          | VARCHAR(20)  | O | `LOCAL`, `KAKAO`, `GOOGLE`         |
+| `updated_at`        | TIMESTAMPZ   | O | 최초 회원 생성 시간                        |
+| `created_at`        | TIMESTAMPZ   | O | 최신 회원 업데이트 시간                      |
+
 
 판매자는 회원의 배타적인 역할이 아니다. `sellers.status = APPROVED`인 회원에게 판매자 기능을 허용한다.
 
-MVP 회원가입은 `LOCAL` 방식만 제공한다. `KAKAO`, `GOOGLE` 값은 소셜 로그인을 도입할 때 사용한다.
+MVP 회원가입은 `LOCAL`및 소셜로그인 `KAKAO`, `GOOGLE` 구현. 
 
 #### 인증 토큰 저장 정책
 
