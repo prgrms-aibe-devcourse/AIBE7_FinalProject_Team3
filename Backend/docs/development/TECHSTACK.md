@@ -49,7 +49,7 @@
 - `.github/workflows/backend-ci.yml`: 이슈 브랜치에서 `develope`로 보내는 PR과 `develope` 푸시에서 PostgreSQL 기반 테스트와 Docker 이미지 빌드 검증
 - `.github/workflows/publish-backend.yml`: `main`의 Backend 변경 시 이미지를 빌드해 GHCR에 `latest`, 커밋 SHA 태그로 게시
 
-Compose에 정의된 Redis와 모니터링 컨테이너는 실행 틀만 마련된 상태다. 애플리케이션 연동과 Prometheus·Loki·Alloy 설정 파일은 해당 기능을 도입할 때 완성한다.
+Actuator와 Prometheus의 로컬 메트릭 수집 연결은 완료됐다. Redis와 Grafana·Loki·Alloy는 실행 틀만 마련된 상태이며 해당 기능을 도입할 때 연동 설정을 완성한다.
 
 ### 4.2 목표 운영 구성
 
@@ -113,7 +113,7 @@ RDS와 S3를 기본 운영안으로 사용한다. 비용이나 운영 일정 때
 | Log Collection | Grafana Alloy | Docker 로그 수집 | 애플리케이션 로그를 수집해 Loki로 전달한다. |
 | Log Storage | Loki | 중앙 로그 저장·조회 | Grafana에서 메트릭과 로그를 함께 조회한다. |
 
-MVP 초기에는 Actuator, 구조화 로그 및 Docker 로그 확인부터 적용한다. Compose에는 Prometheus·Grafana·Alloy·Loki 컨테이너가 정의되어 있지만, 수집 설정과 대시보드 연결은 배포 환경과 핵심 API가 안정된 뒤 단계적으로 완성한다.
+MVP 초기에는 Actuator와 Prometheus를 연결해 JVM·HTTP·DB Connection Pool 메트릭을 수집한다. Grafana 대시보드와 Alloy·Loki 로그 파이프라인은 배포 환경과 핵심 API가 안정된 뒤 단계적으로 완성한다.
 
 ## 7. Testing
 
@@ -154,13 +154,13 @@ MVP 초기에는 Actuator, 구조화 로그 및 Docker 로그 확인부터 적�
 - Docker, Docker Compose, GitHub Actions
 - GHCR 이미지 게시(`latest`, 커밋 SHA 태그)
 - JUnit 기반 테스트와 핵심 API 통합 테스트
-- Actuator Health와 구조화된 애플리케이션 로그
+- Actuator Health·Prometheus 메트릭 수집과 구조화된 애플리케이션 로그
 
 ### 문제를 확인한 뒤 적용
 
 - Redis 캐시와 분산 환경 보조 기능
 - SSE 실시간 재고 전달
-- Prometheus, Grafana, Alloy, Loki 전체 구성
+- Grafana 대시보드와 Alloy·Loki 로그 파이프라인
 - EC2 자동 배포와 Blue/Green 전환
 - 고부하 상황의 재고 처리 최적화
 - pgvector 기반 개인화 추천

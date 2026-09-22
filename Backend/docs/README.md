@@ -8,6 +8,7 @@
 | [ERD.md](development/ERD.md) | 테이블 정의, 제약조건, 관계 |
 | [API_SPEC.md](development/API_SPEC.md) | 공통 응답 규칙과 엔드포인트 명세 |
 | [TECHSTACK.md](development/TECHSTACK.md) | 기술 선정, 인프라, CI/CD, 테스트 전략 |
+| [MONITORING.md](MONITORING.md) | 로컬 메트릭 모니터링 실행·확인 방법 |
 | [CODING_CONVENTION.md](collaboration/CODING_CONVENTION.md) | 코드 작성 규칙 |
 
 ## 협업 (`collaboration/`)
