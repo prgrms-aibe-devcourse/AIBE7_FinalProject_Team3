@@ -2,7 +2,7 @@
 
 ![GRAB MVP ERD](../assets/erd.png)
 
-> 위 이미지는 핵심 업무 관계를 요약한 개념도이며, 공통 시각 컬럼과 Refresh Token 등 인증 보조 테이블은 아래 테이블 정의를 기준으로 한다.
+> 위 이미지는 핵심 업무 관계를 요약한 개념도이며, 공통 시각 컬럼은 아래 테이블 정의를 기준으로 한다.
 
 ## 0. 공통 규칙
 
@@ -27,7 +27,7 @@
 | `id` | BIGINT | O | PK |
 | `public_id` | UUID | O | UQ, 외부 노출 식별자 |
 | `email` | VARCHAR(254) | O | UQ, 정규화 후 저장 |
-| `password_hash` | VARCHAR(255) | 조건부 | LOCAL 회원만 필수 |
+| `password_hash` | VARCHAR(255) | 조건부 | LOCAL 회원만 필수, Argon2id 해시 저장 |
 | `display_name` | VARCHAR(100) | O | 표시 이름 |
 | `phone` | VARCHAR(30) | O | 회원 연락처 |
 | `profile_image_url` | VARCHAR(500) | X | 이미지 객체 키 또는 영속 URL |
@@ -39,17 +39,9 @@
 
 MVP 회원가입은 `LOCAL` 방식만 제공한다. `KAKAO`, `GOOGLE` 값은 소셜 로그인을 도입할 때 사용한다.
 
-#### `refresh_tokens`
+#### 인증 토큰 저장 정책
 
-| 컬럼 | 타입 | 필수 | 설명 |
-| --- | --- | --- | --- |
-| `id` | BIGINT | O | PK |
-| `user_id` | BIGINT | O | FK users |
-| `token_hash` | VARCHAR(255) | O | 원문 대신 해시 저장, UQ |
-| `expires_at` | TIMESTAMPTZ | O | 만료 시각 |
-| `revoked_at` | TIMESTAMPTZ | X | 로그아웃·재발급으로 무효화된 시각 |
-
-Access Token은 짧게 유지하고 Refresh Token은 재발급 시 교체한다. 로그아웃 시 해당 Refresh Token을 폐기한다.
+Access Token은 짧은 수명의 JWT로 발급해 서버에 저장하지 않는다. Refresh Token은 무작위 문자열로 발급해 해시만 Redis에 TTL과 함께 저장한다. 재발급 시 기존 토큰을 교체하고 로그아웃 시 삭제한다.
 
 #### `sellers`
 
@@ -407,7 +399,6 @@ PK와 UQ에서 자동 생성되는 인덱스는 중복 생성하지 않는다.
 
 | 테이블 | 인덱스 | 용도 |
 | --- | --- | --- |
-| `refresh_tokens` | (`user_id`, `revoked_at`, `expires_at`) | 사용자별 유효 Refresh Token 조회 |
 | `sellers` | (`status`, `submitted_at`, `id`) | 판매자 신청 심사 |
 | `drops` | (`status`, `category_id`, `published_at`, `id`) | 공개 DROP 목록 |
 | `drops` | (`seller_id`, `status`, `id`) | 판매자 DROP 관리 |
