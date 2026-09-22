@@ -62,7 +62,7 @@ org.example.grab
 
 - 트랜잭션은 Service에만 선언한다. 조회 메서드는 `@Transactional(readOnly = true)`를 사용한다.
 - 의존성은 `final` 필드 + `@RequiredArgsConstructor` 생성자 주입만 사용한다. `@Autowired` 필드 주입은 사용하지 않는다.
-- Controller는 항상 `ApiResponse`로 감싼 응답을 반환한다. 형식은 [API_SPEC.md](API_SPEC.md) 1.3·1.4를 따른다.
+- Controller는 항상 `ApiResponse`로 감싼 응답을 반환한다. 형식은 [공통 API 규칙](../development/api-spec/COMMON.md) 1.3·1.4를 따른다.
 
 ### 2.4 Entity
 
@@ -102,4 +102,3 @@ org.example.grab
 - 파일명은 `V{번호}__{설명}.sql` (예: `V1__create_user.sql`), 위치는 `src/main/resources/db/migration`.
 - 번호는 팀에서 이어서 증가시키고, 이미 병합된 마이그레이션 파일은 수정하지 않는다. 변경은 새 파일로 추가한다.
 - 스키마 정의의 기준은 [ERD.md](ERD.md)다.
-
