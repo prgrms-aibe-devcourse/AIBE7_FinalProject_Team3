@@ -13,6 +13,12 @@ services:
     depends_on:
       - postgres
       - redis
+
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+
   postgres:
     image: postgres:18
     environment:
