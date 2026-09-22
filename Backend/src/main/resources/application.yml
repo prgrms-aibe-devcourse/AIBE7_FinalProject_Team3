@@ -1,7 +1,17 @@
 spring:
   application:
     name: GRAB
+
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/grab}
     username: ${DB_USERNAME:grab}
     password: ${DB_PASSWORD:grab}
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
