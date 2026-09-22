@@ -11,8 +11,9 @@ services:
       DB_USERNAME: grab
       DB_PASSWORD: ${DB_PASSWORD:-grab}
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+
   postgres:
     image: postgres:18
     environment:
@@ -23,11 +24,16 @@ services:
       - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U grab -d grab"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   redis:
     image: redis:8-alpine
     ports:
-      - 127.0.0.1:6379:6379
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis-data:/data
 
