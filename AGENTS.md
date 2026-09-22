@@ -17,7 +17,7 @@
 
 - 요구사항 및 인수 조건(AUTH-001 등 ID 체계): `Backend/docs/development/REQUIREMENTS.md`
 - 스키마: `Backend/docs/development/ERD.md`
-- API 명세: `Backend/docs/development/API_SPEC.md`
+- API 명세: `Backend/docs/development/api-spec/README.md`
 - 기술 선정 근거: `Backend/docs/development/TECHSTACK.md`
 
 구현 내용이 문서와 어긋나면 코드를 먼저 고치지 말고, 문서를 수정할지 먼저 물어본다.
