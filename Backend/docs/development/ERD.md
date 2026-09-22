@@ -10,6 +10,11 @@
 - 판매 가능 여부, 예약 만료 및 상태 전이는 서버 시각을 기준으로 판단한다.
 - API가 반환하는 `SELLER` 권한은 별도 회원 역할 컬럼이 아니라 `sellers.status = APPROVED`에서 파생한다.
 - 알림 기능은 MVP 범위에서 제외하며 알림 테이블을 생성하지 않는다.
+- PK는 모든 테이블에서 `BIGINT` 자동 증가 값을 쓰고 내부 조인·정렬·행 잠금에만 사용한다.
+  외부에 노출하는 리소스는 `public_id UUID`(UQ)를 별도로 두고, API 경로·응답·외부 연동에는 `public_id`만 내보낸다.
+  대상은 `users`, `sellers`, `drop_images`, `orders`, `payments`, `payment_cancellations`이다.
+  `drops`와 그 옵션 계열은 공개 카탈로그라 열거되어도 노출되는 정보가 없고,
+  `drop_options`는 재고 차감 시 `ORDER BY id`로 행을 잠그는 경로라 `BIGINT` PK만 사용한다.
 
 ## 1. 테이블 정의
 
@@ -20,6 +25,7 @@
 | 컬럼 | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |
 | `id` | BIGINT | O | PK |
+| `public_id` | UUID | O | UQ, 외부 노출 식별자 |
 | `email` | VARCHAR(254) | O | UQ, 정규화 후 저장 |
 | `password_hash` | VARCHAR(255) | 조건부 | LOCAL 회원만 필수, Argon2id 해시 저장 |
 | `display_name` | VARCHAR(100) | O | 표시 이름 |
@@ -42,6 +48,7 @@ Access Token은 짧은 수명의 JWT로 발급해 서버에 저장하지 않는�
 | 컬럼 | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |
 | `id` | BIGINT | O | PK |
+| `public_id` | UUID | O | UQ, 외부 노출 식별자 |
 | `user_id` | BIGINT | O | FK users, UQ |
 | `brand_name` | VARCHAR(100) | O | 브랜드명 |
 | `contact_email` | VARCHAR(254) | O | 판매자 연락 이메일 |
@@ -98,6 +105,7 @@ MVP에서는 판매자 신청과 프로필을 한 테이블에서 관리한다. 
 | 컬럼 | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |
 | `id` | BIGINT | O | PK |
+| `public_id` | UUID | O | UQ, 외부 노출 식별자 겸 이미지 객체 키 |
 | `drop_id` | BIGINT | O | FK drops |
 | `image_url` | VARCHAR(500) | O | 객체 키 또는 영속 URL |
 | `sort_order` | INT | O | 0 이상, UQ(drop_id, sort_order) |
@@ -188,6 +196,7 @@ UQ(`user_id`, `drop_id`)를 둔다. 취소 후 재등록은 기존 행을 다시
 | 컬럼 | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |
 | `id` | BIGINT | O | PK |
+| `public_id` | UUID | O | UQ, 외부 노출 식별자 |
 | `order_number` | VARCHAR(64) | O | UQ, 사용자와 PG에 전달하는 주문번호 |
 | `buyer_id` | BIGINT | O | FK users |
 | `drop_id` | BIGINT | O | FK drops, 주문당 DROP 하나 |
@@ -260,6 +269,7 @@ UQ(`order_id`, `option_id`)를 둔다. `drop_id`를 포함한 복합 FK로 다�
 | 컬럼 | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |
 | `id` | BIGINT | O | PK |
+| `public_id` | UUID | O | UQ, 외부 노출 식별자 |
 | `order_id` | BIGINT | O | FK orders, 주문당 여러 결제 시도 가능 |
 | `provider` | VARCHAR(30) | O | `MOCK`, `TOSS` |
 | `idempotency_key` | VARCHAR(100) | O | UQ(provider, idempotency_key) |
@@ -294,6 +304,7 @@ UQ(`order_id`, `option_id`)를 둔다. `drop_id`를 포함한 복합 FK로 다�
 | 컬럼 | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |
 | `id` | BIGINT | O | PK |
+| `public_id` | UUID | O | UQ, 외부 노출 식별자 |
 | `payment_id` | BIGINT | O | FK payments |
 | `requested_by` | BIGINT | X | FK users, 시스템 보정은 NULL |
 | `purpose` | VARCHAR(30) | O | `ORDER_CANCEL`, `LATE_APPROVAL_COMPENSATION` |

@@ -42,12 +42,12 @@
 
 ## 4. Infrastructure / Deployment
 
-### 4.1 현재 저장소에 반영된 구성
+### 4.1 저장소 구성 및 운영 기준
 
 - `Backend/Dockerfile`: Gradle `bootJar`를 실행하는 멀티 스테이지 빌드와 non-root 런타임 이미지
 - `Backend/compose.yaml`: 백엔드, PostgreSQL, Redis, Prometheus, Grafana, Loki, Alloy 컨테이너 정의
-- `.github/workflows/backend-ci.yml`: 이슈 브랜치에서 `develope`로 보내는 PR과 `develope` 푸시에서 PostgreSQL 기반 테스트와 Docker 이미지 빌드 검증
-- `.github/workflows/publish-backend.yml`: `main`의 Backend 변경 시 이미지를 빌드해 GHCR에 `latest`, 커밋 SHA 태그로 게시
+- `.github/workflows/backend-ci.yml`: `main` 또는 `deploy` 대상 PR과 두 브랜치의 푸시에서 PostgreSQL 기반 테스트와 Docker 이미지 빌드 검증
+- `.github/workflows/publish-backend.yml`: Backend 이미지를 빌드해 GHCR에 `latest`, 커밋 SHA 태그로 게시. 운영 기준은 `deploy` 푸시지만 현재 트리거는 `main`이므로 변경이 필요하다.
 
 Actuator와 Prometheus의 로컬 메트릭 수집 연결은 완료됐다. Redis 컨테이너는 마련됐으며 애플리케이션 인증 연동은 구현 예정이다. Grafana·Loki·Alloy는 실행 틀만 마련된 상태다.
 
@@ -72,7 +72,7 @@ RDS와 S3를 기본 운영안으로 사용한다. 비용이나 운영 일정 때
 
 | 구분 | 기술 | 용도 | 선정 이유 |
 | --- | --- | --- | --- |
-| CI/CD | GitHub Actions | 빌드·테스트·배포 자동화 | Pull Request와 main 브랜치 흐름에 빌드 및 테스트를 연결한다. |
+| CI/CD | GitHub Actions | 빌드·테스트·배포 자동화 | Pull Request와 `main`·`deploy` 브랜치 흐름에 빌드 및 테스트를 연결한다. |
 | Deployment | EC2 + Docker Compose | 컨테이너 실행 | GHCR 이미지를 내려받아 일관된 방식으로 실행한다. |
 | Strategy | Blue/Green | 배포 중 트래픽 전환 | 신규 컨테이너 검증 후 Nginx upstream을 전환하여 중단 시간을 줄인다. |
 | Health Check | Actuator Health | 배포 성공 검증 | 신규 인스턴스가 정상 상태일 때만 트래픽을 전환한다. |
@@ -83,9 +83,9 @@ RDS와 S3를 기본 운영안으로 사용한다. 비용이나 운영 일정 때
 | 단계 | 상태 | 내용 |
 | --- | --- | --- |
 | Docker 이미지 빌드 | 완료 | `Backend/Dockerfile`에서 `bootJar`를 실행하고 non-root 런타임 이미지를 생성한다. |
-| GHCR 로그인·게시 | 완료 | GitHub Actions의 `GITHUB_TOKEN`으로 로그인하고 `latest`, `${{ github.sha }}` 태그를 게시한다. |
+| GHCR 로그인·게시 | 변경 필요 | 현재 `main` 푸시에서 이미지를 게시한다. 운영 기준에 맞게 `deploy` 푸시로 전환해야 한다. |
 | 빌드 캐시 | 완료 | GitHub Actions cache backend를 BuildKit 캐시로 사용한다. |
-| `develope` 통합 CI | 완료 | PR과 통합 후 푸시에서 PostgreSQL 서비스를 사용한 Gradle 테스트와 Docker 이미지 빌드를 검증한다. 이미지는 게시하지 않는다. |
+| `main`·`deploy` CI | 완료 | 두 브랜치 대상 PR과 통합 후 푸시에서 PostgreSQL 서비스를 사용한 Gradle 테스트와 Docker 이미지 빌드를 검증한다. |
 | EC2 자동 배포 | 예정 | GHCR 이미지를 내려받아 Docker Compose로 실행한다. |
 | Health Check·Blue/Green | 예정 | Actuator Health 확인 후 Nginx upstream을 전환한다. |
 
@@ -94,14 +94,15 @@ RDS와 S3를 기본 운영안으로 사용한다. 비용이나 운영 일정 때
 ### 5.2 브랜치 통합 흐름
 
 ```text
-이슈 브랜치 → Pull Request → develope → Pull Request → main
-                 Backend CI                    GHCR 게시
+이슈 브랜치 ── Pull Request ──> main ── Pull Request ──> deploy
+                 Backend CI       개발 통합       Backend CI · GHCR 게시
 ```
 
-- 이슈 브랜치는 `develope`로 Pull Request를 생성한다.
-- `Backend CI / Test and build image`가 성공한 변경만 `develope`에 병합한다.
-- `develope`에서 통합 검증한 뒤 `main`에 병합하면 기존 게시 워크플로가 GHCR 이미지를 생성한다.
-- GitHub Branch Protection에서 위 CI job을 `develope`의 필수 체크로 지정한다.
+- `main`은 개발 통합 브랜치다. 이슈 브랜치는 `main`으로 Pull Request를 생성한다.
+- `deploy`는 배포 브랜치다. 배포할 변경은 `main`에서 통합 검증한 뒤 `deploy`로 Pull Request를 생성한다.
+- `Backend CI / Test and build image`는 `main`과 `deploy` 대상 Pull Request 및 두 브랜치의 푸시에서 실행한다.
+- 위 CI가 성공한 변경만 각 대상 브랜치에 병합하며, `deploy`에 병합하면 GHCR 이미지를 게시한다.
+- GitHub Branch Protection에서 위 CI job을 `main`과 `deploy`의 필수 체크로 지정한다.
 
 ## 6. Monitoring / Logging
 

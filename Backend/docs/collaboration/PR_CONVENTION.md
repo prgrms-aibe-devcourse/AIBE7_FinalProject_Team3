@@ -6,6 +6,8 @@
 ## 1. 브랜치
 
 - 통합 흐름과 CI 조건은 [TECHSTACK.md](../development/TECHSTACK.md) 5.2를 따른다.
+- `main`은 개발 통합 브랜치이며, 이슈 브랜치는 `main`을 대상으로 Pull Request를 생성한다.
+- `deploy`는 배포 브랜치이며, 배포할 때 `main`에서 `deploy`로 Pull Request를 생성한다.
 - 브랜치명은 `{타입}/{이슈키}-{요약}` 형식으로 통일한다. 타입은 커밋 타입과 같은 값을 쓰고, 요약은 영문 소문자와 하이픈으로 적는다.
 
 ```text
