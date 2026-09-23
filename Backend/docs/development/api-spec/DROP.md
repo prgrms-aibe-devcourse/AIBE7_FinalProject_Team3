@@ -25,7 +25,7 @@ GET /api/v1/categories
 }
 ```
 
-> 활성 상태인 카테고리만 표시 순서대로 반환합니다.
+> 활성 상태인 카테고리만 id 순(시드 등록 순)으로 반환합니다.
 
 ### 1.2 공개 DROP 목록 조회
 
@@ -247,6 +247,9 @@ POST /api/v1/seller/drops
 
 > 임시 저장은 일부 필수 정보가 없어도 허용할 수 있으나 공개 시 전체 항목을 검증합니다. 요청의 `key`, `groupKey`, `valueKey`는 같은 요청 안에서 그룹·값·SKU를 연결하기 위한 클라이언트 키이며 저장 후 응답에서는 서버 ID를 사용합니다.
 
+**오류 코드:**
+- `VALIDATION_FAILED` — 존재하지 않거나 비활성인 카테고리(`fieldErrors`의 `field`는 `categoryId`)
+
 ### 2.2 판매자 DROP 목록
 
 ```http
@@ -362,6 +365,7 @@ PATCH /api/v1/seller/drops/{dropId}
 - `DROP_ACCESS_DENIED`
 - `DROP_NOT_EDITABLE`
 - `INVALID_SCHEDULE`
+- `VALIDATION_FAILED` — 존재하지 않거나 비활성인 카테고리(`fieldErrors`의 `field`는 `categoryId`)
 
 ### 2.5 DROP 공개
 
@@ -404,7 +408,7 @@ POST /api/v1/seller/drops/{dropId}/publish
 - `DROP_NOT_FOUND`
 - `DROP_ACCESS_DENIED`
 - `INVALID_STATE_TRANSITION` — DRAFT가 아닌 DROP
-- `VALIDATION_FAILED` — 필수 항목 누락. 누락된 항목 전부를 `fieldErrors`로 반환
+- `VALIDATION_FAILED` — 필수 항목 누락(누락된 항목 전부를 `fieldErrors`로 반환), 존재하지 않거나 비활성인 카테고리(`field`는 `categoryId`)
 - `INVALID_SCHEDULE` — 시작 시각이 종료 시각보다 이전이 아님
 - `INVALID_OPTION_COMBINATION` — 그룹명·옵션값 중복, 그룹별 선택 누락, 음수 가격·재고, 판매 가능한 SKU 없음
 - `DUPLICATE_OPTION_COMBINATION` — 동일한 값 조합의 SKU 중복
