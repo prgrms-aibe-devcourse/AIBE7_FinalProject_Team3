@@ -58,7 +58,7 @@ class OrderRepositoryTest {
         String uniqueValue = UUID.randomUUID().toString();
         buyerId = jdbcTemplate.queryForObject(
                 """
-                INSERT INTO users (email, password_hash, display_name)
+                INSERT INTO users (email, password_hash, nickname)
                 VALUES (?, 'encoded-password', '구매자')
                 RETURNING id
                 """,
@@ -159,7 +159,7 @@ class OrderRepositoryTest {
         String uniqueValue = UUID.randomUUID().toString();
         String sellerEmail = "seller-" + uniqueValue + "@example.com";
         long sellerUserId = jdbcTemplate.queryForObject("""
-                INSERT INTO users (email, password_hash, display_name)
+                INSERT INTO users (email, password_hash, nickname)
                 VALUES (?, 'encoded-password', '판매자')
                 RETURNING id
                 """, Long.class, sellerEmail);

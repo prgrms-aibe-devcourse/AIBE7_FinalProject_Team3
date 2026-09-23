@@ -353,12 +353,13 @@ class DropServiceIntegrationTest {
         String uniqueValue = UUID.randomUUID().toString();
         Long userId = jdbcTemplate.queryForObject(
                 """
-                INSERT INTO users (email, password_hash, display_name)
-                VALUES (?, 'encoded-password', '판매자')
+                INSERT INTO users (email, password_hash, nickname)
+                VALUES (?, 'encoded-password', ?)
                 RETURNING id
                 """,
                 Long.class,
-                uniqueValue + "@example.com"
+                uniqueValue + "@example.com",
+                "판매자-" + uniqueValue
         );
         return jdbcTemplate.queryForObject(
                 """
