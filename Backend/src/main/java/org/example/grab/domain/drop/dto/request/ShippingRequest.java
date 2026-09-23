@@ -1,4 +1,4 @@
-package org.example.grab.domain.drop.dto;
+package org.example.grab.domain.drop.dto.request;
 
 import jakarta.validation.constraints.PositiveOrZero;
 

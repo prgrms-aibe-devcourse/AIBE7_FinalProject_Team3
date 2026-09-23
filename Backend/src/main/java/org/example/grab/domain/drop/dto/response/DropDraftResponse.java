@@ -1,4 +1,4 @@
-package org.example.grab.domain.drop.dto;
+package org.example.grab.domain.drop.dto.response;
 
 import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.domain.drop.entity.DropStatus;
