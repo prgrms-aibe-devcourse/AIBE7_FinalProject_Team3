@@ -197,9 +197,9 @@ class OrderRepositoryTest {
 
         // when
         Page<SellerOrderListResponse> filtered = orderRepository.findSellerOrders(
-                sellerEmail, sellerDropId, "PAID", "SUCCEEDED", PageRequest.of(0, 10));
+                sellerId, sellerDropId, "PAID", "SUCCEEDED", PageRequest.of(0, 10));
         Page<SellerOrderListResponse> unfiltered = orderRepository.findSellerOrders(
-                sellerEmail, null, null, null, PageRequest.of(0, 10));
+                sellerId, null, null, null, PageRequest.of(0, 10));
 
         // then
         assertThat(filtered.getTotalElements()).isEqualTo(1);

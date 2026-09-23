@@ -1,6 +1,7 @@
 package org.example.grab.domain.order.controller;
 
 import org.example.grab.domain.order.service.SellerOrderService;
+import org.example.grab.global.security.CurrentSellerIdProvider;
 import org.example.grab.global.error.GlobalExceptionHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,11 +17,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SellerOrderControllerTest {
 
     private final SellerOrderService sellerOrderService = mock(SellerOrderService.class);
+    private final CurrentSellerIdProvider currentSellerIdProvider = mock(CurrentSellerIdProvider.class);
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new SellerOrderController(sellerOrderService))
+        mockMvc = MockMvcBuilders.standaloneSetup(new SellerOrderController(sellerOrderService, currentSellerIdProvider))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }
