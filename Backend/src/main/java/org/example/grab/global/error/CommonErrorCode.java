@@ -4,6 +4,9 @@ import org.springframework.http.HttpStatus;
 
 public enum CommonErrorCode implements ErrorCode {
 
+    INVALID_IDEMPOTENCY_KEY(HttpStatus.BAD_REQUEST, "유효한 Idempotency-Key 헤더가 필요합니다."),
+    DUPLICATE_IDEMPOTENCY_KEY(HttpStatus.CONFLICT, "동일한 Idempotency-Key에 다른 요청 본문을 사용할 수 없습니다."),
+
     INVALID_REQUEST(HttpStatus.BAD_REQUEST, "요청 형식이 올바르지 않습니다."),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "요청 값 검증에 실패했습니다."),
     AUTHENTICATION_REQUIRED(HttpStatus.UNAUTHORIZED, "인증이 필요합니다."),
