@@ -15,7 +15,10 @@ import org.example.grab.domain.drop.entity.option.DropOptionValue;
 import org.example.grab.domain.drop.entity.option.DropOptionValueMap;
 import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.domain.drop.repository.DropRepository;
+import org.example.grab.domain.category.service.CategoryService;
+import org.example.grab.global.common.ErrorResponse;
 import org.example.grab.global.error.BusinessException;
+import org.example.grab.global.error.CommonErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +40,7 @@ import java.util.Set;
 public class DropService {
 
     private final DropRepository dropRepository;
+    private final CategoryService categoryService;
 
     /** 새 DRAFT를 만들고 요청 값을 반영해 저장한다. */
     @Transactional
@@ -66,6 +70,8 @@ public class DropService {
                 .orElseThrow(() -> new BusinessException(DropErrorCode.DROP_NOT_FOUND));
         drop.validateOwner(sellerId);
         drop.publish(OffsetDateTime.now(ZoneOffset.UTC));
+        // 공개 이후 카테고리 활성 여부를 마지막으로 확인한다. 실패하면 트랜잭션 롤백으로 WISH 전환이 취소된다.
+        validateCategory(drop.getCategoryId());
         return drop;
     }
 
@@ -80,6 +86,8 @@ public class DropService {
                 shipping != null ? shipping.shippingNotice() : null,
                 request.saleStartsAt(),
                 request.saleEndsAt());
+        // 상태(DROP_NOT_EDITABLE)·일정 검증 다음에 카테고리를 확인해 오류 우선순위를 유지한다.
+        validateCategory(request.categoryId());
 
         // 그룹만 또는 옵션만 오면 기존 SKU가 조용히 삭제되므로, 옵션 구조는 둘 다 오거나 둘 다 없어야 한다.
         boolean replaceImages = request.imageUrls() != null;
@@ -112,6 +120,15 @@ public class DropService {
             OptionAssembly assembly = assembleOptions(drop, request.optionGroups(), request.options());
             assembly.groups().forEach(drop::addOptionGroup);
             assembly.options().forEach(drop::addOption);
+        }
+    }
+
+    // categoryId는 부분 수정에서 null이면 "변경하지 않음"이므로 검증하지 않는다.
+    private void validateCategory(Long categoryId) {
+        if (categoryId != null && !categoryService.isActive(categoryId)) {
+            throw new BusinessException(
+                    CommonErrorCode.VALIDATION_FAILED,
+                    List.of(new ErrorResponse.FieldError("categoryId", "존재하지 않거나 비활성인 카테고리입니다.")));
         }
     }
 

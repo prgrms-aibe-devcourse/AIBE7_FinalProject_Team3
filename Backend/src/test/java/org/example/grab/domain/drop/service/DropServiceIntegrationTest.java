@@ -13,7 +13,9 @@ import org.example.grab.domain.drop.entity.DropImage;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.domain.drop.repository.DropRepository;
+import org.example.grab.domain.category.service.CategoryService;
 import org.example.grab.global.error.BusinessException;
+import org.example.grab.global.error.CommonErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,7 +42,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
-@Import({JpaConfig.class, DropService.class})
+@Import({JpaConfig.class, DropService.class, CategoryService.class})
 @Testcontainers
 class DropServiceIntegrationTest {
 
@@ -225,6 +227,43 @@ class DropServiceIntegrationTest {
         Drop found = dropRepository.findById(dropId).orElseThrow();
         assertThat(found.getStatus()).isEqualTo(DropStatus.WISH);
         assertThat(found.getPublishedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 categoryId로 저장하면 500이 아니라 VALIDATION_FAILED로 거부된다")
+    void createDraft_rejectsMissingCategory() {
+        // given
+        DropDraftRequest request = new DropDraftRequest(
+                null, null, null, categoryId + 10_000, null, null, null, null, null);
+
+        // when & then
+        assertThatThrownBy(() -> dropService.createDraft(sellerId, request))
+                .isInstanceOfSatisfying(BusinessException.class, e ->
+                        assertThat(e.getErrorCode()).isEqualTo(CommonErrorCode.VALIDATION_FAILED));
+    }
+
+    @Test
+    @DisplayName("공개 직전 카테고리가 비활성화되면 거부되고 상태는 DRAFT로 남는다")
+    void publish_rejectsInactiveCategory() {
+        // given
+        OffsetDateTime start = OffsetDateTime.now().plusDays(1);
+        DropDraftRequest full = fullRequest();
+        DropDraftRequest request = new DropDraftRequest(full.name(), full.description(), full.imageUrls(),
+                categoryId, start, start.plusDays(1), new ShippingRequest(3000L, "안내"),
+                full.optionGroups(), full.options());
+        Long dropId = dropService.createDraft(sellerId, request).getId();
+        entityManager.flush();
+        jdbcTemplate.update("UPDATE categories SET is_active = false WHERE id = ?", categoryId);
+        entityManager.clear();
+
+        // when & then
+        assertThatThrownBy(() -> dropService.publish(sellerId, dropId))
+                .isInstanceOfSatisfying(BusinessException.class, e ->
+                        assertThat(e.getErrorCode()).isEqualTo(CommonErrorCode.VALIDATION_FAILED));
+
+        entityManager.clear();
+        Drop found = dropRepository.findById(dropId).orElseThrow();
+        assertThat(found.getStatus()).isEqualTo(DropStatus.DRAFT);
     }
 
     private DropDraftRequest fullRequest() {
