@@ -31,7 +31,7 @@
 | POST | `/api/v1/auth/refresh` | Refresh Token | Access Token 재발급 |
 | POST | `/api/v1/auth/logout` | 필요 | 로그아웃 및 Refresh Token 무효화 |
 | GET | `/api/v1/users/me` | USER | 로그인한 사용자의 회원 정보 조회 |
-| PATCH | `/api/v1/users/me` | USER | 본인 표시 이름 수정 |
+| PATCH | `/api/v1/users/me` | USER | 본인 닉네임 수정 |
 | PATCH | `/api/v1/users/me/password` | USER | 본인 비밀번호 변경 |
 | PUT | `/api/v1/users/me/profile-image` | USER | 본인 프로필 이미지 등록 또는 변경 |
 | DELETE | `/api/v1/users/me/profile-image` | USER | 본인 프로필 이미지 삭제 |

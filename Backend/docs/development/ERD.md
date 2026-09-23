@@ -28,7 +28,7 @@
 | `public_id`         | UUID         | O   | UQ, 외부 노출 식별자                      |
 | `email`             | VARCHAR(254) | O   | UQ, 정규화 후 저장                       |
 | `password_hash`     | VARCHAR(255) | 조건부 | LOCAL 회원만 필수, Argon2id 해시 저장       |
-| `display_name`      | VARCHAR(100) | O   | 표시 이름                              |
+| `nickname`          | VARCHAR(100) | O   | 닉네임, 대소문자 무시 UQ                   |
 | `profile_image_url` | VARCHAR(500) | X   | 이미지 객체 키 또는 영속 URL                 |
 | `role`              | VARCHAR(20)  | O   | `USER`, `ADMIN`                    |
 | `status`            | VARCHAR(20)  | O   | `ACTIVE`, `SUSPENDED`, `WITHDRAWN` |
@@ -40,6 +40,13 @@
 판매자는 회원의 배타적인 역할이 아니다. `sellers.status = APPROVED`인 회원에게 판매자 기능을 허용한다.
 
 MVP 회원가입은 `LOCAL` 및 소셜 로그인 `KAKAO`, `GOOGLE`을 구현한다. 회원 휴대폰 번호는 수집·저장하지 않으며, 배송 연락처는 주문 시 `orders.recipient_phone`으로 받는다.
+
+`nickname`은 회원이 직접 정하는 닉네임이며 본명이 아니다. 기존 `display_name` 컬럼의 이름을 바꾼 것이다. 회원 본명은 수집하지 않으며, 배송에 필요한 수령인 이름은 주문 시 `orders.recipient_name`으로 받는다.
+닉네임은 리뷰 등 공개 기능에서 다른 회원에게 노출되므로 중복을 허용하지 않는다.
+- 입력한 대소문자는 그대로 저장하고, 중복 판단은 대소문자를 구분하지 않는다. `lower(nickname)` 기준 유니크 인덱스(`uq_users_nickname_lower`)로 보장한다.
+- 서버의 사전 중복 검사는 사용자에게 빠르게 알리기 위한 것이며, 동시 요청의 최종 판단은 DB 유니크 인덱스가 한다. 인덱스 위반은 `DUPLICATE_NICKNAME`으로 변환한다.
+- 탈퇴(`WITHDRAWN`) 시 닉네임을 `withdrawn_<public_id>` 형식의 익명 값으로 바꿔 기존 닉네임을 해제한다. 이 값은 입력 규칙(길이·허용 문자)을 벗어나므로 사용자가 입력한 닉네임과 겹치지 않는다.
+- 입력 규칙은 API 명세(`MEMBER_AUTH.md` 1.2절)를 따르며, 컬럼 길이는 익명 값과 규칙 변경 여지를 위해 여유 있게 둔다.
 
 #### 인증 토큰 저장 정책
 
