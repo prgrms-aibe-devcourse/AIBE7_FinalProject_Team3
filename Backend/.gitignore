@@ -41,3 +41,6 @@ out/
 !.env.example
 
 todo
+!docs/development/TODO.md
+
+*.pem
