@@ -1,11 +1,13 @@
 package org.example.grab.domain.drop.controller;
 
 import org.example.grab.domain.drop.dto.request.DropDraftRequest;
+import org.example.grab.domain.drop.dto.response.SellerDropListResponse;
 import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.domain.drop.service.DropService;
 import org.example.grab.global.common.ErrorResponse;
+import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
 import org.example.grab.global.error.GlobalExceptionHandler;
@@ -26,6 +28,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -209,6 +213,57 @@ class SellerDropControllerTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("DUPLICATE_OPTION_COMBINATION"))
                 .andExpect(jsonPath("$.error.fieldErrors[0].field").value("options[1]"));
+    }
+
+    @Test
+    @DisplayName("판매자 DROP 목록은 페이지 형식으로 반환한다")
+    void listDrops() throws Exception {
+        // given
+        given(currentSellerIdProvider.currentSellerId()).willReturn(1L);
+        SellerDropListResponse item = new SellerDropListResponse(100L, "상품", DropStatus.DRAFT, 10000L,
+                OffsetDateTime.parse("2026-09-18T07:00:00Z"));
+        given(dropService.findSellerDrops(eq(1L), any(), eq(0), eq(20)))
+                .willReturn(new PageResponse<>(List.of(item), 0, 20, 1, 1, false));
+
+        // when & then
+        mockMvc.perform(get("/api/v1/seller/drops"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].dropId").value(100))
+                .andExpect(jsonPath("$.data.page").value(0))
+                .andExpect(jsonPath("$.data.size").value(20))
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.totalPages").value(1))
+                .andExpect(jsonPath("$.data.hasNext").value(false));
+    }
+
+    @Test
+    @DisplayName("page=-1이면 400 INVALID_REQUEST")
+    void listDrops_rejectsNegativePage() throws Exception {
+        mockMvc.perform(get("/api/v1/seller/drops").param("page", "-1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        verifyNoInteractions(dropService);
+    }
+
+    @Test
+    @DisplayName("size가 1 미만이거나 100을 넘으면 400 INVALID_REQUEST")
+    void listDrops_rejectsInvalidSize() throws Exception {
+        mockMvc.perform(get("/api/v1/seller/drops").param("size", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        mockMvc.perform(get("/api/v1/seller/drops").param("size", "101"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        verifyNoInteractions(dropService);
+    }
+
+    @Test
+    @DisplayName("status=FOO이면 400 INVALID_REQUEST")
+    void listDrops_rejectsInvalidStatus() throws Exception {
+        mockMvc.perform(get("/api/v1/seller/drops").param("status", "FOO"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        verifyNoInteractions(dropService);
     }
 
     private Drop draftWithId(Long id) {

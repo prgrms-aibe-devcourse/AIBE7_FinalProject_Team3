@@ -1,14 +1,17 @@
 package org.example.grab.domain.drop.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.grab.domain.drop.dto.SellerDropListProjection;
 import org.example.grab.domain.drop.dto.request.DropDraftRequest;
 import org.example.grab.domain.drop.dto.request.OptionGroupRequest;
 import org.example.grab.domain.drop.dto.request.OptionRequest;
 import org.example.grab.domain.drop.dto.request.OptionValueRequest;
 import org.example.grab.domain.drop.dto.request.SelectionRequest;
 import org.example.grab.domain.drop.dto.request.ShippingRequest;
+import org.example.grab.domain.drop.dto.response.SellerDropListResponse;
 import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.domain.drop.entity.DropImage;
+import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.entity.option.DropOption;
 import org.example.grab.domain.drop.entity.option.DropOptionGroup;
 import org.example.grab.domain.drop.entity.option.DropOptionValue;
@@ -17,8 +20,11 @@ import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.domain.drop.repository.DropRepository;
 import org.example.grab.domain.category.service.CategoryService;
 import org.example.grab.global.common.ErrorResponse;
+import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -73,6 +79,24 @@ public class DropService {
         // 공개 이후 카테고리 활성 여부를 마지막으로 확인한다. 실패하면 트랜잭션 롤백으로 WISH 전환이 취소된다.
         validateCategory(drop.getCategoryId());
         return drop;
+    }
+
+    // 목록은 조회 전용 트랜잭션에서 쿼리 한 번으로 가져오고, 프로젝션을 응답 DTO로 변환한다.
+    @Transactional(readOnly = true)
+    public PageResponse<SellerDropListResponse> findSellerDrops(
+            Long sellerId, DropStatus status, int page, int size) {
+        Page<SellerDropListProjection> drops = dropRepository.findSellerDrops(
+                sellerId, status, PageRequest.of(page, size));
+        List<SellerDropListResponse> content = drops.getContent().stream()
+                .map(projection -> new SellerDropListResponse(
+                        projection.getDropId(),
+                        projection.getName(),
+                        projection.getStatus(),
+                        projection.getMinPrice(),
+                        projection.getCreatedAt()))
+                .toList();
+        return new PageResponse<>(content, page, size, drops.getTotalElements(),
+                drops.getTotalPages(), drops.hasNext());
     }
 
     private void applyDraft(Drop drop, DropDraftRequest request) {

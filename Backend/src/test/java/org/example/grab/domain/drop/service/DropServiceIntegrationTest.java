@@ -8,12 +8,14 @@ import org.example.grab.domain.drop.dto.request.OptionRequest;
 import org.example.grab.domain.drop.dto.request.OptionValueRequest;
 import org.example.grab.domain.drop.dto.request.SelectionRequest;
 import org.example.grab.domain.drop.dto.request.ShippingRequest;
+import org.example.grab.domain.drop.dto.response.SellerDropListResponse;
 import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.domain.drop.entity.DropImage;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.domain.drop.repository.DropRepository;
 import org.example.grab.domain.category.service.CategoryService;
+import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -73,30 +75,11 @@ class DropServiceIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        String uniqueValue = UUID.randomUUID().toString();
-        Long userId = jdbcTemplate.queryForObject(
-                """
-                INSERT INTO users (email, password_hash, display_name)
-                VALUES (?, 'encoded-password', '판매자')
-                RETURNING id
-                """,
-                Long.class,
-                uniqueValue + "@example.com"
-        );
-        sellerId = jdbcTemplate.queryForObject(
-                """
-                INSERT INTO sellers (user_id, brand_name, contact_email)
-                VALUES (?, 'GRAB 판매자', ?)
-                RETURNING id
-                """,
-                Long.class,
-                userId,
-                "seller-" + uniqueValue + "@example.com"
-        );
+        sellerId = insertSeller();
         categoryId = jdbcTemplate.queryForObject(
                 "INSERT INTO categories (code, name) VALUES (?, '패션') RETURNING id",
                 Long.class,
-                "TEST-" + uniqueValue
+                "TEST-" + UUID.randomUUID()
         );
     }
 
@@ -264,6 +247,135 @@ class DropServiceIntegrationTest {
         entityManager.clear();
         Drop found = dropRepository.findById(dropId).orElseThrow();
         assertThat(found.getStatus()).isEqualTo(DropStatus.DRAFT);
+    }
+
+    @Test
+    @DisplayName("다른 판매자의 DROP은 목록에 나오지 않는다")
+    void findSellerDrops_excludesOtherSeller() {
+        // given
+        Long myDropId = insertDrop(sellerId, "DRAFT");
+        insertDrop(insertSeller(), "DRAFT");
+
+        // when
+        PageResponse<SellerDropListResponse> result = dropService.findSellerDrops(sellerId, null, 0, 20);
+
+        // then
+        assertThat(result.totalElements()).isEqualTo(1);
+        assertThat(result.content()).extracting(SellerDropListResponse::dropId).containsExactly(myDropId);
+    }
+
+    @Test
+    @DisplayName("status 필터는 해당 상태의 DROP만 반환한다")
+    void findSellerDrops_filtersByStatus() {
+        // given
+        insertDrop(sellerId, "DRAFT");
+        insertCanceledDrop(sellerId);
+
+        // when
+        PageResponse<SellerDropListResponse> result =
+                dropService.findSellerDrops(sellerId, DropStatus.DRAFT, 0, 20);
+
+        // then
+        assertThat(result.totalElements()).isEqualTo(1);
+        assertThat(result.content()).extracting(SellerDropListResponse::status).containsOnly(DropStatus.DRAFT);
+    }
+
+    @Test
+    @DisplayName("페이지네이션 메타데이터가 계산된다")
+    void findSellerDrops_paginates() {
+        // given
+        insertDrop(sellerId, "DRAFT");
+        insertDrop(sellerId, "DRAFT");
+        insertDrop(sellerId, "DRAFT");
+
+        // when
+        PageResponse<SellerDropListResponse> first = dropService.findSellerDrops(sellerId, null, 0, 2);
+
+        // then
+        assertThat(first.content()).hasSize(2);
+        assertThat(first.totalElements()).isEqualTo(3);
+        assertThat(first.totalPages()).isEqualTo(2);
+        assertThat(first.hasNext()).isTrue();
+    }
+
+    @Test
+    @DisplayName("minPrice는 활성 SKU 중 최저가이고, 활성 SKU가 없으면 null")
+    void findSellerDrops_calculatesMinPrice() {
+        // given
+        Long withOptions = insertDrop(sellerId, "DRAFT");
+        insertOption(withOptions, 1000L, 5, true);
+        insertOption(withOptions, 500L, 0, true);
+        insertOption(withOptions, 100L, 5, false);
+        Long withoutOptions = insertDrop(sellerId, "DRAFT");
+
+        // when
+        PageResponse<SellerDropListResponse> result = dropService.findSellerDrops(sellerId, null, 0, 20);
+
+        // then
+        assertThat(minPriceOf(result, withOptions)).isEqualTo(500L);
+        assertThat(minPriceOf(result, withoutOptions)).isNull();
+    }
+
+    private Long minPriceOf(PageResponse<SellerDropListResponse> result, Long dropId) {
+        return result.content().stream()
+                .filter(item -> item.dropId().equals(dropId))
+                .findFirst()
+                .orElseThrow()
+                .minPrice();
+    }
+
+    private Long insertSeller() {
+        String uniqueValue = UUID.randomUUID().toString();
+        Long userId = jdbcTemplate.queryForObject(
+                """
+                INSERT INTO users (email, password_hash, display_name)
+                VALUES (?, 'encoded-password', '판매자')
+                RETURNING id
+                """,
+                Long.class,
+                uniqueValue + "@example.com"
+        );
+        return jdbcTemplate.queryForObject(
+                """
+                INSERT INTO sellers (user_id, brand_name, contact_email)
+                VALUES (?, 'GRAB 판매자', ?)
+                RETURNING id
+                """,
+                Long.class,
+                userId,
+                "seller-" + uniqueValue + "@example.com"
+        );
+    }
+
+    private Long insertDrop(Long ownerSellerId, String status) {
+        return jdbcTemplate.queryForObject(
+                "INSERT INTO drops (seller_id, status) VALUES (?, ?) RETURNING id",
+                Long.class,
+                ownerSellerId,
+                status);
+    }
+
+    private Long insertCanceledDrop(Long ownerSellerId) {
+        return jdbcTemplate.queryForObject(
+                """
+                INSERT INTO drops (seller_id, status, closed_at, close_reason)
+                VALUES (?, 'CANCELED', CURRENT_TIMESTAMP, 'SELLER_CANCELED')
+                RETURNING id
+                """,
+                Long.class,
+                ownerSellerId);
+    }
+
+    private void insertOption(Long dropId, long unitPrice, int totalQuantity, boolean active) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO drop_options (drop_id, unit_price, total_quantity, is_active)
+                VALUES (?, ?, ?, ?)
+                """,
+                dropId,
+                unitPrice,
+                totalQuantity,
+                active);
     }
 
     private DropDraftRequest fullRequest() {
