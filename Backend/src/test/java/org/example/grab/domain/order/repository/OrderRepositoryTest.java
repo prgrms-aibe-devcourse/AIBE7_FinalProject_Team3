@@ -1,7 +1,7 @@
 package org.example.grab.domain.order.repository;
 
 import jakarta.persistence.EntityManager;
-import org.example.grab.domain.order.dto.SellerOrderListResponse;
+import org.example.grab.domain.order.dto.SellerOrderListProjection;
 import org.example.grab.domain.order.entity.Order;
 import org.example.grab.domain.order.entity.OrderItem;
 import org.example.grab.domain.order.entity.OrderStatus;
@@ -58,8 +58,8 @@ class OrderRepositoryTest {
         String uniqueValue = UUID.randomUUID().toString();
         buyerId = jdbcTemplate.queryForObject(
                 """
-                INSERT INTO users (email, password_hash, display_name, phone)
-                VALUES (?, 'encoded-password', '구매자', '01000000000')
+                INSERT INTO users (email, password_hash, display_name)
+                VALUES (?, 'encoded-password', '구매자')
                 RETURNING id
                 """,
                 Long.class,
@@ -159,8 +159,8 @@ class OrderRepositoryTest {
         String uniqueValue = UUID.randomUUID().toString();
         String sellerEmail = "seller-" + uniqueValue + "@example.com";
         long sellerUserId = jdbcTemplate.queryForObject("""
-                INSERT INTO users (email, password_hash, display_name, phone)
-                VALUES (?, 'encoded-password', '판매자', '01000000002')
+                INSERT INTO users (email, password_hash, display_name)
+                VALUES (?, 'encoded-password', '판매자')
                 RETURNING id
                 """, Long.class, sellerEmail);
         long sellerId = jdbcTemplate.queryForObject("""
@@ -196,22 +196,22 @@ class OrderRepositoryTest {
                 """, "payment-new-" + uniqueValue, orderId);
 
         // when
-        Page<SellerOrderListResponse> filtered = orderRepository.findSellerOrders(
+        Page<SellerOrderListProjection> filtered = orderRepository.findSellerOrders(
                 sellerId, sellerDropId, "PAID", "SUCCEEDED", PageRequest.of(0, 10));
-        Page<SellerOrderListResponse> unfiltered = orderRepository.findSellerOrders(
+        Page<SellerOrderListProjection> unfiltered = orderRepository.findSellerOrders(
                 sellerId, null, null, null, PageRequest.of(0, 10));
 
         // then
         assertThat(filtered.getTotalElements()).isEqualTo(1);
         assertThat(filtered.getContent()).singleElement().satisfies(order -> {
-            assertThat(order.orderId()).isEqualTo(orderId);
-            assertThat(order.dropId()).isEqualTo(sellerDropId);
-            assertThat(order.orderStatus()).isEqualTo("PAID");
-            assertThat(order.paymentStatus()).isEqualTo("SUCCEEDED");
-            assertThat(order.totalAmount()).isEqualTo(3500);
+            assertThat(order.getOrderId()).isEqualTo(orderId);
+            assertThat(order.getDropId()).isEqualTo(sellerDropId);
+            assertThat(order.getOrderStatus()).isEqualTo("PAID");
+            assertThat(order.getPaymentStatus()).isEqualTo("SUCCEEDED");
+            assertThat(order.getTotalAmount()).isEqualTo(3500);
         });
         assertThat(unfiltered.getContent()).singleElement()
-                .extracting(SellerOrderListResponse::paymentStatus).isEqualTo("SUCCEEDED");
+                .extracting(SellerOrderListProjection::getPaymentStatus).isEqualTo("SUCCEEDED");
     }
 
     private Order createOrder(OffsetDateTime expiresAt) {

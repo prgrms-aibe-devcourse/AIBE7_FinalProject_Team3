@@ -1,7 +1,7 @@
 package org.example.grab.domain.order.repository;
 
 import org.example.grab.domain.order.entity.Order;
-import org.example.grab.domain.order.dto.SellerOrderListResponse;
+import org.example.grab.domain.order.dto.SellerOrderListProjection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -47,7 +47,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
               AND (CAST(:orderStatus AS VARCHAR) IS NULL OR o.status = :orderStatus)
               AND (CAST(:paymentStatus AS VARCHAR) IS NULL OR payment.status = :paymentStatus)
             """, nativeQuery = true)
-    Page<SellerOrderListResponse> findSellerOrders(
+    Page<SellerOrderListProjection> findSellerOrders(
             @Param("sellerId") long sellerId,
             @Param("dropId") Long dropId,
             @Param("orderStatus") String orderStatus,

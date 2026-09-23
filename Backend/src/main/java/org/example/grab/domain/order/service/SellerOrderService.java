@@ -2,6 +2,7 @@ package org.example.grab.domain.order.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.grab.domain.order.dto.SellerOrderDetailResponse;
+import org.example.grab.domain.order.dto.SellerOrderListProjection;
 import org.example.grab.domain.order.dto.SellerOrderListResponse;
 import org.example.grab.domain.order.entity.Order;
 import org.example.grab.domain.order.entity.OrderStatus;
@@ -58,9 +59,18 @@ public class SellerOrderService {
         }
         Page<SellerOrderListResponse> orders = orderRepository.findSellerOrders(
                 sellerId, dropId, orderStatus == null ? null : orderStatus.name(),
-                paymentStatus == null ? null : paymentStatus.name(), PageRequest.of(page, size));
+                paymentStatus == null ? null : paymentStatus.name(), PageRequest.of(page, size))
+                .map(SellerOrderService::toListResponse);
         List<SellerOrderListResponse> content = orders.getContent();
         return new PageResponse<>(content, page, size, orders.getTotalElements(),
                 orders.getTotalPages(), orders.hasNext());
+    }
+
+    private static SellerOrderListResponse toListResponse(SellerOrderListProjection projection) {
+        return new SellerOrderListResponse(
+                projection.getOrderId(), projection.getOrderNumber(), projection.getDropId(),
+                projection.getProductName(), projection.getSellerName(), projection.getOrderStatus(),
+                projection.getPaymentStatus(), projection.getItemsAmount(), projection.getShippingAmount(),
+                projection.getTotalAmount(), projection.getOrderedAt());
     }
 }

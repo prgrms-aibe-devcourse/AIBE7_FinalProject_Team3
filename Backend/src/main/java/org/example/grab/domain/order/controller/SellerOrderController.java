@@ -29,9 +29,18 @@ public class SellerOrderController {
     private final CurrentSellerIdProvider currentSellerIdProvider;
 
     @GetMapping("/orders/{orderId}")
-    public ApiResponse<SellerOrderDetailResponse> findOrder(@PathVariable UUID orderId) {
+    public ApiResponse<SellerOrderDetailResponse> findOrder(@PathVariable String orderId) {
+        UUID uuid;
+        try {
+            uuid = UUID.fromString(orderId);
+        } catch (IllegalArgumentException exception) {
+            throw new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND);
+        }
+        if (!uuid.toString().equalsIgnoreCase(orderId)) {
+            throw new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND);
+        }
         return ApiResponse.success(
-                sellerOrderService.findOrder(currentSellerIdProvider.currentSellerId(), orderId));
+                sellerOrderService.findOrder(currentSellerIdProvider.currentSellerId(), uuid));
     }
 
     @GetMapping("/orders")
