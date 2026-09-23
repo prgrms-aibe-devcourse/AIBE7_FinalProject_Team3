@@ -59,8 +59,9 @@ POST /api/v1/auth/signup
 - 정규화 후 중간에 공백이 포함되면 `INVALID_EMAIL`로 거부한다.
 - 이메일은 유효한 형식이어야 한다.
 - 이메일은 중복될 수 없다.
-- 비밀번호는 최소 8자 이상이어야 한다.
+- 비밀번호는 최소 8자 이상, 최대 64자 이하여야 한다.
 - 비밀번호는 영문, 숫자, 특수문자를 포함해야 한다.
+- 비밀번호에 공백 문자가 포함되면 `INVALID_PASSWORD`로 거부한다. 서버는 비밀번호를 trim하거나 가공하지 않는다.
 - 비밀번호는 Argon2id로 해시해 저장한다.
 
 **오류 코드:**
@@ -342,6 +343,8 @@ PATCH /api/v1/users/me/password
   "newPassword": "NewPassword456!"
 }
 ```
+
+`newPassword`는 1.2절의 비밀번호 검증 규칙을 따른다.
 
 **응답:** `204 No Content`
 
