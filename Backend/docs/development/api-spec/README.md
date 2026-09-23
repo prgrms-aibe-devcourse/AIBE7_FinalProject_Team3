@@ -22,12 +22,16 @@
 
 | Method | Endpoint | 인증 | 용도 |
 | --- | --- | --- | --- |
+| GET | `/api/v1/auth/csrf` | 불필요 | CSRF 토큰 쿠키 발급 |
 | POST | `/api/v1/auth/signup` | 불필요 | 이메일과 비밀번호로 회원가입 |
 | POST | `/api/v1/auth/login` | 불필요 | 로그인 및 Access/Refresh Token 발급 |
+| GET | `/api/v1/auth/oauth2/{provider}` | 불필요 | KAKAO·GOOGLE 소셜 로그인 시작 |
+| GET | `/api/v1/auth/oauth2/{provider}/callback` | 불필요 | 소셜 로그인 콜백 처리 (제공자 호출) |
+| POST | `/api/v1/auth/oauth2/signup` | 소셜 가입 토큰 | 최초 소셜 인증 회원의 가입 완료 |
 | POST | `/api/v1/auth/refresh` | Refresh Token | Access Token 재발급 |
 | POST | `/api/v1/auth/logout` | 필요 | 로그아웃 및 Refresh Token 무효화 |
 | GET | `/api/v1/users/me` | USER | 로그인한 사용자의 회원 정보 조회 |
-| PATCH | `/api/v1/users/me` | USER | 이름, 연락처 등 본인 회원 정보 수정 |
+| PATCH | `/api/v1/users/me` | USER | 본인 표시 이름 수정 |
 | PATCH | `/api/v1/users/me/password` | USER | 본인 비밀번호 변경 |
 | PUT | `/api/v1/users/me/profile-image` | USER | 본인 프로필 이미지 등록 또는 변경 |
 | DELETE | `/api/v1/users/me/profile-image` | USER | 본인 프로필 이미지 삭제 |
@@ -146,7 +150,7 @@
 
 | 영역 | API 수 | 주요 용도 |
 | --- | --- | --- |
-| 회원 및 인증 | 9 | 가입, 로그인, 토큰, 회원 정보 및 프로필 이미지 관리 |
+| 회원 및 인증 | 13 | 가입, 로그인, 소셜 로그인, 토큰, 회원 정보 및 프로필 이미지 관리 |
 | 판매자 등록 | 5 | 판매자 신청, 승인, 반려 |
 | 공개 DROP 탐색 | 4 | 카테고리, 목록, 상세, 재고 조회 |
 | 판매자 DROP 관리 | 8 | 생성, 수정, 공개, 취소, 통계 |
@@ -156,7 +160,7 @@
 | 배송 | 5 | 판매자 주문 조회 및 배송 상태 관리 |
 | 대시보드 | 3 | 판매자 운영 통계 |
 | 이미지 | 1 | 상품 이미지 업로드 |
-| **합계** | **45** | |
+| **합계** | **49** | |
 
 ---
 
