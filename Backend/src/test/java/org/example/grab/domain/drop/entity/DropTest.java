@@ -7,7 +7,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.OffsetDateTime;
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -113,17 +112,17 @@ class DropTest {
     }
 
     @Test
-    @DisplayName("replaceImages는 기존 이미지를 교체한다")
-    void replaceImages() {
+    @DisplayName("clearImages는 기존 이미지를 모두 제거한다")
+    void clearImages() {
         // given
         Drop drop = Drop.createDraft(SELLER_ID);
-        drop.addImage(DropImage.create(drop, "old.jpg", 0, "이전"));
+        drop.addImage(DropImage.create(drop, "a.jpg", 0, "a"));
+        drop.addImage(DropImage.create(drop, "b.jpg", 1, "b"));
 
         // when
-        drop.replaceImages(List.of(DropImage.create(drop, "new.jpg", 0, "이후")));
+        drop.clearImages();
 
         // then
-        assertThat(drop.getImages()).hasSize(1);
-        assertThat(drop.getImages().get(0).getImageUrl()).isEqualTo("new.jpg");
+        assertThat(drop.getImages()).isEmpty();
     }
 }
