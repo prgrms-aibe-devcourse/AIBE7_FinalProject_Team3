@@ -2,8 +2,10 @@ package org.example.grab.domain.drop.controller;
 
 import org.example.grab.domain.drop.dto.request.DropDraftRequest;
 import org.example.grab.domain.drop.entity.Drop;
+import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.domain.drop.service.DropService;
+import org.example.grab.global.common.ErrorResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
 import org.example.grab.global.error.GlobalExceptionHandler;
@@ -15,6 +17,9 @@ import org.springframework.http.MediaType;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+import java.time.OffsetDateTime;
+import java.util.List;
 
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
@@ -170,6 +175,40 @@ class SellerDropControllerTest {
                         .content("{}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("DROP_NOT_EDITABLE"));
+    }
+
+    @Test
+    @DisplayName("공개는 200과 WISH·publishedAt을 반환한다")
+    void publish() throws Exception {
+        // given
+        Drop drop = draftWithId(100L);
+        ReflectionTestUtils.setField(drop, "status", DropStatus.WISH);
+        ReflectionTestUtils.setField(drop, "publishedAt", OffsetDateTime.parse("2026-09-18T07:00:00Z"));
+        given(currentSellerIdProvider.currentSellerId()).willReturn(1L);
+        given(dropService.publish(1L, 100L)).willReturn(drop);
+
+        // when & then
+        mockMvc.perform(post("/api/v1/seller/drops/100/publish"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.dropId").value(100))
+                .andExpect(jsonPath("$.data.status").value("WISH"))
+                .andExpect(jsonPath("$.data.publishedAt").exists());
+    }
+
+    @Test
+    @DisplayName("공개 검증 실패는 오류 코드와 위반 항목을 fieldErrors로 반환한다")
+    void publish_validationFailed() throws Exception {
+        // given
+        given(currentSellerIdProvider.currentSellerId()).willReturn(1L);
+        given(dropService.publish(1L, 100L)).willThrow(new BusinessException(
+                DropErrorCode.DUPLICATE_OPTION_COMBINATION,
+                List.of(new ErrorResponse.FieldError("options[1]", "동일한 옵션값 조합의 SKU가 이미 있습니다."))));
+
+        // when & then
+        mockMvc.perform(post("/api/v1/seller/drops/100/publish"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("DUPLICATE_OPTION_COMBINATION"))
+                .andExpect(jsonPath("$.error.fieldErrors[0].field").value("options[1]"));
     }
 
     private Drop draftWithId(Long id) {

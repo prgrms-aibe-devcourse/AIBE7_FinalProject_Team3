@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.grab.domain.drop.dto.request.DropDraftRequest;
 import org.example.grab.domain.drop.dto.response.DropDraftResponse;
+import org.example.grab.domain.drop.dto.response.DropPublishResponse;
 import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.domain.drop.service.DropService;
 import org.example.grab.global.common.ApiResponse;
@@ -41,5 +42,12 @@ public class SellerDropController {
         Long sellerId = currentSellerIdProvider.currentSellerId();
         Drop drop = dropService.updateDraft(sellerId, dropId, request);
         return ApiResponse.success(DropDraftResponse.from(drop));
+    }
+
+    @PostMapping("/{dropId}/publish")
+    public ApiResponse<DropPublishResponse> publish(@PathVariable Long dropId) {
+        Long sellerId = currentSellerIdProvider.currentSellerId();
+        Drop drop = dropService.publish(sellerId, dropId);
+        return ApiResponse.success(DropPublishResponse.from(drop));
     }
 }

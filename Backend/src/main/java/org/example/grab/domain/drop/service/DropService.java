@@ -19,6 +19,8 @@ import org.example.grab.global.error.BusinessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -27,7 +29,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 판매자의 DROP 임시 저장·수정을 담당한다.
+ * 판매자의 DROP 임시 저장·수정·공개를 담당한다.
  * 모든 변경은 DRAFT 상태에서만 허용하며, 공개 전 필수 항목 검증은 공개(publish) 단계의 책임이다.
  */
 @Service
@@ -54,6 +56,16 @@ public class DropService {
                 .orElseThrow(() -> new BusinessException(DropErrorCode.DROP_NOT_FOUND));
         drop.validateOwner(sellerId);
         applyDraft(drop, request);
+        return drop;
+    }
+
+    /** DRAFT를 WISH로 공개한다. 수정과 같은 순서(조회 → 소유권)로 검증한 뒤 공개 검증은 도메인에 맡긴다. */
+    @Transactional
+    public Drop publish(Long sellerId, Long dropId) {
+        Drop drop = dropRepository.findById(dropId)
+                .orElseThrow(() -> new BusinessException(DropErrorCode.DROP_NOT_FOUND));
+        drop.validateOwner(sellerId);
+        drop.publish(OffsetDateTime.now(ZoneOffset.UTC));
         return drop;
     }
 

@@ -400,6 +400,17 @@ POST /api/v1/seller/drops/{dropId}/publish
 }
 ```
 
+**오류 코드:**
+- `DROP_NOT_FOUND`
+- `DROP_ACCESS_DENIED`
+- `INVALID_STATE_TRANSITION` — DRAFT가 아닌 DROP
+- `VALIDATION_FAILED` — 필수 항목 누락. 누락된 항목 전부를 `fieldErrors`로 반환
+- `INVALID_SCHEDULE` — 시작 시각이 종료 시각보다 이전이 아님
+- `INVALID_OPTION_COMBINATION` — 그룹명·옵션값 중복, 그룹별 선택 누락, 음수 가격·재고, 판매 가능한 SKU 없음
+- `DUPLICATE_OPTION_COMBINATION` — 동일한 값 조합의 SKU 중복
+
+> 옵션 검증 실패 시 `fieldErrors`의 `field`로 위반 위치(예: `options[1]`, `optionGroups[0]`)를 알려줍니다.
+
 ### 2.6 WISH DROP 취소
 
 ```http

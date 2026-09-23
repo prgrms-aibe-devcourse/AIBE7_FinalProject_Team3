@@ -18,7 +18,7 @@ public class GlobalExceptionHandler {
         ErrorCode errorCode = e.getErrorCode();
         log.warn("비즈니스 예외: {} - {}", errorCode.getCode(), e.getMessage());
         return ResponseEntity.status(errorCode.getStatus())
-                .body(ErrorResponse.of(errorCode.getCode(), e.getMessage(), List.of()));
+                .body(ErrorResponse.of(errorCode.getCode(), e.getMessage(), e.getFieldErrors()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
