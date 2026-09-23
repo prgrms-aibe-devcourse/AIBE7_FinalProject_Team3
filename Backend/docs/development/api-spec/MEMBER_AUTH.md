@@ -34,8 +34,7 @@ POST /api/v1/auth/signup
 {
   "email": "user@example.com",
   "password": "Password123!",
-  "displayName": "홍길동",
-  "phone": "01012345678"
+  "displayName": "홍길동"
 }
 ```
 
@@ -55,6 +54,7 @@ POST /api/v1/auth/signup
 ```
 
 **검증 규칙:**
+- MVP 회원가입에서는 휴대폰 번호를 받지 않는다.
 - 이메일은 유효한 형식이어야 한다.
 - 이메일은 중복될 수 없다.
 - 비밀번호는 최소 8자 이상이어야 한다.
@@ -188,7 +188,8 @@ POST /api/v1/auth/oauth2/signup
 }
 ```
 
-서버는 일회용 가입 컨텍스트의 제공자, 고유 사용자 식별자 및 검증된 이메일을 사용한다. 클라이언트가 제공자, 이메일 또는 휴대폰 번호를 지정할 수 없다.
+서버는 일회용 가입 컨텍스트의 제공자, 고유 사용자 식별자 및 검증된 이메일을 사용한다. 클라이언트가 제공자나 이메일을 지정할 수 없다. MVP 회원가입에서는 휴대폰 번호를 받지 않는다.
+
 
 **응답:** `201 Created`
 
@@ -212,7 +213,7 @@ Set-Cookie: refresh_token=<token>; HttpOnly; Secure; SameSite=Lax; Path=/api/v1/
 }
 ```
 
-가입 컨텍스트는 성공 시 한 번만 소비하고 만료·재사용된 토큰은 거부한다. 소셜 회원가입 시 휴대폰 번호와 `password_hash`를 저장하지 않는다.
+가입 컨텍스트는 성공 시 한 번만 소비하고 만료·재사용된 토큰은 거부한다. 소셜 회원가입 시 `password_hash`를 저장하지 않는다.
 
 **오류 코드:**
 - `OAUTH2_SIGNUP_CONTEXT_INVALID`
@@ -283,15 +284,12 @@ GET /api/v1/users/me
     "userId": "6f1a2b3c-4d5e-4f70-8192-a3b4c5d6e7f8",
     "email": "user@example.com",
     "displayName": "홍길동",
-    "phone": "01012345678",
     "roles": ["USER", "SELLER"],
     "profileImageUrl": "https://cdn.example.com/images/profile.jpg",
     "createdAt": "2026-09-18T14:00:00+09:00"
   }
 }
 ```
-
-`phone`은 소셜 회원에게 `null`이며, LOCAL 회원에게만 회원가입 시 입력한 값이 반환된다.
 
 ### 1.10 내 정보 수정
 
@@ -305,8 +303,7 @@ PATCH /api/v1/users/me
 
 ```json
 {
-  "displayName": "김길동",
-  "phone": "01098765432"
+  "displayName": "김길동"
 }
 ```
 
@@ -319,7 +316,6 @@ PATCH /api/v1/users/me
     "userId": "6f1a2b3c-4d5e-4f70-8192-a3b4c5d6e7f8",
     "email": "user@example.com",
     "displayName": "김길동",
-    "phone": "01098765432",
     "roles": ["USER", "SELLER"],
     "createdAt": "2026-09-18T14:00:00+09:00"
   }
