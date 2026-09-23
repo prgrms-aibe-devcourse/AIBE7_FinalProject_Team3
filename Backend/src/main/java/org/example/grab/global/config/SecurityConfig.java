@@ -1,4 +1,4 @@
-package org.example.grab.config;
+package org.example.grab.global.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

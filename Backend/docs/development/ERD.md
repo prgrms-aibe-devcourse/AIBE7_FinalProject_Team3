@@ -33,8 +33,8 @@
 | `role`              | VARCHAR(20)  | O   | `USER`, `ADMIN`                    |
 | `status`            | VARCHAR(20)  | O   | `ACTIVE`, `SUSPENDED`, `WITHDRAWN` |
 | `provider`          | VARCHAR(20)  | O   | `LOCAL`, `KAKAO`, `GOOGLE`         |
-| `updated_at`        | TIMESTAMPZ   | O   | 최초 회원 생성 시간                        |
-| `created_at`        | TIMESTAMPZ   | O   | 최신 회원 업데이트 시간                      |
+| `created_at`        | TIMESTAMPTZ  | O   | 회원 생성 시각                           |
+| `updated_at`        | TIMESTAMPTZ  | O   | 회원 정보 최종 수정 시각                     |
 
 
 판매자는 회원의 배타적인 역할이 아니다. `sellers.status = APPROVED`인 회원에게 판매자 기능을 허용한다.

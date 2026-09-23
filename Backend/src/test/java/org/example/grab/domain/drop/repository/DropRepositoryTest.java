@@ -1,7 +1,7 @@
 package org.example.grab.domain.drop.repository;
 
 import jakarta.persistence.EntityManager;
-import org.example.grab.config.JpaConfig;
+import org.example.grab.global.config.JpaConfig;
 import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.domain.drop.entity.option.DropOption;
 import org.example.grab.domain.drop.entity.option.DropOptionGroup;
