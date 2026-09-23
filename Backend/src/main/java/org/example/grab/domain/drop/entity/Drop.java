@@ -9,6 +9,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -75,12 +76,15 @@ public class Drop extends BaseEntity {
     private DropCloseReason closeReason;
 
     @OneToMany(mappedBy = "drop", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder ASC")
     private List<DropImage> images = new ArrayList<>();
 
     @OneToMany(mappedBy = "drop", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder ASC")
     private List<DropOptionGroup> optionGroups = new ArrayList<>();
 
     @OneToMany(mappedBy = "drop", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder ASC")
     private List<DropOption> options = new ArrayList<>();
 
     private Drop(Long sellerId) {
@@ -137,22 +141,19 @@ public class Drop extends BaseEntity {
         }
     }
 
-    public void replaceImages(List<DropImage> images) {
+    public void clearImages() {
         ensureEditable();
-        this.images.clear();
-        this.images.addAll(images);
+        images.clear();
     }
 
-    public void replaceOptionGroups(List<DropOptionGroup> optionGroups) {
+    public void clearOptionGroups() {
         ensureEditable();
-        this.optionGroups.clear();
-        this.optionGroups.addAll(optionGroups);
+        optionGroups.clear();
     }
 
-    public void replaceOptions(List<DropOption> options) {
+    public void clearOptions() {
         ensureEditable();
-        this.options.clear();
-        this.options.addAll(options);
+        options.clear();
     }
 
     private void ensureEditable() {

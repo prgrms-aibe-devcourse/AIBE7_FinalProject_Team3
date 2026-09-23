@@ -59,16 +59,32 @@ public class DropService {
                 request.saleStartsAt(),
                 request.saleEndsAt());
 
-        if (request.imageUrls() != null) {
-            drop.replaceImages(toImages(drop, request.imageUrls()));
+        boolean replaceImages = request.imageUrls() != null;
+        boolean replaceOptions = request.optionGroups() != null || request.options() != null;
+        if (!replaceImages && !replaceOptions) {
+            return;
         }
-        if (request.optionGroups() != null || request.options() != null) {
+        if (replaceOptions) {
+            drop.clearOptions();
+            dropRepository.flush();
+            drop.clearOptionGroups();
+            dropRepository.flush();
+        }
+        if (replaceImages) {
+            drop.clearImages();
+            dropRepository.flush();
+        }
+
+        if (replaceImages) {
+            toImages(drop, request.imageUrls()).forEach(drop::addImage);
+        }
+        if (replaceOptions) {
             OptionAssembly assembly = assembleOptions(
                     drop,
                     request.optionGroups() != null ? request.optionGroups() : List.of(),
                     request.options() != null ? request.options() : List.of());
-            drop.replaceOptionGroups(assembly.groups());
-            drop.replaceOptions(assembly.options());
+            assembly.groups().forEach(drop::addOptionGroup);
+            assembly.options().forEach(drop::addOption);
         }
     }
 
