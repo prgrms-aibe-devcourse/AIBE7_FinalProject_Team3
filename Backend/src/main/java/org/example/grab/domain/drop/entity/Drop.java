@@ -9,13 +9,16 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.grab.domain.drop.entity.option.DropOption;
 import org.example.grab.domain.drop.entity.option.DropOptionGroup;
+import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.global.entity.BaseEntity;
+import org.example.grab.global.error.BusinessException;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -73,12 +76,15 @@ public class Drop extends BaseEntity {
     private DropCloseReason closeReason;
 
     @OneToMany(mappedBy = "drop", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder ASC")
     private List<DropImage> images = new ArrayList<>();
 
     @OneToMany(mappedBy = "drop", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder ASC")
     private List<DropOptionGroup> optionGroups = new ArrayList<>();
 
     @OneToMany(mappedBy = "drop", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder ASC")
     private List<DropOption> options = new ArrayList<>();
 
     private Drop(Long sellerId) {
@@ -100,5 +106,65 @@ public class Drop extends BaseEntity {
 
     public void addOption(DropOption option) {
         options.add(option);
+    }
+
+    public void updateDraft(String name, String description, Long categoryId, Long shippingFee,
+                            String shippingNotice, OffsetDateTime saleStartsAt, OffsetDateTime saleEndsAt) {
+        ensureEditable();
+        if (name != null) {
+            this.name = name;
+        }
+        if (description != null) {
+            this.description = description;
+        }
+        if (categoryId != null) {
+            this.categoryId = categoryId;
+        }
+        if (shippingFee != null) {
+            this.shippingFee = shippingFee;
+        }
+        if (shippingNotice != null) {
+            this.shippingNotice = shippingNotice;
+        }
+        if (saleStartsAt != null) {
+            this.saleStartsAt = saleStartsAt;
+        }
+        if (saleEndsAt != null) {
+            this.saleEndsAt = saleEndsAt;
+        }
+        validateSchedule();
+    }
+
+    public void validateOwner(Long sellerId) {
+        if (!this.sellerId.equals(sellerId)) {
+            throw new BusinessException(DropErrorCode.DROP_ACCESS_DENIED);
+        }
+    }
+
+    public void clearImages() {
+        ensureEditable();
+        images.clear();
+    }
+
+    public void clearOptionGroups() {
+        ensureEditable();
+        optionGroups.clear();
+    }
+
+    public void clearOptions() {
+        ensureEditable();
+        options.clear();
+    }
+
+    private void ensureEditable() {
+        if (status != DropStatus.DRAFT) {
+            throw new BusinessException(DropErrorCode.DROP_NOT_EDITABLE);
+        }
+    }
+
+    private void validateSchedule() {
+        if (saleStartsAt != null && saleEndsAt != null && !saleStartsAt.isBefore(saleEndsAt)) {
+            throw new BusinessException(DropErrorCode.INVALID_SCHEDULE);
+        }
     }
 }
