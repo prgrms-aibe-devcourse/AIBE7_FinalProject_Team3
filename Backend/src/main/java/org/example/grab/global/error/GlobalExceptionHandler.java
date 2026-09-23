@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.List;
 
@@ -19,6 +20,16 @@ public class GlobalExceptionHandler {
         log.warn("비즈니스 예외: {} - {}", errorCode.getCode(), e.getMessage());
         return ResponseEntity.status(errorCode.getStatus())
                 .body(ErrorResponse.of(errorCode.getCode(), e.getMessage(), e.getFieldErrors()));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleMethodArgumentTypeMismatch(MethodArgumentTypeMismatchException e) {
+        log.warn("요청 파라미터 타입 오류: {} = {}", e.getName(), e.getValue());
+        return ResponseEntity.status(CommonErrorCode.INVALID_REQUEST.getStatus())
+                .body(ErrorResponse.of(
+                        CommonErrorCode.INVALID_REQUEST.getCode(),
+                        CommonErrorCode.INVALID_REQUEST.getMessage(),
+                        List.of()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
