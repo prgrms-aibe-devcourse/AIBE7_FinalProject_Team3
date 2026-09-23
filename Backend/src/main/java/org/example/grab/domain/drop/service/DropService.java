@@ -26,12 +26,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * 판매자의 DROP 임시 저장·수정을 담당한다.
+ * 모든 변경은 DRAFT 상태에서만 허용하며, 공개 전 필수 항목 검증은 공개(publish) 단계의 책임이다.
+ */
 @Service
 @RequiredArgsConstructor
 public class DropService {
 
     private final DropRepository dropRepository;
 
+    /** 새 DRAFT를 만들고 요청 값을 반영해 저장한다. */
     @Transactional
     public Drop createDraft(Long sellerId, DropDraftRequest request) {
         Drop drop = Drop.createDraft(sellerId);
@@ -39,6 +44,10 @@ public class DropService {
         return dropRepository.save(drop);
     }
 
+    /**
+     * DRAFT를 수정한다. 조회 → 소유권 → 상태 순서로 검증해,
+     * 존재하지 않음(404)을 먼저 확정한 뒤 권한(403)과 편집 가능 상태(409)를 판단한다.
+     */
     @Transactional
     public Drop updateDraft(Long sellerId, Long dropId, DropDraftRequest request) {
         Drop drop = dropRepository.findById(dropId)
@@ -49,6 +58,7 @@ public class DropService {
     }
 
     private void applyDraft(Drop drop, DropDraftRequest request) {
+        // null 필드는 "변경하지 않음"으로 해석한다(부분 수정).
         ShippingRequest shipping = request.shipping();
         drop.updateDraft(
                 request.name(),
@@ -59,6 +69,7 @@ public class DropService {
                 request.saleStartsAt(),
                 request.saleEndsAt());
 
+        // 그룹만 또는 옵션만 오면 기존 SKU가 조용히 삭제되므로, 옵션 구조는 둘 다 오거나 둘 다 없어야 한다.
         boolean replaceImages = request.imageUrls() != null;
         boolean hasOptionGroups = request.optionGroups() != null;
         boolean hasOptions = request.options() != null;
@@ -69,6 +80,8 @@ public class DropService {
         if (!replaceImages && !replaceOptions) {
             return;
         }
+        // 자식 컬렉션에는 sort_order 등 unique 제약이 있어, 삽입이 삭제보다 먼저 실행되면 충돌한다.
+        // 컬렉션을 비우고 flush로 삭제를 먼저 확정한 뒤 새 자식을 추가한다(맵이 값·그룹을 참조하므로 옵션 → 그룹 순서).
         if (replaceOptions) {
             drop.clearOptions();
             dropRepository.flush();
@@ -90,6 +103,7 @@ public class DropService {
         }
     }
 
+    // 이미지 정렬 순서는 요청 배열의 인덱스를 그대로 쓰고, alt_text는 정책 확정 전까지 상품명을 기본값으로 둔다.
     private List<DropImage> toImages(Drop drop, List<String> imageUrls) {
         String altText = drop.getName() != null ? drop.getName() : "";
         List<DropImage> images = new ArrayList<>();
@@ -99,6 +113,10 @@ public class DropService {
         return images;
     }
 
+    /**
+     * 요청의 클라이언트 키로 옵션 그룹·값·SKU를 조립한다. 키는 응답에 쓰지 않고 이 요청 안에서 참조를 연결하는 용도다.
+     * DRAFT 단계이므로 "모든 그룹에서 정확히 하나 선택"·"동일 조합 SKU 중복 금지"는 검증하지 않는다(공개 단계 책임).
+     */
     private OptionAssembly assembleOptions(Drop drop,
                                            List<OptionGroupRequest> groupRequests,
                                            List<OptionRequest> optionRequests) {
@@ -108,9 +126,11 @@ public class DropService {
 
         for (int groupIndex = 0; groupIndex < groupRequests.size(); groupIndex++) {
             OptionGroupRequest groupRequest = groupRequests.get(groupIndex);
+            // 그룹 key·이름 중복은 DB UQ(drop_id, name)에 걸리기 전에 도메인에서 먼저 차단한다.
             if (valuesByGroupKey.containsKey(groupRequest.key()) || !groupNames.add(groupRequest.name())) {
                 throw new BusinessException(DropErrorCode.INVALID_OPTION_COMBINATION);
             }
+            // sortOrder 미지정 시 요청 순서를 사용해 표시 순서를 보존한다.
             int groupSortOrder = groupRequest.sortOrder() != null ? groupRequest.sortOrder() : groupIndex;
             DropOptionGroup group = DropOptionGroup.create(drop, groupRequest.name(), groupSortOrder);
 
@@ -120,6 +140,7 @@ public class DropService {
                     groupRequest.values() != null ? groupRequest.values() : List.of();
             for (int valueIndex = 0; valueIndex < valueRequests.size(); valueIndex++) {
                 OptionValueRequest valueRequest = valueRequests.get(valueIndex);
+                // 값 key·내용 중복도 DB UQ(group_id, value) 이전에 차단한다.
                 if (valuesByKey.containsKey(valueRequest.key()) || !values.add(valueRequest.value())) {
                     throw new BusinessException(DropErrorCode.INVALID_OPTION_COMBINATION);
                 }
@@ -135,6 +156,7 @@ public class DropService {
         List<DropOption> options = new ArrayList<>();
         for (int optionIndex = 0; optionIndex < optionRequests.size(); optionIndex++) {
             OptionRequest optionRequest = optionRequests.get(optionIndex);
+            // SKU의 가격·수량은 DB NOT NULL이므로 누락 시 500 대신 422로 응답한다.
             if (optionRequest.unitPrice() == null || optionRequest.totalQuantity() == null) {
                 throw new BusinessException(DropErrorCode.INVALID_OPTION_COMBINATION);
             }
@@ -151,6 +173,7 @@ public class DropService {
             for (SelectionRequest selection : selections) {
                 Map<String, DropOptionValue> valuesByKey = valuesByGroupKey.get(selection.groupKey());
                 DropOptionValue value = valuesByKey != null ? valuesByKey.get(selection.valueKey()) : null;
+                // 없는 키를 참조하거나 한 SKU가 같은 그룹을 두 번 선택하면 PK(option_id, group_id) 위반이므로 사전에 거부한다.
                 if (value == null || !selectedGroupKeys.add(selection.groupKey())) {
                     throw new BusinessException(DropErrorCode.INVALID_OPTION_COMBINATION);
                 }
