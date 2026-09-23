@@ -2,12 +2,12 @@ package org.example.grab.domain.drop.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.grab.domain.drop.dto.SellerDropListProjection;
-import org.example.grab.domain.drop.dto.request.DropDraftRequest;
-import org.example.grab.domain.drop.dto.request.OptionGroupRequest;
+import org.example.grab.domain.drop.dto.request.DropDraftRequest;import org.example.grab.domain.drop.dto.request.OptionGroupRequest;
 import org.example.grab.domain.drop.dto.request.OptionRequest;
 import org.example.grab.domain.drop.dto.request.OptionValueRequest;
 import org.example.grab.domain.drop.dto.request.SelectionRequest;
 import org.example.grab.domain.drop.dto.request.ShippingRequest;
+import org.example.grab.domain.drop.dto.response.SellerDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.SellerDropListResponse;
 import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.domain.drop.entity.DropImage;
@@ -97,6 +97,14 @@ public class DropService {
                 .toList();
         return new PageResponse<>(content, page, size, drops.getTotalElements(),
                 drops.getTotalPages(), drops.hasNext());
+    }
+
+    @Transactional(readOnly = true)
+    public SellerDropDetailResponse findSellerDrop(Long sellerId, Long dropId) {
+        Drop drop = dropRepository.findById(dropId)
+                .orElseThrow(() -> new BusinessException(DropErrorCode.DROP_NOT_FOUND));
+        drop.validateOwner(sellerId);
+        return SellerDropDetailResponse.from(drop);
     }
 
     private void applyDraft(Drop drop, DropDraftRequest request) {

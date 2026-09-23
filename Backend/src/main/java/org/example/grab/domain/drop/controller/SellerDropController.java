@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.grab.domain.drop.dto.request.DropDraftRequest;
 import org.example.grab.domain.drop.dto.response.DropDraftResponse;
 import org.example.grab.domain.drop.dto.response.DropPublishResponse;
+import org.example.grab.domain.drop.dto.response.SellerDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.SellerDropListResponse;
 import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.domain.drop.entity.DropStatus;
@@ -68,5 +69,11 @@ public class SellerDropController {
         }
         Long sellerId = currentSellerIdProvider.currentSellerId();
         return ApiResponse.success(dropService.findSellerDrops(sellerId, status, page, size));
+    }
+
+    @GetMapping("/{dropId}")
+    public ApiResponse<SellerDropDetailResponse> findDrop(@PathVariable Long dropId) {
+        Long sellerId = currentSellerIdProvider.currentSellerId();
+        return ApiResponse.success(dropService.findSellerDrop(sellerId, dropId));
     }
 }

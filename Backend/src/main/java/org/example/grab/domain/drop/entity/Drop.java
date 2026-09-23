@@ -14,6 +14,7 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.BatchSize;
 import org.example.grab.domain.drop.entity.option.DropOption;
 import org.example.grab.domain.drop.entity.option.DropOptionGroup;
 import org.example.grab.domain.drop.entity.option.DropOptionValue;
@@ -86,14 +87,17 @@ public class Drop extends BaseEntity {
 
     @OneToMany(mappedBy = "drop", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sortOrder ASC")
+    @BatchSize(size = 100)
     private List<DropImage> images = new ArrayList<>();
 
     @OneToMany(mappedBy = "drop", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sortOrder ASC")
+    @BatchSize(size = 100)
     private List<DropOptionGroup> optionGroups = new ArrayList<>();
 
     @OneToMany(mappedBy = "drop", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sortOrder ASC")
+    @BatchSize(size = 100)
     private List<DropOption> options = new ArrayList<>();
 
     private Drop(Long sellerId) {

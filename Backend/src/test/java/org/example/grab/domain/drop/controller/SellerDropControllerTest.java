@@ -1,6 +1,7 @@
 package org.example.grab.domain.drop.controller;
 
 import org.example.grab.domain.drop.dto.request.DropDraftRequest;
+import org.example.grab.domain.drop.dto.response.SellerDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.SellerDropListResponse;
 import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.domain.drop.entity.DropStatus;
@@ -264,6 +265,60 @@ class SellerDropControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
         verifyNoInteractions(dropService);
+    }
+
+    @Test
+    @DisplayName("판매자 DROP 상세는 옵션 그룹·값·SKU 구조로 반환한다")
+    void findDrop() throws Exception {
+        // given
+        given(currentSellerIdProvider.currentSellerId()).willReturn(1L);
+        SellerDropDetailResponse detail = new SellerDropDetailResponse(
+                100L, "상품", "설명", List.of("https://example.com/a.jpg"), 10000L, 1L, DropStatus.DRAFT,
+                OffsetDateTime.parse("2026-09-18T07:00:00Z"), OffsetDateTime.parse("2026-09-18T09:00:00Z"),
+                new SellerDropDetailResponse.Shipping(3000L, "안내"),
+                List.of(new SellerDropDetailResponse.OptionGroup(11L, "소재", 0,
+                        List.of(new SellerDropDetailResponse.OptionValue(111L, "코튼", 0)))),
+                List.of(new SellerDropDetailResponse.Option(1001L,
+                        List.of(new SellerDropDetailResponse.Selection(11L, 111L)),
+                        129000L, 10, 0, 0, true, 0)));
+        given(dropService.findSellerDrop(1L, 100L)).willReturn(detail);
+
+        // when & then
+        mockMvc.perform(get("/api/v1/seller/drops/100"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.dropId").value(100))
+                .andExpect(jsonPath("$.data.shipping.shippingFee").value(3000))
+                .andExpect(jsonPath("$.data.optionGroups[0].groupId").value(11))
+                .andExpect(jsonPath("$.data.optionGroups[0].values[0].valueId").value(111))
+                .andExpect(jsonPath("$.data.options[0].selections[0].valueId").value(111));
+    }
+
+    @Test
+    @DisplayName("없는 dropId 상세 조회는 404 DROP_NOT_FOUND")
+    void findDrop_notFound() throws Exception {
+        // given
+        given(currentSellerIdProvider.currentSellerId()).willReturn(1L);
+        given(dropService.findSellerDrop(1L, 999L))
+                .willThrow(new BusinessException(DropErrorCode.DROP_NOT_FOUND));
+
+        // when & then
+        mockMvc.perform(get("/api/v1/seller/drops/999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("DROP_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("다른 판매자의 DROP 상세 조회는 403 DROP_ACCESS_DENIED")
+    void findDrop_accessDenied() throws Exception {
+        // given
+        given(currentSellerIdProvider.currentSellerId()).willReturn(1L);
+        given(dropService.findSellerDrop(1L, 100L))
+                .willThrow(new BusinessException(DropErrorCode.DROP_ACCESS_DENIED));
+
+        // when & then
+        mockMvc.perform(get("/api/v1/seller/drops/100"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("DROP_ACCESS_DENIED"));
     }
 
     private Drop draftWithId(Long id) {

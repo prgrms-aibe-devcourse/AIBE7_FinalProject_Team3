@@ -266,6 +266,33 @@ class DropServiceTest {
                 });
     }
 
+    @Test
+    @DisplayName("존재하지 않는 DROP 상세 조회는 DROP_NOT_FOUND")
+    void findSellerDrop_notFound() {
+        // given
+        given(dropRepository.findById(99L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> dropService.findSellerDrop(1L, 99L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(DropErrorCode.DROP_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("다른 판매자의 DROP 상세 조회는 DROP_ACCESS_DENIED")
+    void findSellerDrop_accessDenied() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+
+        // when & then
+        assertThatThrownBy(() -> dropService.findSellerDrop(2L, 10L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(DropErrorCode.DROP_ACCESS_DENIED);
+    }
+
     private DropDraftRequest requestWithOptions() {
         OptionGroupRequest material = new OptionGroupRequest("material", "소재", 0,
                 List.of(new OptionValueRequest("cotton", "코튼", 0),

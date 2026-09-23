@@ -8,6 +8,7 @@ import org.example.grab.domain.drop.dto.request.OptionRequest;
 import org.example.grab.domain.drop.dto.request.OptionValueRequest;
 import org.example.grab.domain.drop.dto.request.SelectionRequest;
 import org.example.grab.domain.drop.dto.request.ShippingRequest;
+import org.example.grab.domain.drop.dto.response.SellerDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.SellerDropListResponse;
 import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.domain.drop.entity.DropImage;
@@ -314,6 +315,30 @@ class DropServiceIntegrationTest {
         // then
         assertThat(minPriceOf(result, withOptions)).isEqualTo(500L);
         assertThat(minPriceOf(result, withoutOptions)).isNull();
+    }
+
+    @Test
+    @DisplayName("상세 조회는 지연 로딩 상태에서도 그룹·값·SKU 매핑을 순서대로 반환한다")
+    void findSellerDrop_returnsOrderedDetail() {
+        // given
+        Long dropId = dropService.createDraft(sellerId, fullRequest()).getId();
+        entityManager.flush();
+        entityManager.clear();
+
+        // when
+        SellerDropDetailResponse detail = dropService.findSellerDrop(sellerId, dropId);
+
+        // then
+        assertThat(detail.imageUrls())
+                .containsExactly("https://example.com/a.jpg", "https://example.com/b.jpg");
+        assertThat(detail.optionGroups()).extracting(SellerDropDetailResponse.OptionGroup::name)
+                .containsExactly("소재", "길이");
+        assertThat(detail.optionGroups().get(0).values()).extracting(SellerDropDetailResponse.OptionValue::value)
+                .containsExactly("코튼", "린넨");
+        assertThat(detail.options()).hasSize(2);
+        assertThat(detail.options().get(0).selections()).extracting(SellerDropDetailResponse.Selection::groupId)
+                .containsExactly(detail.optionGroups().get(0).groupId(), detail.optionGroups().get(1).groupId());
+        assertThat(detail.minPrice()).isEqualTo(129000L);
     }
 
     private Long minPriceOf(PageResponse<SellerDropListResponse> result, Long dropId) {
