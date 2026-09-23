@@ -14,6 +14,7 @@ import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.domain.drop.repository.DropRepository;
 import org.example.grab.global.error.BusinessException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,13 +25,14 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.jdbc.Sql;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -40,7 +42,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
 @Import({JpaConfig.class, DropService.class})
 @Testcontainers
-@Sql("/sql/drop-fixtures.sql")
 class DropServiceIntegrationTest {
 
     @Container
@@ -62,6 +63,41 @@ class DropServiceIntegrationTest {
     @Autowired
     private EntityManager entityManager;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    private Long sellerId;
+    private Long categoryId;
+
+    @BeforeEach
+    void setUp() {
+        String uniqueValue = UUID.randomUUID().toString();
+        Long userId = jdbcTemplate.queryForObject(
+                """
+                INSERT INTO users (email, password_hash, display_name)
+                VALUES (?, 'encoded-password', '판매자')
+                RETURNING id
+                """,
+                Long.class,
+                uniqueValue + "@example.com"
+        );
+        sellerId = jdbcTemplate.queryForObject(
+                """
+                INSERT INTO sellers (user_id, brand_name, contact_email)
+                VALUES (?, 'GRAB 판매자', ?)
+                RETURNING id
+                """,
+                Long.class,
+                userId,
+                "seller-" + uniqueValue + "@example.com"
+        );
+        categoryId = jdbcTemplate.queryForObject(
+                "INSERT INTO categories (code, name) VALUES (?, '패션') RETURNING id",
+                Long.class,
+                "TEST-" + uniqueValue
+        );
+    }
+
     @Test
     @DisplayName("필수 항목이 비어 있어도 DRAFT로 저장된다")
     void createDraft_persistsDraft() {
@@ -69,7 +105,7 @@ class DropServiceIntegrationTest {
         DropDraftRequest request = emptyRequest();
 
         // when
-        Drop saved = dropService.createDraft(1L, request);
+        Drop saved =         dropService.createDraft(sellerId, request);
 
         // then
         assertThat(saved.getId()).isNotNull();
@@ -84,7 +120,7 @@ class DropServiceIntegrationTest {
     @DisplayName("옵션 조합과 이미지·옵션 그룹·값 정렬 순서가 요청대로 저장된다")
     void createDraft_persistsOptionsWithSortOrder() {
         // when
-        Drop saved = dropService.createDraft(1L, fullRequest());
+        Drop saved =         dropService.createDraft(sellerId, fullRequest());
 
         // then
         entityManager.clear();
@@ -103,12 +139,12 @@ class DropServiceIntegrationTest {
     @DisplayName("DRAFT 수정 내용이 저장된다")
     void updateDraft_persistsChanges() {
         // given
-        Drop saved = dropService.createDraft(1L, fullRequest());
+        Drop saved =         dropService.createDraft(sellerId, fullRequest());
         entityManager.flush();
         entityManager.clear();
 
         // when
-        dropService.updateDraft(1L, saved.getId(),
+        dropService.updateDraft(sellerId, saved.getId(),
                 new DropDraftRequest("수정된 이름", null, null, null, null, null, null, null, null));
         entityManager.flush();
         entityManager.clear();
@@ -125,12 +161,12 @@ class DropServiceIntegrationTest {
         // given
         OffsetDateTime start = OffsetDateTime.now().plusDays(1);
         OffsetDateTime end = start.plusHours(2);
-        Drop saved = dropService.createDraft(1L,
+        Drop saved =         dropService.createDraft(sellerId,
                 new DropDraftRequest(null, null, null, null, start, end, null, null, null));
         entityManager.flush();
 
         // when & then
-        assertThatThrownBy(() -> dropService.updateDraft(1L, saved.getId(),
+        assertThatThrownBy(() -> dropService.updateDraft(sellerId, saved.getId(),
                 new DropDraftRequest(null, null, null, null, end.plusHours(1), null, null, null, null)))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
@@ -141,7 +177,7 @@ class DropServiceIntegrationTest {
     @DisplayName("수정 시 이미지·옵션을 전체 교체해도 제약 위반 없이 저장된다")
     void updateDraft_replacesChildren() {
         // given
-        Drop saved = dropService.createDraft(1L, fullRequest());
+        Drop saved =         dropService.createDraft(sellerId, fullRequest());
         entityManager.flush();
         entityManager.clear();
 
@@ -154,7 +190,7 @@ class DropServiceIntegrationTest {
                 null, null, null, null, List.of(color), List.of(option));
 
         // when
-        dropService.updateDraft(1L, saved.getId(), update);
+        dropService.updateDraft(sellerId, saved.getId(), update);
         entityManager.flush();
         entityManager.clear();
 
@@ -176,12 +212,12 @@ class DropServiceIntegrationTest {
         DropDraftRequest request = new DropDraftRequest(full.name(), full.description(), full.imageUrls(),
                 full.categoryId(), start, start.plusDays(1), new ShippingRequest(3000L, "안내"),
                 full.optionGroups(), full.options());
-        Long dropId = dropService.createDraft(1L, request).getId();
+        Long dropId =         dropService.createDraft(sellerId, request).getId();
         entityManager.flush();
         entityManager.clear();
 
         // when
-        dropService.publish(1L, dropId);
+        dropService.publish(sellerId, dropId);
         entityManager.flush();
         entityManager.clear();
 
@@ -208,7 +244,7 @@ class DropServiceIntegrationTest {
 
         return new DropDraftRequest("상품", "설명",
                 List.of("https://example.com/a.jpg", "https://example.com/b.jpg"),
-                1L, null, null, null, List.of(material, length), List.of(first, second));
+                categoryId, null, null, null, List.of(material, length), List.of(first, second));
     }
 
     private DropDraftRequest emptyRequest() {

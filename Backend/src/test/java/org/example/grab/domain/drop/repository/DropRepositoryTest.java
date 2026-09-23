@@ -7,6 +7,7 @@ import org.example.grab.domain.drop.entity.option.DropOption;
 import org.example.grab.domain.drop.entity.option.DropOptionGroup;
 import org.example.grab.domain.drop.entity.option.DropOptionValue;
 import org.example.grab.domain.drop.entity.option.DropOptionValueMap;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,12 +19,13 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.jdbc.Sql;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -34,7 +36,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
 @Import(JpaConfig.class)
 @Testcontainers
-@Sql("/sql/drop-fixtures.sql")
 class DropRepositoryTest {
 
     @Container
@@ -53,11 +54,40 @@ class DropRepositoryTest {
     @Autowired
     private EntityManager entityManager;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    private Long sellerId;
+
+    @BeforeEach
+    void setUp() {
+        String uniqueValue = UUID.randomUUID().toString();
+        Long userId = jdbcTemplate.queryForObject(
+                """
+                INSERT INTO users (email, password_hash, display_name)
+                VALUES (?, 'encoded-password', '판매자')
+                RETURNING id
+                """,
+                Long.class,
+                uniqueValue + "@example.com"
+        );
+        sellerId = jdbcTemplate.queryForObject(
+                """
+                INSERT INTO sellers (user_id, brand_name, contact_email)
+                VALUES (?, 'GRAB 판매자', ?)
+                RETURNING id
+                """,
+                Long.class,
+                userId,
+                "seller-" + uniqueValue + "@example.com"
+        );
+    }
+
     @Test
     @DisplayName("옵션 조합을 저장하고 SKU별 그룹·값 매핑을 조회한다")
     void savesAndLoadsOptionCombinations() {
         // given
-        Drop drop = Drop.createDraft(1L);
+        Drop drop = Drop.createDraft(sellerId);
 
         DropOptionGroup color = DropOptionGroup.create(drop, "색상", 0);
         DropOptionValue black = DropOptionValue.create(color, "블랙", 0);
@@ -109,7 +139,7 @@ class DropRepositoryTest {
     @DisplayName("옵션 없는 상품은 값 매핑 없는 기본 SKU 하나로 저장된다")
     void savesDefaultOptionWithoutValueMaps() {
         // given
-        Drop drop = Drop.createDraft(1L);
+        Drop drop = Drop.createDraft(sellerId);
         DropOption defaultOption = DropOption.create(drop, 5000L, 10, 0);
         drop.addOption(defaultOption);
 
@@ -127,7 +157,7 @@ class DropRepositoryTest {
     @DisplayName("같은 SKU에 같은 그룹을 두 번 매핑하면 저장에 실패한다")
     void failsToSaveDuplicateGroupMapping() {
         // given
-        Drop drop = Drop.createDraft(1L);
+        Drop drop = Drop.createDraft(sellerId);
 
         DropOptionGroup color = DropOptionGroup.create(drop, "색상", 0);
         DropOptionValue black = DropOptionValue.create(color, "블랙", 0);
