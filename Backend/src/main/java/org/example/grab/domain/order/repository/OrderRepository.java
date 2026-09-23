@@ -84,4 +84,6 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Optional<Order> findByOrderNumber(String orderNumber);
 
     Optional<Order> findByBuyerIdAndIdempotencyKey(Long buyerId, String idempotencyKey);
+
+    long countByBuyerIdAndIdempotencyKey(Long buyerId, String idempotencyKey);
 }
