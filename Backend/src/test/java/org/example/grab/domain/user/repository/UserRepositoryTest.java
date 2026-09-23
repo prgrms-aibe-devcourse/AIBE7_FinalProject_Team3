@@ -37,7 +37,7 @@ import static org.assertj.core.api.Assertions.within;
 @ImportAutoConfiguration(FlywayAutoConfiguration.class) // 빈 컨테이너에 Flyway 마이그레이션 적용
 @Import(JpaConfig.class) // createdAt, updatedAt auditing을 켬
 @Testcontainers // 테스트 클래스 시작 시 PostgreSQL 18 컨테이너를 띄우고, 끝나면 정리
-class UserRepositoryTest {
+class  UserRepositoryTest {
 
     private static final String PASSWORD_HASH = "$argon2id$v=19$m=19456,t=2,p=1$c2FsdA$aGFzaA";
 
@@ -108,7 +108,7 @@ class UserRepositoryTest {
         assertThat(found.getUuid()).isEqualTo(publicId);
         assertThat(found.getEmail()).isEqualTo("user@example.com");
         assertThat(found.getPasswordHash()).isEqualTo(PASSWORD_HASH);
-        assertThat(found.getDisplayName()).isEqualTo("홍길동");
+        assertThat(found.getNickname()).isEqualTo("홍길동");
         assertThat(found.getProfileImageUrl()).isNull();
         assertThat(found.getRole()).isEqualTo(UserRole.USER);
         assertThat(found.getStatus()).isEqualTo(UserStatus.ACTIVE);
@@ -208,7 +208,7 @@ class UserRepositoryTest {
 
     private void insertUserWithoutPasswordHash(String email, String provider) {
         jdbcTemplate.update("""
-                INSERT INTO users (email, password_hash, display_name, provider)
+                INSERT INTO users (email, password_hash, nickname, provider)
                 VALUES (?, NULL, '홍길동', ?)
                 """, email, provider);
     }
