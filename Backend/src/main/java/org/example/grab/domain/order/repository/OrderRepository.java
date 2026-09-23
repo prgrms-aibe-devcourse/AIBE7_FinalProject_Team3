@@ -7,6 +7,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import java.util.Optional;
+import java.util.UUID;
 
 // 주문 엔티티 저장과 판매자 주문 목록 조회 쿼리를 제공한다.
 public interface OrderRepository extends JpaRepository<Order, Long> {
@@ -76,4 +78,10 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     @Query(value = "SELECT EXISTS (SELECT 1 FROM drops WHERE id = :dropId)", nativeQuery = true)
     boolean existsDrop(@Param("dropId") long dropId);
+           
+    Optional<Order> findByUuid(UUID uuid);
+
+    Optional<Order> findByOrderNumber(String orderNumber);
+
+    Optional<Order> findByBuyerIdAndIdempotencyKey(Long buyerId, String idempotencyKey);
 }
