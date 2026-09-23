@@ -5,12 +5,12 @@ import org.example.grab.domain.order.entity.OrderStatus;
 import org.example.grab.domain.order.entity.PaymentStatus;
 import org.example.grab.domain.order.repository.OrderRepository;
 import org.example.grab.global.common.PageResponse;
+import org.example.grab.global.error.BusinessException;
+import org.example.grab.global.error.CommonErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -44,8 +44,8 @@ class SellerOrderServiceTest {
 
         // then
         assertThat(exception)
-                .isInstanceOfSatisfying(ResponseStatusException.class,
-                        actual -> assertThat(actual.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+                .isInstanceOfSatisfying(BusinessException.class,
+                        actual -> assertThat(actual.getErrorCode()).isEqualTo(CommonErrorCode.ACCESS_DENIED));
 
         assertNoFurtherRepositoryCalls();
     }
@@ -62,8 +62,8 @@ class SellerOrderServiceTest {
 
         // then
         assertThat(exception)
-                .isInstanceOfSatisfying(ResponseStatusException.class,
-                        actual -> assertThat(actual.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+                .isInstanceOfSatisfying(BusinessException.class,
+                        actual -> assertThat(actual.getErrorCode()).isEqualTo(CommonErrorCode.ACCESS_DENIED));
 
         verify(orderRepository).existsApprovedSeller("seller@example.com");
         verify(orderRepository).existsDrop(42L);
@@ -82,8 +82,8 @@ class SellerOrderServiceTest {
 
         // then
         assertThat(exception)
-                .isInstanceOfSatisfying(ResponseStatusException.class,
-                        actual -> assertThat(actual.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+                .isInstanceOfSatisfying(BusinessException.class,
+                        actual -> assertThat(actual.getErrorCode()).isEqualTo(CommonErrorCode.RESOURCE_NOT_FOUND));
 
         verify(orderRepository).existsApprovedSeller("seller@example.com");
         verify(orderRepository).existsDrop(42L);

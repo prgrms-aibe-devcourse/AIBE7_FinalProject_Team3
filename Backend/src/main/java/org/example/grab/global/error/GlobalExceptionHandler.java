@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.List;
 
@@ -32,5 +33,13 @@ public class GlobalExceptionHandler {
                         CommonErrorCode.VALIDATION_FAILED.getCode(),
                         CommonErrorCode.VALIDATION_FAILED.getMessage(),
                         fieldErrors));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleMethodArgumentTypeMismatch(
+            MethodArgumentTypeMismatchException e) {
+        CommonErrorCode errorCode = CommonErrorCode.INVALID_REQUEST;
+        return ResponseEntity.status(errorCode.getStatus())
+                .body(ErrorResponse.of(errorCode.getCode(), errorCode.getMessage(), List.of()));
     }
 }
