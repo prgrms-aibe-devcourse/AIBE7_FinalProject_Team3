@@ -37,7 +37,7 @@ import static org.assertj.core.api.Assertions.within;
 @ImportAutoConfiguration(FlywayAutoConfiguration.class) // 빈 컨테이너에 Flyway 마이그레이션 적용
 @Import(JpaConfig.class) // createdAt, updatedAt auditing을 켬
 @Testcontainers // 테스트 클래스 시작 시 PostgreSQL 18 컨테이너를 띄우고, 끝나면 정리
-class UserRepositoryTest {
+class  UserRepositoryTest {
 
     private static final String PASSWORD_HASH = "$argon2id$v=19$m=19456,t=2,p=1$c2FsdA$aGFzaA";
 
@@ -108,7 +108,7 @@ class UserRepositoryTest {
         assertThat(found.getUuid()).isEqualTo(publicId);
         assertThat(found.getEmail()).isEqualTo("user@example.com");
         assertThat(found.getPasswordHash()).isEqualTo(PASSWORD_HASH);
-        assertThat(found.getDisplayName()).isEqualTo("홍길동");
+        assertThat(found.getNickname()).isEqualTo("홍길동");
         assertThat(found.getProfileImageUrl()).isNull();
         assertThat(found.getRole()).isEqualTo(UserRole.USER);
         assertThat(found.getStatus()).isEqualTo(UserStatus.ACTIVE);
@@ -179,6 +179,21 @@ class UserRepositoryTest {
                 .hasMessageContaining("uq_users_email");
     }
 
+    @Test
+    @DisplayName("대소문자만 다른 닉네임으로 저장하면 DB 유니크 인덱스 위반이 발생한다")
+    void rejectsNicknameDifferingOnlyInCase() {
+        // given
+        userRepository.saveAndFlush(User.createLocal("first@example.com", PASSWORD_HASH, "Grab"));
+        User duplicate = User.createLocal("second@example.com", PASSWORD_HASH, "grab");
+
+        // when & then
+        // 중복 판단은 lower(nickname) 기준이므로 대소문자만 다른 값도 같은 닉네임으로 거부한다.
+        assertThatThrownBy(() -> userRepository.saveAndFlush(duplicate))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .rootCause()
+                .hasMessageContaining("uq_users_nickname_lower");
+    }
+
     // createLocal은 null 해시를 먼저 거부하고 소셜 팩토리는 GR-46 범위라, DB 제약은 SQL로 직접 검증한다.
     @Test
     @DisplayName("LOCAL 회원은 비밀번호 해시 없이 DB에 저장할 수 없다")
@@ -208,7 +223,7 @@ class UserRepositoryTest {
 
     private void insertUserWithoutPasswordHash(String email, String provider) {
         jdbcTemplate.update("""
-                INSERT INTO users (email, password_hash, display_name, provider)
+                INSERT INTO users (email, password_hash, nickname, provider)
                 VALUES (?, NULL, '홍길동', ?)
                 """, email, provider);
     }

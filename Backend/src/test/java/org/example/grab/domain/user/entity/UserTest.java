@@ -14,18 +14,18 @@ class UserTest {
     // 테스트용 입력값
     private static final String EMAIL = "user@example.com";
     private static final String PASSWORD_HASH = "$argon2id$v=19$m=19456,t=2,p=1$c2FsdA$aGFzaA";
-    private static final String DISPLAY_NAME = "홍길동";
+    private static final String NICKNAME = "홍길동";
 
     @Test
     @DisplayName("LOCAL 회원은 USER, ACTIVE, LOCAL 기본값으로 생성된다")
     void createLocalAppliesDefaults() {
         // when
-        User user = User.createLocal(EMAIL, PASSWORD_HASH, DISPLAY_NAME);
+        User user = User.createLocal(EMAIL, PASSWORD_HASH, NICKNAME);
 
         // then
         assertThat(user.getEmail()).isEqualTo(EMAIL);
         assertThat(user.getPasswordHash()).isEqualTo(PASSWORD_HASH);
-        assertThat(user.getDisplayName()).isEqualTo(DISPLAY_NAME);
+        assertThat(user.getNickname()).isEqualTo(NICKNAME);
         assertThat(user.getProfileImageUrl()).isNull();
         assertThat(user.getRole()).isEqualTo(UserRole.USER);
         assertThat(user.getStatus()).isEqualTo(UserStatus.ACTIVE);
@@ -37,8 +37,8 @@ class UserTest {
     @DisplayName("LOCAL 회원은 생성 시 서로 다른 공개 UUID를 가진다")
     void createLocalGeneratesPublicUuid() {
         // when
-        User first = User.createLocal(EMAIL, PASSWORD_HASH, DISPLAY_NAME);
-        User second = User.createLocal("other@example.com", PASSWORD_HASH, DISPLAY_NAME);
+        User first = User.createLocal(EMAIL, PASSWORD_HASH, NICKNAME);
+        User second = User.createLocal("other@example.com", PASSWORD_HASH, NICKNAME);
 
         // then
         assertThat(first.getUuid()).isNotNull();
@@ -53,7 +53,7 @@ class UserTest {
     void createLocalRejectsMissingPasswordHash(String passwordHash) {
         // when & then
         //
-        assertThatThrownBy(() -> User.createLocal(EMAIL, passwordHash, DISPLAY_NAME))
+        assertThatThrownBy(() -> User.createLocal(EMAIL, passwordHash, NICKNAME))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

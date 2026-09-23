@@ -60,7 +60,7 @@ class OrderIdempotencyServiceTest {
         String uniqueValue = UUID.randomUUID().toString();
         buyerId = jdbcTemplate.queryForObject(
                 """
-                INSERT INTO users (email, password_hash, display_name)
+                INSERT INTO users (email, password_hash, nickname)
                 VALUES (?, 'encoded-password', '멱등 구매자')
                 RETURNING id
                 """,
