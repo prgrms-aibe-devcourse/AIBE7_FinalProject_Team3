@@ -139,6 +139,40 @@ class DropServiceTest {
                 .isEqualTo(DropErrorCode.DROP_NOT_EDITABLE);
     }
 
+    @Test
+    @DisplayName("optionGroups만 보내면 INVALID_OPTION_COMBINATION")
+    void createDraft_rejectsGroupsWithoutOptions() {
+        // given
+        DropDraftRequest request = new DropDraftRequest(
+                null, null, null, null, null, null, null,
+                List.of(new OptionGroupRequest("material", "소재", 0,
+                        List.of(new OptionValueRequest("cotton", "코튼", 0)))),
+                null);
+
+        // when & then
+        assertThatThrownBy(() -> dropService.createDraft(1L, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(DropErrorCode.INVALID_OPTION_COMBINATION);
+    }
+
+    @Test
+    @DisplayName("options만 보내면 INVALID_OPTION_COMBINATION")
+    void createDraft_rejectsOptionsWithoutGroups() {
+        // given
+        DropDraftRequest request = new DropDraftRequest(
+                null, null, null, null, null, null, null,
+                null,
+                List.of(new OptionRequest(
+                        List.of(new SelectionRequest("material", "cotton")), 1000L, 5, true, 0)));
+
+        // when & then
+        assertThatThrownBy(() -> dropService.createDraft(1L, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(DropErrorCode.INVALID_OPTION_COMBINATION);
+    }
+
     private DropDraftRequest requestWithOptions() {
         OptionGroupRequest material = new OptionGroupRequest("material", "소재", 0,
                 List.of(new OptionValueRequest("cotton", "코튼", 0),

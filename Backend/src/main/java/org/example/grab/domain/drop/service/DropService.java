@@ -60,7 +60,12 @@ public class DropService {
                 request.saleEndsAt());
 
         boolean replaceImages = request.imageUrls() != null;
-        boolean replaceOptions = request.optionGroups() != null || request.options() != null;
+        boolean hasOptionGroups = request.optionGroups() != null;
+        boolean hasOptions = request.options() != null;
+        if (hasOptionGroups != hasOptions) {
+            throw new BusinessException(DropErrorCode.INVALID_OPTION_COMBINATION);
+        }
+        boolean replaceOptions = hasOptionGroups;
         if (!replaceImages && !replaceOptions) {
             return;
         }
@@ -79,10 +84,7 @@ public class DropService {
             toImages(drop, request.imageUrls()).forEach(drop::addImage);
         }
         if (replaceOptions) {
-            OptionAssembly assembly = assembleOptions(
-                    drop,
-                    request.optionGroups() != null ? request.optionGroups() : List.of(),
-                    request.options() != null ? request.options() : List.of());
+            OptionAssembly assembly = assembleOptions(drop, request.optionGroups(), request.options());
             assembly.groups().forEach(drop::addOptionGroup);
             assembly.options().forEach(drop::addOption);
         }
