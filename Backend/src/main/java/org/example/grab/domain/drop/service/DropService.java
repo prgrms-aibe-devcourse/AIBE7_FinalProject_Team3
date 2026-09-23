@@ -115,13 +115,22 @@ public class DropService {
 
     /**
      * 요청의 클라이언트 키로 옵션 그룹·값·SKU를 조립한다. 키는 응답에 쓰지 않고 이 요청 안에서 참조를 연결하는 용도다.
+     *
+     * <p>2단계로 처리한다.
+     * <ol>
+     *   <li>그룹·값을 먼저 만들어 {@code (groupKey → (valueKey → 값))} 조회 맵을 구성한다.</li>
+     *   <li>각 SKU의 {@code selections}를 그 맵으로 해석해 실제 값 엔티티를 연결한다.</li>
+     * </ol>
+     * SKU는 값 ID가 아니라 클라이언트 키로 값을 참조하므로, 참조를 풀 수 있게 1단계에서 만든 키→엔티티 맵이 필요하다.
      * DRAFT 단계이므로 "모든 그룹에서 정확히 하나 선택"·"동일 조합 SKU 중복 금지"는 검증하지 않는다(공개 단계 책임).
      */
     private OptionAssembly assembleOptions(Drop drop,
                                            List<OptionGroupRequest> groupRequests,
                                            List<OptionRequest> optionRequests) {
         List<DropOptionGroup> groups = new ArrayList<>();
+        // groupKey → (valueKey → 값) 조회 맵이자 그룹 key 중복 검사 인덱스(이미 담긴 key면 중복).
         Map<String, Map<String, DropOptionValue>> valuesByGroupKey = new HashMap<>();
+        // 그룹 이름 중복 검사용(DB UQ(drop_id, name) 대응).
         Set<String> groupNames = new HashSet<>();
 
         for (int groupIndex = 0; groupIndex < groupRequests.size(); groupIndex++) {
@@ -134,6 +143,7 @@ public class DropService {
             int groupSortOrder = groupRequest.sortOrder() != null ? groupRequest.sortOrder() : groupIndex;
             DropOptionGroup group = DropOptionGroup.create(drop, groupRequest.name(), groupSortOrder);
 
+            // 값 key → 값 조회 맵과 값 내용 중복 검사용 집합(DB UQ(group_id, value) 대응).
             Map<String, DropOptionValue> valuesByKey = new HashMap<>();
             Set<String> values = new HashSet<>();
             List<OptionValueRequest> valueRequests =
@@ -153,6 +163,7 @@ public class DropService {
             valuesByGroupKey.put(groupRequest.key(), valuesByKey);
         }
 
+        // 2단계: 각 SKU의 selections를 1단계에서 만든 값 조회 맵으로 해석해 값 엔티티를 연결한다.
         List<DropOption> options = new ArrayList<>();
         for (int optionIndex = 0; optionIndex < optionRequests.size(); optionIndex++) {
             OptionRequest optionRequest = optionRequests.get(optionIndex);
@@ -167,6 +178,7 @@ public class DropService {
                 option.updateActive(false);
             }
 
+            // 한 SKU가 같은 그룹을 두 번 선택하는지 검사(PK(option_id, group_id)는 그룹당 값 하나만 허용).
             Set<String> selectedGroupKeys = new HashSet<>();
             List<SelectionRequest> selections =
                     optionRequest.selections() != null ? optionRequest.selections() : List.of();
