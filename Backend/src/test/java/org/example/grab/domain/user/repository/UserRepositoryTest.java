@@ -179,6 +179,21 @@ class  UserRepositoryTest {
                 .hasMessageContaining("uq_users_email");
     }
 
+    @Test
+    @DisplayName("대소문자만 다른 닉네임으로 저장하면 DB 유니크 인덱스 위반이 발생한다")
+    void rejectsNicknameDifferingOnlyInCase() {
+        // given
+        userRepository.saveAndFlush(User.createLocal("first@example.com", PASSWORD_HASH, "Grab"));
+        User duplicate = User.createLocal("second@example.com", PASSWORD_HASH, "grab");
+
+        // when & then
+        // 중복 판단은 lower(nickname) 기준이므로 대소문자만 다른 값도 같은 닉네임으로 거부한다.
+        assertThatThrownBy(() -> userRepository.saveAndFlush(duplicate))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .rootCause()
+                .hasMessageContaining("uq_users_nickname_lower");
+    }
+
     // createLocal은 null 해시를 먼저 거부하고 소셜 팩토리는 GR-46 범위라, DB 제약은 SQL로 직접 검증한다.
     @Test
     @DisplayName("LOCAL 회원은 비밀번호 해시 없이 DB에 저장할 수 없다")
