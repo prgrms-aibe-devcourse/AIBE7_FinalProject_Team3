@@ -6,9 +6,9 @@ import org.example.grab.domain.order.repository.OrderRepository;
 import org.example.grab.domain.order.entity.OrderStatus;
 import org.example.grab.domain.order.entity.PaymentStatus;
 import org.example.grab.global.common.PageResponse;
-import org.springframework.http.HttpStatus;
+import org.example.grab.global.error.BusinessException;
+import org.example.grab.global.error.CommonErrorCode;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Page;
@@ -26,14 +26,14 @@ public class SellerOrderService {
     public PageResponse<SellerOrderListResponse> findOrders(
             String email, Long dropId, OrderStatus orderStatus, PaymentStatus paymentStatus, int page, int size) {
         if (!orderRepository.existsApprovedSeller(email)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "ACCESS_DENIED");
+            throw new BusinessException(CommonErrorCode.ACCESS_DENIED);
         }
         if (dropId != null) {
             if (!orderRepository.existsDrop(dropId)) {
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND");
+                throw new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND);
             }
             if (!orderRepository.ownsDrop(email, dropId)) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "ACCESS_DENIED");
+                throw new BusinessException(CommonErrorCode.ACCESS_DENIED);
             }
         }
         Page<SellerOrderListResponse> orders = orderRepository.findSellerOrders(

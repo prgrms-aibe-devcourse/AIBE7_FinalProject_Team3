@@ -1,7 +1,7 @@
 package org.example.grab.domain.order.controller;
 
-import org.example.grab.domain.order.exception.SellerOrderExceptionHandler;
 import org.example.grab.domain.order.service.SellerOrderService;
+import org.example.grab.global.error.GlobalExceptionHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
@@ -21,7 +21,7 @@ class SellerOrderControllerTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(new SellerOrderController(sellerOrderService))
-                .setControllerAdvice(new SellerOrderExceptionHandler())
+                .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }
 

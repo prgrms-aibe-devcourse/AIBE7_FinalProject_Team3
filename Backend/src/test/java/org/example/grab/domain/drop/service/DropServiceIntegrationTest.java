@@ -7,6 +7,7 @@ import org.example.grab.domain.drop.dto.request.OptionGroupRequest;
 import org.example.grab.domain.drop.dto.request.OptionRequest;
 import org.example.grab.domain.drop.dto.request.OptionValueRequest;
 import org.example.grab.domain.drop.dto.request.SelectionRequest;
+import org.example.grab.domain.drop.dto.request.ShippingRequest;
 import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.domain.drop.entity.DropImage;
 import org.example.grab.domain.drop.entity.DropStatus;
@@ -164,6 +165,30 @@ class DropServiceIntegrationTest {
         assertThat(found.getOptionGroups()).singleElement()
                 .extracting("name").isEqualTo("색상");
         assertThat(found.getOptions()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("DB에서 다시 읽은 DRAFT를 공개하면 WISH와 publishedAt이 저장된다")
+    void publish_persistsWish() {
+        // given: 영속성 컨텍스트를 비워 LAZY 로딩된 옵션 구조로 검증이 동작하는지 확인한다.
+        OffsetDateTime start = OffsetDateTime.now().plusDays(1);
+        DropDraftRequest full = fullRequest();
+        DropDraftRequest request = new DropDraftRequest(full.name(), full.description(), full.imageUrls(),
+                full.categoryId(), start, start.plusDays(1), new ShippingRequest(3000L, "안내"),
+                full.optionGroups(), full.options());
+        Long dropId = dropService.createDraft(1L, request).getId();
+        entityManager.flush();
+        entityManager.clear();
+
+        // when
+        dropService.publish(1L, dropId);
+        entityManager.flush();
+        entityManager.clear();
+
+        // then
+        Drop found = dropRepository.findById(dropId).orElseThrow();
+        assertThat(found.getStatus()).isEqualTo(DropStatus.WISH);
+        assertThat(found.getPublishedAt()).isNotNull();
     }
 
     private DropDraftRequest fullRequest() {

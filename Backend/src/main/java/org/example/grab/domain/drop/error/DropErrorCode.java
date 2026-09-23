@@ -9,7 +9,8 @@ public enum DropErrorCode implements ErrorCode {
     DROP_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 DROP에 대한 권한이 없습니다."),
     DROP_NOT_EDITABLE(HttpStatus.CONFLICT, "수정할 수 없는 상태의 DROP입니다."),
     INVALID_SCHEDULE(HttpStatus.UNPROCESSABLE_CONTENT, "판매 일정이 올바르지 않습니다."),
-    INVALID_OPTION_COMBINATION(HttpStatus.UNPROCESSABLE_CONTENT, "옵션 그룹·값·SKU 조합이 올바르지 않습니다.");
+    INVALID_OPTION_COMBINATION(HttpStatus.UNPROCESSABLE_CONTENT, "옵션 그룹·값·SKU 조합이 올바르지 않습니다."),
+    DUPLICATE_OPTION_COMBINATION(HttpStatus.CONFLICT, "동일한 옵션값 조합의 SKU가 중복됩니다.");
 
     private final HttpStatus status;
     private final String message;
