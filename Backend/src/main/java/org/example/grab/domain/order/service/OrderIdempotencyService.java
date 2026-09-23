@@ -3,10 +3,11 @@ package org.example.grab.domain.order.service;
 import lombok.RequiredArgsConstructor;
 import org.example.grab.domain.order.entity.Order;
 import org.example.grab.domain.order.repository.OrderRepository;
-import org.example.grab.global.idempotency.IdempotencyException;
 import org.example.grab.global.idempotency.IdempotencyKey;
 import org.example.grab.global.idempotency.IdempotencyResult;
 import org.example.grab.global.idempotency.RequestHash;
+import org.example.grab.global.error.BusinessException;
+import org.example.grab.global.error.CommonErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -62,7 +63,7 @@ public class OrderIdempotencyService {
     /** 같은 키라도 요청 내용이 다르면 기존 주문을 반환하지 않고 충돌 처리한다. */
     private Order validateRequestHash(Order order, RequestHash requestHash) {
         if (!order.getRequestHash().equals(requestHash.value())) {
-            throw IdempotencyException.duplicateKey();
+            throw new BusinessException(CommonErrorCode.DUPLICATE_IDEMPOTENCY_KEY);
         }
         return order;
     }

@@ -3,11 +3,11 @@ package org.example.grab.domain.order.service;
 import org.example.grab.domain.order.entity.Order;
 import org.example.grab.domain.order.entity.ShippingAddress;
 import org.example.grab.domain.order.repository.OrderRepository;
-import org.example.grab.global.idempotency.IdempotencyErrorCode;
-import org.example.grab.global.idempotency.IdempotencyException;
 import org.example.grab.global.idempotency.IdempotencyKey;
 import org.example.grab.global.idempotency.IdempotencyResult;
 import org.example.grab.global.idempotency.RequestHash;
+import org.example.grab.global.error.BusinessException;
+import org.example.grab.global.error.CommonErrorCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -120,12 +120,12 @@ class OrderIdempotencyServiceTest {
                 IDEMPOTENCY_KEY,
                 RequestHash.from("b".repeat(64))
         ))
-                .isInstanceOf(IdempotencyException.class)
+                .isInstanceOf(BusinessException.class)
                 .satisfies(exception -> {
-                    IdempotencyException idempotencyException = (IdempotencyException) exception;
-                    assertThat(idempotencyException.getErrorCode())
-                            .isEqualTo(IdempotencyErrorCode.DUPLICATE_IDEMPOTENCY_KEY);
-                    assertThat(idempotencyException.getErrorCode().getHttpStatus()).isEqualTo(409);
+                    BusinessException businessException = (BusinessException) exception;
+                    assertThat(businessException.getErrorCode())
+                            .isEqualTo(CommonErrorCode.DUPLICATE_IDEMPOTENCY_KEY);
+                    assertThat(businessException.getErrorCode().getStatus().value()).isEqualTo(409);
                 });
     }
 

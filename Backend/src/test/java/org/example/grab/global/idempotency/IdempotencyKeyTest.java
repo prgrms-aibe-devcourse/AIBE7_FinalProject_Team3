@@ -2,6 +2,8 @@ package org.example.grab.global.idempotency;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.example.grab.global.error.BusinessException;
+import org.example.grab.global.error.CommonErrorCode;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -33,8 +35,8 @@ class IdempotencyKeyTest {
 
     private void assertInvalidKey(String rawKey) {
         assertThatThrownBy(() -> IdempotencyKey.from(rawKey))
-                .isInstanceOf(IdempotencyException.class)
-                .satisfies(exception -> assertThat(((IdempotencyException) exception).getErrorCode())
-                        .isEqualTo(IdempotencyErrorCode.INVALID_REQUEST));
+                .isInstanceOf(BusinessException.class)
+                .satisfies(exception -> assertThat(((BusinessException) exception).getErrorCode())
+                        .isEqualTo(CommonErrorCode.INVALID_IDEMPOTENCY_KEY));
     }
 }
