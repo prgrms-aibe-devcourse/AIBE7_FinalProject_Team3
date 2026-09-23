@@ -15,7 +15,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.grab.domain.drop.entity.option.DropOption;
 import org.example.grab.domain.drop.entity.option.DropOptionGroup;
+import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.global.entity.BaseEntity;
+import org.example.grab.global.error.BusinessException;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -100,5 +102,68 @@ public class Drop extends BaseEntity {
 
     public void addOption(DropOption option) {
         options.add(option);
+    }
+
+    public void updateDraft(String name, String description, Long categoryId, Long shippingFee,
+                            String shippingNotice, OffsetDateTime saleStartsAt, OffsetDateTime saleEndsAt) {
+        ensureEditable();
+        if (name != null) {
+            this.name = name;
+        }
+        if (description != null) {
+            this.description = description;
+        }
+        if (categoryId != null) {
+            this.categoryId = categoryId;
+        }
+        if (shippingFee != null) {
+            this.shippingFee = shippingFee;
+        }
+        if (shippingNotice != null) {
+            this.shippingNotice = shippingNotice;
+        }
+        if (saleStartsAt != null) {
+            this.saleStartsAt = saleStartsAt;
+        }
+        if (saleEndsAt != null) {
+            this.saleEndsAt = saleEndsAt;
+        }
+        validateSchedule();
+    }
+
+    public void validateOwner(Long sellerId) {
+        if (!this.sellerId.equals(sellerId)) {
+            throw new BusinessException(DropErrorCode.DROP_ACCESS_DENIED);
+        }
+    }
+
+    public void replaceImages(List<DropImage> images) {
+        ensureEditable();
+        this.images.clear();
+        this.images.addAll(images);
+    }
+
+    public void replaceOptionGroups(List<DropOptionGroup> optionGroups) {
+        ensureEditable();
+        this.optionGroups.clear();
+        this.optionGroups.addAll(optionGroups);
+    }
+
+    public void replaceOptions(List<DropOption> options) {
+        ensureEditable();
+        this.options.clear();
+        this.options.addAll(options);
+    }
+
+    private void ensureEditable() {
+        if (status != DropStatus.DRAFT) {
+            throw new BusinessException(DropErrorCode.DROP_NOT_EDITABLE);
+        }
+    }
+
+    private void validateSchedule() {
+        if (saleStartsAt != null && saleEndsAt != null && !saleStartsAt.isBefore(saleEndsAt)) {
+            throw new BusinessException(DropErrorCode.INVALID_SCHEDULE);
+        }
     }
 }
