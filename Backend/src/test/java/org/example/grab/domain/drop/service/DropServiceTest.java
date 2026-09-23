@@ -98,6 +98,34 @@ class DropServiceTest {
     }
 
     @Test
+    @DisplayName("존재하지 않는 DROP 공개는 DROP_NOT_FOUND")
+    void publish_notFound() {
+        // given
+        given(dropRepository.findById(99L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> dropService.publish(1L, 99L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(DropErrorCode.DROP_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("다른 판매자의 DROP 공개는 상태와 무관하게 DROP_ACCESS_DENIED")
+    void publish_accessDeniedBeforeStateCheck() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        ReflectionTestUtils.setField(drop, "status", DropStatus.WISH);
+        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+
+        // when & then
+        assertThatThrownBy(() -> dropService.publish(2L, 10L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(DropErrorCode.DROP_ACCESS_DENIED);
+    }
+
+    @Test
     @DisplayName("존재하지 않는 DROP 수정은 DROP_NOT_FOUND")
     void updateDraft_notFound() {
         // given
