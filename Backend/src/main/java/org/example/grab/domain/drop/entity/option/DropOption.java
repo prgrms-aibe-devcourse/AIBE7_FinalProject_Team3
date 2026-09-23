@@ -80,4 +80,8 @@ public class DropOption extends BaseEntity {
     public void addValueMap(DropOptionValueMap valueMap) {
         valueMaps.add(valueMap);
     }
+
+    public void updateActive(boolean active) {
+        this.active = active;
+    }
 }
