@@ -179,7 +179,7 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 | `INVALID_REQUEST` | 400 | 요청 형식 오류 |
 | `VALIDATION_FAILED` | 400 | 필드 검증 실패 |
 | `INVALID_EMAIL` | 400 | 이메일 형식·길이 규칙 위반 |
-| `INVALID_PASSWORD` | 400 | 비밀번호 길이·문자 조합·공백 규칙 위반 |
+| `INVALID_PASSWORD` | 400 | 비밀번호 길이·공백·허용 문자·문자 조합 규칙 위반 |
 | `INVALID_NICKNAME` | 400 | 닉네임 길이·허용 문자 규칙 위반 |
 | `AUTHENTICATION_REQUIRED` | 401 | 인증 필요 |
 | `INVALID_TOKEN` | 401 | 유효하지 않은 토큰 |
