@@ -57,22 +57,22 @@ POST /api/v1/auth/signup
 - MVP 회원가입에서는 휴대폰 번호를 받지 않는다.
 - `email`, `password`, `nickname`은 필수다. 필수값이 없으면 `VALIDATION_FAILED`로 거부하고, 없는 항목 전부를 `fieldErrors`로 반환한다.
   - `email`, `nickname`: 키 누락, `null`, 빈 문자열, 앞뒤 공백 제거 후 빈 문자열인 경우
-  - `password`: 키 누락, `null`, 빈 문자열인 경우. 비밀번호는 trim하지 않으므로 공백 문자만으로 된 값은 공백 포함 규칙에 따라 `INVALID_PASSWORD`로 거부한다.
+  - `password`: 키 누락, `null`, 빈 문자열인 경우. 비밀번호는 trim하지 않으므로 공백 문자만으로 된 값은 필수값 위반이 아니라 비밀번호 규칙 위반(`INVALID_PASSWORD`)으로 거부한다.
 - 이메일은 앞뒤 공백을 제거하고 전체를 소문자로 변환해 정규화한 뒤 검증·중복 검사·저장한다.
   대소문자·공백만 다른 이메일로 중복 가입하거나 가입 때와 다르게 입력해 로그인에 실패하는 것을 막기 위함이다.
 - 정규화 후 중간에 공백이 포함되면 `INVALID_EMAIL`로 거부한다.
-- 이메일은 유효한 형식이어야 한다.
+- 이메일은 유효한 형식이어야 한다. 형식이 잘못되면 `INVALID_EMAIL`로 거부한다.
 - 정규화한 이메일은 254자 이하여야 한다. 초과하면 `INVALID_EMAIL`로 거부한다.
 - 이메일은 중복될 수 없다.
-- 비밀번호는 최소 8자 이상, 최대 64자 이하여야 한다. 허용 문자가 모두 ASCII이므로 길이는 문자(char) 수 기준이다.
+- 비밀번호는 최소 8자 이상, 최대 64자 이하여야 한다. 벗어나면 `INVALID_PASSWORD`로 거부한다. 허용 문자가 모두 ASCII이므로 길이는 문자(char) 수 기준이다.
 - 비밀번호에는 영문 대소문자(`A-Z`, `a-z`), 숫자(`0-9`), ASCII 특수문자 32개(``!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~``)만 사용할 수 있다. 한글·이모지 등 그 밖의 문자가 있으면 `INVALID_PASSWORD`로 거부한다.
   입력 환경에 따라 같은 모양의 문자가 다른 코드로 입력돼 로그인에 실패하는 것을 막기 위함이다.
-- 비밀번호는 영문, 숫자, 특수문자를 각각 1자 이상 포함해야 한다. 영문은 대소문자 중 어느 쪽이든 1자 이상이면 된다.
+- 비밀번호는 영문, 숫자, 특수문자를 각각 1자 이상 포함해야 한다. 영문은 대소문자 중 어느 쪽이든 1자 이상이면 된다. 하나라도 없으면 `INVALID_PASSWORD`로 거부한다.
 - 비밀번호에 공백 문자(스페이스, 탭, 개행 등)가 포함되면 `INVALID_PASSWORD`로 거부한다. 서버는 비밀번호를 trim하거나 가공하지 않는다.
 - 비밀번호는 Argon2id로 해시해 저장한다.
 - `nickname`은 회원이 직접 정하는 닉네임이며 본명이 아니다. 본명은 수집하지 않는다.
 - 닉네임은 앞뒤 공백을 제거한 뒤 검증·저장한다.
-- 닉네임은 2자 이상 10자 이하여야 한다. 길이는 문자(코드 포인트) 수 기준이다.
+- 닉네임은 2자 이상 10자 이하여야 한다. 벗어나면 `INVALID_NICKNAME`으로 거부한다. 길이는 앞뒤 공백을 제거한 값의 문자(코드 포인트) 수 기준이다.
 - 닉네임은 한글(완성형), 영문, 숫자, 밑줄(`_`)만 허용한다. 중간 공백을 포함해 그 밖의 문자가 있으면 `INVALID_NICKNAME`으로 거부한다.
 - 닉네임은 중복될 수 없다. 중복 판단은 대소문자를 구분하지 않으며(`Grab`과 `grab`은 같은 닉네임), 저장은 입력한 대소문자 그대로 한다.
   동시 요청으로 사전 검사를 함께 통과하더라도 DB 유니크 인덱스 위반을 `DUPLICATE_NICKNAME`으로 응답한다.
@@ -85,10 +85,32 @@ POST /api/v1/auth/signup
   - `password`: 필수값 → 길이 → 공백 → 허용 문자 → 문자 조합
   - `nickname`: 필수값 → 길이 → 허용 문자
 - `fieldErrors`는 `email`, `password`, `nickname` 순서로 정렬한다.
-- 최상위 `error.code`는 `fieldErrors`에 남은 필드들의 오류 코드가 모두 같으면 그 코드를, 서로 다르면 `VALIDATION_FAILED`를 사용한다.
-  - 예: 이메일 형식만 잘못됨 → `INVALID_EMAIL`, 이메일 형식과 비밀번호가 모두 잘못됨 → `VALIDATION_FAILED`
+- 최상위 `error.code`는 `fieldErrors`에 남은 각 사유의 오류 코드(위 검증 규칙에서 정한 코드)가 모두 같으면 그 코드를, 서로 다르면 `VALIDATION_FAILED`를 사용한다.
+  - 예: 이메일 형식만 잘못됨 → `INVALID_EMAIL`, 이메일 형식과 비밀번호가 모두 잘못됨 → `VALIDATION_FAILED`, 세 필드가 모두 누락됨 → `VALIDATION_FAILED`
+- `fieldErrors`는 필드 이름과 사유(`reason`)만 담고 거부된 입력값은 담지 않는다.
+
+```json
+{
+  "success": false,
+  "data": null,
+  "error": {
+    "code": "VALIDATION_FAILED",
+    "message": "요청 값 검증에 실패했습니다.",
+    "fieldErrors": [
+      { "field": "email", "reason": "올바른 이메일 형식이 아닙니다." },
+      { "field": "password", "reason": "비밀번호는 8자 이상 64자 이하여야 합니다." }
+    ]
+  }
+}
+```
+
+> `reason` 문구는 예시이며, 클라이언트는 `code`와 `field`로 분기한다.
+
+**요청 본문 오류:**
+- 요청 본문이 없거나 JSON 형식이 잘못되면 `INVALID_REQUEST`로 거부하고 `fieldErrors`는 빈 배열로 반환한다.
 
 **오류 코드:**
+- `INVALID_REQUEST`
 - `VALIDATION_FAILED`
 - `INVALID_EMAIL`
 - `DUPLICATE_EMAIL`
