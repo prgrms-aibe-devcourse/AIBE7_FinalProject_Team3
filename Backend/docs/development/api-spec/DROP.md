@@ -282,6 +282,11 @@ GET /api/v1/seller/drops?status=DRAFT&page=0&size=20
 }
 ```
 
+> `minPrice`는 활성 SKU(`is_active = true`) 중 최저 `unitPrice`이며, 활성 SKU가 없으면 `null`입니다. 정렬은 `id` 내림차순(최근 생성 순)입니다.
+
+**오류 코드:**
+- `INVALID_REQUEST` — `page`가 0 미만, `size`가 1 미만 또는 100 초과, 잘못된 `status` 값
+
 ### 2.3 판매자 DROP 상세
 
 ```http
@@ -349,6 +354,12 @@ GET /api/v1/seller/drops/{dropId}
   }
 }
 ```
+
+> `minPrice`는 목록과 같은 규칙(활성 SKU 중 최저 `unitPrice`, 활성 SKU가 없으면 `null`)입니다. 옵션 그룹·값·SKU와 각 `selections`는 `sortOrder` 순으로 반환합니다.
+
+**오류 코드:**
+- `DROP_NOT_FOUND`
+- `DROP_ACCESS_DENIED`
 
 ### 2.4 DRAFT DROP 수정
 

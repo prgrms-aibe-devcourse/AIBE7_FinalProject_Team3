@@ -14,6 +14,7 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.BatchSize;
 import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.global.entity.BaseEntity;
 
@@ -56,6 +57,7 @@ public class DropOption extends BaseEntity {
     private int sortOrder;
 
     @OneToMany(mappedBy = "option", cascade = CascadeType.ALL, orphanRemoval = true)
+    @BatchSize(size = 100)
     private List<DropOptionValueMap> valueMaps = new ArrayList<>();
 
     private DropOption(Drop drop, Long unitPrice, int totalQuantity, int sortOrder) {
