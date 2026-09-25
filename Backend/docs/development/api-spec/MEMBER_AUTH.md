@@ -55,10 +55,14 @@ POST /api/v1/auth/signup
 
 **검증 규칙:**
 - MVP 회원가입에서는 휴대폰 번호를 받지 않는다.
+- `email`, `password`, `nickname`은 필수다. 필수값이 없으면 `VALIDATION_FAILED`로 거부하고, 없는 항목 전부를 `fieldErrors`로 반환한다.
+  - `email`, `nickname`: 키 누락, `null`, 빈 문자열, 앞뒤 공백 제거 후 빈 문자열인 경우
+  - `password`: 키 누락, `null`, 빈 문자열인 경우. 비밀번호는 trim하지 않으므로 공백 문자만으로 된 값은 공백 포함 규칙에 따라 `INVALID_PASSWORD`로 거부한다.
 - 이메일은 앞뒤 공백을 제거하고 전체를 소문자로 변환해 정규화한 뒤 검증·중복 검사·저장한다.
   대소문자·공백만 다른 이메일로 중복 가입하거나 가입 때와 다르게 입력해 로그인에 실패하는 것을 막기 위함이다.
 - 정규화 후 중간에 공백이 포함되면 `INVALID_EMAIL`로 거부한다.
 - 이메일은 유효한 형식이어야 한다.
+- 정규화한 이메일은 254자 이하여야 한다. 초과하면 `INVALID_EMAIL`로 거부한다.
 - 이메일은 중복될 수 없다.
 - 비밀번호는 최소 8자 이상, 최대 64자 이하여야 한다.
 - 비밀번호는 영문, 숫자, 특수문자를 포함해야 한다.
@@ -74,6 +78,7 @@ POST /api/v1/auth/signup
 - 닉네임 규칙은 1.6절 소셜 회원가입과 1.10절 내 정보 수정에도 동일하게 적용한다.
 
 **오류 코드:**
+- `VALIDATION_FAILED`
 - `INVALID_EMAIL`
 - `DUPLICATE_EMAIL`
 - `INVALID_PASSWORD`
