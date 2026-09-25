@@ -29,11 +29,12 @@ org.example.grab
 │       ├── service         DropService
 │       ├── repository      DropRepository
 │       ├── entity          Drop, DropStatus
-│       └── dto             DropCreateRequest, DropResponse
+│       ├── dto             DropCreateRequest, DropResponse
+│       └── error           DropErrorCode
 └── global
     ├── config              SecurityConfig, JpaConfig
     ├── common              ApiResponse, PageResponse
-    ├── error               ErrorCode, BusinessException, GlobalExceptionHandler
+    ├── error               ErrorCode, CommonErrorCode, BusinessException, GlobalExceptionHandler
     └── security            JwtProvider, AuthenticationFilter
 ```
 
@@ -80,7 +81,11 @@ org.example.grab
 
 ### 2.6 예외 처리
 
-- 비즈니스 예외는 `BusinessException(ErrorCode)` 하나로 통일하고, 오류 코드는 `ErrorCode` enum에 HTTP 상태와 함께 정의한다.
+- 비즈니스 예외는 `BusinessException(ErrorCode)` 하나로 통일한다.
+- `ErrorCode`는 `global.error`의 인터페이스이고, 오류 코드는 이를 구현한 enum에 HTTP 상태·메시지와 함께 정의한다.
+  - 여러 도메인이 함께 쓰는 코드(`INVALID_REQUEST`, `VALIDATION_FAILED`, `ACCESS_DENIED` 등)는 `global.error.CommonErrorCode`에 둔다.
+  - 한 도메인에서만 쓰는 코드는 해당 도메인의 `error` 패키지에 `<Domain>ErrorCode` enum으로 둔다(예: `DropErrorCode`, `OrderErrorCode`).
+  - 응답의 `error.code`는 enum 상수 이름이므로 enum이 달라도 같은 이름을 다시 정의하지 않는다. 새 코드를 추가하면 [COMMON.md](../development/api-spec/COMMON.md) 3절 오류 코드 표에도 기록한다.
 - 예외 응답 변환은 `@RestControllerAdvice` 한 곳에서만 한다. Controller에서 `try-catch`로 응답을 만들지 않는다.
 - 예외를 삼키지 않는다. `catch` 후 로그만 남기고 넘어가는 코드는 이유를 주석으로 남긴다.
 
