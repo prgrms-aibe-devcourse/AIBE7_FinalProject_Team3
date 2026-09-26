@@ -4,8 +4,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.util.List;
 import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -85,5 +87,48 @@ class EmailNormalizerTest {
             // 기본 로케일은 JVM 전역 설정이므로 다른 테스트에 영향이 없도록 되돌린다
             Locale.setDefault(originalLocale);
         }
+    }
+
+    @Test
+    @DisplayName("대소문자와 앞뒤 공백만 다른 주소는 모두 같은 값으로 정규화된다")
+    // 가입·로그인·중복 검사에서 같은 회원으로 인식되려면 정규화 된 입력이 하나의 값으로 통일되야 함
+    void normalizesVariantsToSameEmail() {
+        // given
+        List<String> variants = List.of(
+                "user@example.com",
+                "User@Example.COM",
+                "  USER@EXAMPLE.COM  ",
+                "\tUser@example.com\n",
+                "\u3000uSeR@ExAmPlE.cOm\u3000"
+        );
+
+        // when
+        List<String> normalized = variants.stream()
+                .map(EmailNormalizer::normalize)
+                .distinct()
+                .toList();
+
+        // then
+        assertThat(normalized).containsExactly("user@example.com");
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {
+            "user@example.com",
+            "  User@Example.COM  ",
+            "\u3000Us er@Example.com\t"
+    })
+    @DisplayName("이미 정규화한 값을 다시 정규화해도 결과가 같다")
+    // DTO와 서비스 등 여러 단계에서 정규화를 거쳐도 값이 바뀌지 않는지 확인하는 테스트
+    void isIdempotent(String email) {
+        // given
+        String normalizedOnce = EmailNormalizer.normalize(email);
+
+        // when
+        String normalizedTwice = EmailNormalizer.normalize(normalizedOnce);
+
+        // then
+        assertThat(normalizedTwice).isEqualTo(normalizedOnce);
     }
 }
