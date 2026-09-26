@@ -30,4 +30,60 @@ class ErrorResponseTest {
         assertThat(json.get("data").isNull()).isTrue();
         assertThat(json.get("error").isObject()).isTrue();
     }
+
+    @Test
+    @DisplayName("error는 code, message, fieldErrors로 직렬화된다")
+    // COMMON.md 1.5 error 내부 계약을 확인하는 테스트
+    void serializesErrorDetail() {
+        // given
+        ErrorResponse response = ErrorResponse.of("INVALID_EMAIL", "이메일 형식이 올바르지 않습니다.", List.of());
+
+        // when
+        JsonNode error = jsonMapper.readTree(jsonMapper.writeValueAsString(response)).get("error");
+
+        // then
+        assertThat(error.propertyNames()).containsExactlyInAnyOrder("code", "message", "fieldErrors");
+        assertThat(error.get("code").asString()).isEqualTo("INVALID_EMAIL");
+        assertThat(error.get("message").asString()).isEqualTo("이메일 형식이 올바르지 않습니다.");
+        assertThat(error.get("fieldErrors").isArray()).isTrue();
+    }
+
+    @Test
+    @DisplayName("필드 오류가 없으면 fieldErrors는 null이 아닌 빈 배열로 직렬화된다")
+    // COMMON.md 1.5 "해당 사항이 없으면 빈 배열" 규칙을 확인하는 테스트
+    void serializesEmptyFieldErrorsAsEmptyArray() {
+        // given
+        ErrorResponse response = ErrorResponse.of("INVALID_REQUEST", "요청 형식이 올바르지 않습니다.", List.of());
+
+        // when
+        JsonNode fieldErrors = jsonMapper.readTree(jsonMapper.writeValueAsString(response))
+                .get("error").get("fieldErrors");
+
+        // then
+        assertThat(fieldErrors.isArray()).isTrue();
+        assertThat(fieldErrors.isEmpty()).isTrue();
+    }
+
+    @Test
+    @DisplayName("필드 오류 하나는 field와 reason만 포함하고 거부된 입력값을 포함하지 않는다")
+    // 비밀번호 등 입력 원문이 응답에 노출되지 않도록 필드 오류의 키를 확인하는 테스트
+    void serializesFieldErrorWithoutRejectedValue() {
+        // given
+        ErrorResponse response = ErrorResponse.of(
+                "INVALID_PASSWORD",
+                "비밀번호가 규칙을 충족하지 않습니다.",
+                List.of(new ErrorResponse.FieldError("password", "비밀번호는 8자 이상 64자 이하여야 합니다.")));
+
+        // when
+        JsonNode fieldErrors = jsonMapper.readTree(jsonMapper.writeValueAsString(response))
+                .get("error").get("fieldErrors");
+
+        // then
+        // rejectedValue 같은 입력값 키가 없어야 함
+        assertThat(fieldErrors).hasSize(1);
+        JsonNode fieldError = fieldErrors.get(0);
+        assertThat(fieldError.propertyNames()).containsExactlyInAnyOrder("field", "reason");
+        assertThat(fieldError.get("field").asString()).isEqualTo("password");
+        assertThat(fieldError.get("reason").asString()).isEqualTo("비밀번호는 8자 이상 64자 이하여야 합니다.");
+    }
 }
