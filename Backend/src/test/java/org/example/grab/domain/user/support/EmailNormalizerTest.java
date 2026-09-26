@@ -3,6 +3,7 @@ package org.example.grab.domain.user.support;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.Locale;
@@ -37,6 +38,23 @@ class EmailNormalizerTest {
 
         // then
         assertThat(normalized).isEqualTo("user@example.com");
+    }
+
+    @ParameterizedTest
+    // 앞뒤 공백과 대소문자만 정리되고 중간 공백은 입력 그대로 남아야 한다
+    @CsvSource(delimiter = '|', value = {
+            "'  Us er@Example.com  '     | 'us er@example.com'",
+            "'User\t@example.com'        | 'user\t@example.com'",
+            "'user@exam\u3000ple.com'    | 'user@exam\u3000ple.com'"
+    })
+    @DisplayName("이메일 중간의 공백은 삭제하지 않고 그대로 남긴다")
+    // 중간 공백을 지우면 다른 주소로 바뀌므로, 남겨 두고 이후 형식 검증에서 INVALID_EMAIL로 거부하게 하는지 확인하는 테스트
+    void keepsWhitespaceInsideEmail(String email, String expected) {
+        // when
+        String normalized = EmailNormalizer.normalize(email);
+
+        // then
+        assertThat(normalized).isEqualTo(expected);
     }
 
     @Test
