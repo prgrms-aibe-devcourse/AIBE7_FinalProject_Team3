@@ -65,6 +65,22 @@ class ErrorResponseTest {
     }
 
     @Test
+    @DisplayName("fieldErrors로 null을 전달해도 빈 배열로 직렬화된다")
+    // 호출부가 null을 넘겨도 오류 응답이 명세의 빈 배열 규칙을 지키는지 확인하는 테스트
+    void serializesNullFieldErrorsAsEmptyArray() {
+        // given
+        ErrorResponse response = ErrorResponse.of("INVALID_REQUEST", "요청 형식이 올바르지 않습니다.", null);
+
+        // when
+        JsonNode fieldErrors = jsonMapper.readTree(jsonMapper.writeValueAsString(response))
+                .get("error").get("fieldErrors");
+
+        // then
+        assertThat(fieldErrors.isArray()).isTrue();
+        assertThat(fieldErrors.isEmpty()).isTrue();
+    }
+
+    @Test
     @DisplayName("필드 오류 하나는 field와 reason만 포함하고 거부된 입력값을 포함하지 않는다")
     // 비밀번호 등 입력 원문이 응답에 노출되지 않도록 필드 오류의 키를 확인하는 테스트
     void serializesFieldErrorWithoutRejectedValue() {
