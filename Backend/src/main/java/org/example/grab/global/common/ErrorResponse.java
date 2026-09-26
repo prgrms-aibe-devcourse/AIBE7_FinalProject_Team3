@@ -26,11 +26,13 @@ public record ErrorResponse(
     ) {
 
         /*
-            1.5 명세가 필드 오류가 없으면 빈 배열로 정의하므로 compact constructor를 사용하여 null을 빈 목록으로 바꾼다.
+            1.5 명세가 필드 오류가 없으면 빈 배열로 정의하므로 null을 빈 목록으로 바꾼다.
             오류 응답 생성 중 예외가 나면 500으로 바뀌므로 거부하지 않는다.
          */
-        public ErrorDetail {
-            fieldErrors = fieldErrors == null ? List.of() : fieldErrors;
+        public ErrorDetail(String code, String message, List<FieldError> fieldErrors) {
+            this.code = code;
+            this.message = message;
+            this.fieldErrors = fieldErrors == null ? List.of() : fieldErrors;
         }
     }
 
