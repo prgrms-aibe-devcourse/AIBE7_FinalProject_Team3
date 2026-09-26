@@ -4,6 +4,7 @@ package org.example.grab.global.common;
 public record ApiResponse<T>(
         boolean success,
         T data,
+        // message는 현재까지 활용되는 곳은 없는 것으로 확인
         String message
 ) {
 
