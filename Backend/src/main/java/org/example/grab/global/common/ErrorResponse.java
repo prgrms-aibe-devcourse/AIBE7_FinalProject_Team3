@@ -40,8 +40,8 @@ public record ErrorResponse(
         개별 필드 오류 하나를 표기
      */
     public record FieldError(
-            String field,
-            String reason
+            String field, // 검증에 실패한 요청 입력 항목의 이름
+            String reason // 실패 이유
     ) {
     }
 }
