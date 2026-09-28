@@ -3,6 +3,7 @@ package org.example.grab.domain.order.dto;
 import org.example.grab.domain.order.entity.Order;
 import org.example.grab.domain.order.entity.OrderItem;
 import org.example.grab.domain.order.entity.OrderStatus;
+import org.example.grab.domain.order.entity.PaymentStatus;
 import org.example.grab.domain.order.entity.Shipment;
 
 import java.time.OffsetDateTime;
@@ -17,14 +18,14 @@ public record MyOrderDetailResponse(
         long itemsAmount,
         long shippingAmount,
         long totalAmount,
-        String paymentStatus,
+        PaymentStatus paymentStatus,
         OffsetDateTime paymentExpiresAt,
         Shipping shipping,
         OffsetDateTime orderedAt
 ) {
 
     public static MyOrderDetailResponse from(
-            Order order, List<OrderItem> orderItems, String paymentStatus, Shipment shipment) {
+            Order order, List<OrderItem> orderItems, PaymentStatus paymentStatus, Shipment shipment) {
         List<Item> items = orderItems.stream()
                 .map(item -> new Item(
                         order.getProductNameSnapshot(),
@@ -37,6 +38,10 @@ public record MyOrderDetailResponse(
         Shipping shipping = shipment == null
                 ? new Shipping(null, null, null)
                 : new Shipping(order.getStatus().name(), shipment.getCarrierCode(), shipment.getTrackingNumber());
+        // payment_expires_at은 결제 후에도 남아 있으므로 결제 대기 주문에서만 마감 시각으로 노출한다.
+        OffsetDateTime paymentExpiresAt = order.getStatus() == OrderStatus.PAYMENT_PENDING
+                ? order.getPaymentExpiresAt()
+                : null;
 
         return new MyOrderDetailResponse(
                 order.getUuid(),
@@ -47,7 +52,7 @@ public record MyOrderDetailResponse(
                 order.getShippingAmount(),
                 order.getTotalAmount(),
                 paymentStatus,
-                order.getPaymentExpiresAt(),
+                paymentExpiresAt,
                 shipping,
                 order.getCreatedAt()
         );

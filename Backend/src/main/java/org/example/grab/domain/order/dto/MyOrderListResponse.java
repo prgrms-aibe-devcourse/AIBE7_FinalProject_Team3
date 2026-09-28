@@ -9,6 +9,7 @@ import java.util.UUID;
 public record MyOrderListResponse(
         UUID orderId,
         String orderNumber,
+        String productName,
         OrderStatus status,
         long totalAmount,
         OffsetDateTime orderedAt
@@ -18,6 +19,7 @@ public record MyOrderListResponse(
         return new MyOrderListResponse(
                 order.getUuid(),
                 order.getOrderNumber(),
+                order.getProductNameSnapshot(),
                 order.getStatus(),
                 order.getTotalAmount(),
                 order.getCreatedAt()

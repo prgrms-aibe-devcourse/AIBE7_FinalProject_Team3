@@ -5,6 +5,7 @@ import org.example.grab.domain.order.dto.MyOrderListResponse;
 import org.example.grab.domain.order.entity.Order;
 import org.example.grab.domain.order.entity.OrderItem;
 import org.example.grab.domain.order.entity.OrderStatus;
+import org.example.grab.domain.order.entity.PaymentStatus;
 import org.example.grab.domain.order.entity.Shipment;
 import org.example.grab.domain.order.entity.ShippingAddress;
 import org.example.grab.domain.order.error.OrderErrorCode;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -56,6 +58,7 @@ class OrderQueryServiceTest {
         // then
         assertThat(result.content()).singleElement().satisfies(summary -> {
             assertThat(summary.orderId()).isEqualTo(order.getUuid());
+            assertThat(summary.productName()).isEqualTo("한정 상품");
             assertThat(summary.status()).isEqualTo(OrderStatus.PAYMENT_PENDING);
             assertThat(summary.totalAmount()).isEqualTo(33000);
         });
@@ -108,10 +111,49 @@ class OrderQueryServiceTest {
         assertThat(result.itemsAmount()).isEqualTo(30000);
         assertThat(result.shippingAmount()).isEqualTo(3000);
         assertThat(result.totalAmount()).isEqualTo(33000);
-        assertThat(result.paymentStatus()).isEqualTo("PENDING");
+        assertThat(result.paymentStatus()).isEqualTo(PaymentStatus.PENDING);
         assertThat(result.paymentExpiresAt()).isEqualTo(PAYMENT_EXPIRES_AT);
         assertThat(result.shipping()).isEqualTo(
                 new MyOrderDetailResponse.Shipping("PAYMENT_PENDING", "CJ", "1234567890"));
+    }
+
+    @Test
+    @DisplayName("결제가 끝난 주문은 결제 마감 시각을 노출하지 않는다")
+    void hidesPaymentExpiryAfterPayment() {
+        // given
+        UUID orderId = UUID.randomUUID();
+        Order order = createOrder();
+        ReflectionTestUtils.setField(order, "status", OrderStatus.PAID);
+        given(orderRepository.findByUuidAndBuyerId(orderId, BUYER_ID)).willReturn(Optional.of(order));
+        given(orderItemRepository.findAllByOrderIdOrderByIdAsc(null)).willReturn(List.of());
+        given(orderRepository.findLatestPaymentStatus(null)).willReturn(Optional.of("SUCCEEDED"));
+        given(shipmentRepository.findByOrderId(null)).willReturn(Optional.empty());
+
+        // when
+        MyOrderDetailResponse result = orderQueryService.findMyOrder(BUYER_ID, orderId);
+
+        // then
+        assertThat(result.status()).isEqualTo(OrderStatus.PAID);
+        assertThat(result.paymentStatus()).isEqualTo(PaymentStatus.SUCCEEDED);
+        assertThat(result.paymentExpiresAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("결제 이력이 없으면 결제 상태를 null로 반환한다")
+    void returnsNullPaymentStatusWithoutPayment() {
+        // given
+        UUID orderId = UUID.randomUUID();
+        given(orderRepository.findByUuidAndBuyerId(orderId, BUYER_ID)).willReturn(Optional.of(createOrder()));
+        given(orderItemRepository.findAllByOrderIdOrderByIdAsc(null)).willReturn(List.of());
+        given(orderRepository.findLatestPaymentStatus(null)).willReturn(Optional.empty());
+        given(shipmentRepository.findByOrderId(null)).willReturn(Optional.empty());
+
+        // when
+        MyOrderDetailResponse result = orderQueryService.findMyOrder(BUYER_ID, orderId);
+
+        // then
+        assertThat(result.paymentStatus()).isNull();
+        assertThat(result.paymentExpiresAt()).isEqualTo(PAYMENT_EXPIRES_AT);
     }
 
     @Test

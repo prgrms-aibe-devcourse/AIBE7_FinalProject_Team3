@@ -5,6 +5,7 @@ import org.example.grab.domain.order.dto.MyOrderListResponse;
 import org.example.grab.domain.order.dto.OrderCreateRequest;
 import org.example.grab.domain.order.dto.OrderCreateResponse;
 import org.example.grab.domain.order.entity.OrderStatus;
+import org.example.grab.domain.order.entity.PaymentStatus;
 import org.example.grab.domain.order.error.OrderErrorCode;
 import org.example.grab.domain.order.service.OrderCreateService;
 import org.example.grab.domain.order.service.OrderQueryService;
@@ -105,6 +106,7 @@ class OrderControllerTest {
                 List.of(new MyOrderListResponse(
                         orderId,
                         "ORD-20260928-ABC",
+                        "한정판 스니커즈",
                         OrderStatus.PAID,
                         261000,
                         OffsetDateTime.parse("2026-09-28T12:00:00Z")
@@ -122,6 +124,7 @@ class OrderControllerTest {
         mockMvc.perform(get("/api/v1/orders").param("status", "PAID"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].orderId").value(orderId.toString()))
+                .andExpect(jsonPath("$.data.content[0].productName").value("한정판 스니커즈"))
                 .andExpect(jsonPath("$.data.content[0].status").value("PAID"))
                 .andExpect(jsonPath("$.data.content[0].totalAmount").value(261000))
                 .andExpect(jsonPath("$.data.totalElements").value(1))
@@ -152,7 +155,7 @@ class OrderControllerTest {
                 258000,
                 3000,
                 261000,
-                "PENDING",
+                PaymentStatus.PENDING,
                 OffsetDateTime.parse("2026-09-28T12:10:00Z"),
                 new MyOrderDetailResponse.Shipping(null, null, null),
                 OffsetDateTime.parse("2026-09-28T12:00:00Z")

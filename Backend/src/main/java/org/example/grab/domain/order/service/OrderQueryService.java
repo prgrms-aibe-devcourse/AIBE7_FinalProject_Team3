@@ -5,6 +5,7 @@ import org.example.grab.domain.order.dto.MyOrderDetailResponse;
 import org.example.grab.domain.order.dto.MyOrderListResponse;
 import org.example.grab.domain.order.entity.Order;
 import org.example.grab.domain.order.entity.OrderStatus;
+import org.example.grab.domain.order.entity.PaymentStatus;
 import org.example.grab.domain.order.error.OrderErrorCode;
 import org.example.grab.domain.order.repository.OrderItemRepository;
 import org.example.grab.domain.order.repository.OrderRepository;
@@ -51,7 +52,7 @@ public class OrderQueryService {
         return MyOrderDetailResponse.from(
                 order,
                 orderItemRepository.findAllByOrderIdOrderByIdAsc(order.getId()),
-                orderRepository.findLatestPaymentStatus(order.getId()).orElse(null),
+                orderRepository.findLatestPaymentStatus(order.getId()).map(PaymentStatus::valueOf).orElse(null),
                 shipmentRepository.findByOrderId(order.getId()).orElse(null)
         );
     }
