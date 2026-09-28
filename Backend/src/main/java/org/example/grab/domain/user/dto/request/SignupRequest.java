@@ -27,4 +27,13 @@ public record SignupRequest(
         this.password = password;
         this.nickname = nickname == null ? null : nickname.strip();
     }
+
+    /*
+        record가 자동으로 만드는 toString()은 모든 필드를 그대로 출력해, 로그·예외 메시지·디버거에 비밀번호 원문이 남는다.
+        비밀번호는 null·길이 여부도 드러나지 않도록 항상 같은 값으로 가리고, 공개 정보인 닉네임만 남긴다.
+     */
+    @Override
+    public String toString() {
+        return "SignupRequest[password=masked, nickname=" + nickname + "]";
+    }
 }

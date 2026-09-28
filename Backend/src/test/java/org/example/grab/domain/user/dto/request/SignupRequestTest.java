@@ -280,4 +280,33 @@ class SignupRequestTest {
                 .doesNotContain(password)
                 .doesNotContain(nickname));
     }
+
+    @Test
+    @DisplayName("toString은 비밀번호를 가리고 닉네임만 보여 준다")
+    // record 기본 toString은 비밀번호 원문을 출력하므로, 로그 등에 남지 않도록 가렸는지 확인하는 테스트
+    void masksPasswordInToString() {
+        // given
+        SignupRequest request = new SignupRequest("Secret#Pass123", "드롭헌터");
+
+        // when
+        String text = request.toString();
+
+        // then
+        assertThat(text)
+                .isEqualTo("SignupRequest[password=masked, nickname=드롭헌터]")
+                .doesNotContain("Secret#Pass123");
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"   ", "a", "Password123!"})
+    @DisplayName("toString은 비밀번호가 null이든 어떤 길이든 같은 값으로 가린다")
+    // 가린 결과가 입력에 따라 달라지면 비밀번호 유무나 길이가 드러나므로, 항상 같은 문자열인지 확인하는 테스트
+    void masksPasswordRegardlessOfValue(String password) {
+        // when
+        String text = new SignupRequest(password, "드롭헌터").toString();
+
+        // then
+        assertThat(text).isEqualTo("SignupRequest[password=masked, nickname=드롭헌터]");
+    }
 }
