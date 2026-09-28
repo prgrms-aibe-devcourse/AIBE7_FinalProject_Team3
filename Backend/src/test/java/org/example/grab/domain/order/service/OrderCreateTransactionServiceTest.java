@@ -15,11 +15,14 @@ import org.example.grab.global.idempotency.RequestHash;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.projection.ProjectionFactory;
+import org.springframework.data.projection.SpelAwareProxyProjectionFactory;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -30,6 +33,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 class OrderCreateTransactionServiceTest {
+
+    private static final ProjectionFactory PROJECTION_FACTORY = new SpelAwareProxyProjectionFactory();
 
     private OrderInventoryRepository inventoryRepository;
     private OrderRepository orderRepository;
@@ -61,10 +66,10 @@ class OrderCreateTransactionServiceTest {
         // given
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         given(inventoryRepository.findDrop(100L)).willReturn(java.util.Optional.of(
-                new DropSnapshot(100L, "GRAB", "한정판", "판매자", 3000, now.minusMinutes(1), now.plusHours(1))
+                dropSnapshot(100L, "GRAB", "한정판", "판매자", 3000, now.minusMinutes(1), now.plusHours(1))
         ));
         given(inventoryRepository.lockOptions(100L, List.of(1001L))).willReturn(List.of(
-                new LockedOption(1001L, 129000, 10, 1, 0, 0, true, "블랙 / M")
+                lockedOption(1001L, 129000, 10, 1, 0, 0, true, "블랙 / M")
         ));
         given(orderRepository.saveAndFlush(any(Order.class))).willAnswer(invocation -> {
             Order order = invocation.getArgument(0);
@@ -90,10 +95,10 @@ class OrderCreateTransactionServiceTest {
         // given
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         given(inventoryRepository.findDrop(100L)).willReturn(java.util.Optional.of(
-                new DropSnapshot(100L, "GRAB", "한정판", "판매자", 3000, now.minusMinutes(1), now.plusHours(1))
+                dropSnapshot(100L, "GRAB", "한정판", "판매자", 3000, now.minusMinutes(1), now.plusHours(1))
         ));
         given(inventoryRepository.lockOptions(100L, List.of(1001L))).willReturn(List.of(
-                new LockedOption(1001L, 129000, 2, 1, 0, 0, true, "블랙 / M")
+                lockedOption(1001L, 129000, 2, 1, 0, 0, true, "블랙 / M")
         ));
 
         // when & then
@@ -111,7 +116,7 @@ class OrderCreateTransactionServiceTest {
         // given
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         given(inventoryRepository.findDrop(100L)).willReturn(java.util.Optional.of(
-                new DropSnapshot(100L, "GRAB", "한정판", "판매자", 3000, now.plusHours(1), now.plusHours(2))
+                dropSnapshot(100L, "GRAB", "한정판", "판매자", 3000, now.plusHours(1), now.plusHours(2))
         ));
 
         // when & then
@@ -137,5 +142,47 @@ class OrderCreateTransactionServiceTest {
 
     private RequestHash requestHash() {
         return RequestHash.from("a".repeat(64));
+    }
+
+    private DropSnapshot dropSnapshot(
+            Long id,
+            String status,
+            String productName,
+            String sellerName,
+            long shippingFee,
+            OffsetDateTime saleStartsAt,
+            OffsetDateTime saleEndsAt
+    ) {
+        return PROJECTION_FACTORY.createProjection(DropSnapshot.class, Map.of(
+                "id", id,
+                "status", status,
+                "productName", productName,
+                "sellerName", sellerName,
+                "shippingFee", shippingFee,
+                "saleStartsAt", saleStartsAt.toInstant(),
+                "saleEndsAt", saleEndsAt.toInstant()
+        ));
+    }
+
+    private LockedOption lockedOption(
+            Long id,
+            long unitPrice,
+            int totalQuantity,
+            int reservedQuantity,
+            int soldQuantity,
+            int withheldQuantity,
+            boolean active,
+            String optionName
+    ) {
+        return PROJECTION_FACTORY.createProjection(LockedOption.class, Map.of(
+                "id", id,
+                "unitPrice", unitPrice,
+                "totalQuantity", totalQuantity,
+                "reservedQuantity", reservedQuantity,
+                "soldQuantity", soldQuantity,
+                "withheldQuantity", withheldQuantity,
+                "active", active,
+                "optionName", optionName
+        ));
     }
 }

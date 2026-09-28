@@ -19,6 +19,7 @@ import org.example.grab.global.idempotency.RequestHash;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -55,36 +56,36 @@ public class OrderCreateTransactionService {
                 .map(OrderCreateRequest.Item::optionId)
                 .sorted()
                 .toList();
-        List<LockedOption> lockedOptions = inventoryRepository.lockOptions(drop.id(), optionIds);
+        List<LockedOption> lockedOptions = inventoryRepository.lockOptions(drop.getId(), optionIds);
         if (lockedOptions.size() != optionIds.size()) {
             throw new BusinessException(OrderErrorCode.OPTION_NOT_FOUND);
         }
         Map<Long, LockedOption> optionsById = lockedOptions.stream()
-                .collect(Collectors.toMap(LockedOption::id, Function.identity()));
+                .collect(Collectors.toMap(LockedOption::getId, Function.identity()));
 
         long itemsAmount = 0;
         for (OrderCreateRequest.Item item : request.items()) {
             LockedOption option = optionsById.get(item.optionId());
-            if (option == null || !option.active()) {
+            if (option == null || !option.isActive()) {
                 throw new BusinessException(OrderErrorCode.OPTION_NOT_FOUND);
             }
-            if (option.availableQuantity() < item.quantity()) {
+            if (option.getAvailableQuantity() < item.quantity()) {
                 throw new BusinessException(OrderErrorCode.INSUFFICIENT_STOCK);
             }
-            itemsAmount = Math.addExact(itemsAmount, Math.multiplyExact(option.unitPrice(), item.quantity()));
+            itemsAmount = Math.addExact(itemsAmount, Math.multiplyExact(option.getUnitPrice(), item.quantity()));
         }
 
         OffsetDateTime paymentExpiresAt = now.plusMinutes(PAYMENT_WAIT_MINUTES);
         Order order = orderRepository.saveAndFlush(Order.create(
                 orderNumberGenerator.generate(),
                 buyerId,
-                drop.id(),
+                drop.getId(),
                 idempotencyKey.value(),
                 requestHash.value(),
-                drop.productName(),
-                drop.sellerName(),
+                drop.getProductName(),
+                drop.getSellerName(),
                 itemsAmount,
-                drop.shippingFee(),
+                drop.getShippingFee(),
                 toShippingAddress(request.shippingAddress()),
                 paymentExpiresAt
         ));
@@ -92,12 +93,12 @@ public class OrderCreateTransactionService {
         List<OrderItem> orderItems = new ArrayList<>();
         for (OrderCreateRequest.Item requestItem : request.items()) {
             LockedOption option = optionsById.get(requestItem.optionId());
-            inventoryRepository.increaseReservedQuantity(option.id(), requestItem.quantity());
+            inventoryRepository.increaseReservedQuantity(option.getId(), requestItem.quantity());
             orderItems.add(OrderItem.create(
                     order,
-                    option.id(),
-                    option.optionName(),
-                    option.unitPrice(),
+                    option.getId(),
+                    option.getOptionName(),
+                    option.getUnitPrice(),
                     requestItem.quantity()
             ));
         }
@@ -109,13 +110,14 @@ public class OrderCreateTransactionService {
     }
 
     private void validateSale(DropSnapshot drop, OffsetDateTime now) {
-        if (!"GRAB".equals(drop.status())) {
+        if (!"GRAB".equals(drop.getStatus())) {
             throw new BusinessException(OrderErrorCode.DROP_NOT_ON_SALE);
         }
-        if (now.isBefore(drop.saleStartsAt())) {
+        Instant current = now.toInstant();
+        if (current.isBefore(drop.getSaleStartsAt())) {
             throw new BusinessException(OrderErrorCode.SALE_NOT_STARTED);
         }
-        if (!now.isBefore(drop.saleEndsAt())) {
+        if (!current.isBefore(drop.getSaleEndsAt())) {
             throw new BusinessException(OrderErrorCode.SALE_ENDED);
         }
     }
