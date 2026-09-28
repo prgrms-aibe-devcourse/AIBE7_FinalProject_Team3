@@ -2,9 +2,15 @@ package org.example.grab.global.error;
 
 import jakarta.validation.ConstraintViolation;
 import org.springframework.stereotype.Component;
+import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.RecordComponent;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,5 +54,65 @@ public class ValidationErrorCodeResolver {
                 .getAnnotation()
                 .annotationType();
         return errorCodes.getOrDefault(constraint, CommonErrorCode.VALIDATION_FAILED);
+    }
+
+    /*
+        요청 하나의 검증 실패 전체를 최상위 코드와 정렬된 필드 오류 목록으로 정리한다(MEMBER_AUTH.md 1.2.3 "여러 항목이 동시에 검증에 실패한 경우").
+        필드당 사유 하나만 남기는 일은 각 DTO의 제약 조합이 맡으므로(필수값 제약과 규칙 제약이 같은 값을 함께 거부하지 않게 조합), 여기서는 받은 필드 오류를 모두 담는다.
+     */
+    public ValidationFailure resolve(BindingResult bindingResult) {
+        List<FieldError> fieldErrors = sortByDeclarationOrder(bindingResult);
+        return new ValidationFailure(selectErrorCode(bindingResult, fieldErrors), fieldErrors);
+    }
+
+    /*
+        Bean Validation이 위반을 보고하는 순서는 보장되지 않으므로, 요청 DTO에 필드를 선언한 순서로 정렬한다.
+        명세의 fieldErrors 순서(password → nickname)는 DTO 선언 순서와 같게 유지한다.
+        선언에서 찾지 못한 필드는 뒤로 보내고, 같은 필드끼리는 받은 순서를 유지한다.
+     */
+    private List<FieldError> sortByDeclarationOrder(BindingResult bindingResult) {
+        List<String> declaredFields = declaredFieldNames(bindingResult.getTarget());
+        return bindingResult.getFieldErrors().stream()
+                .sorted(Comparator.comparingInt(error -> declarationIndex(declaredFields, error.getField())))
+                .toList();
+    }
+
+    private List<String> declaredFieldNames(Object target) {
+        if (target == null) {
+            return List.of();
+        }
+        Class<?> type = target.getClass();
+        // record 구성 요소는 선언 순서로 반환되는 것이 보장된다
+        if (type.isRecord()) {
+            return Arrays.stream(type.getRecordComponents())
+                    .map(RecordComponent::getName)
+                    .toList();
+        }
+        return Arrays.stream(type.getDeclaredFields())
+                .filter(field -> !Modifier.isStatic(field.getModifiers()))
+                .map(Field::getName)
+                .toList();
+    }
+
+    private int declarationIndex(List<String> declaredFields, String field) {
+        // 중첩 필드(address.city, options[0].name)는 최상위 필드의 위치를 따른다
+        String rootField = field.split("[.\\[]", 2)[0];
+        int index = declaredFields.indexOf(rootField);
+        return index < 0 ? Integer.MAX_VALUE : index;
+    }
+
+    /*
+        필드 오류들의 코드가 모두 같으면 그 코드를, 서로 다르면 VALIDATION_FAILED를 쓴다.
+        클래스 단위 제약 위반은 fieldErrors에 담기지 않으므로, 있으면 특정 필드의 코드로 대표하지 않고 VALIDATION_FAILED로 둔다.
+     */
+    private ErrorCode selectErrorCode(BindingResult bindingResult, List<FieldError> fieldErrors) {
+        if (bindingResult.hasGlobalErrors()) {
+            return CommonErrorCode.VALIDATION_FAILED;
+        }
+        List<ErrorCode> fieldErrorCodes = fieldErrors.stream()
+                .map(this::resolve)
+                .distinct()
+                .toList();
+        return fieldErrorCodes.size() == 1 ? fieldErrorCodes.get(0) : CommonErrorCode.VALIDATION_FAILED;
     }
 }

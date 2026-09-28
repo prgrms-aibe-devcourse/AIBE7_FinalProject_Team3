@@ -13,7 +13,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.BeanPropertyBindingResult;
+import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
+import org.springframework.validation.ObjectError;
 import org.springframework.validation.beanvalidation.SpringValidatorAdapter;
 
 import java.lang.annotation.Retention;
@@ -72,6 +74,21 @@ class ValidationErrorCodeResolverTest {
     private record StandardRequest(@NotBlank String value) {
     }
 
+    private record TwoMappedRequest(@AlwaysInvalid String first, @AlwaysInvalid String second) {
+    }
+
+    private record MixedRequest(@AlwaysInvalid String first, @NotBlank String second) {
+    }
+
+    private record StandardOnlyRequest(@NotBlank String first, @NotBlank String second) {
+    }
+
+    private record DifferentMessageRequest(
+            @AlwaysInvalid(message = "첫 번째 문구입니다.") String first,
+            @AlwaysInvalid(message = "전혀 다른 두 번째 문구입니다.") String second
+    ) {
+    }
+
     @BeforeAll
     static void setUpValidator() {
         validatorFactory = Validation.buildDefaultValidatorFactory();
@@ -89,6 +106,30 @@ class ValidationErrorCodeResolverTest {
         springValidator.validate(target, result);
         assertThat(result.getFieldErrors()).hasSize(1);
         return result.getFieldErrors().get(0);
+    }
+
+    private static BindingResult validate(Object target) {
+        BeanPropertyBindingResult result = new BeanPropertyBindingResult(target, "request");
+        springValidator.validate(target, result);
+        return result;
+    }
+
+    // 검증기가 선언과 반대 순서로 위반을 보고한 상황을 만든다
+    private static BindingResult validateInReverseOrder(Object target) {
+        List<FieldError> fieldErrors = validate(target).getFieldErrors();
+        BeanPropertyBindingResult reversed = new BeanPropertyBindingResult(target, "request");
+        for (int i = fieldErrors.size() - 1; i >= 0; i--) {
+            reversed.addError(fieldErrors.get(i));
+        }
+        return reversed;
+    }
+
+    private static List<String> fieldNames(ValidationFailure failure) {
+        return failure.fieldErrors().stream().map(FieldError::getField).toList();
+    }
+
+    private static ValidationErrorCodeResolver mappedResolver() {
+        return new ValidationErrorCodeResolver(List.of(mapping(TestErrorCode.TEST_INVALID)));
     }
 
     private static ConstraintErrorCodeMapping mapping(ErrorCode errorCode) {
@@ -165,5 +206,84 @@ class ValidationErrorCodeResolverTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("TEST_INVALID")
                 .hasMessageContaining("OTHER_INVALID");
+    }
+
+    @Test
+    @DisplayName("필드 오류의 코드가 모두 같으면 그 코드를 최상위 코드로 쓴다")
+    void selectsCommonCodeWhenAllFieldErrorsMatch() {
+        // when
+        ValidationFailure failure = mappedResolver().resolve(validate(new TwoMappedRequest("값", "값")));
+
+        // then
+        assertThat(failure.errorCode()).isEqualTo(TestErrorCode.TEST_INVALID);
+        assertThat(fieldNames(failure)).containsExactly("first", "second");
+    }
+
+    @Test
+    @DisplayName("필드 오류의 코드가 섞이면 최상위 코드는 VALIDATION_FAILED다")
+    // 매핑된 제약과 미등록 제약이 함께 위반되면 특정 필드의 코드로 대표하지 않는지 확인하는 테스트(GR-28 M06-07)
+    void selectsValidationFailedWhenFieldErrorCodesDiffer() {
+        // when
+        ValidationFailure failure = mappedResolver().resolve(validate(new MixedRequest("값", "")));
+
+        // then
+        assertThat(failure.errorCode()).isEqualTo(CommonErrorCode.VALIDATION_FAILED);
+        assertThat(fieldNames(failure)).containsExactly("first", "second");
+    }
+
+    @Test
+    @DisplayName("매핑을 등록하지 않은 DTO의 다중 위반은 기존처럼 VALIDATION_FAILED다")
+    // 회원가입 외 DTO의 표준 제약 위반이 도메인 코드로 바뀌지 않는지 확인하는 테스트(GR-28 M06-04)
+    void keepsValidationFailedForUnmappedRequest() {
+        // when
+        ValidationFailure failure = mappedResolver().resolve(validate(new StandardOnlyRequest("", "")));
+
+        // then
+        assertThat(failure.errorCode()).isEqualTo(CommonErrorCode.VALIDATION_FAILED);
+        assertThat(fieldNames(failure)).containsExactly("first", "second");
+    }
+
+    @Test
+    @DisplayName("오류 문구가 달라도 같은 제약이면 같은 코드로 바꾼다")
+    // 문구가 아니라 제약 타입으로 분기하는지 확인하는 테스트(GR-28 M06-05)
+    void resolvesByConstraintTypeRegardlessOfMessage() {
+        // when
+        ValidationFailure failure = mappedResolver().resolve(validate(new DifferentMessageRequest("값", "값")));
+
+        // then
+        assertThat(failure.fieldErrors())
+                .extracting(FieldError::getDefaultMessage)
+                .containsExactly("첫 번째 문구입니다.", "전혀 다른 두 번째 문구입니다.");
+        assertThat(failure.errorCode()).isEqualTo(TestErrorCode.TEST_INVALID);
+    }
+
+    @Test
+    @DisplayName("필드 오류는 검증기가 보고한 순서와 관계없이 DTO 선언 순서로 정렬한다")
+    void sortsFieldErrorsByDeclarationOrder() {
+        // given
+        BindingResult reversed = validateInReverseOrder(new MixedRequest("값", ""));
+        assertThat(reversed.getFieldErrors()).extracting(FieldError::getField).containsExactly("second", "first");
+
+        // when
+        ValidationFailure failure = mappedResolver().resolve(reversed);
+
+        // then
+        assertThat(fieldNames(failure)).containsExactly("first", "second");
+    }
+
+    @Test
+    @DisplayName("클래스 단위 제약 위반이 함께 있으면 최상위 코드는 VALIDATION_FAILED다")
+    // fieldErrors에 담기지 않는 위반을 특정 필드의 코드로 숨기지 않는지 확인하는 테스트
+    void selectsValidationFailedWhenGlobalErrorExists() {
+        // given
+        BindingResult result = validate(new MappedRequest("값"));
+        result.addError(new ObjectError("request", "요청 전체가 올바르지 않습니다."));
+
+        // when
+        ValidationFailure failure = mappedResolver().resolve(result);
+
+        // then
+        assertThat(failure.errorCode()).isEqualTo(CommonErrorCode.VALIDATION_FAILED);
+        assertThat(fieldNames(failure)).containsExactly("value");
     }
 }
