@@ -1,9 +1,12 @@
 package org.example.grab.domain.drop.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.grab.domain.drop.dto.PublicDropListProjection;
+import org.example.grab.domain.drop.dto.PublicDropSort;
 import org.example.grab.domain.drop.dto.SellerDropListProjection;
 import org.example.grab.domain.drop.dto.request.DropDraftRequest;
 import org.example.grab.domain.drop.dto.request.ShippingRequest;
+import org.example.grab.domain.drop.dto.response.PublicDropListResponse;
 import org.example.grab.domain.drop.dto.response.SellerDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.SellerDropListResponse;
 import org.example.grab.domain.drop.entity.Drop;
@@ -33,6 +36,10 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class DropService {
+
+    private static final List<String> PUBLIC_STATUSES = List.of(
+            DropStatus.WISH.name(), DropStatus.GRAB.name(), DropStatus.ENDED.name());
+    private static final int KEYWORD_MAX_LENGTH = 100;
 
     private final DropRepository dropRepository;
     private final CategoryService categoryService;
@@ -84,9 +91,60 @@ public class DropService {
                 drops.getTotalPages(), drops.hasNext());
     }
 
+    /*
+     * 공개 DROP 목록. DRAFT·CANCELED는 어떤 경우에도 제외한다(DISC-001).
+     * status가 없으면 WISH·GRAB·ENDED를 모두, 있으면 그 상태만 조회한다.
+     * 정렬은 허용 속성을 컬럼명으로 매핑한 Sort를 쓰고, keyword는 trim·이스케이프해 넘긴다.
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<PublicDropListResponse> findPublicDrops(
+            DropStatus status, Long categoryId, String keyword, Boolean soldOut,
+            PublicDropSort sort, int page, int size) {
+        List<String> statuses = resolvePublicStatuses(status);
+        PublicDropSort effectiveSort = sort != null ? sort : PublicDropSort.parse(null);
+        Page<PublicDropListProjection> drops = dropRepository.findPublicDrops(
+                statuses, categoryId, normalizeKeyword(keyword), soldOut,
+                PageRequest.of(page, size, effectiveSort.toSort()));
+        List<PublicDropListResponse> content = drops.getContent().stream()
+                .map(PublicDropListResponse::from)
+                .toList();
+        return new PageResponse<>(content, page, size, drops.getTotalElements(),
+                drops.getTotalPages(), drops.hasNext());
+    }
+
     @Transactional(readOnly = true)
     public SellerDropDetailResponse findSellerDrop(Long sellerId, Long dropId) {
         return SellerDropDetailResponse.from(findOwnedDrop(sellerId, dropId));
+    }
+
+    // status가 없으면 공개 상태 전체, DRAFT·CANCELED는 공개 목록에 넣을 수 없으므로 거부한다.
+    private List<String> resolvePublicStatuses(DropStatus status) {
+        if (status == null) {
+            return PUBLIC_STATUSES;
+        }
+        if (status == DropStatus.DRAFT || status == DropStatus.CANCELED) {
+            throw new BusinessException(CommonErrorCode.INVALID_REQUEST);
+        }
+        return List.of(status.name());
+    }
+
+    // 앞뒤 공백을 제거하고, 비어 있으면 조건을 무시(null)한다. %·_·\는 와일드카드가 아니라 리터럴로 만든다.
+    private String normalizeKeyword(String keyword) {
+        if (keyword == null) {
+            return null;
+        }
+        String trimmed = keyword.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        if (trimmed.length() > KEYWORD_MAX_LENGTH) {
+            throw new BusinessException(CommonErrorCode.INVALID_REQUEST);
+        }
+        String escaped = trimmed
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
+        return "%" + escaped + "%";
     }
 
     private Drop findOwnedDrop(Long sellerId, Long dropId) {
