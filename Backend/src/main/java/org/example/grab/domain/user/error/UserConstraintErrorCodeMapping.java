@@ -1,5 +1,6 @@
 package org.example.grab.domain.user.error;
 
+import org.example.grab.domain.user.validation.ValidNickname;
 import org.example.grab.domain.user.validation.ValidPassword;
 import org.example.grab.global.error.ConstraintErrorCodeMapping;
 import org.example.grab.global.error.ErrorCode;
@@ -19,7 +20,8 @@ public class UserConstraintErrorCodeMapping implements ConstraintErrorCodeMappin
     @Override
     public Map<Class<? extends Annotation>, ErrorCode> errorCodes() {
         return Map.of(
-                ValidPassword.class, UserErrorCode.INVALID_PASSWORD
+                ValidPassword.class, UserErrorCode.INVALID_PASSWORD,
+                ValidNickname.class, UserErrorCode.INVALID_NICKNAME
         );
     }
 }
