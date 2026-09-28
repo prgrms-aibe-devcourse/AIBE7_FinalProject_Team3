@@ -189,6 +189,7 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 | `EMAIL_SIGNUP_CONTEXT_EXPIRED` | 401 | 이메일 가입 컨텍스트 만료 |
 | `ACCESS_DENIED` | 403 | 권한 없음 |
 | `RESOURCE_NOT_FOUND` | 404 | 리소스 없음 |
+| `DUPLICATE_IDEMPOTENCY_KEY` | 409 | 같은 멱등 키에 다른 요청 본문 사용 |
 | `DUPLICATE_EMAIL` | 409 | 이메일 중복 |
 | `DUPLICATE_NICKNAME` | 409 | 닉네임 중복 (대소문자 무시) |
 | `INVALID_STATE_TRANSITION` | 409 | 허용되지 않은 상태 전이 |
