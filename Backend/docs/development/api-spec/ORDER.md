@@ -100,6 +100,7 @@ GET /api/v1/orders?status=PAID&page=0&size=20
       {
         "orderId": "b2d4f6a8-1c3e-4a5b-8c7d-9e0f1a2b3c4d",
         "orderNumber": "ORD-20260918-000500",
+        "productName": "한정판 스니커즈",
         "status": "PAID",
         "totalAmount": 261000,
         "orderedAt": "2026-09-18T14:00:00+09:00"
@@ -146,7 +147,7 @@ GET /api/v1/orders/{orderId}
     "shippingAmount": 3000,
     "totalAmount": 261000,
     "paymentStatus": "SUCCEEDED",
-    "paymentExpiresAt": "2026-09-18T14:10:00+09:00",
+    "paymentExpiresAt": null,
     "shipping": {
       "status": null,
       "carrier": null,
@@ -157,6 +158,8 @@ GET /api/v1/orders/{orderId}
 }
 ```
 
+- `paymentExpiresAt`은 `PAYMENT_PENDING` 주문에서만 결제 마감 시각을 담고, 그 외 상태에서는 `null`입니다.
+- `paymentStatus`는 최근 결제 시도의 상태이며, 결제 시도가 없으면 `null`입니다.
 - `shipping`은 배송 정보가 등록되기 전까지 모든 값이 `null`입니다.
 
 **오류 코드:**
