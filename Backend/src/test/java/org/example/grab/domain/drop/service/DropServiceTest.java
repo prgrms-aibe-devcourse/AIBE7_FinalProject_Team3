@@ -6,12 +6,16 @@ import org.example.grab.domain.drop.dto.request.OptionRequest;
 import org.example.grab.domain.drop.dto.request.OptionValueRequest;
 import org.example.grab.domain.drop.dto.request.SelectionRequest;
 import org.example.grab.domain.drop.dto.request.ShippingRequest;
+import org.example.grab.domain.category.service.CategoryService;
 import org.example.grab.domain.drop.entity.Drop;
+import org.example.grab.domain.drop.entity.DropImage;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.entity.option.DropOption;
 import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.domain.drop.repository.DropRepository;
+import org.example.grab.global.common.ErrorResponse;
 import org.example.grab.global.error.BusinessException;
+import org.example.grab.global.error.CommonErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,6 +24,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -27,12 +32,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class DropServiceTest {
 
     @Mock
     private DropRepository dropRepository;
+
+    @Mock
+    private CategoryService categoryService;
 
     @InjectMocks
     private DropService dropService;
@@ -42,6 +51,7 @@ class DropServiceTest {
     void createDraft_assemblesOptions() {
         // given
         given(dropRepository.save(any(Drop.class))).willAnswer(invocation -> invocation.getArgument(0));
+        given(categoryService.isActive(1L)).willReturn(true);
         DropDraftRequest request = requestWithOptions();
 
         // when
@@ -98,6 +108,34 @@ class DropServiceTest {
     }
 
     @Test
+    @DisplayName("존재하지 않는 DROP 공개는 DROP_NOT_FOUND")
+    void publish_notFound() {
+        // given
+        given(dropRepository.findById(99L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> dropService.publish(1L, 99L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(DropErrorCode.DROP_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("다른 판매자의 DROP 공개는 상태와 무관하게 DROP_ACCESS_DENIED")
+    void publish_accessDeniedBeforeStateCheck() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        ReflectionTestUtils.setField(drop, "status", DropStatus.WISH);
+        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+
+        // when & then
+        assertThatThrownBy(() -> dropService.publish(2L, 10L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(DropErrorCode.DROP_ACCESS_DENIED);
+    }
+
+    @Test
     @DisplayName("존재하지 않는 DROP 수정은 DROP_NOT_FOUND")
     void updateDraft_notFound() {
         // given
@@ -122,21 +160,6 @@ class DropServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(DropErrorCode.DROP_ACCESS_DENIED);
-    }
-
-    @Test
-    @DisplayName("DRAFT 상태가 아닌 DROP 수정은 DROP_NOT_EDITABLE")
-    void updateDraft_notEditable() {
-        // given
-        Drop drop = Drop.createDraft(1L);
-        ReflectionTestUtils.setField(drop, "status", DropStatus.WISH);
-        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
-
-        // when & then
-        assertThatThrownBy(() -> dropService.updateDraft(1L, 10L, emptyRequest()))
-                .isInstanceOf(BusinessException.class)
-                .extracting("errorCode")
-                .isEqualTo(DropErrorCode.DROP_NOT_EDITABLE);
     }
 
     @Test
@@ -171,6 +194,103 @@ class DropServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(DropErrorCode.INVALID_OPTION_COMBINATION);
+    }
+
+    @Test
+    @DisplayName("DRAFT 상태가 아닌 DROP 수정은 카테고리 검증보다 DROP_NOT_EDITABLE이 우선한다")
+    void updateDraft_notEditable() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        ReflectionTestUtils.setField(drop, "status", DropStatus.WISH);
+        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+        DropDraftRequest request = new DropDraftRequest(
+                null, null, null, 999L, null, null, null, null, null);
+
+        // when & then
+        assertThatThrownBy(() -> dropService.updateDraft(1L, 10L, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(DropErrorCode.DROP_NOT_EDITABLE);
+        verifyNoInteractions(categoryService);
+    }
+
+    @Test
+    @DisplayName("없거나 비활성인 카테고리로 임시 저장하면 VALIDATION_FAILED와 categoryId 필드 오류를 반환한다")
+    void createDraft_rejectsInactiveCategory() {
+        // given
+        given(categoryService.isActive(999L)).willReturn(false);
+        DropDraftRequest request = new DropDraftRequest(
+                null, null, null, 999L, null, null, null, null, null);
+
+        // when & then
+        assertThatThrownBy(() -> dropService.createDraft(1L, request))
+                .isInstanceOfSatisfying(BusinessException.class, e -> {
+                    assertThat(e.getErrorCode()).isEqualTo(CommonErrorCode.VALIDATION_FAILED);
+                    assertThat(e.getFieldErrors()).extracting(ErrorResponse.FieldError::field)
+                            .containsExactly("categoryId");
+                });
+    }
+
+    @Test
+    @DisplayName("categoryId가 null인 부분 수정은 카테고리 검증을 호출하지 않는다")
+    void updateDraft_skipsCategoryValidationWhenCategoryIdIsNull() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+
+        // when
+        dropService.updateDraft(1L, 10L, emptyRequest());
+
+        // then
+        verifyNoInteractions(categoryService);
+    }
+
+    @Test
+    @DisplayName("공개 시 카테고리가 비활성이면 VALIDATION_FAILED로 거부된다")
+    void publish_rejectsInactiveCategory() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        drop.updateDraft("상품", "설명", 1L, 3000L, "안내",
+                OffsetDateTime.now().plusDays(1), OffsetDateTime.now().plusDays(2));
+        drop.addImage(DropImage.create(drop, "https://example.com/a.jpg", 0, "상품"));
+        drop.addOption(DropOption.create(drop, 1000L, 5, 0));
+        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+        given(categoryService.isActive(1L)).willReturn(false);
+
+        // when & then
+        assertThatThrownBy(() -> dropService.publish(1L, 10L))
+                .isInstanceOfSatisfying(BusinessException.class, e -> {
+                    assertThat(e.getErrorCode()).isEqualTo(CommonErrorCode.VALIDATION_FAILED);
+                    assertThat(e.getFieldErrors()).extracting(ErrorResponse.FieldError::field)
+                            .containsExactly("categoryId");
+                });
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 DROP 상세 조회는 DROP_NOT_FOUND")
+    void findSellerDrop_notFound() {
+        // given
+        given(dropRepository.findById(99L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> dropService.findSellerDrop(1L, 99L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(DropErrorCode.DROP_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("다른 판매자의 DROP 상세 조회는 DROP_ACCESS_DENIED")
+    void findSellerDrop_accessDenied() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+
+        // when & then
+        assertThatThrownBy(() -> dropService.findSellerDrop(2L, 10L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(DropErrorCode.DROP_ACCESS_DENIED);
     }
 
     private DropDraftRequest requestWithOptions() {

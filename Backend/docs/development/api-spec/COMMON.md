@@ -62,6 +62,8 @@ CORS는 허용된 프론트엔드 Origin만 등록하고 Credential 요청을 �
 }
 ```
 
+> `fieldErrors`는 요청 본문 검증 실패뿐 아니라, 도메인 검증에서 위반 항목을 식별해야 할 때도 채워집니다. 해당 사항이 없으면 빈 배열입니다.
+
 ### 1.6 공통 HTTP 상태 코드
 
 | 상태 코드 | 의미 |
@@ -181,6 +183,7 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 | `ACCESS_DENIED` | 403 | 권한 없음 |
 | `RESOURCE_NOT_FOUND` | 404 | 리소스 없음 |
 | `DUPLICATE_EMAIL` | 409 | 이메일 중복 |
+| `DUPLICATE_NICKNAME` | 409 | 닉네임 중복 (대소문자 무시) |
 | `INVALID_STATE_TRANSITION` | 409 | 허용되지 않은 상태 전이 |
 | `DROP_NOT_EDITABLE` | 409 | 수정할 수 없는 DROP |
 | `DROP_NOT_WISHABLE` | 409 | WISH 불가능 상태 |

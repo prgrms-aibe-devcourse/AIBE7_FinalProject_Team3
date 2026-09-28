@@ -8,10 +8,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -51,6 +54,16 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.error.fieldErrors[0].reason").isNotEmpty());
     }
 
+    @Test
+    @DisplayName("요청 파라미터 타입 오류는 400 INVALID_REQUEST로 응답한다")
+    void handlesParameterTypeMismatch() throws Exception {
+        mockMvc.perform(get("/test/type").param("page", "abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"))
+                .andExpect(jsonPath("$.error.fieldErrors").isEmpty());
+    }
+
     @RestController
     static class TestController {
 
@@ -61,6 +74,10 @@ class GlobalExceptionHandlerTest {
 
         @PostMapping("/test/validation")
         void validation(@Valid @RequestBody TestRequest request) {
+        }
+
+        @GetMapping("/test/type")
+        void type(@RequestParam int page) {
         }
     }
 

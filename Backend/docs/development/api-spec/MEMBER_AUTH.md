@@ -34,7 +34,7 @@ POST /api/v1/auth/signup
 {
   "email": "user@example.com",
   "password": "Password123!",
-  "displayName": "홍길동"
+  "nickname": "드롭헌터"
 }
 ```
 
@@ -46,7 +46,7 @@ POST /api/v1/auth/signup
   "data": {
     "userId": "6f1a2b3c-4d5e-4f70-8192-a3b4c5d6e7f8",
     "email": "user@example.com",
-    "displayName": "홍길동",
+    "nickname": "드롭헌터",
     "roles": ["USER"],
     "createdAt": "2026-09-18T14:00:00+09:00"
   }
@@ -55,16 +55,30 @@ POST /api/v1/auth/signup
 
 **검증 규칙:**
 - MVP 회원가입에서는 휴대폰 번호를 받지 않는다.
+- 이메일은 앞뒤 공백을 제거하고 전체를 소문자로 변환해 정규화한 뒤 검증·중복 검사·저장한다.
+  대소문자·공백만 다른 이메일로 중복 가입하거나 가입 때와 다르게 입력해 로그인에 실패하는 것을 막기 위함이다.
+- 정규화 후 중간에 공백이 포함되면 `INVALID_EMAIL`로 거부한다.
 - 이메일은 유효한 형식이어야 한다.
 - 이메일은 중복될 수 없다.
-- 비밀번호는 최소 8자 이상이어야 한다.
+- 비밀번호는 최소 8자 이상, 최대 64자 이하여야 한다.
 - 비밀번호는 영문, 숫자, 특수문자를 포함해야 한다.
+- 비밀번호에 공백 문자가 포함되면 `INVALID_PASSWORD`로 거부한다. 서버는 비밀번호를 trim하거나 가공하지 않는다.
 - 비밀번호는 Argon2id로 해시해 저장한다.
+- `nickname`은 회원이 직접 정하는 닉네임이며 본명이 아니다. 본명은 수집하지 않는다.
+- 닉네임은 앞뒤 공백을 제거한 뒤 검증·저장한다.
+- 닉네임은 2자 이상 10자 이하여야 한다. 길이는 문자(코드 포인트) 수 기준이다.
+- 닉네임은 한글(완성형), 영문, 숫자, 밑줄(`_`)만 허용한다. 중간 공백을 포함해 그 밖의 문자가 있으면 `INVALID_NICKNAME`으로 거부한다.
+- 닉네임은 중복될 수 없다. 중복 판단은 대소문자를 구분하지 않으며(`Grab`과 `grab`은 같은 닉네임), 저장은 입력한 대소문자 그대로 한다.
+  동시 요청으로 사전 검사를 함께 통과하더라도 DB 유니크 인덱스 위반을 `DUPLICATE_NICKNAME`으로 응답한다.
+- 탈퇴한 회원의 닉네임은 익명 값으로 바뀌므로 다른 회원이 다시 사용할 수 있다.
+- 닉네임 규칙은 1.6절 소셜 회원가입과 1.10절 내 정보 수정에도 동일하게 적용한다.
 
 **오류 코드:**
 - `INVALID_EMAIL`
 - `DUPLICATE_EMAIL`
 - `INVALID_PASSWORD`
+- `INVALID_NICKNAME`
+- `DUPLICATE_NICKNAME`
 
 ### 1.3 LOCAL 로그인
 
@@ -83,6 +97,8 @@ POST /api/v1/auth/login
 }
 ```
 
+요청 이메일은 1.2절과 동일한 규칙으로 정규화한 뒤 회원을 조회한다.
+
 **응답:**
 
 ```http
@@ -99,7 +115,7 @@ Access Token과 Refresh Token은 응답 본문에 포함하지 않는다. Access
     "user": {
       "userId": "6f1a2b3c-4d5e-4f70-8192-a3b4c5d6e7f8",
       "email": "user@example.com",
-      "displayName": "홍길동",
+      "nickname": "드롭헌터",
       "roles": ["USER"]
     }
   }
@@ -139,7 +155,7 @@ GET /api/v1/auth/oauth2/{provider}/callback
 - **인증**: 불필요
 - **호출 주체**: KAKAO 또는 GOOGLE OAuth2 제공자
 
-클라이언트가 직접 호출하는 API가 아니다. 서버는 인가 코드와 `state`를 검증하고 제공자의 고유 사용자 식별자와 검증된 이메일을 조회한다.
+클라이언트가 직접 호출하는 API가 아니다. 서버는 인가 코드와 `state`를 검증하고 제공자의 고유 사용자 식별자와 검증된 이메일을 조회한다. 제공자 이메일은 1.2절과 동일한 규칙으로 정규화한 뒤 기존 회원 여부를 판단하고 가입 컨텍스트에 저장한다.
 
 기존 소셜 회원이면 Access Token과 Refresh Token을 1.3절과 동일한 HttpOnly 쿠키로 발급하고 프론트엔드 콜백 화면으로 이동시킨다.
 
@@ -150,7 +166,7 @@ Set-Cookie: refresh_token=<token>; HttpOnly; Secure; SameSite=Lax; Path=/api/v1/
 Location: <frontend-auth-callback>?result=success
 ```
 
-최초 소셜 인증이면 회원을 바로 생성하지 않는다. 짧은 수명의 일회용 가입 컨텍스트를 Redis에 저장하고, 원문은 전용 HttpOnly 쿠키로 전달한 뒤 표시 이름 입력 화면으로 이동시킨다.
+최초 소셜 인증이면 회원을 바로 생성하지 않는다. 짧은 수명의 일회용 가입 컨텍스트를 Redis에 저장하고, 원문은 전용 HttpOnly 쿠키로 전달한 뒤 닉네임 입력 화면으로 이동시킨다.
 
 ```http
 HTTP/1.1 302 Found
@@ -184,11 +200,12 @@ POST /api/v1/auth/oauth2/signup
 
 ```json
 {
-  "displayName": "홍길동"
+  "nickname": "드롭헌터"
 }
 ```
 
 서버는 일회용 가입 컨텍스트의 제공자, 고유 사용자 식별자 및 검증된 이메일을 사용한다. 클라이언트가 제공자나 이메일을 지정할 수 없다. MVP 회원가입에서는 휴대폰 번호를 받지 않는다.
+`nickname`은 1.2절의 닉네임 규칙으로 검증한다. 제공자 프로필의 이름·닉네임을 자동으로 사용하지 않는다.
 
 
 **응답:** `201 Created`
@@ -206,7 +223,7 @@ Set-Cookie: refresh_token=<token>; HttpOnly; Secure; SameSite=Lax; Path=/api/v1/
     "user": {
       "userId": "6f1a2b3c-4d5e-4f70-8192-a3b4c5d6e7f8",
       "email": "user@example.com",
-      "displayName": "홍길동",
+      "nickname": "드롭헌터",
       "roles": ["USER"]
     }
   }
@@ -219,7 +236,10 @@ Set-Cookie: refresh_token=<token>; HttpOnly; Secure; SameSite=Lax; Path=/api/v1/
 - `OAUTH2_SIGNUP_CONTEXT_INVALID`
 - `OAUTH2_SIGNUP_CONTEXT_EXPIRED`
 - `DUPLICATE_EMAIL`
-- `INVALID_DISPLAY_NAME`
+- `INVALID_NICKNAME`
+- `DUPLICATE_NICKNAME`
+
+닉네임 오류(`INVALID_NICKNAME`, `DUPLICATE_NICKNAME`)는 가입 컨텍스트를 소비하지 않는다. 사용자는 컨텍스트가 만료되기 전까지 닉네임을 바꿔 다시 요청할 수 있다.
 
 ### 1.7 토큰 재발급
 
@@ -283,7 +303,7 @@ GET /api/v1/users/me
   "data": {
     "userId": "6f1a2b3c-4d5e-4f70-8192-a3b4c5d6e7f8",
     "email": "user@example.com",
-    "displayName": "홍길동",
+    "nickname": "드롭헌터",
     "roles": ["USER", "SELLER"],
     "profileImageUrl": "https://cdn.example.com/images/profile.jpg",
     "createdAt": "2026-09-18T14:00:00+09:00"
@@ -303,7 +323,7 @@ PATCH /api/v1/users/me
 
 ```json
 {
-  "displayName": "김길동"
+  "nickname": "한정판수집가"
 }
 ```
 
@@ -315,12 +335,18 @@ PATCH /api/v1/users/me
   "data": {
     "userId": "6f1a2b3c-4d5e-4f70-8192-a3b4c5d6e7f8",
     "email": "user@example.com",
-    "displayName": "김길동",
+    "nickname": "한정판수집가",
     "roles": ["USER", "SELLER"],
     "createdAt": "2026-09-18T14:00:00+09:00"
   }
 }
 ```
+
+`nickname`은 1.2절의 닉네임 규칙으로 검증한다. 본인의 현재 닉네임과 대소문자만 다른 값으로 바꾸는 것은 중복으로 보지 않는다.
+
+**오류 코드:**
+- `INVALID_NICKNAME`
+- `DUPLICATE_NICKNAME`
 
 ### 1.11 비밀번호 변경
 
@@ -338,6 +364,8 @@ PATCH /api/v1/users/me/password
   "newPassword": "NewPassword456!"
 }
 ```
+
+`newPassword`는 1.2절의 비밀번호 검증 규칙을 따른다.
 
 **응답:** `204 No Content`
 
