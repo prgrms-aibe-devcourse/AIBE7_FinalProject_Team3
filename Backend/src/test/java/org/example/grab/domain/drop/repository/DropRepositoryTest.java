@@ -3,6 +3,7 @@ package org.example.grab.domain.drop.repository;
 import jakarta.persistence.EntityManager;
 import org.example.grab.global.config.JpaConfig;
 import org.example.grab.domain.drop.dto.PublicDropListProjection;
+import org.example.grab.domain.drop.dto.PublicDropSort;
 import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.entity.option.DropOption;
@@ -287,6 +288,32 @@ class DropRepositoryTest {
         assertThat(first.getTotalElements()).isEqualTo(3);
         assertThat(first.getTotalPages()).isEqualTo(2);
         assertThat(first.hasNext()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Pageable Sort가 컬럼명으로 적용되고 값이 같으면 id 내림차순으로 정렬한다")
+    void appliesSortWithIdTieBreaker() {
+        // given
+        Long older = insertPublishedDrop(DropStatus.WISH, "먼저");
+        Long newer = insertPublishedDrop(DropStatus.WISH, "나중");
+        jdbcTemplate.update(
+                "UPDATE drops SET sale_starts_at = CURRENT_TIMESTAMP + INTERVAL '1 hour' WHERE id = ?", newer);
+
+        // when
+        List<Long> ascending = idsOf(dropRepository.findPublicDrops(
+                List.of("WISH"), null, null, null,
+                PageRequest.of(0, 20, PublicDropSort.parse("saleStartsAt,asc").toSort())));
+        List<Long> descending = idsOf(dropRepository.findPublicDrops(
+                List.of("WISH"), null, null, null,
+                PageRequest.of(0, 20, PublicDropSort.parse("saleStartsAt,desc").toSort())));
+        List<Long> defaultOrder = idsOf(dropRepository.findPublicDrops(
+                List.of("WISH"), null, null, null,
+                PageRequest.of(0, 20, PublicDropSort.parse(null).toSort())));
+
+        // then: 값이 다르면 sale_starts_at 기준, 같으면(같은 트랜잭션 시각) id 내림차순
+        assertThat(ascending).containsExactly(older, newer);
+        assertThat(descending).containsExactly(newer, older);
+        assertThat(defaultOrder).containsExactly(newer, older);
     }
 
     private Long insertPublishedDrop(DropStatus status, String name) {
