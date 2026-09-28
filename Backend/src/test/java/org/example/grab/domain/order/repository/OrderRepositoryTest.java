@@ -214,6 +214,74 @@ class OrderRepositoryTest {
                 .extracting(SellerOrderListProjection::getPaymentStatus).isEqualTo("SUCCEEDED");
     }
 
+    @Test
+    @DisplayName("구매자 본인 주문만 최신순으로 조회하고 상태로 걸러낸다")
+    void findBuyerOrdersNewestFirstAndFilterByStatus() {
+        // given
+        Long otherBuyerId = insertUser("other-" + UUID.randomUUID() + "@example.com");
+        OffsetDateTime expiresAt = OffsetDateTime.now().plusMinutes(10);
+        Order older = orderRepository.saveAndFlush(createOrder(buyerId, "ORD-BUYER-1", "key-1", expiresAt));
+        Order newer = orderRepository.saveAndFlush(createOrder(buyerId, "ORD-BUYER-2", "key-2", expiresAt));
+        orderRepository.saveAndFlush(createOrder(otherBuyerId, "ORD-OTHER-1", "key-1", expiresAt));
+        jdbcTemplate.update("UPDATE orders SET status = 'PAID', paid_at = CURRENT_TIMESTAMP WHERE id = ?", older.getId());
+        entityManager.clear();
+
+        // when
+        Page<Order> all = orderRepository.findByBuyerIdOrderByCreatedAtDescIdDesc(buyerId, PageRequest.of(0, 10));
+        Page<Order> paid = orderRepository.findByBuyerIdAndStatusOrderByCreatedAtDescIdDesc(
+                buyerId, OrderStatus.PAID, PageRequest.of(0, 10));
+
+        // then
+        assertThat(all.getContent()).extracting(Order::getOrderNumber)
+                .containsExactly(newer.getOrderNumber(), older.getOrderNumber());
+        assertThat(all.getTotalElements()).isEqualTo(2);
+        assertThat(paid.getContent()).extracting(Order::getOrderNumber)
+                .containsExactly(older.getOrderNumber());
+    }
+
+    @Test
+    @DisplayName("다른 구매자의 주문은 UUID로 조회되지 않는다")
+    void findByUuidAndBuyerIdHidesOthersOrder() {
+        // given
+        Long otherBuyerId = insertUser("other-" + UUID.randomUUID() + "@example.com");
+        Order order = orderRepository.saveAndFlush(
+                createOrder(buyerId, "ORD-OWNER-1", "key-1", OffsetDateTime.now().plusMinutes(10)));
+        entityManager.clear();
+
+        // when & then
+        assertThat(orderRepository.findByUuidAndBuyerId(order.getUuid(), buyerId)).isPresent();
+        assertThat(orderRepository.findByUuidAndBuyerId(order.getUuid(), otherBuyerId)).isEmpty();
+    }
+
+    private Long insertUser(String email) {
+        return jdbcTemplate.queryForObject(
+                """
+                INSERT INTO users (email, password_hash, nickname)
+                VALUES (?, 'encoded-password', ?)
+                RETURNING id
+                """,
+                Long.class,
+                email,
+                "구매자-" + UUID.randomUUID().toString().substring(0, 8)
+        );
+    }
+
+    private Order createOrder(Long orderBuyerId, String orderNumber, String idempotencyKey, OffsetDateTime expiresAt) {
+        return Order.create(
+                orderNumber + "-" + UUID.randomUUID(),
+                orderBuyerId,
+                dropId,
+                idempotencyKey,
+                "a".repeat(64),
+                "한정판 후드",
+                "GRAB 판매자",
+                30000,
+                3000,
+                ShippingAddress.of("홍길동", "010-1234-5678", "06236", "서울시 강남구 테헤란로", "101호", null),
+                expiresAt
+        );
+    }
+
     private Order createOrder(OffsetDateTime expiresAt) {
         ShippingAddress address = ShippingAddress.of(
                 "홍길동",
