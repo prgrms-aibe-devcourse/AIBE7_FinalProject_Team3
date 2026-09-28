@@ -83,7 +83,12 @@ GET /api/v1/orders?status=PAID&page=0&size=20
 
 - **인증**: 필요 (`USER`)
 
-> 본인 주문만 반환합니다.
+> 본인 주문만 최신 주문순으로 반환합니다.
+
+**쿼리 파라미터:**
+- `status`: 주문 상태 (선택, 예: `PAID`)
+- `page`: 페이지 번호 (기본값 `0`)
+- `size`: 페이지 크기 (기본값 `20`, 최대 `100`)
 
 **응답:**
 
@@ -137,8 +142,11 @@ GET /api/v1/orders/{orderId}
         "subtotal": 258000
       }
     ],
+    "itemsAmount": 258000,
+    "shippingAmount": 3000,
     "totalAmount": 261000,
     "paymentStatus": "SUCCEEDED",
+    "paymentExpiresAt": "2026-09-18T14:10:00+09:00",
     "shipping": {
       "status": null,
       "carrier": null,
@@ -148,6 +156,12 @@ GET /api/v1/orders/{orderId}
   }
 }
 ```
+
+- `shipping`은 배송 정보가 등록되기 전까지 모든 값이 `null`입니다.
+
+**오류 코드:**
+- `ORDER_NOT_FOUND`: 주문이 없거나 다른 사용자의 주문인 경우. 주문 존재 여부를 노출하지 않도록 두 경우를 구분하지 않습니다.
+- `RESOURCE_NOT_FOUND`: 주문 ID 형식이 올바르지 않은 경우
 
 ### 1.4 주문 취소
 
