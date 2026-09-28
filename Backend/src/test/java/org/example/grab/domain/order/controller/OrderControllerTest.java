@@ -69,6 +69,7 @@ class OrderControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.orderId").value(orderId.toString()))
                 .andExpect(jsonPath("$.data.items[0].subtotal").value(258000))
+                .andExpect(jsonPath("$.data.shippingAmount").value(3000))
                 .andExpect(jsonPath("$.data.totalAmount").value(261000));
     }
 

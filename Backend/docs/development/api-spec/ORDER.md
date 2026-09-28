@@ -60,7 +60,7 @@ POST /api/v1/orders
       }
     ],
     "itemsAmount": 258000,
-    "shippingFee": 3000,
+    "shippingAmount": 3000,
     "totalAmount": 261000,
     "paymentExpiresAt": "2026-09-18T14:10:00+09:00"
   }

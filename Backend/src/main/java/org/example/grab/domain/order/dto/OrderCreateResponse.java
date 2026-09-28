@@ -14,7 +14,7 @@ public record OrderCreateResponse(
         OrderStatus status,
         List<Item> items,
         long itemsAmount,
-        long shippingFee,
+        long shippingAmount,
         long totalAmount,
         OffsetDateTime paymentExpiresAt
 ) {
