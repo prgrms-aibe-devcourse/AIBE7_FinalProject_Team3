@@ -152,6 +152,13 @@ public class Order extends UUIDEntity {
         this.status = OrderStatus.PREPARING;
     }
 
+    public void completeDelivery() {
+        if (status != OrderStatus.SHIPPED) {
+            throw new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION);
+        }
+        this.status = OrderStatus.DELIVERED;
+    }
+
     @Override
     public String toString() {
         return "Order{" +

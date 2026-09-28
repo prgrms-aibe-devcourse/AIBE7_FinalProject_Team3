@@ -52,4 +52,8 @@ public class Shipment extends BaseEntity {
     public static Shipment create(Order order, String carrierCode, String trackingNumber) {
         return new Shipment(order, carrierCode, trackingNumber);
     }
+
+    public void markDelivered(OffsetDateTime deliveredAt) {
+        this.deliveredAt = Objects.requireNonNull(deliveredAt);
+    }
 }

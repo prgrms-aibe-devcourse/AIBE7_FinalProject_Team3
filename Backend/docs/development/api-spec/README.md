@@ -129,7 +129,7 @@
 | POST | `/api/v1/mock/orders/{orderId}/delivery/complete` | 로컬·테스트 전용 | Mock 배송 완료 결과를 주문에 반영 |
 
 > 판매자는 자신이 생성한 DROP의 주문만 조회하거나 변경할 수 있습니다.
-> Mock 배송 API는 로컬·테스트 환경에서만 활성화하며 운영 환경에는 노출하지 않습니다.
+> Mock 배송 API는 `GRAB_MOCK_DELIVERY_ENABLED=true`일 때만 활성화합니다. 로컬·테스트 환경에서만 켜고 운영 환경에서는 기본값(`false`)을 유지합니다.
 
 ### 2.9 판매자 대시보드
 
