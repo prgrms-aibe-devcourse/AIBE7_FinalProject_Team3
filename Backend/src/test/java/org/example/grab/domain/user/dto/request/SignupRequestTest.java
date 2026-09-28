@@ -4,6 +4,7 @@ import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
 import jakarta.validation.constraints.NotEmpty;
+import org.example.grab.domain.user.validation.ValidNickname;
 import org.example.grab.domain.user.validation.ValidPassword;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -21,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class SignupRequestTest {
 
+    private static final String VALID_PASSWORD = "Password123!";
     private static final String VALID_NICKNAME = "드롭헌터";
 
     private static ValidatorFactory validatorFactory;
@@ -47,12 +49,19 @@ class SignupRequestTest {
                 .toList();
     }
 
+    private List<Class<? extends Annotation>> nicknameViolations(String nickname) {
+        return validator.validate(new SignupRequest(VALID_PASSWORD, nickname)).stream()
+                .filter(violation -> violation.getPropertyPath().toString().equals("nickname"))
+                .<Class<? extends Annotation>>map(violation -> violation.getConstraintDescriptor().getAnnotation().annotationType())
+                .toList();
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {
             "  드롭헌터  ",
             "\t드롭헌터\t",
             "\n드롭헌터\r\n",
-            "　드롭헌터　"
+            "\u3000드롭헌터\u3000"
     })
     @DisplayName("닉네임 앞뒤의 공백 문자를 제거한다")
     // 전각 스페이스(U+3000)는 trim()으로 제거되지 않으므로 strip()을 사용하는지 확인하는 테스트
@@ -91,7 +100,7 @@ class SignupRequestTest {
     // 앞뒤 공백 제거 후 빈 값이 필수값 위반(VALIDATION_FAILED)으로 분류되도록 빈 문자열로 남는지 확인하는 테스트
     void stripsBlankNicknameToEmpty() {
         // when
-        SignupRequest request = new SignupRequest("Password123!", " \t　 ");
+        SignupRequest request = new SignupRequest("Password123!", " \t\u3000 ");
 
         // then
         assertThat(request.nickname()).isEmpty();
@@ -160,5 +169,52 @@ class SignupRequestTest {
 
         // then
         assertThat(violations).containsExactly(ValidPassword.class);
+    }
+
+    @Test
+    @DisplayName("비밀번호와 닉네임이 모두 유효하면 위반이 없다")
+    void acceptsValidRequest() {
+        // when
+        var violations = validator.validate(new SignupRequest(VALID_PASSWORD, VALID_NICKNAME));
+
+        // then
+        assertThat(violations).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {" 드롭 ", "\u3000드롭헌터\t", "\n가나다라마바사아자차\r\n"})
+    @DisplayName("앞뒤 공백을 제거한 닉네임이 규칙을 충족하면 통과한다")
+    // 길이는 앞뒤 공백을 제거한 값으로 센다. 공백을 포함하면 규칙을 벗어나는 값으로 생성자 정규화가 검증보다 먼저인지 확인한다
+    void acceptsNicknameAfterStrip(String nickname) {
+        // when
+        List<Class<? extends Annotation>> violations = nicknameViolations(nickname);
+
+        // then
+        assertThat(violations).isEmpty();
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"   ", "\u3000\t\n"})
+    @DisplayName("닉네임이 null, 빈 문자열, 공백뿐이면 필수값 위반 하나만 나온다")
+    // 공백만 있는 값은 생성자에서 빈 문자열이 되어 VALIDATION_FAILED로 분류되어야 한다(MEMBER_AUTH.md 1.2.3)
+    void reportsOnlyRequiredViolationForNickname(String nickname) {
+        // when
+        List<Class<? extends Annotation>> violations = nicknameViolations(nickname);
+
+        // then
+        assertThat(violations).containsExactly(NotEmpty.class);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {" 드 ", "가나다라마바사아자차카", "드롭 헌터", "drop-hunter", "ㄱㄴ", "\u0001"})
+    @DisplayName("닉네임 규칙을 위반하면 닉네임 규칙 위반 하나만 나온다")
+    // 제어 문자(U+0001)는 strip()으로 제거되지 않아 1자로 남고, 필수값이 아닌 길이 사유로 거부되어야 한다
+    void reportsOnlyNicknamePolicyViolation(String nickname) {
+        // when
+        List<Class<? extends Annotation>> violations = nicknameViolations(nickname);
+
+        // then
+        assertThat(violations).containsExactly(ValidNickname.class);
     }
 }
