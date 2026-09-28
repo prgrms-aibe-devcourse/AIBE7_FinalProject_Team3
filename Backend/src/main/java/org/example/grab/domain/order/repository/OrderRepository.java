@@ -78,6 +78,10 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query("select o from Order o where o.uuid = :uuid")
     Optional<Order> findByUuidForUpdate(@Param("uuid") UUID uuid);
 
+    /*
+    payments_cancellations에서 해당 주문의 purpose = 'ORDER_CANCEL', status = 'UNKNOWN'인 기록이 있는지 조회
+    -> 구매자가 취소를 요청했는데 PG 응답이 끊겨 취소됐는지 모르는 상태(UNKNOWN)
+    */
     @Query(value = """
             SELECT EXISTS (
                 SELECT 1

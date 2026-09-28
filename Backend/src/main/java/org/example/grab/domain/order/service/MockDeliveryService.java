@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.grab.domain.order.dto.OrderStatusResponse;
 import org.example.grab.domain.order.entity.Order;
 import org.example.grab.domain.order.entity.OrderStatus;
+import org.example.grab.domain.order.entity.Shipment;
 import org.example.grab.domain.order.repository.OrderRepository;
 import org.example.grab.domain.order.repository.ShipmentRepository;
 import org.example.grab.global.error.BusinessException;
@@ -33,7 +34,7 @@ public class MockDeliveryService {
             throw new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION);
         }
 
-        var shipment = shipmentRepository.findByOrderId(order.getId())
+        Shipment shipment = shipmentRepository.findByOrderId(order.getId())
                 .orElseThrow(() -> new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION));
         OffsetDateTime deliveredAt = OffsetDateTime.now();
         order.completeDelivery();

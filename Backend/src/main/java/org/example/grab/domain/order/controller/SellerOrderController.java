@@ -37,6 +37,7 @@ public class SellerOrderController {
                 sellerOrderService.findOrder(currentSellerIdProvider.currentSellerId(), uuid));
     }
 
+    // Seller 인증 및 Drop 소유권 검증 후 order의 상태를 PAID -> PREPARING으로 전환
     @PostMapping("/orders/{orderId}/prepare-shipment")
     public ApiResponse<OrderStatusResponse> prepareShipment(@PathVariable String orderId) {
         return ApiResponse.success(sellerOrderService.prepareShipment(
