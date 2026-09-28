@@ -1,9 +1,19 @@
 package org.example.grab.domain.user.dto.request;
 
-// 역할·상태·가입 경로는 서버가 정하므로 입력으로 받지 않는다(MEMBER_AUTH.md 1.2)
+// 역할·상태·가입 경로는 서버가 정하므로 입력으로 받지 않는다(MEMBER_AUTH.md 1.2.3)
 public record SignupRequest(
-        String email,
         String password,
         String nickname
 ) {
+
+    /*
+        JSON 바인딩도 이 생성자를 거치므로, Bean Validation·중복 검사·저장이 모두 앞뒤 공백을 제거한 닉네임을 쓴다.
+        trim()은 한글 IME에서 섞이는 전각 스페이스(U+3000)를 남기므로 strip()을 쓴다.
+        null은 필수값 검증에서 VALIDATION_FAILED로 처리하도록 그대로 둔다.
+        비밀번호는 trim·가공하지 않는다(MEMBER_AUTH.md 1.2.3).
+     */
+    public SignupRequest(String password, String nickname) {
+        this.password = password;
+        this.nickname = nickname == null ? null : nickname.strip();
+    }
 }
