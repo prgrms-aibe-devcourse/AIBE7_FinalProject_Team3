@@ -1,5 +1,6 @@
 package org.example.grab.domain.user.dto.request;
 
+import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
@@ -11,14 +12,19 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.lang.annotation.Annotation;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 
 class SignupRequestTest {
 
@@ -41,7 +47,7 @@ class SignupRequestTest {
         validatorFactory.close();
     }
 
-    // 기본 @NotEmpty 문구는 로케일에 따라 달라지므로 문구 대신 위반한 제약 타입으로 비교한다
+    // 어떤 제약이 위반됐는지를 비교한다. 문구는 아래 문구 테스트에서 따로 확인한다
     private List<Class<? extends Annotation>> passwordViolations(String password) {
         return validator.validate(new SignupRequest(password, VALID_NICKNAME)).stream()
                 .filter(violation -> violation.getPropertyPath().toString().equals("password"))
@@ -216,5 +222,55 @@ class SignupRequestTest {
 
         // then
         assertThat(violations).containsExactly(ValidNickname.class);
+    }
+
+    @Test
+    @DisplayName("필수값 위반 문구는 필드별로 지정한 문구이며 실행 환경의 로케일에 따라 바뀌지 않는다")
+    // @NotEmpty의 기본 문구는 로케일이 영어면 "must not be empty"가 되므로, 영어 로케일에서 만든 Validator로도 지정한 문구가 나오는지 확인하는 테스트
+    void reportsFixedRequiredMessagesRegardlessOfLocale() {
+        // given
+        Locale originalLocale = Locale.getDefault();
+        Locale.setDefault(Locale.ENGLISH);
+        try (ValidatorFactory englishFactory = Validation.buildDefaultValidatorFactory()) {
+            Validator englishValidator = englishFactory.getValidator();
+
+            // when
+            Map<String, String> messages = englishValidator.validate(new SignupRequest(null, "   ")).stream()
+                    .collect(Collectors.toMap(violation -> violation.getPropertyPath().toString(), ConstraintViolation::getMessage));
+
+            // then
+            assertThat(messages).containsOnly(
+                    entry("password", "비밀번호는 필수입니다."),
+                    entry("nickname", "닉네임은 필수입니다.")
+            );
+        } finally {
+            Locale.setDefault(originalLocale);
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "Secret Pass1!     | 드롭헌터",
+            "SecretPass한글1!  | 드롭헌터",
+            "Sh0rt!            | 드롭헌터",
+            "SecretPass1       | 드롭헌터",
+            "Password123!      | Nick-Name",
+            "Password123!      | 가나다라마바사아자차카",
+            "Secret Pass1!     | Nick-Name"
+    })
+    @DisplayName("위반 문구에는 거부된 비밀번호·닉네임이 들어가지 않는다")
+    // 문구는 fieldErrors[].reason으로 응답에 나가므로, 비밀번호 원문이나 입력값이 문구에 섞이지 않는지 확인하는 테스트
+    void excludesRejectedValuesFromMessages(String password, String nickname) {
+        // when
+        List<String> messages = validator.validate(new SignupRequest(password, nickname)).stream()
+                .map(ConstraintViolation::getMessage)
+                .toList();
+
+        // then
+        assertThat(messages).isNotEmpty();
+        assertThat(messages).allSatisfy(message -> assertThat(message)
+                .isNotBlank()
+                .doesNotContain(password)
+                .doesNotContain(nickname));
     }
 }

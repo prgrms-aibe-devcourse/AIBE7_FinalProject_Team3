@@ -4,13 +4,17 @@ import jakarta.validation.constraints.NotEmpty;
 import org.example.grab.domain.user.validation.ValidNickname;
 import org.example.grab.domain.user.validation.ValidPassword;
 
-// 역할·상태·가입 경로는 서버가 정하므로 입력으로 받지 않는다(MEMBER_AUTH.md 1.2.3)
+/*
+    역할·상태·가입 경로는 서버가 정하므로 입력으로 받지 않는다(MEMBER_AUTH.md 1.2.3).
+    제약 문구는 응답의 fieldErrors[].reason으로 나가므로 입력값을 넣지 않고 위반 이유만 적는다.
+    @NotEmpty의 기본 문구는 실행 환경의 로케일에 따라 영어·한국어로 바뀌므로 문구를 직접 지정한다.
+ */
 public record SignupRequest(
         // @NotBlank는 공백만 있는 값을 필수값 위반으로 분류하므로, 비밀번호 규칙 위반(INVALID_PASSWORD)이 되도록 @NotEmpty를 쓴다
-        @NotEmpty @ValidPassword String password,
+        @NotEmpty(message = "비밀번호는 필수입니다.") @ValidPassword String password,
         // 생성자에서 앞뒤 공백을 제거하므로 공백만 있던 값은 ""가 되어 @NotEmpty로 걸린다
         // @ValidNickname이 null·""를 건너뛰는 조건과 정확히 맞물려, 한 값에 두 제약이 함께 위반을 보고하지 않는다
-        @NotEmpty @ValidNickname String nickname
+        @NotEmpty(message = "닉네임은 필수입니다.") @ValidNickname String nickname
 ) {
 
     /*
