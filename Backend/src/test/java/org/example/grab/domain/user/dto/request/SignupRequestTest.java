@@ -1,16 +1,51 @@
 package org.example.grab.domain.user.dto.request;
 
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
+import jakarta.validation.ValidatorFactory;
+import jakarta.validation.constraints.NotEmpty;
+import org.example.grab.domain.user.validation.ValidPassword;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.json.JsonMapper;
+
+import java.lang.annotation.Annotation;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class SignupRequestTest {
 
+    private static final String VALID_NICKNAME = "드롭헌터";
+
+    private static ValidatorFactory validatorFactory;
+    private static Validator validator;
+
     private final JsonMapper jsonMapper = JsonMapper.builder().build();
+
+    @BeforeAll
+    static void setUpValidator() {
+        validatorFactory = Validation.buildDefaultValidatorFactory();
+        validator = validatorFactory.getValidator();
+    }
+
+    @AfterAll
+    static void closeValidator() {
+        validatorFactory.close();
+    }
+
+    // 기본 @NotEmpty 문구는 로케일에 따라 달라지므로 문구 대신 위반한 제약 타입으로 비교한다
+    private List<Class<? extends Annotation>> passwordViolations(String password) {
+        return validator.validate(new SignupRequest(password, VALID_NICKNAME)).stream()
+                .filter(violation -> violation.getPropertyPath().toString().equals("password"))
+                .<Class<? extends Annotation>>map(violation -> violation.getConstraintDescriptor().getAnnotation().annotationType())
+                .toList();
+    }
 
     @ParameterizedTest
     @ValueSource(strings = {
@@ -89,5 +124,41 @@ class SignupRequestTest {
         // then
         assertThat(request.nickname()).isEqualTo("드롭헌터");
         assertThat(request.password()).isEqualTo(" Password123! ");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Password123!", "password1!", "Aa1!aaaa"})
+    @DisplayName("비밀번호 규칙을 충족하면 비밀번호 위반이 없다")
+    // 필수값 제약과 비밀번호 정책 제약이 DTO에 연결된 뒤에도 정상 값을 막지 않는지 확인하는 테스트
+    void acceptsValidPassword(String password) {
+        // when
+        List<Class<? extends Annotation>> violations = passwordViolations(password);
+
+        // then
+        assertThat(violations).isEmpty();
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @DisplayName("비밀번호가 null이거나 빈 문자열이면 필수값 위반 하나만 나온다")
+    // 누락·null·빈 문자열은 VALIDATION_FAILED로 분류되어야 하므로 비밀번호 정책 위반이 함께 나오지 않는지 확인하는 테스트
+    void reportsOnlyRequiredViolation(String password) {
+        // when
+        List<Class<? extends Annotation>> violations = passwordViolations(password);
+
+        // then
+        assertThat(violations).containsExactly(NotEmpty.class);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"        ", "   ", "Pass word1!", " Password1! ", "Pa1!", "Password1", "비밀번호Pass1!"})
+    @DisplayName("비밀번호 규칙을 위반하면 비밀번호 정책 위반 하나만 나온다")
+    // 공백만 있는 값도 trim하지 않으므로 필수값이 아닌 비밀번호 규칙 위반(INVALID_PASSWORD)으로 분류되는지 확인하는 테스트
+    void reportsOnlyPasswordPolicyViolation(String password) {
+        // when
+        List<Class<? extends Annotation>> violations = passwordViolations(password);
+
+        // then
+        assertThat(violations).containsExactly(ValidPassword.class);
     }
 }

@@ -1,8 +1,12 @@
 package org.example.grab.domain.user.dto.request;
 
+import jakarta.validation.constraints.NotEmpty;
+import org.example.grab.domain.user.validation.ValidPassword;
+
 // 역할·상태·가입 경로는 서버가 정하므로 입력으로 받지 않는다(MEMBER_AUTH.md 1.2.3)
 public record SignupRequest(
-        String password,
+        // @NotBlank는 공백만 있는 값을 필수값 위반으로 분류하므로, 비밀번호 규칙 위반(INVALID_PASSWORD)이 되도록 @NotEmpty를 쓴다
+        @NotEmpty @ValidPassword String password,
         String nickname
 ) {
 
