@@ -23,7 +23,9 @@
 | Method | Endpoint | 인증 | 용도 |
 | --- | --- | --- | --- |
 | GET | `/api/v1/auth/csrf` | 불필요 | CSRF 토큰 쿠키 발급 |
-| POST | `/api/v1/auth/signup` | 불필요 | 이메일과 비밀번호로 회원가입 |
+| POST | `/api/v1/auth/email-verification` | 불필요 | LOCAL 회원가입용 이메일 인증 코드 발송 |
+| POST | `/api/v1/auth/email-verification/confirm` | 불필요 | 이메일 인증 코드 확인 및 이메일 가입 토큰 발급 |
+| POST | `/api/v1/auth/signup` | 이메일 가입 토큰 | 인증된 이메일과 비밀번호로 LOCAL 회원가입 완료 |
 | POST | `/api/v1/auth/login` | 불필요 | 로그인 및 Access/Refresh Token 발급 |
 | GET | `/api/v1/auth/oauth2/{provider}` | 불필요 | KAKAO·GOOGLE 소셜 로그인 시작 |
 | GET | `/api/v1/auth/oauth2/{provider}/callback` | 불필요 | 소셜 로그인 콜백 처리 (제공자 호출) |

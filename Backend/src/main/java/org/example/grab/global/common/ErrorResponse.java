@@ -24,14 +24,24 @@ public record ErrorResponse(
             String message,
             List<FieldError> fieldErrors
     ) {
+
+        /*
+            1.5 명세가 필드 오류가 없으면 빈 배열로 정의하므로 null을 빈 목록으로 바꾼다.
+            오류 응답 생성 중 예외가 나면 500으로 바뀌므로 거부하지 않는다.
+         */
+        public ErrorDetail(String code, String message, List<FieldError> fieldErrors) {
+            this.code = code;
+            this.message = message;
+            this.fieldErrors = fieldErrors == null ? List.of() : fieldErrors;
+        }
     }
 
     /*
         개별 필드 오류 하나를 표기
      */
     public record FieldError(
-            String field,
-            String reason
+            String field, // 검증에 실패한 요청 입력 항목의 이름
+            String reason // 실패 이유
     ) {
     }
 }
