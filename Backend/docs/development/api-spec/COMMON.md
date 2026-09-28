@@ -181,8 +181,12 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 | `INVALID_EMAIL` | 400 | 이메일 형식·길이 규칙 위반 |
 | `INVALID_PASSWORD` | 400 | 비밀번호 길이·공백·허용 문자·문자 조합 규칙 위반 |
 | `INVALID_NICKNAME` | 400 | 닉네임 길이·허용 문자 규칙 위반 |
+| `EMAIL_VERIFICATION_CODE_MISMATCH` | 400 | 이메일 인증 코드 불일치 |
+| `EMAIL_VERIFICATION_CODE_EXPIRED` | 400 | 유효한 이메일 인증 코드 없음 (만료·미요청·사용 완료) |
 | `AUTHENTICATION_REQUIRED` | 401 | 인증 필요 |
 | `INVALID_TOKEN` | 401 | 유효하지 않은 토큰 |
+| `EMAIL_SIGNUP_CONTEXT_INVALID` | 401 | 이메일 가입 컨텍스트 없음 또는 이미 사용됨 |
+| `EMAIL_SIGNUP_CONTEXT_EXPIRED` | 401 | 이메일 가입 컨텍스트 만료 |
 | `ACCESS_DENIED` | 403 | 권한 없음 |
 | `RESOURCE_NOT_FOUND` | 404 | 리소스 없음 |
 | `DUPLICATE_EMAIL` | 409 | 이메일 중복 |
@@ -200,6 +204,8 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 | `PAYMENT_AMOUNT_MISMATCH` | 422 | 결제 금액 불일치 |
 | `PAYMENT_EXPIRED` | 422 | 결제 유효시간 만료 |
 | `INVALID_SCHEDULE` | 422 | 판매 일정 오류 |
+| `EMAIL_VERIFICATION_ATTEMPTS_EXCEEDED` | 429 | 이메일 인증 코드 확인 시도 횟수 초과 |
+| `EMAIL_VERIFICATION_RESEND_TOO_SOON` | 429 | 이메일 인증 코드 재발송 간격 또는 발송 한도 초과 |
 
 ---
 

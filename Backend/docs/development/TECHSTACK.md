@@ -13,6 +13,7 @@
 | ORM | Spring Data JPA / Hibernate | Boot 관리 | 주문·옵션·결제 도메인의 관계 매핑과 트랜잭션을 관리한다. 복잡한 조회는 DTO Projection 또는 별도 쿼리로 처리한다. |
 | Security | Spring Security | Boot 관리 | HttpOnly 쿠키 기반 JWT 인증, CSRF 보호, Argon2id 비밀번호 해시, USER·SELLER·ADMIN 권한 및 리소스 소유권을 검증한다. |
 | Validation | Jakarta Bean Validation | Boot 관리 | 요청 DTO와 상태별 필수값을 검증한다. |
+| Mail | Spring Boot Starter Mail (`JavaMailSender`) | Boot 관리 | LOCAL 회원가입의 이메일 인증 코드를 SMTP로 발송한다. 발송 인터페이스 뒤에 두어 운영 발송 서비스를 설정으로 교체한다(4.3절). |
 | Build | Gradle Wrapper | 8.14+ 또는 9.x | 로컬과 CI에서 동일한 빌드 도구 버전을 사용한다. |
 | API Docs | SpringDoc OpenAPI / Swagger UI | 3.1.0 | Spring Boot 4 기반 API 명세를 자동 생성하고 프론트엔드와 공유한다. |
 | Monitoring Endpoint | Spring Boot Actuator | Boot 관리 | 상태 확인, 메트릭 노출 및 배포 성공 여부를 검증한다. |
@@ -22,10 +23,10 @@
 | 구분 | 기술 | 도입 시점 | 용도 및 선정 이유 |
 | --- | --- | --- | --- |
 | RDBMS | PostgreSQL | MVP | 회원·DROP·주문·재고·결제 데이터를 저장하는 영속 원장이다. 트랜잭션, 행 잠금, 인덱스 및 향후 pgvector 확장이 가능하다. |
-| In-memory Store | Redis | MVP | Refresh Token 해시를 TTL과 함께 저장한다. 조회 캐시는 병목 확인 후 도입하며 주문과 재고의 최종 원장으로 사용하지 않는다. |
+| In-memory Store | Redis | MVP | Refresh Token 해시와 이메일 인증 코드·가입 컨텍스트 해시를 TTL과 함께 저장한다. 조회 캐시는 병목 확인 후 도입하며 주문과 재고의 최종 원장으로 사용하지 않는다. |
 | Migration | Flyway | MVP | ERD 변경 이력을 SQL 마이그레이션으로 관리하고 환경별 스키마를 일치시킨다. |
 
-재고 정합성은 PostgreSQL 트랜잭션과 행 잠금으로 먼저 보장한다. Redis는 MVP에서 Refresh Token 저장에만 사용하고 조회 캐시는 부하 테스트로 병목이 확인된 후 도입한다.
+재고 정합성은 PostgreSQL 트랜잭션과 행 잠금으로 먼저 보장한다. Redis는 MVP에서 Refresh Token과 이메일 인증 임시 데이터(인증 코드, 가입 컨텍스트, 발송 제한 횟수) 저장에만 사용하고 조회 캐시는 부하 테스트로 병목이 확인된 후 도입한다.
 
 ## 3. Frontend
 
@@ -63,10 +64,28 @@ Actuator와 Prometheus의 로컬 메트릭 수집 연결은 완료됐다. Redis 
 | Container Management | Docker Compose | 컨테이너 실행 | Kubernetes 없이 애플리케이션과 운영 도구를 단순하게 관리한다. |
 | Reverse Proxy | Nginx | TLS 종료 및 트래픽 전환 | 외부 요청을 애플리케이션으로 전달하고 Blue/Green 포트 전환에 사용한다. |
 | Container Registry | GHCR | Docker 이미지 저장 | GitHub Actions와 권한 및 배포 흐름을 연계한다. |
-| Secrets | AWS Systems Manager Parameter Store | 환경변수·비밀값 관리 | DB 비밀번호와 PG Secret Key가 저장소 및 이미지에 포함되는 것을 방지한다. |
+| Secrets | AWS Systems Manager Parameter Store | 환경변수·비밀값 관리 | DB 비밀번호, PG Secret Key, SMTP 계정 정보가 저장소 및 이미지에 포함되는 것을 방지한다. |
 | DNS / TLS | Route 53 + ACM | 도메인·인증서 | 운영 서비스에 HTTPS를 적용한다. |
 
 RDS와 S3를 기본 운영안으로 사용한다. 비용이나 운영 일정 때문에 Neon 또는 Supabase를 검토할 수 있지만, 같은 역할의 서비스를 동시에 사용하지 않고 배포 전 하나로 확정한다.
+
+### 4.3 이메일 발송
+
+LOCAL 회원가입의 이메일 인증 코드(`MEMBER_AUTH.md` 1.2절)는 SMTP로 발송한다. 애플리케이션은 발송 인터페이스(`EmailSender`)에만 의존하고, 실제 발송 구현은 `app.mail.provider` 설정으로 선택한다.
+
+| 환경 | 발송 대상 | 용도 |
+| --- | --- | --- |
+| 로컬 개발 | Mailpit | 메일을 실제로 발송하지 않고 받아 두는 개발용 SMTP 서버다. 웹 화면에서 받은 메일과 인증 코드를 확인한다. |
+| 자동 테스트·CI | GreenMail | 테스트 중 메모리에서 실행하는 SMTP 서버다. 발송 여부와 받는 사람을 검증한다(7절). |
+| 부하 테스트 | Mailpit 또는 발송하지 않는 구현 | 실제 발송 서비스의 한도를 소모하지 않는다. |
+| 시연·운영 (MVP) | Gmail SMTP | 팀 전용 Gmail 계정과 앱 비밀번호로 발송한다. |
+| 시연·운영 (전환 후) | Amazon SES | 실사용자를 받거나 발송량이 늘어나면 전환한다. |
+
+- Gmail을 MVP에 사용하는 이유: 비용이 없고 도메인·DNS 설정 없이 바로 사용할 수 있다.
+- Gmail의 알려진 한계: 하루 약 500통으로 발송이 제한되고, 비정상 활동으로 판단되면 계정이 잠겨 회원가입이 멈출 수 있다. 발신 주소가 `@gmail.com`으로 표시되며, 앱 비밀번호 방식은 앞으로 막힐 수 있다.
+- SES 전환 방법: SES의 SMTP 창구로 전환하면 환경변수만 바꾼다. SES API로 전환하면 API 구현체를 추가하고 설정을 바꾸며, EC2 인스턴스 역할(IAM Role)을 사용해 보관할 SMTP 계정 정보를 없앤다.
+- SES 전환 전에 팀 도메인을 확보해 DKIM·SPF·DMARC를 설정하고, 샌드박스 해제(프로덕션 전환)를 신청한다.
+- 발송은 트랜잭션 커밋 후 비동기로 처리하고, SMTP 연결·읽기·쓰기 타임아웃을 지정한다. SMTP 장애가 Actuator Health 결과에 영향을 주지 않도록 메일 헬스 체크는 사용하지 않는다.
 
 ## 5. CI/CD
 
@@ -124,6 +143,7 @@ MVP 초기에는 Actuator와 Prometheus를 연결해 JVM·HTTP·DB Connection Po
 | Repository Test | `@DataJpaTest` | JPA 매핑, 제약조건, 잠금 쿼리 및 조회 쿼리를 검증한다. |
 | Integration Test | Spring Boot Test + Testcontainers | 실제 PostgreSQL 환경에서 주문·재고·결제 트랜잭션을 검증한다. |
 | API Test | MockMvc | 인증·권한, 요청 검증 및 API 응답 계약을 테스트한다. |
+| Mail Test | GreenMail | 이메일 인증 코드 발송을 실제 발송 없이 검증한다. |
 | Load Test | k6 | 동시 주문, 재고 선점, 결제 완료 API의 VU·RPS와 Threshold를 검증한다. |
 
 핵심 테스트 시나리오는 다음과 같다.
@@ -150,7 +170,8 @@ MVP 초기에는 Actuator와 Prometheus를 연결해 JVM·HTTP·DB Connection Po
 ### MVP에 바로 적용
 
 - Java, Spring Boot, Spring MVC, JPA, Security, Validation
-- PostgreSQL, Flyway, Refresh Token 저장용 Redis
+- PostgreSQL, Flyway, Refresh Token·이메일 인증 저장용 Redis
+- Gmail SMTP 기반 이메일 인증 코드 발송, 로컬 Mailpit·테스트 GreenMail
 - React, TypeScript, Vite, Tailwind CSS, Axios, React Router
 - Docker, Docker Compose, GitHub Actions
 - GHCR 이미지 게시(`latest`, 커밋 SHA 태그)
@@ -163,6 +184,7 @@ MVP 초기에는 Actuator와 Prometheus를 연결해 JVM·HTTP·DB Connection Po
 - SSE 실시간 재고 전달
 - Grafana 대시보드와 Alloy·Loki 로그 파이프라인
 - EC2 자동 배포와 Blue/Green 전환
+- Amazon SES 발송 전환 (실사용자 오픈 또는 발송량 증가 시)
 - 고부하 상황의 재고 처리 최적화
 - pgvector 기반 개인화 추천
 
