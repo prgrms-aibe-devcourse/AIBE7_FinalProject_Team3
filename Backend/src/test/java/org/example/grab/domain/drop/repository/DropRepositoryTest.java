@@ -297,7 +297,12 @@ class DropRepositoryTest {
         Long older = insertPublishedDrop(DropStatus.WISH, "먼저");
         Long newer = insertPublishedDrop(DropStatus.WISH, "나중");
         jdbcTemplate.update(
-                "UPDATE drops SET sale_starts_at = CURRENT_TIMESTAMP + INTERVAL '1 hour' WHERE id = ?", newer);
+                """
+                UPDATE drops
+                SET sale_starts_at = CURRENT_TIMESTAMP + INTERVAL '1 hour',
+                    sale_ends_at = CURRENT_TIMESTAMP + INTERVAL '2 hours'
+                WHERE id = ?
+                """, newer);
 
         // when
         List<Long> ascending = idsOf(dropRepository.findPublicDrops(
