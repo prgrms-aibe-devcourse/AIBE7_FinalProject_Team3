@@ -38,7 +38,9 @@ class SignupRequestTest {
 
     @BeforeAll
     static void setUpValidator() {
+        // Validation가 찾은 Hibernate Validator를 찾고 찾은 구현으로 ValidatorFactory를 만듦
         validatorFactory = Validation.buildDefaultValidatorFactory();
+        // getValidator()를 사용하여 실제로 검사를 수행하는 Validator를 validator에 할당
         validator = validatorFactory.getValidator();
     }
 
@@ -48,6 +50,11 @@ class SignupRequestTest {
     }
 
     // 어떤 제약이 위반됐는지를 비교한다. 문구는 아래 문구 테스트에서 따로 확인한다
+    /*
+    테스트에서 호출하는 validator.validate(new SignupRequest(...))를
+    호출하면 필드의 제약 애노테이션을 훑고, 각 검증기의 isValid를 불러,
+    위반 목록 -> 위반 제약 클래스 정보를 돌려준다.
+     */
     private List<Class<? extends Annotation>> passwordViolations(String password) {
         return validator.validate(new SignupRequest(password, VALID_NICKNAME)).stream()
                 .filter(violation -> violation.getPropertyPath().toString().equals("password"))
