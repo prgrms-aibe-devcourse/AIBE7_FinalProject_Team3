@@ -18,6 +18,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.RecordComponent;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -308,5 +310,69 @@ class SignupRequestTest {
 
         // then
         assertThat(text).isEqualTo("SignupRequest[password=masked, nickname=드롭헌터]");
+    }
+
+    @Test
+    @DisplayName("phone 없이 비밀번호와 닉네임만 담은 요청 본문은 검증을 통과한다")
+    // MVP 회원가입은 휴대폰 번호를 받지 않으므로, phone이 없는 실제 요청 형태가 바인딩과 검증을 모두 통과하는지 확인하는 테스트
+    void acceptsRequestBodyWithoutPhone() {
+        // given
+        String body = """
+                {"password": "Password123!", "nickname": "드롭헌터"}
+                """;
+
+        // when
+        SignupRequest request = jsonMapper.readValue(body, SignupRequest.class);
+        var violations = validator.validate(request);
+
+        // then
+        assertThat(violations).isEmpty();
+    }
+
+    @Test
+    @DisplayName("회원가입 요청은 비밀번호와 닉네임만 입력으로 받는다")
+    // 이메일은 가입 컨텍스트에서, 역할·상태·가입 경로는 서버가 정하므로 phone·email·role 등이 입력 필드로 추가되지 않았는지 확인하는 테스트
+    void declaresOnlyPasswordAndNickname() {
+        // when
+        List<String> fieldNames = Arrays.stream(SignupRequest.class.getRecordComponents())
+                .map(RecordComponent::getName)
+                .toList();
+
+        // then
+        assertThat(fieldNames).containsExactly("password", "nickname");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Password123!", " Pass word1! ", "비밀번호Pass1!", "Sh0rt!", "   "})
+    @DisplayName("검증을 통과하든 실패하든 검증 후 비밀번호는 전달받은 원문 그대로다")
+    // 검증 과정에서 비밀번호가 trim·치환되면 사용자가 입력한 것과 다른 값이 해시·저장되므로, 검증 전후 값이 같은지 확인하는 테스트
+    void keepsOriginalPasswordAfterValidation(String password) {
+        // given
+        SignupRequest request = new SignupRequest(password, VALID_NICKNAME);
+
+        // when
+        validator.validate(request);
+
+        // then
+        assertThat(request.password()).isEqualTo(password);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Pa\"ssword1", "Pa\\ssword1", "Aa1!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"})
+    @DisplayName("JSON 이스케이프가 필요한 특수문자가 든 비밀번호도 역직렬화 후 원문과 같고 검증을 통과한다")
+    // 큰따옴표·역슬래시는 JSON에서 \" \\로 이스케이프되므로, 역직렬화 후 원래 문자로 정확히 돌아와 허용 특수문자로 인정되는지 확인하는 테스트
+    // 앞의 두 값은 큰따옴표·역슬래시가 유일한 특수문자라, 특수문자로 인정되지 않으면 문자 조합 사유로 거부된다
+    void keepsPasswordWithJsonEscapedCharacters(String password) {
+        // given
+        String body = jsonMapper.writeValueAsString(Map.of("password", password, "nickname", VALID_NICKNAME));
+
+        // when
+        SignupRequest request = jsonMapper.readValue(body, SignupRequest.class);
+
+        // then
+        // 본문에 원문이 그대로 없으면 이스케이프된 형태로 전달된 것
+        assertThat(body).doesNotContain(password);
+        assertThat(request.password()).isEqualTo(password);
+        assertThat(passwordViolations(request.password())).isEmpty();
     }
 }
