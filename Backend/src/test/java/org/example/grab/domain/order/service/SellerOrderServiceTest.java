@@ -18,6 +18,7 @@ import org.example.grab.global.error.CommonErrorCode;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -98,6 +99,68 @@ class SellerOrderServiceTest {
         assertThat(exception)
                 .isInstanceOfSatisfying(BusinessException.class,
                         actual -> assertThat(actual.getErrorCode()).isEqualTo(OrderErrorCode.ORDER_NOT_FOUND));
+        verifyNoMoreInteractions(orderItemRepository, shipmentRepository);
+    }
+
+    @Test
+    void preparesShipmentWhenPaidAndNoUnknownCancellationExists() {
+        // given
+        UUID orderId = UUID.randomUUID();
+        Order order = createOrder();
+        ReflectionTestUtils.setField(order, "id", 100L);
+        ReflectionTestUtils.setField(order, "status", OrderStatus.PAID);
+        when(orderRepository.findByUuidForUpdate(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.ownsDrop(SELLER_ID, 42L)).thenReturn(true);
+        when(orderRepository.hasUnknownOrderCancellation(100L)).thenReturn(false);
+
+        // when
+        var response = sellerOrderService.prepareShipment(SELLER_ID, orderId);
+
+        // then
+        assertThat(response.orderId()).isEqualTo(order.getUuid());
+        assertThat(response.status()).isEqualTo("PREPARING");
+        verify(orderRepository).findByUuidForUpdate(orderId);
+        verify(orderRepository).hasUnknownOrderCancellation(100L);
+    }
+
+    @Test
+    void rejectsShipmentPreparationWhenCancellationIsUnknown() {
+        // given
+        UUID orderId = UUID.randomUUID();
+        Order order = createOrder();
+        ReflectionTestUtils.setField(order, "id", 100L);
+        ReflectionTestUtils.setField(order, "status", OrderStatus.PAID);
+        when(orderRepository.findByUuidForUpdate(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.ownsDrop(SELLER_ID, 42L)).thenReturn(true);
+        when(orderRepository.hasUnknownOrderCancellation(100L)).thenReturn(true);
+
+        // when
+        Throwable exception = catchThrowable(() -> sellerOrderService.prepareShipment(SELLER_ID, orderId));
+
+        // then
+        assertThat(exception)
+                .isInstanceOfSatisfying(BusinessException.class,
+                        actual -> assertThat(actual.getErrorCode())
+                                .isEqualTo(OrderErrorCode.PAYMENT_CANCELLATION_UNKNOWN));
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+    }
+
+    @Test
+    void rejectsShipmentPreparationFromNonPaidState() {
+        // given
+        UUID orderId = UUID.randomUUID();
+        Order order = createOrder();
+        when(orderRepository.findByUuidForUpdate(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.ownsDrop(SELLER_ID, 42L)).thenReturn(true);
+
+        // when
+        Throwable exception = catchThrowable(() -> sellerOrderService.prepareShipment(SELLER_ID, orderId));
+
+        // then
+        assertThat(exception)
+                .isInstanceOfSatisfying(BusinessException.class,
+                        actual -> assertThat(actual.getErrorCode())
+                                .isEqualTo(CommonErrorCode.INVALID_STATE_TRANSITION));
         verifyNoMoreInteractions(orderItemRepository, shipmentRepository);
     }
 

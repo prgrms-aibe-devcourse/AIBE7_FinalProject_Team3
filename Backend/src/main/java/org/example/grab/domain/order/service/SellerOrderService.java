@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.grab.domain.order.dto.SellerOrderDetailResponse;
 import org.example.grab.domain.order.dto.SellerOrderListProjection;
 import org.example.grab.domain.order.dto.SellerOrderListResponse;
+import org.example.grab.domain.order.dto.OrderStatusResponse;
 import org.example.grab.domain.order.entity.Order;
 import org.example.grab.domain.order.entity.OrderStatus;
 import org.example.grab.domain.order.entity.PaymentStatus;
@@ -45,6 +46,21 @@ public class SellerOrderService {
                 orderItemRepository.findAllByOrderIdOrderByIdAsc(order.getId()),
                 orderRepository.findLatestPaymentStatus(order.getId()).orElse(null),
                 shipmentRepository.findByOrderId(order.getId()).orElse(null));
+    }
+
+    @Transactional
+    public OrderStatusResponse prepareShipment(long sellerId, UUID orderId) {
+        Order order = orderRepository.findByUuidForUpdate(orderId)
+                .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+        if (!orderRepository.ownsDrop(sellerId, order.getDropId())) {
+            throw new BusinessException(OrderErrorCode.ORDER_ACCESS_DENIED);
+        }
+        if (order.getStatus() == OrderStatus.PAID && orderRepository.hasUnknownOrderCancellation(order.getId())) {
+            throw new BusinessException(OrderErrorCode.PAYMENT_CANCELLATION_UNKNOWN);
+        }
+
+        order.prepareShipment();
+        return new OrderStatusResponse(order.getUuid(), order.getStatus().name());
     }
 
     public PageResponse<SellerOrderListResponse> findOrders(

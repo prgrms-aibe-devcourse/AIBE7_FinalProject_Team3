@@ -190,6 +190,7 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 | `ACCESS_DENIED` | 403 | 권한 없음 |
 | `RESOURCE_NOT_FOUND` | 404 | 리소스 없음 |
 | `DUPLICATE_IDEMPOTENCY_KEY` | 409 | 같은 멱등 키에 다른 요청 본문 사용 |
+| `PAYMENT_CANCELLATION_UNKNOWN` | 409 | 결제 취소 결과 확인 중이라 배송 준비 불가 |
 | `DUPLICATE_EMAIL` | 409 | 이메일 중복 |
 | `DUPLICATE_NICKNAME` | 409 | 닉네임 중복 (대소문자 무시) |
 | `INVALID_STATE_TRANSITION` | 409 | 허용되지 않은 상태 전이 |
