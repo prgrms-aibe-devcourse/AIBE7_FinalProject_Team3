@@ -20,16 +20,20 @@ public class ValidationErrorCodeResolver {
 
     public ValidationErrorCodeResolver(List<ConstraintErrorCodeMapping> mappings) {
         Map<Class<? extends Annotation>, ErrorCode> merged = new HashMap<>();
+
         for (ConstraintErrorCodeMapping mapping : mappings) {
             mapping.errorCodes().forEach((constraint, errorCode) -> {
                 // 두 도메인이 같은 제약에 서로 다른 코드를 등록하면 응답 코드가 등록 순서에 따라 달라지므로 기동 시 실패시킨다
+                // putIfAbsent(키, 값)은 이 키가 merged 맵에 없을 때만 넣음
                 ErrorCode previous = merged.putIfAbsent(constraint, errorCode);
+                // 값이 있는데 동일 constraint에 다른 errorCode가 있으면 중복 등록 오류 발생
                 if (previous != null && previous != errorCode) {
                     throw new IllegalStateException("제약 " + constraint.getName() + "에 오류 코드가 중복 등록되었습니다: "
                             + previous.getCode() + ", " + errorCode.getCode());
                 }
             });
         }
+
         this.errorCodes = Map.copyOf(merged);
     }
 
@@ -38,6 +42,7 @@ public class ValidationErrorCodeResolver {
         if (!fieldError.contains(ConstraintViolation.class)) {
             return CommonErrorCode.VALIDATION_FAILED;
         }
+        // 검증에 에러가 발생한 어노테이션의 클래스 정보를 추출 ex) ValidNickname.class
         Class<? extends Annotation> constraint = fieldError.unwrap(ConstraintViolation.class)
                 .getConstraintDescriptor()
                 .getAnnotation()
