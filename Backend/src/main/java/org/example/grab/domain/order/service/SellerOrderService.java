@@ -38,6 +38,8 @@ public class SellerOrderService {
 
     private final OrderRepository orderRepository;
     private final OrderDetailReader orderDetailReader;
+    private final ShipmentRepository shipmentRepository;
+    private final ShipmentRequestHasher shipmentRequestHasher;
 
     public SellerOrderDetailResponse findOrder(long sellerId, UUID orderId) {
         Order order = orderRepository.findByUuid(orderId)
