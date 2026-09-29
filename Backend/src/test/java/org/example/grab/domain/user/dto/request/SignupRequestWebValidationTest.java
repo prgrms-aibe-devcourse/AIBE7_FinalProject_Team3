@@ -165,6 +165,8 @@ class SignupRequestWebValidationTest {
                 Arguments.of("Pass word1!", WHITESPACE_REASON),
                 Arguments.of("Pass\\tword1!", WHITESPACE_REASON),
                 // 비밀번호는 trim하지 않으므로 공백만 있는 값은 필수값 위반이 아니라 비밀번호 규칙 위반이다(M00-02)
+                // 3자는 길이 단계가 공백 단계보다 먼저 걸리고, 8자 이상이면 공백 사유가 된다(T01)
+                Arguments.of("   ", LENGTH_REASON),
                 Arguments.of("        ", WHITESPACE_REASON),
                 Arguments.of("Password1!비밀", CHARACTER_SET_REASON),
                 Arguments.of("Password1", COMPOSITION_REASON)
@@ -187,6 +189,29 @@ class SignupRequestWebValidationTest {
                 .andExpect(jsonPath("$.error.fieldErrors[0].reason").value(expectedReason));
 
         assertThat(controller.received).isNull();
+    }
+
+    // T10. 첫 값은 JSON 본문에 넣는 이스케이프된 표현, 둘째 값은 역직렬화 후 기대하는 비밀번호 원문이다
+    static Stream<Arguments> passwordsWithJsonEscapedCharacters() {
+        return Stream.of(
+                Arguments.of("Pa\\\"ssword1", "Pa\"ssword1"),
+                Arguments.of("Pa\\\\ssword1", "Pa\\ssword1"),
+                Arguments.of("Aa1!\\\"#$%&'()*+,-./:;<=>?@[\\\\]^_`{|}~", "Aa1!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~")
+        );
+    }
+
+    @ParameterizedTest(name = "[{index}] {1}")
+    @MethodSource("passwordsWithJsonEscapedCharacters")
+    @DisplayName("JSON 이스케이프가 필요한 특수문자가 든 비밀번호는 검증을 통과하고 원문 그대로 Controller에 도달한다")
+    // DTO 단계(SignupRequestTest)에 더해 실제 요청 경로의 역직렬화·검증에서도 비밀번호가 바뀌지 않는지 확인한다(T10)
+    void keepsPasswordWithJsonEscapedCharactersThroughRequestPath(String jsonPassword, String expectedPassword) throws Exception {
+        // when
+        postSignup("{\"password\":\"" + jsonPassword + "\",\"nickname\":\"" + VALID_NICKNAME + "\"}")
+                .andExpect(status().isCreated());
+
+        // then
+        assertThat(controller.received).isNotNull();
+        assertThat(controller.received.password()).isEqualTo(expectedPassword);
     }
 
     // M08-05. 필수값 누락: 키 누락·null·빈 문자열, 닉네임은 앞뒤 공백 제거 후 빈 값까지 VALIDATION_FAILED다(M00-02)
