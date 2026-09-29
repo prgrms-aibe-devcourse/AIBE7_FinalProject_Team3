@@ -268,8 +268,10 @@ UQ(`order_id`, `option_id`)를 둔다. `drop_id`를 포함한 복합 FK로 다�
 | `public_id` | UUID | O | UQ, 외부 노출 식별자 |
 | `order_id` | BIGINT | O | FK orders, 주문당 여러 결제 시도 가능 |
 | `provider` | VARCHAR(30) | O | `MOCK`, `TOSS` |
-| `idempotency_key` | VARCHAR(100) | O | UQ(provider, idempotency_key) |
-| `provider_payment_id` | VARCHAR(200) | X | PG 결제 식별자 |
+| `idempotency_key` | VARCHAR(100) | O | UQ(provider, idempotency_key), 서버가 생성해 PG 승인 요청에 붙이는 UUID |
+| `client_idempotency_key` | VARCHAR(100) | O | UQ(order_id, client_idempotency_key), 클라이언트 `Idempotency-Key` |
+| `request_hash` | VARCHAR(64) | O | 같은 클라이언트 키의 다른 요청 탐지 |
+| `provider_payment_id` | VARCHAR(200) | X | PG 결제 식별자 (토스페이먼츠 `paymentKey`) |
 | `amount` | BIGINT | O | 승인 요청 금액 |
 | `status` | VARCHAR(30) | O | `PENDING`, `SUCCEEDED`, `FAILED`, `UNKNOWN`, `CANCELED` |
 | `reconciliation_status` | VARCHAR(20) | O | `NONE`, `REQUIRED`, `RESOLVED` |
@@ -280,6 +282,8 @@ UQ(`order_id`, `option_id`)를 둔다. `drop_id`를 포함한 복합 FK로 다�
 | `failure_message` | TEXT | X | 민감정보를 제거한 실패 내용 |
 
 개별 결제 시도가 실패해도 주문은 결제 마감 전까지 `PAYMENT_PENDING`을 유지할 수 있다. 주문은 결제 성공, 사용자 취소 또는 만료 시 최종 상태로 전환한다.
+
+같은 주문에 진행 중인 결제 시도(`PENDING`, `UNKNOWN`)가 있으면 새 결제 시도를 만들지 않는다. 결제 PG는 토스페이먼츠 테스트 환경을 사용하며 `provider`는 `TOSS`로 저장한다.
 
 #### `payment_events`
 
@@ -400,7 +404,8 @@ COMMITTED → RELEASED
 
 - 성공: 주문 `PAID`, 예약 `COMMITTED`, reserved 감소, sold 증가
 - 확정 실패: 결제 시도 `FAILED`; 주문은 정책에 따라 재시도 또는 만료 대기
-- 통신 결과 불명: 결제 `UNKNOWN`, 보정 `REQUIRED`; PG 조회 전 실패로 단정하지 않음
+- 통신 결과 불명: PG 결제 조회로 즉시 확인한다. 승인 확인 시 성공과 같이 반영하고, 미승인 확인 시 `FAILED`로 기록한다. 조회도 실패하면 결제 `UNKNOWN`, 보정 `REQUIRED`; PG 조회 전 실패로 단정하지 않음
+- 결제 마감 후 도착한 승인 성공: 결제 `SUCCEEDED`, 보정 `REQUIRED`; 주문을 자동 완료하지 않음
 - 만료: 주문 `EXPIRED`, 예약 `RELEASED`, reserved 감소
 
 결제 성공과 만료 처리는 같은 주문 행을 잠가 한 경로만 재고를 변경하도록 한다.
@@ -442,7 +447,7 @@ PK와 UQ에서 자동 생성되는 인덱스는 중복 생성하지 않는다.
 | --- | --- | --- |
 | 판매자 신청 정보 | 브랜드명·연락 이메일 | 사업자 정보와 증빙 필수 여부 |
 | 결제 대기 시간 | DB에 절대 만료 시각 저장 | 구체적인 만료 시간 |
-| 결제 재시도 | 결제 마감 전 허용 | 최대 횟수 또는 제한 없음 여부 |
+| 결제 재시도 | 결제 마감 전까지 횟수 제한 없이 허용, 진행 중인 결제(`PENDING`, `UNKNOWN`)가 있으면 거부 (확정) | - |
 | 판매 종료 후 결제 | 선점 주문은 결제 마감까지 허용 | 최종 허용 여부 |
 | 구매 제한 | 재고 범위만 검증 | 주문별·회원 누적 제한 |
 | 주문 취소 | PAID까지 허용 | 시간 제한과 PREPARING 취소 여부 |
