@@ -24,8 +24,11 @@ import java.lang.annotation.RetentionPolicy;
 import java.util.List;
 import java.util.Map;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -97,6 +100,34 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("각 필드 위반은 해당 제약의 문구를 사유로 하는 field·reason 쌍으로 변환한다")
+    void convertsEachViolationToFieldAndReason() throws Exception {
+        mockMvc.perform(post("/test/mixed-validation")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"first\":\"a\",\"second\":\"\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.fieldErrors.length()").value(2))
+                .andExpect(jsonPath("$.error.fieldErrors[0].field").value("first"))
+                .andExpect(jsonPath("$.error.fieldErrors[0].reason").value("항상 거부합니다."))
+                .andExpect(jsonPath("$.error.fieldErrors[1].field").value("second"))
+                .andExpect(jsonPath("$.error.fieldErrors[1].reason").value("두 번째 값은 필수입니다."));
+    }
+
+    @Test
+    @DisplayName("필드 오류는 field·reason만 담고 거부된 입력값을 담지 않는다")
+    void excludesRejectedValueFromFieldErrors() throws Exception {
+        mockMvc.perform(post("/test/mapped-validation")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"first\":\"거부될입력값\",\"second\":\"거부될입력값\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.fieldErrors[0].length()").value(2))
+                .andExpect(jsonPath("$.error.fieldErrors[0].field").exists())
+                .andExpect(jsonPath("$.error.fieldErrors[0].reason").exists())
+                .andExpect(jsonPath("$.error.fieldErrors[1].length()").value(2))
+                .andExpect(content().string(not(containsString("거부될입력값"))));
+    }
+
+    @Test
     @DisplayName("요청 파라미터 타입 오류는 400 INVALID_REQUEST로 응답한다")
     void handlesParameterTypeMismatch() throws Exception {
         mockMvc.perform(get("/test/type").param("page", "abc"))
@@ -137,7 +168,8 @@ class GlobalExceptionHandlerTest {
     record MappedRequest(@AlwaysInvalid String first, @AlwaysInvalid String second) {
     }
 
-    record MixedRequest(@AlwaysInvalid String first, @NotBlank String second) {
+    // @NotBlank의 기본 문구는 로케일에 따라 바뀌므로 사유를 비교할 수 있도록 문구를 지정한다
+    record MixedRequest(@AlwaysInvalid String first, @NotBlank(message = "두 번째 값은 필수입니다.") String second) {
     }
 
     @Retention(RetentionPolicy.RUNTIME)
