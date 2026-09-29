@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -124,5 +125,84 @@ class DropTest {
 
         // then
         assertThat(drop.getImages()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("DRAFT는 WISH할 수 없고 DROP_NOT_FOUND로 숨긴다")
+    void validateWishable_hidesDraft() {
+        // given
+        Drop drop = Drop.createDraft(SELLER_ID);
+
+        // when & then
+        assertThatThrownBy(() -> drop.validateWishable(OffsetDateTime.now()))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(DropErrorCode.DROP_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("WISH이고 판매 시작 전이면 WISH할 수 있다")
+    void validateWishable_allowsWishBeforeStart() {
+        // given
+        OffsetDateTime start = OffsetDateTime.now().plusHours(1);
+        Drop drop = wishDrop(start);
+
+        // when & then
+        assertThatCode(() -> drop.validateWishable(start.minusMinutes(1))).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("판매 시작 시각과 같거나 지나면 GRAB_ALREADY_STARTED")
+    void validateWishable_rejectsWishAtOrAfterStart() {
+        // given
+        OffsetDateTime start = OffsetDateTime.now();
+        Drop drop = wishDrop(start);
+
+        // when & then
+        assertThatThrownBy(() -> drop.validateWishable(start))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(DropErrorCode.GRAB_ALREADY_STARTED);
+        assertThatThrownBy(() -> drop.validateWishable(start.plusSeconds(1)))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(DropErrorCode.GRAB_ALREADY_STARTED);
+    }
+
+    @Test
+    @DisplayName("GRAB·ENDED는 GRAB_ALREADY_STARTED")
+    void validateWishable_rejectsGrabAndEnded() {
+        // given
+        for (DropStatus status : List.of(DropStatus.GRAB, DropStatus.ENDED)) {
+            Drop drop = Drop.createDraft(SELLER_ID);
+            ReflectionTestUtils.setField(drop, "status", status);
+
+            // when & then
+            assertThatThrownBy(() -> drop.validateWishable(OffsetDateTime.now()))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(DropErrorCode.GRAB_ALREADY_STARTED);
+        }
+    }
+
+    @Test
+    @DisplayName("CANCELED는 DROP_NOT_WISHABLE")
+    void validateWishable_rejectsCanceled() {
+        // given
+        Drop drop = Drop.createDraft(SELLER_ID);
+        ReflectionTestUtils.setField(drop, "status", DropStatus.CANCELED);
+
+        // when & then
+        assertThatThrownBy(() -> drop.validateWishable(OffsetDateTime.now()))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(DropErrorCode.DROP_NOT_WISHABLE);
+    }
+
+    private Drop wishDrop(OffsetDateTime saleStartsAt) {
+        Drop drop = Drop.createDraft(SELLER_ID);
+        ReflectionTestUtils.setField(drop, "status", DropStatus.WISH);
+        ReflectionTestUtils.setField(drop, "saleStartsAt", saleStartsAt);
+        return drop;
     }
 }

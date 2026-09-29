@@ -11,6 +11,8 @@ PUT /api/v1/drops/{dropId}/wish
 - **인증**: 필요 (`USER`)
 
 > 동일한 요청을 반복해도 활성 WISH는 하나만 존재합니다.
+>
+> 이미 활성 WISH가 있으면 저장하지 않고 기존 `wishedAt`을 그대로 반환하며, 취소 후 재등록할 때만 `wishedAt`이 갱신됩니다.
 
 **응답:**
 
@@ -27,9 +29,15 @@ PUT /api/v1/drops/{dropId}/wish
 ```
 
 **오류 코드:**
-- `DROP_NOT_FOUND`
-- `DROP_NOT_WISHABLE`
-- `GRAB_ALREADY_STARTED`
+
+| DROP 상태·시각 | 오류 코드 | HTTP |
+| --- | --- | --- |
+| 없음, `DRAFT` | `DROP_NOT_FOUND` | 404 |
+| `WISH`, 현재 시각 ≥ `saleStartsAt` | `GRAB_ALREADY_STARTED` | 409 |
+| `GRAB`, `ENDED` | `GRAB_ALREADY_STARTED` | 409 |
+| `CANCELED` | `DROP_NOT_WISHABLE` | 409 |
+
+> `WISH`이고 현재 시각이 `saleStartsAt` 전이면 등록할 수 있습니다.
 
 ### 1.2 WISH 취소
 
@@ -41,7 +49,18 @@ DELETE /api/v1/drops/{dropId}/wish
 
 **응답:** `204 No Content`
 
-> GRAB 시작 이후에는 취소할 수 없습니다.
+> 활성 WISH가 없거나 이미 취소된 경우에도 `204`를 반환합니다(멱등).
+
+**오류 코드:**
+
+| DROP 상태·시각 | 오류 코드 | HTTP |
+| --- | --- | --- |
+| 없음, `DRAFT` | `DROP_NOT_FOUND` | 404 |
+| `WISH`, 현재 시각 ≥ `saleStartsAt` | `GRAB_ALREADY_STARTED` | 409 |
+| `GRAB`, `ENDED` | `GRAB_ALREADY_STARTED` | 409 |
+| `CANCELED` | `DROP_NOT_WISHABLE` | 409 |
+
+> GRAB 시작 이후에는 취소할 수 없습니다. 등록과 취소의 판정 규칙은 같습니다.
 
 ### 1.3 내 WISH 목록
 
