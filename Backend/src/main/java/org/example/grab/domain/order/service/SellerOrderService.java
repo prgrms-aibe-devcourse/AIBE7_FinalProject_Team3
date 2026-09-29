@@ -27,6 +27,7 @@ import org.springframework.data.domain.PageRequest;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 // DROP 소유권을 확인하고 판매자 주문을 조회한다.
@@ -81,7 +82,7 @@ public class SellerOrderService {
             throw new BusinessException(OrderErrorCode.ORDER_ACCESS_DENIED);
         }
 
-        var existingShipment = shipmentRepository.findByOrderId(order.getId());
+        Optional<Shipment> existingShipment = shipmentRepository.findByOrderId(order.getId());
         if (existingShipment.isPresent()) {
             Shipment shipment = existingShipment.get();
             if (idempotencyKey.value().equals(shipment.getIdempotencyKey())) {
