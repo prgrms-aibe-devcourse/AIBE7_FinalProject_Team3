@@ -7,7 +7,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -39,6 +42,24 @@ class PublicEndpointSecurityTests {
     @DisplayName("판매자 DROP 경로는 여전히 401")
     void keepsSellerDropRoutesProtected() throws Exception {
         mockMvc.perform(get("/api/v1/seller/drops").header("Accept", "application/json"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    // GR-16은 GET /api/v1/drops만 permitAll로 열었다. 아래 두 API는 인증이 필요하다.
+    // CSRF가 켜져 있어 비인증 비안전 메서드는 토큰 없으면 403이 먼저 나므로, csrf()로 토큰을 채워
+    // 인가 단계까지 보낸 뒤 인증 요구(401)를 확인한다. 추후 matcher가 /api/v1/drops/** 로
+    // 넓어져 이 경로가 permitAll이 되면 이 테스트가 깨져야 한다.
+    @Test
+    @DisplayName("비로그인 PUT /api/v1/drops/{dropId}/wish는 401")
+    void keepsWishRegistrationProtected() throws Exception {
+        mockMvc.perform(put("/api/v1/drops/1/wish").with(csrf()).header("Accept", "application/json"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("비로그인 DELETE /api/v1/drops/{dropId}/wish는 401")
+    void keepsWishCancelProtected() throws Exception {
+        mockMvc.perform(delete("/api/v1/drops/1/wish").with(csrf()).header("Accept", "application/json"))
                 .andExpect(status().isUnauthorized());
     }
 }
