@@ -94,7 +94,7 @@ class OrderQueryServiceTest {
         UUID orderId = UUID.randomUUID();
         Order order = createOrder();
         OrderItem item = OrderItem.create(order, 11L, "검정 / L", 15000, 2);
-        Shipment shipment = Shipment.create(order, "CJ", "1234567890");
+        Shipment shipment = createShipment(order);
         given(orderRepository.findByUuidAndBuyerId(orderId, BUYER_ID)).willReturn(Optional.of(order));
         given(orderItemRepository.findAllByOrderIdOrderByIdAsc(null)).willReturn(List.of(item));
         given(orderRepository.findLatestPaymentStatus(null)).willReturn(Optional.of("PENDING"));
@@ -147,7 +147,7 @@ class OrderQueryServiceTest {
         OffsetDateTime deliveredAt = OffsetDateTime.parse("2026-09-30T09:00:00Z");
         Order order = createOrder();
         ReflectionTestUtils.setField(order, "status", OrderStatus.DELIVERED);
-        Shipment shipment = Shipment.create(order, "CJ", "1234567890");
+        Shipment shipment = createShipment(order);
         shipment.markDelivered(deliveredAt);
         given(orderRepository.findByUuidAndBuyerId(orderId, BUYER_ID)).willReturn(Optional.of(order));
         given(orderItemRepository.findAllByOrderIdOrderByIdAsc(null)).willReturn(List.of());
@@ -193,6 +193,11 @@ class OrderQueryServiceTest {
         // then
         assertThat(thrown).isInstanceOf(BusinessException.class);
         assertThat(((BusinessException) thrown).getErrorCode()).isEqualTo(OrderErrorCode.ORDER_NOT_FOUND);
+    }
+
+    private Shipment createShipment(Order order) {
+        return Shipment.register(order, "CJ", "1234567890", UUID.randomUUID().toString(),
+                "a".repeat(64), OffsetDateTime.parse("2026-09-28T12:00:00Z"));
     }
 
     private Order createOrder() {
