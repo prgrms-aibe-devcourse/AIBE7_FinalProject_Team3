@@ -2,6 +2,7 @@ package org.example.grab.domain.order.service;
 
 import org.example.grab.domain.order.dto.MyOrderDetailResponse;
 import org.example.grab.domain.order.dto.MyOrderListResponse;
+import org.example.grab.domain.order.dto.OrderShippingResponse;
 import org.example.grab.domain.order.entity.Order;
 import org.example.grab.domain.order.entity.OrderItem;
 import org.example.grab.domain.order.entity.OrderStatus;
@@ -114,7 +115,7 @@ class OrderQueryServiceTest {
         assertThat(result.paymentStatus()).isEqualTo(PaymentStatus.PENDING);
         assertThat(result.paymentExpiresAt()).isEqualTo(PAYMENT_EXPIRES_AT);
         assertThat(result.shipping()).isEqualTo(
-                new MyOrderDetailResponse.Shipping("PAYMENT_PENDING", "CJ", "1234567890"));
+                new OrderShippingResponse("PAYMENT_PENDING", "CJ", "1234567890"));
     }
 
     @Test

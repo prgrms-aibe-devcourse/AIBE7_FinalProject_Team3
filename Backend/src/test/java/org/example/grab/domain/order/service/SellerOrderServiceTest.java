@@ -1,5 +1,6 @@
 package org.example.grab.domain.order.service;
 
+import org.example.grab.domain.order.dto.OrderShippingResponse;
 import org.example.grab.domain.order.dto.SellerOrderListResponse;
 import org.example.grab.domain.order.dto.SellerOrderDetailResponse;
 import org.example.grab.domain.order.dto.SellerOrderListProjection;
@@ -65,7 +66,7 @@ class SellerOrderServiceTest {
             assertThat(detail.subtotal()).isEqualTo(30000);
         });
         assertThat(result.paymentStatus()).isEqualTo("SUCCEEDED");
-        assertThat(result.shipping()).isEqualTo(new SellerOrderDetailResponse.ShippingResponse(null, null, null));
+        assertThat(result.shipping()).isEqualTo(new OrderShippingResponse(null, null, null));
         verify(orderRepository).ownsDrop(SELLER_ID, 42L);
     }
 
