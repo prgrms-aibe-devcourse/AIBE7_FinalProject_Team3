@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -87,6 +88,22 @@ class SignupRequestWebValidationTest {
         assertThat(controller.received).isNotNull();
         assertThat(controller.received.password()).isEqualTo("Password1!");
         assertThat(controller.received.nickname()).isEqualTo("드롭헌터");
+    }
+
+    @Test
+    @DisplayName("phone 없는 유효 요청은 검증을 통과하고 공통 성공 응답으로 직렬화된다")
+    // 테스트 전용 Controller의 응답이므로 DB 회원 생성 완료를 의미하지 않는다. 실제 응답 data(userId 등)는 GR-29·GR-30에서 확인한다
+    void respondsWithCommonSuccessForValidRequestWithoutPhone() throws Exception {
+        // when & then
+        postSignup("{\"password\":\"Password1!\",\"nickname\":\"드롭헌터\"}")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").value(nullValue()))
+                .andExpect(jsonPath("$.message").value(nullValue()))
+                .andExpect(jsonPath("$.error").doesNotExist());
+
+        assertThat(controller.received).isEqualTo(new SignupRequest("Password1!", "드롭헌터"));
     }
 
     @Test
