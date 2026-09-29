@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 
 /**
  * WISH 등록·취소 파사드. DROP 판정은 DropService에 맡기고, 저장은 WishTransactionService에 위임한다.
@@ -29,7 +30,7 @@ public class WishService {
      * 취소된 WISH면 기존 행을 재활성화한다.
      */
     public WishResponse register(Long userId, Long dropId) {
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        OffsetDateTime now = now();
         dropService.validateWishable(dropId, now);
         try {
             Wish wish = wishTransactionService.register(userId, dropId, now);
@@ -41,9 +42,17 @@ public class WishService {
 
     /** 활성 WISH가 없으면 아무 것도 하지 않는다(멱등 204). DROP 상태 검사가 먼저다. */
     public void cancel(Long userId, Long dropId) {
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        OffsetDateTime now = now();
         dropService.validateWishable(dropId, now);
         wishTransactionService.cancel(userId, dropId, now);
+    }
+
+    /**
+     * PostgreSQL {@code timestamptz}는 마이크로초 정밀도까지만 저장한다. 나노초를 그대로 쓰면 첫 응답(메모리)과
+     * 재조회 응답(DB)의 값이 어긋나므로, 저장 전에 마이크로초로 절삭해 두 값을 일치시킨다.
+     */
+    private OffsetDateTime now() {
+        return OffsetDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.MICROS);
     }
 
     /**
