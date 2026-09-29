@@ -10,6 +10,7 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/grab
       DB_USERNAME: grab
       DB_PASSWORD: ${DB_PASSWORD:-grab}
+      TOSS_SECRET_KEY: ${TOSS_SECRET_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
