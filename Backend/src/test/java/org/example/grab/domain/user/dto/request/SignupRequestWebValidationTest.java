@@ -10,6 +10,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -21,6 +24,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
@@ -36,6 +40,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SignupRequestWebValidationTest {
 
     private static final String SIGNUP_PATH = "/test/signup";
+    private static final String VALID_NICKNAME = "드롭헌터";
+
+    private static final String LENGTH_REASON = "비밀번호는 8자 이상 64자 이하여야 합니다.";
+    private static final String WHITESPACE_REASON = "비밀번호에 공백을 포함할 수 없습니다.";
+    private static final String CHARACTER_SET_REASON = "비밀번호는 영문, 숫자, 특수문자만 사용할 수 있습니다.";
+    private static final String COMPOSITION_REASON = "비밀번호는 영문, 숫자, 특수문자를 각각 1자 이상 포함해야 합니다.";
 
     private final TestSignupController controller = new TestSignupController();
     private SensitiveValueMaskingValidator validator;
@@ -117,6 +127,38 @@ class SignupRequestWebValidationTest {
                 .andExpect(jsonPath("$.error.code").value("INVALID_PASSWORD"));
 
         // then
+        assertThat(controller.received).isNull();
+    }
+
+    // 첫 값은 JSON 문자열 안에 그대로 넣는 표현이다(탭은 JSON 이스케이프 \t로 적는다). 규칙별 경계값은 PasswordValidatorTest가 다룬다
+    static Stream<Arguments> passwordPolicyViolations() {
+        return Stream.of(
+                Arguments.of("Pass1!a", LENGTH_REASON),
+                Arguments.of("Password1!" + "a".repeat(55), LENGTH_REASON),
+                Arguments.of("Pass word1!", WHITESPACE_REASON),
+                Arguments.of("Pass\\tword1!", WHITESPACE_REASON),
+                // 비밀번호는 trim하지 않으므로 공백만 있는 값은 필수값 위반이 아니라 비밀번호 규칙 위반이다(M00-02)
+                Arguments.of("        ", WHITESPACE_REASON),
+                Arguments.of("Password1!비밀", CHARACTER_SET_REASON),
+                Arguments.of("Password1", COMPOSITION_REASON)
+        );
+    }
+
+    @ParameterizedTest(name = "[{index}] {1}")
+    @MethodSource("passwordPolicyViolations")
+    @DisplayName("비밀번호 정책만 위반하면 400, INVALID_PASSWORD, password 필드 오류 하나로 응답한다")
+    void respondsWithInvalidPasswordForPasswordPolicyViolation(String jsonPassword, String expectedReason) throws Exception {
+        // when & then
+        postSignup("{\"password\":\"" + jsonPassword + "\",\"nickname\":\"" + VALID_NICKNAME + "\"}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.data").value(nullValue()))
+                .andExpect(jsonPath("$.error.code").value("INVALID_PASSWORD"))
+                .andExpect(jsonPath("$.error.message").value("비밀번호가 규칙을 충족하지 않습니다."))
+                .andExpect(jsonPath("$.error.fieldErrors.length()").value(1))
+                .andExpect(jsonPath("$.error.fieldErrors[0].field").value("password"))
+                .andExpect(jsonPath("$.error.fieldErrors[0].reason").value(expectedReason));
+
         assertThat(controller.received).isNull();
     }
 }
