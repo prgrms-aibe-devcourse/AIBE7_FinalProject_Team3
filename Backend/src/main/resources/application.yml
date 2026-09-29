@@ -16,6 +16,10 @@ spring:
     hibernate:
       ddl-auto: validate
 
+grab:
+  mock-delivery:
+    enabled: ${GRAB_MOCK_DELIVERY_ENABLED:false}
+
 management:
   endpoints:
     web:

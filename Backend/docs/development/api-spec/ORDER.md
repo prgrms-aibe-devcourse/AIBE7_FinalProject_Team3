@@ -124,6 +124,7 @@ GET /api/v1/orders/{orderId}
 - **인증**: 필요 (`USER`)
 
 > 응답에는 주문 당시 스냅샷 정보를 반환합니다.
+> 판매자가 송장 정보를 등록하기 전에는 Shipment 행이 없으므로 `shipping`의 필드는 `null`입니다. 송장 등록과 발송 처리 후에는 `status`가 `SHIPPED`가 되고 배송 정보가 채워집니다. Mock 배송 완료 결과가 반영되면 `status`는 `DELIVERED`가 됩니다.
 
 **응답:**
 
@@ -239,6 +240,11 @@ POST /api/v1/seller/orders/{orderId}/prepare-shipment
 **상태 전이:**
 - `PAID` → `PREPARING`
 
+**처리 조건:**
+- 해당 주문의 DROP 소유자인 판매자만 요청할 수 있다.
+- 결제 취소 상태가 `UNKNOWN`인 주문은 배송 준비로 전환할 수 없다.
+- 주문 행 잠금으로 취소와 경합해도 하나의 상태 전이만 반영한다.
+
 **응답:**
 
 ```json
@@ -265,26 +271,34 @@ POST /api/v1/seller/orders/{orderId}/shipment
 ```json
 {
   "carrier": "CJ대한통운",
-  "trackingNumber": "123456789012",
-  "shippedAt": "2026-09-19T10:00:00+09:00"
+  "trackingNumber": "123456789012"
 }
 ```
 
 **상태 전이:**
 - `PREPARING` → `SHIPPED`
 
-> 취소 처리와 동시에 요청된 경우 하나의 상태 전이만 성공해야 합니다.
+**처리 규칙:**
+- `carrier`와 `trackingNumber`는 공백이 아닌 문자열이며 각각 최대 50자·100자다. 숫자 전용 송장 형식은 강제하지 않는다.
+- 요청 키 범위는 주문별이다. 같은 주문·키·본문 재요청은 최초 성공 결과를 반환하고, 같은 키에 다른 본문이면 `409 DUPLICATE_IDEMPOTENCY_KEY`를 반환한다.
+- 주문 행을 잠근 트랜잭션에서 소유권·`PREPARING` 상태를 확인하고 배송 정보와 상태를 함께 저장한다. `shipped_at`은 이 요청을 처리한 서버 시각으로 기록한다.
+- 발송 상태는 주문의 `SHIPPED` 상태와 일치한다. 취소와 동시에 요청되면 먼저 커밋한 상태 전이만 성공한다.
 
-### 2.5 배송 완료 처리
+### 2.5 Mock 배송 완료 반영
 
 ```http
-POST /api/v1/seller/orders/{orderId}/delivery-complete
+POST /api/v1/mock/orders/{orderId}/delivery/complete
 ```
 
-- **인증**: `SELLER`
+- **사용 범위**: 로컬·테스트 환경 전용. 운영 환경에서 비활성화한다.
+- **요청 본문**: 없음
 
-**상태 전이:**
-- `SHIPPED` → `DELIVERED`
+Mock 배송 시스템이 배송 완료 결과를 전달하면 주문을 자동 완료 처리한다.
+
+**처리 조건:**
+- 주문 행 잠금으로 취소 등 다른 상태 변경과 경합해도 하나의 상태 전이만 반영한다.
+- `SHIPPED` 주문만 `DELIVERED`로 전환하고 `shipments.delivered_at`에 서버 시각을 기록한다.
+- 이미 `DELIVERED`인 주문에 반복 전달되면 현재 완료 결과를 반환한다.
 
 **응답:**
 
