@@ -145,6 +145,26 @@ public class Order extends UUIDEntity {
         );
     }
 
+    // 결제 마감 시각 정각부터 만료로 본다. 결제 확정과 만료 처리가 같은 기준을 써야 두 경로가 동시에 성공하지 않는다.
+    public boolean isPaymentExpired(OffsetDateTime now) {
+        return !now.isBefore(paymentExpiresAt);
+    }
+
+    public void markPaid(OffsetDateTime paidAt) {
+        if (status != OrderStatus.PAYMENT_PENDING) {
+            throw new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION);
+        }
+        this.status = OrderStatus.PAID;
+        this.paidAt = Objects.requireNonNull(paidAt);
+    }
+
+    public void expire() {
+        if (status != OrderStatus.PAYMENT_PENDING) {
+            throw new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION);
+        }
+        this.status = OrderStatus.EXPIRED;
+    }
+
     public void prepareShipment() {
         if (status != OrderStatus.PAID) {
             throw new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION);

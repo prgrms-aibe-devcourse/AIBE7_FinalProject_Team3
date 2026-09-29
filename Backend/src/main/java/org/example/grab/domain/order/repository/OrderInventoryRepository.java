@@ -10,7 +10,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
-// 주문 생성 트랜잭션에서 DROP 판매 조건과 옵션 재고를 잠금 조회하고 선점 수량을 반영한다.
+// 주문 생성·결제 확정·만료 트랜잭션에서 DROP 판매 조건과 옵션 재고를 잠금 조회하고 선점·판매 수량을 반영한다.
 public interface OrderInventoryRepository extends Repository<Order, Long> {
 
     @Query(value = """
@@ -51,6 +51,27 @@ public interface OrderInventoryRepository extends Repository<Order, Long> {
             WHERE id = :optionId
             """, nativeQuery = true)
     void increaseReservedQuantity(@Param("optionId") Long optionId, @Param("quantity") int quantity);
+
+    // 결제 성공: 선점 수량을 판매 수량으로 옮긴다. 선점이 모자라면 0행을 돌려주고, 호출하는 쪽이 정합성 오류로 처리한다.
+    @Modifying
+    @Query(value = """
+            UPDATE drop_options
+            SET reserved_quantity = reserved_quantity - :quantity,
+                sold_quantity = sold_quantity + :quantity,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = :optionId AND reserved_quantity >= :quantity
+            """, nativeQuery = true)
+    int commitReservedQuantity(@Param("optionId") Long optionId, @Param("quantity") int quantity);
+
+    // 결제 전 만료·실패: 선점 수량을 가용 재고로 되돌린다.
+    @Modifying
+    @Query(value = """
+            UPDATE drop_options
+            SET reserved_quantity = reserved_quantity - :quantity,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = :optionId AND reserved_quantity >= :quantity
+            """, nativeQuery = true)
+    int releaseReservedQuantity(@Param("optionId") Long optionId, @Param("quantity") int quantity);
 
     interface DropSnapshot {
 
