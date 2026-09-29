@@ -1,6 +1,7 @@
 package org.example.grab.domain.drop.service;
 
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
 import org.example.grab.domain.category.service.CategoryService;
 import org.example.grab.domain.drop.dto.request.DropDraftRequest;
 import org.example.grab.domain.drop.dto.request.OptionGroupRequest;
@@ -26,8 +27,11 @@ import org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
@@ -43,6 +47,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
 @Import({JpaConfig.class, DropService.class, CategoryService.class, WishQueryService.class})
+@TestPropertySource(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
 @Testcontainers
 class PublicDropDetailIntegrationTest {
 
@@ -64,6 +69,9 @@ class PublicDropDetailIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private EntityManagerFactory entityManagerFactory;
 
     private Long sellerId;
     private Long categoryId;
@@ -212,6 +220,23 @@ class PublicDropDetailIntegrationTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(DropErrorCode.DROP_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("상세 조회는 자식 컬렉션을 @BatchSize로 묶어 쿼리 수를 고정한다(N+1 아님)")
+    void findPublicDrop_avoidsNPlusOne() {
+        // given
+        Long dropId = publishDrop();
+        entityManager.clear();
+        Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+        statistics.clear();
+
+        // when
+        dropService.findPublicDrop(dropId);
+
+        // then: DROP·카테고리·WISH 수 + 자식 컬렉션 배치(이미지·그룹·값·옵션·valueMap)로 8회.
+        // 배치가 풀리면 자식 수에 비례해 늘어나므로 10으로 상한을 둔다.
+        assertThat(statistics.getPrepareStatementCount()).isLessThanOrEqualTo(10);
     }
 
     // 그룹·값·SKU의 sort_order를 뒤섞어 저장해도 응답은 sortOrder 순이어야 한다.
