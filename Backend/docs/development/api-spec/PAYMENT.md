@@ -89,6 +89,7 @@ POST /api/v1/orders/{orderId}/payments
 
 **멱등성:**
 - 같은 `Idempotency-Key`와 같은 요청 본문이 다시 오면 새 결제 시도를 만들지 않고 최초 결제 시도의 현재 결과를 반환합니다.
+  - 최초 요청이 아직 토스 승인을 기다리는 중이면 `status`는 `PENDING`입니다. 잠시 후 같은 요청을 다시 보내면 확정된 결과를 받습니다.
 - 같은 `Idempotency-Key`에 다른 요청 본문이 오면 `409 DUPLICATE_IDEMPOTENCY_KEY`로 거부합니다.
 - 클라이언트 `Idempotency-Key`는 `payments.client_idempotency_key`에 저장하고, 토스 승인 요청의 `Idempotency-Key` 헤더에는 서버가 새로 만든 UUID(`payments.idempotency_key`)를 사용합니다.
 

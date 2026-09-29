@@ -1,0 +1,90 @@
+package org.example.grab.domain.payment.service;
+
+import org.example.grab.domain.payment.dto.PaymentRequest;
+import org.example.grab.domain.payment.dto.PaymentResponse;
+import org.example.grab.domain.payment.entity.Payment;
+import org.example.grab.domain.payment.error.PaymentErrorCode;
+import org.example.grab.domain.payment.gateway.PaymentGateway;
+import org.example.grab.domain.payment.gateway.PaymentGatewayResult;
+import org.example.grab.global.error.BusinessException;
+import org.example.grab.global.idempotency.IdempotencyKey;
+import org.example.grab.global.idempotency.RequestHash;
+import org.example.grab.global.idempotency.RequestHashGenerator;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.time.Clock;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+/*
+    토스페이먼츠 결제 승인 흐름(PAYMENT.md 1.1). 이 클래스는 트랜잭션을 열지 않는다.
+    PG 호출이 DB 트랜잭션과 행 잠금을 붙잡지 않도록, 검증·저장과 결과 반영은 PaymentTransactionService의 별도 트랜잭션으로 나눈다.
+ */
+@Service
+public class PaymentService {
+
+    // 진행 중인 이전 결제를 조회로 정리한 뒤 다시 검증하는 횟수. 정리되지 않으면 이중 결제를 막기 위해 거부한다.
+    private static final int MAX_PREPARE_ATTEMPTS = 2;
+
+    private final PaymentGateway paymentGateway;
+    private final PaymentTransactionService transactionService;
+    private final RequestHashGenerator requestHashGenerator;
+    private final Clock clock;
+
+    @Autowired
+    public PaymentService(
+            PaymentGateway paymentGateway,
+            PaymentTransactionService transactionService,
+            RequestHashGenerator requestHashGenerator
+    ) {
+        this(paymentGateway, transactionService, requestHashGenerator, Clock.systemUTC());
+    }
+
+    PaymentService(
+            PaymentGateway paymentGateway,
+            PaymentTransactionService transactionService,
+            RequestHashGenerator requestHashGenerator,
+            Clock clock
+    ) {
+        this.paymentGateway = paymentGateway;
+        this.transactionService = transactionService;
+        this.requestHashGenerator = requestHashGenerator;
+        this.clock = clock;
+    }
+
+    public PaymentResponse pay(long buyerId, UUID orderId, String idempotencyKeyHeader, PaymentRequest request) {
+        IdempotencyKey idempotencyKey = IdempotencyKey.from(idempotencyKeyHeader);
+        RequestHash requestHash = requestHashGenerator.generate(request);
+
+        for (int attempt = 0; attempt < MAX_PREPARE_ATTEMPTS; attempt++) {
+            PaymentPreparation preparation =
+                    transactionService.prepare(buyerId, orderId, idempotencyKey, requestHash, request, now());
+            if (preparation instanceof PaymentPreparation.Replay replay) {
+                return PaymentResponse.of(replay.payment(), replay.order().orderId(), replay.order().orderNumber());
+            }
+            if (preparation instanceof PaymentPreparation.Ready ready) {
+                Payment payment = confirm(ready);
+                return PaymentResponse.of(payment, ready.order().orderId(), ready.order().orderNumber());
+            }
+            PaymentPreparation.Resolve resolve = (PaymentPreparation.Resolve) preparation;
+            PaymentGatewayResult lookup = paymentGateway.lookup(resolve.paymentKey());
+            transactionService.applyResult(resolve.paymentId(), null, lookup, now());
+        }
+        throw new BusinessException(PaymentErrorCode.PAYMENT_ALREADY_PROCESSED);
+    }
+
+    // 승인 결과가 불명이면 바로 조회해 확정을 시도한다. 조회로도 모르면 UNKNOWN으로 남긴다.
+    private Payment confirm(PaymentPreparation.Ready ready) {
+        PaymentGatewayResult confirmResult = paymentGateway.confirm(ready.command());
+        PaymentGatewayResult lookupResult = null;
+        if (confirmResult.outcome() == PaymentGatewayResult.Outcome.UNKNOWN) {
+            lookupResult = paymentGateway.lookup(ready.command().paymentKey());
+        }
+        return transactionService.applyResult(ready.paymentId(), confirmResult, lookupResult, now());
+    }
+
+    private OffsetDateTime now() {
+        return OffsetDateTime.now(clock);
+    }
+}

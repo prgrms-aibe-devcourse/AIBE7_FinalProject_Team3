@@ -1,9 +1,13 @@
 package org.example.grab.domain.payment.repository;
 
+import jakarta.persistence.LockModeType;
 import org.example.grab.domain.payment.entity.Payment;
 import org.example.grab.domain.payment.entity.PaymentProvider;
 import org.example.grab.domain.payment.entity.PaymentStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
@@ -17,4 +21,9 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     List<Payment> findByOrderIdAndStatusInOrderByIdAsc(Long orderId, Collection<PaymentStatus> statuses);
 
     boolean existsByProviderAndProviderPaymentId(PaymentProvider provider, String providerPaymentId);
+
+    // 같은 결제 시도에 승인 응답과 상태 조회 결과가 동시에 반영되지 않도록 결제 행을 잠근다.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from Payment p where p.id = :id")
+    Optional<Payment> findByIdForUpdate(@Param("id") Long id);
 }

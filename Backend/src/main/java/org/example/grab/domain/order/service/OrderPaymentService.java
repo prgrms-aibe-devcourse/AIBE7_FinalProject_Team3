@@ -45,6 +45,14 @@ public class OrderPaymentService {
     }
 
     /**
+     * 결제 결과를 반영하기 전에 주문 행을 잠근다. 결제 요청 검증과 같은 순서(주문 → 결제)로 잠가 교착을 피한다.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public PayableOrder lockForPaymentResult(Long orderId) {
+        return PayableOrder.from(lockOrder(orderId));
+    }
+
+    /**
      * PG 승인 성공을 주문에 반영한다. COMPLETED일 때만 주문 PAID, 예약 COMMITTED, 선점 수량을 판매 수량으로 옮긴다.
      * 결제 상태 기록과 같은 트랜잭션에서 실행돼야 하므로 호출하는 쪽의 트랜잭션을 요구한다.
      */
