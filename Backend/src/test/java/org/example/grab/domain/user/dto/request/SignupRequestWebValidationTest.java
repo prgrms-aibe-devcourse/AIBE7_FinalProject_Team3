@@ -5,8 +5,6 @@ import org.example.grab.domain.user.error.UserConstraintErrorCodeMapping;
 import org.example.grab.global.common.ApiResponse;
 import org.example.grab.global.error.GlobalExceptionHandler;
 import org.example.grab.global.error.ValidationErrorCodeResolver;
-import org.example.grab.global.validation.SensitiveValueMaskingValidator;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -35,7 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /*
     회원가입 요청의 JSON 바인딩 → 정규화 → 검증 → 오류 변환 경로를 MockMvc로 확인한다(GR-28 M08).
     실제 회원가입 Controller·서비스는 GR-29·GR-30에서 만들므로, 받은 요청만 기록하는 테스트 전용 Controller를 쓴다.
-    검증기·오류 코드 매핑·전역 예외 처리기는 운영과 같은 구성을 연결한다.
+    오류 코드 매핑·전역 예외 처리기는 운영과 같은 구성을 연결하고, 검증기는 standalone MockMvc의 기본 Bean Validation 검증기를 쓴다.
  */
 class SignupRequestWebValidationTest {
 
@@ -48,7 +46,6 @@ class SignupRequestWebValidationTest {
     private static final String COMPOSITION_REASON = "비밀번호는 영문, 숫자, 특수문자를 각각 1자 이상 포함해야 합니다.";
 
     private final TestSignupController controller = new TestSignupController();
-    private SensitiveValueMaskingValidator validator;
     private MockMvc mockMvc;
 
     @RestController
@@ -66,19 +63,10 @@ class SignupRequestWebValidationTest {
 
     @BeforeEach
     void setUp() {
-        // 운영의 ValidationConfig와 같은 검증기를 쓴다. standalone MockMvc는 스프링 컨텍스트의 검증기를 쓰지 않으므로 직접 넘긴다
-        validator = new SensitiveValueMaskingValidator();
-        validator.afterPropertiesSet();
         ValidationErrorCodeResolver resolver = new ValidationErrorCodeResolver(List.of(new UserConstraintErrorCodeMapping()));
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler(resolver))
-                .setValidator(validator)
                 .build();
-    }
-
-    @AfterEach
-    void closeValidator() {
-        validator.close();
     }
 
     private ResultActions postSignup(String body) throws Exception {
