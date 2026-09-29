@@ -32,7 +32,7 @@ public class SellerOrderController {
 
     @GetMapping("/orders/{orderId}")
     public ApiResponse<SellerOrderDetailResponse> findOrder(@PathVariable String orderId) {
-        UUID uuid = parseOrderId(orderId);
+        UUID uuid = OrderIdParser.parse(orderId);
         return ApiResponse.success(
                 sellerOrderService.findOrder(currentSellerIdProvider.currentSellerId(), uuid));
     }
@@ -41,7 +41,7 @@ public class SellerOrderController {
     @PostMapping("/orders/{orderId}/prepare-shipment")
     public ApiResponse<OrderStatusResponse> prepareShipment(@PathVariable String orderId) {
         return ApiResponse.success(sellerOrderService.prepareShipment(
-                currentSellerIdProvider.currentSellerId(), parseOrderId(orderId)));
+                currentSellerIdProvider.currentSellerId(), OrderIdParser.parse(orderId)));
     }
 
     @GetMapping("/orders")
@@ -56,19 +56,6 @@ public class SellerOrderController {
         }
         return ApiResponse.success(sellerOrderService.findOrders(
                 currentSellerIdProvider.currentSellerId(), dropId, orderStatus, paymentStatus, page, size));
-    }
-
-    private static UUID parseOrderId(String orderId) {
-        UUID uuid;
-        try {
-            uuid = UUID.fromString(orderId);
-        } catch (IllegalArgumentException exception) {
-            throw new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND);
-        }
-        if (!uuid.toString().equalsIgnoreCase(orderId)) {
-            throw new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND);
-        }
-        return uuid;
     }
 
 }

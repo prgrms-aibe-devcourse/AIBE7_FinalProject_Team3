@@ -2,6 +2,7 @@ package org.example.grab.domain.order.service;
 
 import org.example.grab.domain.order.dto.MyOrderDetailResponse;
 import org.example.grab.domain.order.dto.MyOrderListResponse;
+import org.example.grab.domain.order.dto.OrderShippingResponse;
 import org.example.grab.domain.order.entity.Order;
 import org.example.grab.domain.order.entity.OrderItem;
 import org.example.grab.domain.order.entity.OrderStatus;
@@ -41,7 +42,7 @@ class OrderQueryServiceTest {
     private final OrderItemRepository orderItemRepository = mock(OrderItemRepository.class);
     private final ShipmentRepository shipmentRepository = mock(ShipmentRepository.class);
     private final OrderQueryService orderQueryService = new OrderQueryService(
-            orderRepository, orderItemRepository, shipmentRepository);
+            orderRepository, new OrderDetailReader(orderRepository, orderItemRepository, shipmentRepository));
 
     @Test
     @DisplayName("상태 필터가 없으면 구매자의 전체 주문을 최신순으로 조회한다")
@@ -114,7 +115,7 @@ class OrderQueryServiceTest {
         assertThat(result.paymentStatus()).isEqualTo(PaymentStatus.PENDING);
         assertThat(result.paymentExpiresAt()).isEqualTo(PAYMENT_EXPIRES_AT);
         assertThat(result.shipping()).isEqualTo(
-                new MyOrderDetailResponse.Shipping("PAYMENT_PENDING", "CJ", "1234567890"));
+                new OrderShippingResponse(OrderStatus.PAYMENT_PENDING, "CJ", "1234567890", null));
     }
 
     @Test
@@ -136,6 +137,29 @@ class OrderQueryServiceTest {
         assertThat(result.status()).isEqualTo(OrderStatus.PAID);
         assertThat(result.paymentStatus()).isEqualTo(PaymentStatus.SUCCEEDED);
         assertThat(result.paymentExpiresAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("배송 완료된 주문은 배송 상태와 배송 완료 시각을 반환한다")
+    void returnsDeliveredAtForDeliveredOrder() {
+        // given
+        UUID orderId = UUID.randomUUID();
+        OffsetDateTime deliveredAt = OffsetDateTime.parse("2026-09-30T09:00:00Z");
+        Order order = createOrder();
+        ReflectionTestUtils.setField(order, "status", OrderStatus.DELIVERED);
+        Shipment shipment = Shipment.create(order, "CJ", "1234567890");
+        shipment.markDelivered(deliveredAt);
+        given(orderRepository.findByUuidAndBuyerId(orderId, BUYER_ID)).willReturn(Optional.of(order));
+        given(orderItemRepository.findAllByOrderIdOrderByIdAsc(null)).willReturn(List.of());
+        given(orderRepository.findLatestPaymentStatus(null)).willReturn(Optional.of("SUCCEEDED"));
+        given(shipmentRepository.findByOrderId(null)).willReturn(Optional.of(shipment));
+
+        // when
+        MyOrderDetailResponse result = orderQueryService.findMyOrder(BUYER_ID, orderId);
+
+        // then
+        assertThat(result.shipping()).isEqualTo(
+                new OrderShippingResponse(OrderStatus.DELIVERED, "CJ", "1234567890", deliveredAt));
     }
 
     @Test

@@ -2,6 +2,8 @@ package org.example.grab.domain.order.dto;
 
 import org.example.grab.domain.order.entity.Order;
 import org.example.grab.domain.order.entity.OrderItem;
+import org.example.grab.domain.order.entity.OrderStatus;
+import org.example.grab.domain.order.entity.PaymentStatus;
 import org.example.grab.domain.shipment.entity.Shipment;
 
 import java.time.OffsetDateTime;
@@ -11,50 +13,22 @@ import java.util.UUID;
 public record SellerOrderDetailResponse(
         UUID orderId,
         String orderNumber,
-        String status,
-        List<ItemResponse> items,
+        OrderStatus status,
+        List<OrderItemResponse> items,
         long itemsAmount,
         long shippingAmount,
         long totalAmount,
-        String paymentStatus,
-        ShippingResponse shipping,
+        PaymentStatus paymentStatus,
+        OrderShippingResponse shipping,
         OffsetDateTime orderedAt
 ) {
 
     public static SellerOrderDetailResponse from(
-            Order order, List<OrderItem> orderItems, String paymentStatus, Shipment shipment) {
-        List<ItemResponse> items = orderItems.stream()
-                .map(item -> new ItemResponse(
-                        order.getProductNameSnapshot(),
-                        item.getOptionNameSnapshot(),
-                        item.getUnitPrice(),
-                        item.getQuantity(),
-                        Math.multiplyExact(item.getUnitPrice(), item.getQuantity())))
-                .toList();
-        ShippingResponse shipping = shipment == null
-                ? new ShippingResponse(null, null, null)
-                : new ShippingResponse(order.getStatus().name(), shipment.getCarrierCode(),
-                        shipment.getTrackingNumber());
-
+            Order order, List<OrderItem> orderItems, PaymentStatus paymentStatus, Shipment shipment) {
         return new SellerOrderDetailResponse(
-                order.getUuid(), order.getOrderNumber(), order.getStatus().name(), items,
+                order.getUuid(), order.getOrderNumber(), order.getStatus(),
+                OrderItemResponse.from(order, orderItems),
                 order.getItemsAmount(), order.getShippingAmount(), order.getTotalAmount(),
-                paymentStatus, shipping, order.getCreatedAt());
-    }
-
-    public record ItemResponse(
-            String productName,
-            String optionName,
-            long unitPrice,
-            int quantity,
-            long subtotal
-    ) {
-    }
-
-    public record ShippingResponse(
-            String status,
-            String carrier,
-            String trackingNumber
-    ) {
+                paymentStatus, OrderShippingResponse.from(order, shipment), order.getCreatedAt());
     }
 }

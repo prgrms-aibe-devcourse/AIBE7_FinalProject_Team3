@@ -14,30 +14,18 @@ public record MyOrderDetailResponse(
         UUID orderId,
         String orderNumber,
         OrderStatus status,
-        List<Item> items,
+        List<OrderItemResponse> items,
         long itemsAmount,
         long shippingAmount,
         long totalAmount,
         PaymentStatus paymentStatus,
         OffsetDateTime paymentExpiresAt,
-        Shipping shipping,
+        OrderShippingResponse shipping,
         OffsetDateTime orderedAt
 ) {
 
     public static MyOrderDetailResponse from(
             Order order, List<OrderItem> orderItems, PaymentStatus paymentStatus, Shipment shipment) {
-        List<Item> items = orderItems.stream()
-                .map(item -> new Item(
-                        order.getProductNameSnapshot(),
-                        item.getOptionNameSnapshot(),
-                        item.getUnitPrice(),
-                        item.getQuantity(),
-                        Math.multiplyExact(item.getUnitPrice(), item.getQuantity())))
-                .toList();
-        // 배송 상태는 orders.status로 관리하므로 배송 정보가 등록된 뒤에만 주문 상태를 배송 상태로 노출한다.
-        Shipping shipping = shipment == null
-                ? new Shipping(null, null, null)
-                : new Shipping(order.getStatus().name(), shipment.getCarrierCode(), shipment.getTrackingNumber());
         // payment_expires_at은 결제 후에도 남아 있으므로 결제 대기 주문에서만 마감 시각으로 노출한다.
         OffsetDateTime paymentExpiresAt = order.getStatus() == OrderStatus.PAYMENT_PENDING
                 ? order.getPaymentExpiresAt()
@@ -47,30 +35,14 @@ public record MyOrderDetailResponse(
                 order.getUuid(),
                 order.getOrderNumber(),
                 order.getStatus(),
-                items,
+                OrderItemResponse.from(order, orderItems),
                 order.getItemsAmount(),
                 order.getShippingAmount(),
                 order.getTotalAmount(),
                 paymentStatus,
                 paymentExpiresAt,
-                shipping,
+                OrderShippingResponse.from(order, shipment),
                 order.getCreatedAt()
         );
-    }
-
-    public record Item(
-            String productName,
-            String optionName,
-            long unitPrice,
-            int quantity,
-            long subtotal
-    ) {
-    }
-
-    public record Shipping(
-            String status,
-            String carrier,
-            String trackingNumber
-    ) {
     }
 }

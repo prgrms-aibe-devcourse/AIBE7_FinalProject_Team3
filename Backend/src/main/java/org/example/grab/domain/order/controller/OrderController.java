@@ -25,8 +25,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.UUID;
-
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/orders")
@@ -65,18 +63,6 @@ public class OrderController {
     @GetMapping("/{orderId}")
     public ApiResponse<MyOrderDetailResponse> findMyOrder(@PathVariable String orderId) {
         return ApiResponse.success(orderQueryService.findMyOrder(
-                currentUserIdProvider.currentUserId(), parseOrderId(orderId)));
-    }
-
-    private UUID parseOrderId(String orderId) {
-        try {
-            UUID uuid = UUID.fromString(orderId);
-            if (uuid.toString().equalsIgnoreCase(orderId)) {
-                return uuid;
-            }
-        } catch (IllegalArgumentException ignored) {
-            // 형식이 잘못된 ID는 존재하지 않는 주문과 같은 404로 응답한다.
-        }
-        throw new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND);
+                currentUserIdProvider.currentUserId(), OrderIdParser.parse(orderId)));
     }
 }
