@@ -38,6 +38,12 @@ public class Shipment extends BaseEntity {
     @Column(name = "tracking_number", nullable = false, length = 100)
     private String trackingNumber;
 
+    @Column(name = "idempotency_key", length = 100)
+    private String idempotencyKey;
+
+    @Column(name = "request_hash", length = 64, columnDefinition = "char(64)")
+    private String requestHash;
+
     @Column(name = "shipped_at")
     private OffsetDateTime shippedAt;
 
@@ -52,6 +58,16 @@ public class Shipment extends BaseEntity {
 
     public static Shipment create(Order order, String carrierCode, String trackingNumber) {
         return new Shipment(order, carrierCode, trackingNumber);
+    }
+
+    public static Shipment register(
+            Order order, String carrierCode, String trackingNumber,
+            String idempotencyKey, String requestHash, OffsetDateTime shippedAt) {
+        Shipment shipment = new Shipment(order, carrierCode, trackingNumber);
+        shipment.idempotencyKey = Objects.requireNonNull(idempotencyKey);
+        shipment.requestHash = Objects.requireNonNull(requestHash);
+        shipment.shippedAt = Objects.requireNonNull(shippedAt);
+        return shipment;
     }
 
     public void markDelivered(OffsetDateTime deliveredAt) {

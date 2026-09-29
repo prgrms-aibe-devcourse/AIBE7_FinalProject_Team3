@@ -11,15 +11,21 @@ import org.example.grab.domain.order.entity.PaymentStatus;
 import org.example.grab.domain.order.error.OrderErrorCode;
 import org.example.grab.domain.order.repository.OrderItemRepository;
 import org.example.grab.domain.order.repository.OrderRepository;
+import org.example.grab.domain.shipment.dto.ShipmentRegisterRequest;
+import org.example.grab.domain.shipment.entity.Shipment;
 import org.example.grab.domain.shipment.repository.ShipmentRepository;
+import org.example.grab.domain.shipment.service.ShipmentRequestHasher;
 import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
+import org.example.grab.global.idempotency.IdempotencyKey;
+import org.example.grab.global.idempotency.RequestHash;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -33,6 +39,7 @@ public class SellerOrderService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final ShipmentRepository shipmentRepository;
+    private final ShipmentRequestHasher shipmentRequestHasher;
 
     public SellerOrderDetailResponse findOrder(long sellerId, UUID orderId) {
         Order order = orderRepository.findByUuid(orderId)
@@ -60,6 +67,35 @@ public class SellerOrderService {
         }
 
         order.prepareShipment();
+        return new OrderStatusResponse(order.getUuid(), order.getStatus().name());
+    }
+
+    @Transactional
+    public OrderStatusResponse registerShipment(
+            long sellerId, UUID orderId, String idempotencyKeyHeader, ShipmentRegisterRequest request) {
+        IdempotencyKey idempotencyKey = IdempotencyKey.from(idempotencyKeyHeader);
+        RequestHash requestHash = shipmentRequestHasher.hash(request);
+        Order order = orderRepository.findByUuidForUpdate(orderId)
+                .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+        if (!orderRepository.ownsDrop(sellerId, order.getDropId())) {
+            throw new BusinessException(OrderErrorCode.ORDER_ACCESS_DENIED);
+        }
+
+        var existingShipment = shipmentRepository.findByOrderId(order.getId());
+        if (existingShipment.isPresent()) {
+            Shipment shipment = existingShipment.get();
+            if (idempotencyKey.value().equals(shipment.getIdempotencyKey())) {
+                if (!requestHash.value().equals(shipment.getRequestHash())) {
+                    throw new BusinessException(CommonErrorCode.DUPLICATE_IDEMPOTENCY_KEY);
+                }
+                return new OrderStatusResponse(order.getUuid(), order.getStatus().name());
+            }
+            throw new BusinessException(CommonErrorCode.ORDER_STATUS_CONFLICT);
+        }
+
+        order.ship();
+        shipmentRepository.save(Shipment.register(order, request.carrier(), request.trackingNumber(),
+                idempotencyKey.value(), requestHash.value(), OffsetDateTime.now()));
         return new OrderStatusResponse(order.getUuid(), order.getStatus().name());
     }
 
