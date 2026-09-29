@@ -3,6 +3,7 @@ package org.example.grab.domain.order.controller;
 import lombok.RequiredArgsConstructor;
 import org.example.grab.domain.order.dto.SellerOrderDetailResponse;
 import org.example.grab.domain.order.dto.SellerOrderListResponse;
+import org.example.grab.domain.order.dto.OrderStatusResponse;
 import org.example.grab.domain.order.entity.OrderStatus;
 import org.example.grab.domain.order.entity.PaymentStatus;
 import org.example.grab.domain.order.service.SellerOrderService;
@@ -13,8 +14,9 @@ import org.example.grab.global.error.CommonErrorCode;
 import org.example.grab.global.security.CurrentSellerIdProvider;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
@@ -30,17 +32,16 @@ public class SellerOrderController {
 
     @GetMapping("/orders/{orderId}")
     public ApiResponse<SellerOrderDetailResponse> findOrder(@PathVariable String orderId) {
-        UUID uuid;
-        try {
-            uuid = UUID.fromString(orderId);
-        } catch (IllegalArgumentException exception) {
-            throw new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND);
-        }
-        if (!uuid.toString().equalsIgnoreCase(orderId)) {
-            throw new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND);
-        }
+        UUID uuid = parseOrderId(orderId);
         return ApiResponse.success(
                 sellerOrderService.findOrder(currentSellerIdProvider.currentSellerId(), uuid));
+    }
+
+    // Seller 인증 및 Drop 소유권 검증 후 order의 상태를 PAID -> PREPARING으로 전환
+    @PostMapping("/orders/{orderId}/prepare-shipment")
+    public ApiResponse<OrderStatusResponse> prepareShipment(@PathVariable String orderId) {
+        return ApiResponse.success(sellerOrderService.prepareShipment(
+                currentSellerIdProvider.currentSellerId(), parseOrderId(orderId)));
     }
 
     @GetMapping("/orders")
@@ -55,6 +56,19 @@ public class SellerOrderController {
         }
         return ApiResponse.success(sellerOrderService.findOrders(
                 currentSellerIdProvider.currentSellerId(), dropId, orderStatus, paymentStatus, page, size));
+    }
+
+    private static UUID parseOrderId(String orderId) {
+        UUID uuid;
+        try {
+            uuid = UUID.fromString(orderId);
+        } catch (IllegalArgumentException exception) {
+            throw new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND);
+        }
+        if (!uuid.toString().equalsIgnoreCase(orderId)) {
+            throw new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND);
+        }
+        return uuid;
     }
 
 }

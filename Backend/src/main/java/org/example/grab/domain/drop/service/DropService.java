@@ -66,6 +66,17 @@ public class DropService {
         return drop;
     }
 
+    /**
+     * WISH 등록·취소 가능 여부를 판정한다. 등록과 취소의 규칙이 같아 하나의 메서드로 공유한다.
+     * 존재하지 않거나 DRAFT인 DROP은 DROP_NOT_FOUND로 숨기고, 그 밖의 불가 상태는 도메인이 판정한다.
+     */
+    @Transactional(readOnly = true)
+    public void validateWishable(Long dropId, OffsetDateTime now) {
+        Drop drop = dropRepository.findById(dropId)
+                .orElseThrow(() -> new BusinessException(DropErrorCode.DROP_NOT_FOUND));
+        drop.validateWishable(now);
+    }
+
     // 목록은 조회 전용 트랜잭션에서 쿼리 한 번으로 가져오고, 프로젝션을 응답 DTO로 변환한다.
     @Transactional(readOnly = true)
     public PageResponse<SellerDropListResponse> findSellerDrops(
