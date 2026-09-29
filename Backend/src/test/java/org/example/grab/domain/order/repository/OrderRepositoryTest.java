@@ -105,7 +105,8 @@ class OrderRepositoryTest {
                 OrderItem.create(savedOrder, optionId, "검정 / L", 15000, 2)
         );
         stockReservationRepository.saveAndFlush(StockReservation.hold(savedItem, expiresAt));
-        shipmentRepository.saveAndFlush(Shipment.create(savedOrder, "CJ", "1234567890"));
+        shipmentRepository.saveAndFlush(Shipment.register(savedOrder, "CJ", "1234567890",
+                UUID.randomUUID().toString(), "0".repeat(64), OffsetDateTime.now()));
         entityManager.clear();
 
         // then

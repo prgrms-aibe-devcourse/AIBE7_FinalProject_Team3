@@ -323,16 +323,14 @@ UQ(`order_id`, `option_id`)를 둔다. `drop_id`를 포함한 복합 FK로 다�
 | `order_id` | BIGINT | O | FK orders, UQ |
 | `carrier_code` | VARCHAR(50) | O | 택배사 코드 |
 | `tracking_number` | VARCHAR(100) | O | 송장번호 |
-| `idempotency_key` | VARCHAR(100) | X | 송장 등록 요청의 멱등 키, 주문별 키 범위 |
-| `request_hash` | CHAR(64) | X | 송장 등록 요청 본문의 SHA-256 해시 |
+| `idempotency_key` | VARCHAR(100) | O | 송장 등록 요청의 멱등 키, 주문별 키 범위 |
+| `request_hash` | CHAR(64) | O | 송장 등록 요청 본문의 SHA-256 해시 |
 | `shipped_at` | TIMESTAMPTZ | O | 송장 등록·발송 처리 시각, 서버 시각 |
 | `delivered_at` | TIMESTAMPTZ | X | 배송 완료 시각 |
 
 MVP는 주문당 배송 한 건만 지원한다. 배송 상태는 `orders.status`의 `SHIPPED`, `DELIVERED`로 관리한다. Mock 배송 완료 결과를 받으면 주문 상태와 `shipments.delivered_at`을 함께 갱신하며, 실제 택배사 연동은 MVP 범위에서 제외한다.
 
 송장 등록의 멱등 키와 요청 해시는 등록 성공 후 `shipments`에 저장한다. 이 값은 주문별로 키 재사용 여부와 요청 본문 일치 여부를 확인하는 데 사용한다. 성공 전 실패한 요청은 배송 정보를 만들지 않는다.
-
-GR-42 적용 전 생성된 배송 행에는 멱등 키와 요청 해시가 없을 수 있다. 신규 송장 등록 행에는 두 값을 모두 저장한다.
 
 ## 2. 상태 전이
 
