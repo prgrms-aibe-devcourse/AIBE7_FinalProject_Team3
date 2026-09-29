@@ -184,6 +184,24 @@ public class Drop extends BaseEntity {
         this.publishedAt = now;
     }
 
+    /**
+     * WISH 등록·취소 가능 여부를 판정한다. 등록과 취소의 규칙이 같다.
+     * 공개되지 않았거나 존재 자체를 숨겨야 하는 DRAFT는 DROP_NOT_FOUND로 응답한다(공개 상세 조회와 동일).
+     * WISH라도 판매 시작 시각이 지났으면 GRAB이 시작된 것으로 본다(GR-18 전환 배치 이전의 경합 대비).
+     */
+    public void validateWishable(OffsetDateTime now) {
+        switch (status) {
+            case DRAFT -> throw new BusinessException(DropErrorCode.DROP_NOT_FOUND);
+            case WISH -> {
+                if (saleStartsAt != null && !now.isBefore(saleStartsAt)) {
+                    throw new BusinessException(DropErrorCode.GRAB_ALREADY_STARTED);
+                }
+            }
+            case GRAB, ENDED -> throw new BusinessException(DropErrorCode.GRAB_ALREADY_STARTED);
+            case CANCELED -> throw new BusinessException(DropErrorCode.DROP_NOT_WISHABLE);
+        }
+    }
+
     // 필드명은 요청 DTO(DropDraftRequest) 기준으로 적어 클라이언트가 입력 위치를 바로 찾을 수 있게 한다.
     private void validateRequiredForPublish() {
         List<ErrorResponse.FieldError> missing = new ArrayList<>();

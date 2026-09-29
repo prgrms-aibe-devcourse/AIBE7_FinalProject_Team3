@@ -121,6 +121,33 @@ class DropServiceTest {
     }
 
     @Test
+    @DisplayName("WISH 등록·취소 판정에서 존재하지 않는 DROP은 DROP_NOT_FOUND")
+    void validateWishable_notFound() {
+        // given
+        given(dropRepository.findById(99L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> dropService.validateWishable(99L, OffsetDateTime.now()))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(DropErrorCode.DROP_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("WISH 등록·취소 판정은 DRAFT를 DROP_NOT_FOUND로 숨긴다")
+    void validateWishable_hidesDraft() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+
+        // when & then
+        assertThatThrownBy(() -> dropService.validateWishable(10L, OffsetDateTime.now()))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(DropErrorCode.DROP_NOT_FOUND);
+    }
+
+    @Test
     @DisplayName("다른 판매자의 DROP 공개는 상태와 무관하게 DROP_ACCESS_DENIED")
     void publish_accessDeniedBeforeStateCheck() {
         // given

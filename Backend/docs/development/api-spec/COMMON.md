@@ -197,6 +197,7 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 | `INVALID_STATE_TRANSITION` | 409 | 허용되지 않은 상태 전이 |
 | `DROP_NOT_EDITABLE` | 409 | 수정할 수 없는 DROP |
 | `DROP_NOT_WISHABLE` | 409 | WISH 불가능 상태 |
+| `GRAB_ALREADY_STARTED` | 409 | 이미 GRAB이 시작된 DROP |
 | `DROP_NOT_ON_SALE` | 409 | 판매 상태가 아님 |
 | `DUPLICATE_OPTION_COMBINATION` | 409 | 동일한 옵션값 조합의 SKU 중복 |
 | `ORDER_NOT_CANCELABLE` | 409 | 취소할 수 없는 주문 |
