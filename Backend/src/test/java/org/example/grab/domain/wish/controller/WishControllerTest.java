@@ -6,6 +6,7 @@ import org.example.grab.domain.wish.service.WishService;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
 import org.example.grab.global.error.GlobalExceptionHandler;
+import org.example.grab.global.error.ValidationErrorCodeResolver;
 import org.example.grab.global.security.CurrentUserIdProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -14,6 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
@@ -38,7 +40,7 @@ class WishControllerTest {
         wishService = mock(WishService.class);
         currentUserIdProvider = mock(CurrentUserIdProvider.class);
         mockMvc = MockMvcBuilders.standaloneSetup(new WishController(wishService, currentUserIdProvider))
-                .setControllerAdvice(new GlobalExceptionHandler())
+                .setControllerAdvice(new GlobalExceptionHandler(new ValidationErrorCodeResolver(List.of())))
                 .build();
     }
 
