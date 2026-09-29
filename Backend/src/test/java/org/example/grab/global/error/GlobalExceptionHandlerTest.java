@@ -155,6 +155,35 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("JSON 형식이 잘못된 요청 본문은 400 INVALID_REQUEST와 빈 필드 오류로 응답한다")
+    void handlesMalformedJson() throws Exception {
+        mockMvc.perform(post("/test/validation")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"깨진본문값\""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.data").doesNotExist())
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"))
+                .andExpect(jsonPath("$.error.message").value("요청 형식이 올바르지 않습니다."))
+                .andExpect(jsonPath("$.error.fieldErrors").isArray())
+                .andExpect(jsonPath("$.error.fieldErrors").isEmpty())
+                .andExpect(content().string(not(containsString("깨진본문값"))));
+    }
+
+    @Test
+    @DisplayName("요청 본문이 없으면 400 INVALID_REQUEST와 빈 필드 오류로 응답한다")
+    void handlesMissingRequestBody() throws Exception {
+        mockMvc.perform(post("/test/validation")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"))
+                .andExpect(jsonPath("$.error.message").value("요청 형식이 올바르지 않습니다."))
+                .andExpect(jsonPath("$.error.fieldErrors").isArray())
+                .andExpect(jsonPath("$.error.fieldErrors").isEmpty());
+    }
+
+    @Test
     @DisplayName("요청 파라미터 타입 오류는 400 INVALID_REQUEST로 응답한다")
     void handlesParameterTypeMismatch() throws Exception {
         mockMvc.perform(get("/test/type").param("page", "abc"))
