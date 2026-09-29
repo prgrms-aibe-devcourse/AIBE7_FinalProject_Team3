@@ -29,7 +29,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ErrorResponse> handleMethodArgumentTypeMismatch(MethodArgumentTypeMismatchException e) {
-        log.warn("요청 파라미터 타입 오류: {} = {}", e.getName(), e.getValue());
+        // 거부된 값은 사용자가 보낸 원문이므로 기록하지 않고, 원인을 찾을 수 있도록 파라미터 이름과 기대 타입만 남긴다
+        log.warn("요청 파라미터 타입 오류: {} ({})", e.getName(),
+                e.getRequiredType() == null ? "unknown" : e.getRequiredType().getSimpleName());
         return ResponseEntity.status(CommonErrorCode.INVALID_REQUEST.getStatus())
                 .body(ErrorResponse.of(
                         CommonErrorCode.INVALID_REQUEST.getCode(),

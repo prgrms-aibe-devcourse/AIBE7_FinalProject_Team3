@@ -1,5 +1,8 @@
 package org.example.grab.global.error;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import jakarta.validation.Constraint;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
@@ -7,9 +10,11 @@ import jakarta.validation.Payload;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.example.grab.global.common.ErrorResponse;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -25,6 +30,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.util.List;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -34,6 +40,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class GlobalExceptionHandlerTest {
+
+    private static final String SECRET_INPUT = "로그비공개입력값";
+
+    private final Logger handlerLogger = (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private final ListAppender<ILoggingEvent> logAppender = new ListAppender<>();
 
     private MockMvc mockMvc;
 
@@ -48,6 +59,70 @@ class GlobalExceptionHandlerTest {
         mockMvc = MockMvcBuilders.standaloneSetup(new TestController())
                 .setControllerAdvice(new GlobalExceptionHandler(resolver()))
                 .build();
+    }
+
+    @BeforeEach
+    void attachLogAppender() {
+        logAppender.start();
+        handlerLogger.addAppender(logAppender);
+    }
+
+    @AfterEach
+    void detachLogAppender() {
+        handlerLogger.detachAppender(logAppender);
+    }
+
+    // 로그가 남았는지 함께 확인해, 로그를 아예 남기지 않아 통과하는 경우를 막는다
+    private void assertLoggedWithoutSecretInput() {
+        assertThat(logAppender.list).isNotEmpty();
+        assertThat(logAppender.list)
+                .extracting(ILoggingEvent::getFormattedMessage)
+                .noneMatch(message -> message.contains(SECRET_INPUT));
+    }
+
+    @Test
+    @DisplayName("요청 값 검증 실패 로그에는 거부된 입력값을 남기지 않는다")
+    void doesNotLogRejectedValueOnValidationFailure() throws Exception {
+        mockMvc.perform(post("/test/mapped-validation")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"first\":\"" + SECRET_INPUT + "\",\"second\":\"" + SECRET_INPUT + "\"}"))
+                .andExpect(status().isBadRequest());
+
+        assertLoggedWithoutSecretInput();
+    }
+
+    @Test
+    @DisplayName("요청 본문 해석 실패 로그에는 원문 요청 본문을 남기지 않는다")
+    void doesNotLogRequestBodyOnMalformedJson() throws Exception {
+        mockMvc.perform(post("/test/validation")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"" + SECRET_INPUT + "\""))
+                .andExpect(status().isBadRequest());
+
+        assertLoggedWithoutSecretInput();
+    }
+
+    @Test
+    @DisplayName("JSON 값의 타입이 맞지 않을 때도 로그에 거부된 값을 남기지 않는다")
+    // 타입 불일치 파싱 예외 메시지에는 거부된 값이 들어가므로, 깨진 JSON과 별도로 확인한다
+    void doesNotLogRejectedValueOnJsonTypeMismatch() throws Exception {
+        mockMvc.perform(post("/test/number")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"count\":\"" + SECRET_INPUT + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"))
+                .andExpect(content().string(not(containsString(SECRET_INPUT))));
+
+        assertLoggedWithoutSecretInput();
+    }
+
+    @Test
+    @DisplayName("요청 파라미터 타입 오류 로그에는 거부된 값을 남기지 않는다")
+    void doesNotLogRejectedValueOnTypeMismatch() throws Exception {
+        mockMvc.perform(get("/test/type").param("page", SECRET_INPUT))
+                .andExpect(status().isBadRequest());
+
+        assertLoggedWithoutSecretInput();
     }
 
     @Test
@@ -225,12 +300,19 @@ class GlobalExceptionHandlerTest {
         void mixedValidation(@Valid @RequestBody MixedRequest request) {
         }
 
+        @PostMapping("/test/number")
+        void number(@RequestBody NumberRequest request) {
+        }
+
         @GetMapping("/test/type")
         void type(@RequestParam int page) {
         }
     }
 
     record TestRequest(@NotBlank(message = "이름은 필수입니다.") String name) {
+    }
+
+    record NumberRequest(int count) {
     }
 
     record MappedRequest(@AlwaysInvalid String first, @AlwaysInvalid String second) {
