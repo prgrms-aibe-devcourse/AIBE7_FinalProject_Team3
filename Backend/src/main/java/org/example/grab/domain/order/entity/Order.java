@@ -14,6 +14,8 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.grab.global.entity.UUIDEntity;
+import org.example.grab.global.error.BusinessException;
+import org.example.grab.global.error.CommonErrorCode;
 
 import java.time.OffsetDateTime;
 import java.util.Objects;
@@ -141,6 +143,20 @@ public class Order extends UUIDEntity {
                 shippingAddress,
                 paymentExpiresAt
         );
+    }
+
+    public void prepareShipment() {
+        if (status != OrderStatus.PAID) {
+            throw new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION);
+        }
+        this.status = OrderStatus.PREPARING;
+    }
+
+    public void completeDelivery() {
+        if (status != OrderStatus.SHIPPED) {
+            throw new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION);
+        }
+        this.status = OrderStatus.DELIVERED;
     }
 
     @Override

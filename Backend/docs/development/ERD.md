@@ -323,10 +323,14 @@ UQ(`order_id`, `option_id`)를 둔다. `drop_id`를 포함한 복합 FK로 다�
 | `order_id` | BIGINT | O | FK orders, UQ |
 | `carrier_code` | VARCHAR(50) | O | 택배사 코드 |
 | `tracking_number` | VARCHAR(100) | O | 송장번호 |
-| `shipped_at` | TIMESTAMPTZ | X | 출고 시각 |
+| `idempotency_key` | VARCHAR(100) | O | 송장 등록 요청의 멱등 키, 주문별 키 범위 |
+| `request_hash` | CHAR(64) | O | 송장 등록 요청 본문의 SHA-256 해시 |
+| `shipped_at` | TIMESTAMPTZ | O | 송장 등록·발송 처리 시각, 서버 시각 |
 | `delivered_at` | TIMESTAMPTZ | X | 배송 완료 시각 |
 
-MVP는 주문당 배송 한 건만 지원하며 배송 상태는 `orders.status`에서 관리한다.
+MVP는 주문당 배송 한 건만 지원한다. 배송 상태는 `orders.status`의 `SHIPPED`, `DELIVERED`로 관리한다. Mock 배송 완료 결과를 받으면 주문 상태와 `shipments.delivered_at`을 함께 갱신하며, 실제 택배사 연동은 MVP 범위에서 제외한다.
+
+송장 등록의 멱등 키와 요청 해시는 등록 성공 후 `shipments`에 저장한다. 이 값은 주문별로 키 재사용 여부와 요청 본문 일치 여부를 확인하는 데 사용한다. 성공 전 실패한 요청은 배송 정보를 만들지 않는다.
 
 ## 2. 상태 전이
 
@@ -346,6 +350,14 @@ PAYMENT_PENDING → PAID → PREPARING → SHIPPED → DELIVERED
 
 PAID → CANCELED
 ```
+
+배송 상태는 다음 순서로 전이한다.
+
+```text
+SHIPPED → DELIVERED
+```
+
+배송 완료 시 주문 상태와 배송 완료 시각을 함께 기록한다. 이미 완료된 배송은 이전 단계로 되돌리지 않는다.
 
 결제 시도 실패는 `payments.status = FAILED`로 기록한다. 결제 마감 전 재시도를 허용하므로 개별 실패만으로 주문을 `PAYMENT_FAILED`로 종료하지 않는다.
 
@@ -396,8 +408,8 @@ COMMITTED → RELEASED
 ### 3.3 주문 취소
 
 - `PAYMENT_PENDING`: PG 호출 없이 예약을 해제하고 주문을 취소한다.
-- `PAID`: PG 취소 성공을 확인한 후 주문과 결제를 취소하고 sold를 감소시킨다.
-- `PREPARING` 이후: MVP에서는 소비자의 직접 취소를 제한한다.
+- `PAID`, `PREPARING`: PG 취소 성공을 확인한 후 주문과 결제를 취소하고 sold를 감소시킨다.
+- Shipment 행이 생성된 이후(`SHIPPED`, `DELIVERED`): 배송이 시작됐으므로 소비자 취소를 거부한다.
 - 취소 응답이 불명확하면 `UNKNOWN`으로 두고 배송 준비 전환을 막는다.
 
 PG 취소 성공과 재고 반환은 같은 DB 트랜잭션에서 반영한다. 이미 반환된 예약에는 다시 수량을 더하지 않는다.

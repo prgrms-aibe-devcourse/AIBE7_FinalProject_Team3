@@ -126,9 +126,10 @@
 | GET | `/api/v1/seller/orders/{orderId}` | SELLER | 본인 DROP의 주문 상세 조회 |
 | POST | `/api/v1/seller/orders/{orderId}/prepare-shipment` | SELLER | 결제 완료 주문을 배송 준비 상태로 변경 |
 | POST | `/api/v1/seller/orders/{orderId}/shipment` | SELLER | 택배사와 송장번호를 등록하고 발송 처리 |
-| POST | `/api/v1/seller/orders/{orderId}/delivery-complete` | SELLER | 배송 중인 주문을 배송 완료 처리 |
+| POST | `/api/v1/mock/orders/{orderId}/delivery/complete` | 로컬·테스트 전용 | Mock 배송 완료 결과를 주문에 반영 |
 
 > 판매자는 자신이 생성한 DROP의 주문만 조회하거나 변경할 수 있습니다.
+> Mock 배송 API는 `GRAB_MOCK_DELIVERY_ENABLED=true`일 때만 활성화합니다. 로컬·테스트 환경에서만 켜고 운영 환경에서는 기본값(`false`)을 유지합니다.
 
 ### 2.9 판매자 대시보드
 
