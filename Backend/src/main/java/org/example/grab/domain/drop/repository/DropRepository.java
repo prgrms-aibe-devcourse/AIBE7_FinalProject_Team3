@@ -1,5 +1,6 @@
 package org.example.grab.domain.drop.repository;
 
+import org.example.grab.domain.drop.dto.PublicDropListProjection;
 import org.example.grab.domain.drop.dto.SellerDropListProjection;
 import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.domain.drop.entity.DropStatus;
@@ -10,6 +11,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface DropRepository extends JpaRepository<Drop, Long> {
@@ -41,5 +43,54 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
     Page<SellerDropListProjection> findSellerDrops(
             @Param("sellerId") Long sellerId,
             @Param("status") DropStatus status,
+            Pageable pageable);
+
+    /*
+     * 공개 DROP 목록 조회(DISC-001·002·003, STOCK-006).
+     * 썸네일(LIMIT 1)·ILIKE ESCAPE·컬럼명 기준 정렬 때문에 네이티브로 작성하고, 목록에 필요한 값
+     * (minPrice·soldOut·wishCount·thumbnailUrl)을 한 쿼리 안에서 서브쿼리로 계산해 N+1을 막는다.
+     * 활성 WISH 집계(canceled_at IS NULL)는 WishRepository 대신 같은 쿼리 안에서 네이티브로 센다.
+     * PostgreSQL은 네이티브 쿼리의 null 파라미터 타입을 추론하지 못하므로 CAST로 타입을 지정한다.
+     * soldOut 판정식은 SELECT와 WHERE 두 곳에 중복되므로 한쪽만 바꾸지 않도록 주의한다.
+     * statuses는 서비스가 채워 넘기며 DRAFT·CANCELED는 들어오지 않는다. 카테고리는 INNER JOIN이다.
+     */
+    @Query(value = """
+            SELECT d.id AS "dropId", d.name AS "name", d.status AS "status",
+                   d.sale_starts_at AS "saleStartsAt", d.sale_ends_at AS "saleEndsAt",
+                   c.id AS "categoryId", c.name AS "categoryName",
+                   (SELECT i.image_url FROM drop_images i WHERE i.drop_id = d.id
+                     ORDER BY i.sort_order LIMIT 1) AS "thumbnailUrl",
+                   (SELECT MIN(o.unit_price) FROM drop_options o
+                     WHERE o.drop_id = d.id AND o.is_active) AS "minPrice",
+                   (SELECT COALESCE(SUM(o.total_quantity - o.reserved_quantity - o.sold_quantity - o.withheld_quantity), 0) = 0
+                      FROM drop_options o WHERE o.drop_id = d.id AND o.is_active) AS "soldOut",
+                   (SELECT COUNT(*) FROM wishes w
+                     WHERE w.drop_id = d.id AND w.canceled_at IS NULL) AS "wishCount"
+            FROM drops d
+            JOIN categories c ON c.id = d.category_id
+            WHERE d.status IN (:statuses)
+              AND (CAST(:categoryId AS BIGINT) IS NULL OR d.category_id = :categoryId)
+              AND (CAST(:keyword AS TEXT) IS NULL OR d.name ILIKE :keyword ESCAPE '\\')
+              AND (CAST(:soldOut AS BOOLEAN) IS NULL
+                   OR (SELECT COALESCE(SUM(o.total_quantity - o.reserved_quantity - o.sold_quantity - o.withheld_quantity), 0) = 0
+                         FROM drop_options o WHERE o.drop_id = d.id AND o.is_active) = :soldOut)
+            """,
+            countQuery = """
+            SELECT COUNT(*)
+            FROM drops d
+            JOIN categories c ON c.id = d.category_id
+            WHERE d.status IN (:statuses)
+              AND (CAST(:categoryId AS BIGINT) IS NULL OR d.category_id = :categoryId)
+              AND (CAST(:keyword AS TEXT) IS NULL OR d.name ILIKE :keyword ESCAPE '\\')
+              AND (CAST(:soldOut AS BOOLEAN) IS NULL
+                   OR (SELECT COALESCE(SUM(o.total_quantity - o.reserved_quantity - o.sold_quantity - o.withheld_quantity), 0) = 0
+                         FROM drop_options o WHERE o.drop_id = d.id AND o.is_active) = :soldOut)
+            """,
+            nativeQuery = true)
+    Page<PublicDropListProjection> findPublicDrops(
+            @Param("statuses") List<String> statuses,
+            @Param("categoryId") Long categoryId,
+            @Param("keyword") String keyword,
+            @Param("soldOut") Boolean soldOut,
             Pageable pageable);
 }

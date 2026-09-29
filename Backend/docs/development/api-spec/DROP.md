@@ -36,13 +36,16 @@ GET /api/v1/drops
 - **인증**: 불필요
 
 **쿼리 파라미터:**
-- `status`: `WISH` | `GRAB` | `ENDED`
-- `categoryId`: 카테고리 ID (예: `1`)
-- `keyword`: 상품명 검색 키워드
-- `soldOut`: 품절 여부 (`true` | `false`)
-- `sort`: 정렬 조건 (예: `createdAt,desc`)
-- `page`: 페이지 번호 (0부터 시작)
-- `size`: 페이지 크기
+
+| 파라미터 | 허용 값 | 기본값 | 설명 |
+| --- | --- | --- | --- |
+| `status` | `WISH` \| `GRAB` \| `ENDED` | 전체 | 없으면 세 상태를 모두 반환합니다. |
+| `categoryId` | 정수 | 전체 | 카테고리 ID (예: `1`) |
+| `keyword` | 문자열 (최대 100자) | 전체 | 상품명 부분 일치 검색 |
+| `soldOut` | `true` \| `false` | 전체 | 품절 여부 |
+| `sort` | `publishedAt` \| `saleStartsAt` \| `createdAt` + `,asc`\|`,desc` | `publishedAt,desc` | 정렬 조건 (예: `createdAt,desc`) |
+| `page` | 0 이상 정수 | `0` | 페이지 번호 (0부터 시작) |
+| `size` | 1 ~ 100 | `20` | 페이지 크기 |
 
 **응답:**
 
@@ -77,6 +80,19 @@ GET /api/v1/drops
 ```
 
 > `DRAFT`와 `CANCELED` DROP은 공개 목록에서 제외합니다.
+>
+> - `status`에 `WISH`·`GRAB`·`ENDED` 외의 값(예: `DRAFT`, `CANCELED`)을 주면 거부합니다.
+> - `keyword`는 앞뒤 공백을 제거하고, 비어 있으면 검색 조건을 무시합니다. 상품명을 대소문자 구분 없이 부분 일치로 찾고, `%`·`_`·`\`는 와일드카드가 아니라 리터럴로 처리합니다. 100자를 넘으면 거부합니다.
+> - `soldOut`은 활성 옵션(`is_active = true`)의 가용 재고(`total - reserved - sold - withheld`) 합이 0이면 `true`입니다. 활성 옵션이 하나도 없으면 `true`입니다. DROP 상태가 `GRAB`이어도 재고가 없으면 `true`입니다.
+> - `minPrice`는 활성 SKU(`is_active = true`) 중 최저 `unitPrice`이며, 활성 SKU가 없으면 `null`입니다(2.2와 같은 규칙).
+> - `wishCount`는 취소되지 않은(`canceled_at IS NULL`) WISH 수입니다.
+> - `thumbnailUrl`은 `sort_order`가 가장 작은 이미지이며, 이미지가 없으면 `null`입니다.
+> - 정렬 값이 같으면 `id` 내림차순으로 정렬합니다. `minPrice`·`wishCount` 정렬은 지원하지 않습니다.
+>
+> `status`는 저장된 DROP 상태 기준입니다. 판매 시작 시각(`saleStartsAt`)이 지나도 전환 배치(GR-18)가 실행되기 전까지 `WISH`로 보일 수 있으며, 이때 WISH 등록·취소는 `GRAB_ALREADY_STARTED`(409)로 거부됩니다.
+
+**오류 코드:**
+- `INVALID_REQUEST` — `page`가 0 미만, `size`가 1 미만 또는 100 초과, 허용되지 않은 `status`·`sort` 값, 숫자가 아닌 `categoryId`, `keyword` 100자 초과
 
 ### 1.3 DROP 상세 조회
 
