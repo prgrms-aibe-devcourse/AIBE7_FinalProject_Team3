@@ -9,6 +9,7 @@ import org.example.grab.domain.order.service.SellerOrderService;
 import org.example.grab.domain.payment.entity.PaymentStatus;
 import org.example.grab.global.common.ApiResponse;
 import org.example.grab.global.common.PageResponse;
+import org.example.grab.global.common.PublicIdParser;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
 import org.example.grab.global.security.CurrentSellerIdProvider;
@@ -32,7 +33,7 @@ public class SellerOrderController {
 
     @GetMapping("/orders/{orderId}")
     public ApiResponse<SellerOrderDetailResponse> findOrder(@PathVariable String orderId) {
-        UUID uuid = OrderIdParser.parse(orderId);
+        UUID uuid = PublicIdParser.parse(orderId);
         return ApiResponse.success(
                 sellerOrderService.findOrder(currentSellerIdProvider.currentSellerId(), uuid));
     }
@@ -41,7 +42,7 @@ public class SellerOrderController {
     @PostMapping("/orders/{orderId}/prepare-shipment")
     public ApiResponse<OrderStatusResponse> prepareShipment(@PathVariable String orderId) {
         return ApiResponse.success(sellerOrderService.prepareShipment(
-                currentSellerIdProvider.currentSellerId(), OrderIdParser.parse(orderId)));
+                currentSellerIdProvider.currentSellerId(), PublicIdParser.parse(orderId)));
     }
 
     @GetMapping("/orders")
