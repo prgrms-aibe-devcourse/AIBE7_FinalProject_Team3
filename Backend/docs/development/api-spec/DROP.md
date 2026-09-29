@@ -172,6 +172,27 @@ GET /api/v1/drops/{dropId}
 ```
 
 > 옵션 그룹명과 값은 판매자가 자유롭게 정의합니다. 프론트엔드는 `optionGroups`를 순서대로 표시하고 선택된 값 조합과 일치하는 `options[].optionId`를 주문에 사용합니다.
+>
+> `minPrice`·`soldOut`·`wishCount`는 1.2와 같은 규칙입니다. `minPrice`는 활성 SKU 최저 `unitPrice`(없으면 `null`), `soldOut`은 활성 옵션의 가용 재고 합이 0이면 `true`, `wishCount`는 취소되지 않은(`canceled_at IS NULL`) WISH 수입니다.
+> `options`에는 활성 SKU(`is_active = true`)만 포함하고, 각 SKU의 `soldOut`은 `availableStock == 0`입니다. `optionGroups`·`values`는 활성 개념 없이 전부 반환합니다.
+> 없는 DROP과 `DRAFT`는 `DROP_NOT_FOUND`로 숨깁니다. `CANCELED`는 200으로 보여 주고 `actions`가 모두 `false`입니다.
+> `wishNotice`는 WISH 안내 문구이고, `serverTime`은 `actions`를 판정한 서버 시각입니다.
+>
+> `actions`는 비로그인 API이므로 사용자와 무관하게 DROP 상태·시각으로만 정합니다.
+>
+> | DROP 상태·시각 | `wishable` | `wishCancelable` | `orderable` |
+> | --- | --- | --- | --- |
+> | `WISH`, 현재 시각 < `saleStartsAt` | true | true | false |
+> | `WISH`, 현재 시각 ≥ `saleStartsAt` (전환 배치 이전) | false | false | false |
+> | `GRAB`, 현재 시각 < `saleEndsAt`, 품절 아님 | false | false | true |
+> | `GRAB`, 품절 또는 현재 시각 ≥ `saleEndsAt` | false | false | false |
+> | `ENDED`, `CANCELED` | false | false | false |
+>
+> `orderable`은 주문 생성 검증(상태 `GRAB` + 판매 시각 범위)과 같으며 품절이면 `false`입니다.
+
+**오류 코드:**
+- `DROP_NOT_FOUND` — 없는 DROP, `DRAFT`
+- `INVALID_REQUEST` — 숫자가 아닌 `dropId`
 
 ---
 
