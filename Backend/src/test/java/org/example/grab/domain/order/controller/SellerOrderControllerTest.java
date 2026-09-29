@@ -40,13 +40,14 @@ class SellerOrderControllerTest {
         SellerOrderDetailResponse response = new SellerOrderDetailResponse(
                 orderId,
                 "ORD-20260929-ABC",
-                OrderStatus.SHIPPED,
+                OrderStatus.DELIVERED,
                 List.of(new OrderItemResponse("한정 상품", "검정 / L", 15000, 2, 30000)),
                 30000,
                 3000,
                 33000,
                 PaymentStatus.SUCCEEDED,
-                new OrderShippingResponse(OrderStatus.SHIPPED, "CJ", "1234567890"),
+                new OrderShippingResponse(OrderStatus.DELIVERED, "CJ", "1234567890",
+                        OffsetDateTime.parse("2026-09-30T09:00:00Z")),
                 OffsetDateTime.parse("2026-09-29T12:00:00Z")
         );
         given(currentSellerIdProvider.currentSellerId()).willReturn(7L);
@@ -59,12 +60,13 @@ class SellerOrderControllerTest {
         result
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.orderId").value(orderId.toString()))
-                .andExpect(jsonPath("$.data.status").value("SHIPPED"))
+                .andExpect(jsonPath("$.data.status").value("DELIVERED"))
                 .andExpect(jsonPath("$.data.paymentStatus").value("SUCCEEDED"))
                 .andExpect(jsonPath("$.data.items[0].subtotal").value(30000))
-                .andExpect(jsonPath("$.data.shipping.status").value("SHIPPED"))
+                .andExpect(jsonPath("$.data.shipping.status").value("DELIVERED"))
                 .andExpect(jsonPath("$.data.shipping.carrier").value("CJ"))
-                .andExpect(jsonPath("$.data.shipping.trackingNumber").value("1234567890"));
+                .andExpect(jsonPath("$.data.shipping.trackingNumber").value("1234567890"))
+                .andExpect(jsonPath("$.data.shipping.deliveredAt").exists());
     }
 
     @Test

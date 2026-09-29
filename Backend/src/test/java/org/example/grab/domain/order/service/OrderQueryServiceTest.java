@@ -115,7 +115,7 @@ class OrderQueryServiceTest {
         assertThat(result.paymentStatus()).isEqualTo(PaymentStatus.PENDING);
         assertThat(result.paymentExpiresAt()).isEqualTo(PAYMENT_EXPIRES_AT);
         assertThat(result.shipping()).isEqualTo(
-                new OrderShippingResponse(OrderStatus.PAYMENT_PENDING, "CJ", "1234567890"));
+                new OrderShippingResponse(OrderStatus.PAYMENT_PENDING, "CJ", "1234567890", null));
     }
 
     @Test
@@ -137,6 +137,29 @@ class OrderQueryServiceTest {
         assertThat(result.status()).isEqualTo(OrderStatus.PAID);
         assertThat(result.paymentStatus()).isEqualTo(PaymentStatus.SUCCEEDED);
         assertThat(result.paymentExpiresAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("배송 완료된 주문은 배송 상태와 배송 완료 시각을 반환한다")
+    void returnsDeliveredAtForDeliveredOrder() {
+        // given
+        UUID orderId = UUID.randomUUID();
+        OffsetDateTime deliveredAt = OffsetDateTime.parse("2026-09-30T09:00:00Z");
+        Order order = createOrder();
+        ReflectionTestUtils.setField(order, "status", OrderStatus.DELIVERED);
+        Shipment shipment = Shipment.create(order, "CJ", "1234567890");
+        shipment.markDelivered(deliveredAt);
+        given(orderRepository.findByUuidAndBuyerId(orderId, BUYER_ID)).willReturn(Optional.of(order));
+        given(orderItemRepository.findAllByOrderIdOrderByIdAsc(null)).willReturn(List.of());
+        given(orderRepository.findLatestPaymentStatus(null)).willReturn(Optional.of("SUCCEEDED"));
+        given(shipmentRepository.findByOrderId(null)).willReturn(Optional.of(shipment));
+
+        // when
+        MyOrderDetailResponse result = orderQueryService.findMyOrder(BUYER_ID, orderId);
+
+        // then
+        assertThat(result.shipping()).isEqualTo(
+                new OrderShippingResponse(OrderStatus.DELIVERED, "CJ", "1234567890", deliveredAt));
     }
 
     @Test

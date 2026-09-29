@@ -152,7 +152,8 @@ GET /api/v1/orders/{orderId}
     "shipping": {
       "status": null,
       "carrier": null,
-      "trackingNumber": null
+      "trackingNumber": null,
+      "deliveredAt": null
     },
     "orderedAt": "2026-09-18T14:00:00+09:00"
   }
@@ -162,6 +163,7 @@ GET /api/v1/orders/{orderId}
 - `paymentExpiresAt`은 `PAYMENT_PENDING` 주문에서만 결제 마감 시각을 담고, 그 외 상태에서는 `null`입니다.
 - `paymentStatus`는 최근 결제 시도의 상태이며, 결제 시도가 없으면 `null`입니다.
 - `shipping`은 배송 정보가 등록되기 전까지 모든 값이 `null`입니다.
+- `shipping.deliveredAt`은 Mock 배송 완료 결과가 반영된 시각(`shipments.delivered_at`)이며, 배송 완료 전에는 `null`입니다.
 
 **오류 코드:**
 - `ORDER_NOT_FOUND`: 주문이 없거나 다른 사용자의 주문인 경우. 주문 존재 여부를 노출하지 않도록 두 경우를 구분하지 않습니다.
@@ -228,6 +230,8 @@ GET /api/v1/seller/orders/{orderId}
 - **인증**: `SELLER`
 
 > 해당 주문에 포함된 DROP의 소유권을 검증합니다.
+
+- `items`, `shipping`은 1.3 내 주문 상세와 같은 형식이며, `shipping.deliveredAt`도 함께 반환합니다.
 
 ### 2.3 배송 준비 처리
 

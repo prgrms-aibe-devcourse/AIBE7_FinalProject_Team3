@@ -159,7 +159,7 @@ class OrderControllerTest {
                 261000,
                 PaymentStatus.PENDING,
                 OffsetDateTime.parse("2026-09-28T12:10:00Z"),
-                new OrderShippingResponse(null, null, null),
+                new OrderShippingResponse(null, null, null, null),
                 OffsetDateTime.parse("2026-09-28T12:00:00Z")
         );
         given(currentUserIdProvider.currentUserId()).willReturn(1L);

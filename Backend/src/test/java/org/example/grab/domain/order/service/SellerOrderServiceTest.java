@@ -66,7 +66,7 @@ class SellerOrderServiceTest {
             assertThat(detail.subtotal()).isEqualTo(30000);
         });
         assertThat(result.paymentStatus()).isEqualTo(PaymentStatus.SUCCEEDED);
-        assertThat(result.shipping()).isEqualTo(new OrderShippingResponse(null, null, null));
+        assertThat(result.shipping()).isEqualTo(new OrderShippingResponse(null, null, null, null));
         verify(orderRepository).ownsDrop(SELLER_ID, 42L);
     }
 
