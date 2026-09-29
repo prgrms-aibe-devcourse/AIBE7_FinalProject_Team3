@@ -20,6 +20,7 @@ import org.springframework.validation.beanvalidation.SpringValidatorAdapter;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -115,12 +116,13 @@ class ValidationErrorCodeResolverTest {
     }
 
     // 검증기가 선언과 반대 순서로 위반을 보고한 상황을 만든다
+    // 검증기가 보고하는 순서는 보장되지 않으므로, 받은 순서를 뒤집지 않고 필드 이름 역순으로 다시 담아 선언 순서와 어긋나게 만든다
     private static BindingResult validateInReverseOrder(Object target) {
-        List<FieldError> fieldErrors = validate(target).getFieldErrors();
+        List<FieldError> fieldErrors = validate(target).getFieldErrors().stream()
+                .sorted(Comparator.comparing(FieldError::getField).reversed())
+                .toList();
         BeanPropertyBindingResult reversed = new BeanPropertyBindingResult(target, "request");
-        for (int i = fieldErrors.size() - 1; i >= 0; i--) {
-            reversed.addError(fieldErrors.get(i));
-        }
+        fieldErrors.forEach(reversed::addError);
         return reversed;
     }
 
