@@ -47,8 +47,9 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
 
     /*
      * 공개 DROP 목록 조회(DISC-001·002·003, STOCK-006).
-     * Wish 엔티티가 아직 없어(GR-53) wishes를 네이티브로 참조하고, 목록에 필요한 값
+     * 썸네일(LIMIT 1)·ILIKE ESCAPE·컬럼명 기준 정렬 때문에 네이티브로 작성하고, 목록에 필요한 값
      * (minPrice·soldOut·wishCount·thumbnailUrl)을 한 쿼리 안에서 서브쿼리로 계산해 N+1을 막는다.
+     * 활성 WISH 집계(canceled_at IS NULL)는 WishRepository 대신 같은 쿼리 안에서 네이티브로 센다.
      * PostgreSQL은 네이티브 쿼리의 null 파라미터 타입을 추론하지 못하므로 CAST로 타입을 지정한다.
      * soldOut 판정식은 SELECT와 WHERE 두 곳에 중복되므로 한쪽만 바꾸지 않도록 주의한다.
      * statuses는 서비스가 채워 넘기며 DRAFT·CANCELED는 들어오지 않는다. 카테고리는 INNER JOIN이다.
