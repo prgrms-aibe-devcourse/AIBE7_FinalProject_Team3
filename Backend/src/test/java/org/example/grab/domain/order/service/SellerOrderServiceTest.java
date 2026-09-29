@@ -206,7 +206,7 @@ class SellerOrderServiceTest {
         var request = new ShipmentRegisterRequest("CJ대한통운", "1234567890");
         Order order = createOrder();
         ReflectionTestUtils.setField(order, "id", 100L);
-        ReflectionTestUtils.setField(order, "status", OrderStatus.SHIPPED);
+        ReflectionTestUtils.setField(order, "status", OrderStatus.DELIVERED);
         var hash = shipmentRequestHasher.hash(request).value();
         Shipment shipment = Shipment.register(order, request.carrier(), request.trackingNumber(),
                 "123e4567-e89b-12d3-a456-426614174000", hash, OffsetDateTime.now());

@@ -83,13 +83,18 @@ public class SellerOrderService {
         }
 
         Optional<Shipment> existingShipment = shipmentRepository.findByOrderId(order.getId());
+
+        // 해당 주문에 배송 정보가 이미 있는지
         if (existingShipment.isPresent()) {
             Shipment shipment = existingShipment.get();
+            // 기존 배송 정보의 키와 요청 키가 같으면 같은 요청 키를 사용한 재시도로 봄
             if (idempotencyKey.value().equals(shipment.getIdempotencyKey())) {
+                // 멱등성 키는 같은데 요청 내용이 다르면 DUPLICATE_IDEMPOTENCY_KEY 오류 던짐
                 if (!requestHash.value().equals(shipment.getRequestHash())) {
                     throw new BusinessException(CommonErrorCode.DUPLICATE_IDEMPOTENCY_KEY);
                 }
-                return new OrderStatusResponse(order.getUuid(), order.getStatus().name());
+                // 송장 재요청 시 최초 응답 상태인 SHIPPED 반환
+                return new OrderStatusResponse(order.getUuid(), OrderStatus.SHIPPED.name());
             }
             throw new BusinessException(CommonErrorCode.ORDER_STATUS_CONFLICT);
         }
