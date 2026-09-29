@@ -17,6 +17,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class GlobalExceptionHandler {
 
+    // 바인딩 실패의 기본 문구는 변환 예외 메시지라 거부된 입력값이 섞이므로 고정 문구로 바꾼다
+    static final String BINDING_FAILURE_REASON = "값의 형식이 올바르지 않습니다.";
+
     private final ValidationErrorCodeResolver validationErrorCodeResolver;
 
     @ExceptionHandler(BusinessException.class)
@@ -60,7 +63,8 @@ public class GlobalExceptionHandler {
         ValidationFailure failure = validationErrorCodeResolver.resolve(e.getBindingResult());
         ErrorCode errorCode = failure.errorCode();
         List<ErrorResponse.FieldError> fieldErrors = failure.fieldErrors().stream()
-                .map(error -> new ErrorResponse.FieldError(error.getField(), error.getDefaultMessage()))
+                .map(error -> new ErrorResponse.FieldError(error.getField(),
+                        error.isBindingFailure() ? BINDING_FAILURE_REASON : error.getDefaultMessage()))
                 .toList();
         log.warn("요청 값 검증 실패: {} - {}", errorCode.getCode(), fieldErrors);
         return ResponseEntity.status(errorCode.getStatus())

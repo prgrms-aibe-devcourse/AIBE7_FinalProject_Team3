@@ -20,6 +20,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -259,6 +260,20 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("바인딩 실패 필드 오류는 변환 예외 문구 대신 고정 사유로 응답하고 입력값을 담지 않는다")
+    // 바인딩 실패의 기본 문구에는 거부된 입력값이 섞인다(GR-28 M07-07)
+    void respondsWithFixedReasonForBindingFailure() throws Exception {
+        mockMvc.perform(get("/test/binding").param("count", SECRET_INPUT))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.error.fieldErrors[0].field").value("count"))
+                .andExpect(jsonPath("$.error.fieldErrors[0].reason").value(GlobalExceptionHandler.BINDING_FAILURE_REASON))
+                .andExpect(content().string(not(containsString(SECRET_INPUT))));
+
+        assertLoggedWithoutSecretInput();
+    }
+
+    @Test
     @DisplayName("요청 파라미터 타입 오류는 400 INVALID_REQUEST로 응답한다")
     void handlesParameterTypeMismatch() throws Exception {
         mockMvc.perform(get("/test/type").param("page", "abc"))
@@ -302,6 +317,10 @@ class GlobalExceptionHandlerTest {
 
         @PostMapping("/test/number")
         void number(@RequestBody NumberRequest request) {
+        }
+
+        @GetMapping("/test/binding")
+        void binding(@ModelAttribute NumberRequest request) {
         }
 
         @GetMapping("/test/type")
