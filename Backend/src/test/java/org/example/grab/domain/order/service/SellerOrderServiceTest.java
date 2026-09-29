@@ -1,5 +1,6 @@
 package org.example.grab.domain.order.service;
 
+import org.example.grab.domain.order.dto.OrderShippingResponse;
 import org.example.grab.domain.order.dto.SellerOrderListResponse;
 import org.example.grab.domain.order.dto.SellerOrderDetailResponse;
 import org.example.grab.domain.order.dto.SellerOrderListProjection;
@@ -44,7 +45,7 @@ class SellerOrderServiceTest {
     private final ShipmentRepository shipmentRepository = mock(ShipmentRepository.class);
     private final ShipmentRequestHasher shipmentRequestHasher = new ShipmentRequestHasher();
     private final SellerOrderService sellerOrderService = new SellerOrderService(
-            orderRepository, orderItemRepository, shipmentRepository, shipmentRequestHasher);
+            orderRepository, new OrderDetailReader(orderRepository, orderItemRepository, shipmentRepository));
 
     @Test
     void returnsOrderDetailsForOwnedOrder() {
@@ -68,8 +69,8 @@ class SellerOrderServiceTest {
             assertThat(detail.optionName()).isEqualTo("검정 / L");
             assertThat(detail.subtotal()).isEqualTo(30000);
         });
-        assertThat(result.paymentStatus()).isEqualTo("SUCCEEDED");
-        assertThat(result.shipping()).isEqualTo(new SellerOrderDetailResponse.ShippingResponse(null, null, null));
+        assertThat(result.paymentStatus()).isEqualTo(PaymentStatus.SUCCEEDED);
+        assertThat(result.shipping()).isEqualTo(new OrderShippingResponse(null, null, null, null));
         verify(orderRepository).ownsDrop(SELLER_ID, 42L);
     }
 

@@ -9,7 +9,6 @@ import org.example.grab.domain.order.entity.Order;
 import org.example.grab.domain.order.entity.OrderStatus;
 import org.example.grab.domain.order.entity.PaymentStatus;
 import org.example.grab.domain.order.error.OrderErrorCode;
-import org.example.grab.domain.order.repository.OrderItemRepository;
 import org.example.grab.domain.order.repository.OrderRepository;
 import org.example.grab.domain.shipment.dto.ShipmentRegisterRequest;
 import org.example.grab.domain.shipment.entity.Shipment;
@@ -38,9 +37,7 @@ import java.util.UUID;
 public class SellerOrderService {
 
     private final OrderRepository orderRepository;
-    private final OrderItemRepository orderItemRepository;
-    private final ShipmentRepository shipmentRepository;
-    private final ShipmentRequestHasher shipmentRequestHasher;
+    private final OrderDetailReader orderDetailReader;
 
     public SellerOrderDetailResponse findOrder(long sellerId, UUID orderId) {
         Order order = orderRepository.findByUuid(orderId)
@@ -49,11 +46,12 @@ public class SellerOrderService {
             throw new BusinessException(OrderErrorCode.ORDER_ACCESS_DENIED);
         }
 
+        OrderDetailReader.OrderDetail detail = orderDetailReader.read(order);
         return SellerOrderDetailResponse.from(
                 order,
-                orderItemRepository.findAllByOrderIdOrderByIdAsc(order.getId()),
-                orderRepository.findLatestPaymentStatus(order.getId()).orElse(null),
-                shipmentRepository.findByOrderId(order.getId()).orElse(null));
+                detail.items(),
+                detail.paymentStatus(),
+                detail.shipment());
     }
 
     @Transactional
