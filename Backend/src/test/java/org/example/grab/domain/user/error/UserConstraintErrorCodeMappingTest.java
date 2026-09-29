@@ -7,6 +7,7 @@ import org.example.grab.global.error.CommonErrorCode;
 import org.example.grab.global.error.ErrorCode;
 import org.example.grab.global.error.ValidationErrorCodeResolver;
 import org.example.grab.global.error.ValidationFailure;
+import org.example.grab.global.validation.SensitiveValueMaskingValidator;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -174,5 +175,30 @@ class UserConstraintErrorCodeMappingTest {
         // then
         assertThat(first).hasSize(3).startsWith("VALIDATION_FAILED");
         assertThat(repeated).allSatisfy(result -> assertThat(result).isEqualTo(first));
+    }
+
+    @Test
+    @DisplayName("비밀번호의 거부된 값은 가려도 INVALID_PASSWORD로 분류하고, 닉네임은 가리지 않는다")
+    // 운영 검증기는 @SensitiveValue 필드의 rejectedValue를 가린다(GR-28 M07-07). 오류 코드 선택이 원본 위반으로 유지되는지 확인한다
+    void masksPasswordWithoutChangingErrorCode() {
+        // given
+        SensitiveValueMaskingValidator maskingValidator = new SensitiveValueMaskingValidator();
+        maskingValidator.afterPropertiesSet();
+        SignupRequest request = new SignupRequest("short1!", "a");
+        BeanPropertyBindingResult result = new BeanPropertyBindingResult(request, "signupRequest");
+
+        // when
+        try {
+            maskingValidator.validate(request, result);
+        } finally {
+            maskingValidator.close();
+        }
+
+        // then
+        FieldError passwordError = result.getFieldError("password");
+        assertThat(passwordError.getRejectedValue()).isEqualTo(SensitiveValueMaskingValidator.MASKED_VALUE);
+        assertThat(passwordError.toString()).doesNotContain("short1!");
+        assertThat(resolver.resolve(passwordError)).isEqualTo(UserErrorCode.INVALID_PASSWORD);
+        assertThat(result.getFieldError("nickname").getRejectedValue()).isEqualTo("a");
     }
 }
