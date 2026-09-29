@@ -6,6 +6,7 @@ import jakarta.validation.ConstraintValidatorContext;
 import jakarta.validation.Payload;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import org.example.grab.global.common.ErrorResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -57,6 +58,32 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("ACCESS_DENIED"))
                 .andExpect(jsonPath("$.error.message").value("접근 권한이 없습니다."))
+                .andExpect(jsonPath("$.error.fieldErrors").isEmpty());
+    }
+
+    @Test
+    @DisplayName("필드 오류를 담은 BusinessException은 ErrorCode의 상태·코드와 전달한 필드 오류로 응답한다")
+    // 검증 실패의 400·코드 선택 로직이 도메인 예외의 상태와 필드 오류를 바꾸지 않는지 확인하는 테스트(GR-28 M07-04)
+    void handlesBusinessExceptionWithFieldErrors() throws Exception {
+        mockMvc.perform(post("/test/business-field-errors"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("INVALID_STATE_TRANSITION"))
+                .andExpect(jsonPath("$.error.message").value("허용되지 않은 상태 전이입니다."))
+                .andExpect(jsonPath("$.error.fieldErrors.length()").value(2))
+                .andExpect(jsonPath("$.error.fieldErrors[0].field").value("status"))
+                .andExpect(jsonPath("$.error.fieldErrors[0].reason").value("현재 상태에서 바꿀 수 없습니다."))
+                .andExpect(jsonPath("$.error.fieldErrors[1].field").value("options[0]"))
+                .andExpect(jsonPath("$.error.fieldErrors[1].reason").value("옵션이 올바르지 않습니다."));
+    }
+
+    @Test
+    @DisplayName("메시지를 지정한 BusinessException은 ErrorCode의 기본 메시지 대신 지정한 메시지로 응답한다")
+    void handlesBusinessExceptionWithCustomMessage() throws Exception {
+        mockMvc.perform(post("/test/business-message"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"))
+                .andExpect(jsonPath("$.error.message").value("주문을 찾을 수 없습니다."))
                 .andExpect(jsonPath("$.error.fieldErrors").isEmpty());
     }
 
@@ -143,6 +170,18 @@ class GlobalExceptionHandlerTest {
         @PostMapping("/test/business")
         void business() {
             throw new BusinessException(CommonErrorCode.ACCESS_DENIED);
+        }
+
+        @PostMapping("/test/business-field-errors")
+        void businessWithFieldErrors() {
+            throw new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION, List.of(
+                    new ErrorResponse.FieldError("status", "현재 상태에서 바꿀 수 없습니다."),
+                    new ErrorResponse.FieldError("options[0]", "옵션이 올바르지 않습니다.")));
+        }
+
+        @PostMapping("/test/business-message")
+        void businessWithMessage() {
+            throw new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND, "주문을 찾을 수 없습니다.");
         }
 
         @PostMapping("/test/validation")
