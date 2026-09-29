@@ -83,7 +83,12 @@ GET /api/v1/orders?status=PAID&page=0&size=20
 
 - **인증**: 필요 (`USER`)
 
-> 본인 주문만 반환합니다.
+> 본인 주문만 최신 주문순으로 반환합니다.
+
+**쿼리 파라미터:**
+- `status`: 주문 상태 (선택, 예: `PAID`)
+- `page`: 페이지 번호 (기본값 `0`)
+- `size`: 페이지 크기 (기본값 `20`, 최대 `100`)
 
 **응답:**
 
@@ -95,6 +100,7 @@ GET /api/v1/orders?status=PAID&page=0&size=20
       {
         "orderId": "b2d4f6a8-1c3e-4a5b-8c7d-9e0f1a2b3c4d",
         "orderNumber": "ORD-20260918-000500",
+        "productName": "한정판 스니커즈",
         "status": "PAID",
         "totalAmount": 261000,
         "orderedAt": "2026-09-18T14:00:00+09:00"
@@ -138,8 +144,11 @@ GET /api/v1/orders/{orderId}
         "subtotal": 258000
       }
     ],
+    "itemsAmount": 258000,
+    "shippingAmount": 3000,
     "totalAmount": 261000,
     "paymentStatus": "SUCCEEDED",
+    "paymentExpiresAt": null,
     "shipping": {
       "status": null,
       "carrier": null,
@@ -149,6 +158,14 @@ GET /api/v1/orders/{orderId}
   }
 }
 ```
+
+- `paymentExpiresAt`은 `PAYMENT_PENDING` 주문에서만 결제 마감 시각을 담고, 그 외 상태에서는 `null`입니다.
+- `paymentStatus`는 최근 결제 시도의 상태이며, 결제 시도가 없으면 `null`입니다.
+- `shipping`은 배송 정보가 등록되기 전까지 모든 값이 `null`입니다.
+
+**오류 코드:**
+- `ORDER_NOT_FOUND`: 주문이 없거나 다른 사용자의 주문인 경우. 주문 존재 여부를 노출하지 않도록 두 경우를 구분하지 않습니다.
+- `RESOURCE_NOT_FOUND`: 주문 ID 형식이 올바르지 않은 경우
 
 ### 1.4 주문 취소
 
