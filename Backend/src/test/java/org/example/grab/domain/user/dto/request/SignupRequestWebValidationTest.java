@@ -1,5 +1,9 @@
 package org.example.grab.domain.user.dto.request;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import jakarta.validation.Valid;
 import org.example.grab.domain.user.error.UserConstraintErrorCodeMapping;
 import org.example.grab.global.common.ApiResponse;
@@ -11,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -21,12 +26,16 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -38,7 +47,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SignupRequestWebValidationTest {
 
     private static final String SIGNUP_PATH = "/test/signup";
+    private static final String VALID_PASSWORD = "Password1!";
     private static final String VALID_NICKNAME = "드롭헌터";
+    // 응답·로그 노출 검사용 비밀번호. 특수문자를 맨 뒤에 둬서, 따옴표 없는 값의 파싱 오류가 잘라 보여 주는 토큰(SECRET_TOKEN)도 비밀번호 대부분이 되게 한다
+    private static final String SECRET_TOKEN = "SecretPw12";
+    private static final String SECRET_PASSWORD = SECRET_TOKEN + "#";
+
+    private static final String VALIDATION_FAILED_MESSAGE = "요청 값 검증에 실패했습니다.";
+    private static final String INVALID_NICKNAME_MESSAGE = "닉네임이 규칙을 충족하지 않습니다.";
+    private static final String INVALID_REQUEST_MESSAGE = "요청 형식이 올바르지 않습니다.";
+
+    private static final String PASSWORD_REQUIRED_REASON = "비밀번호는 필수입니다.";
+    private static final String NICKNAME_REQUIRED_REASON = "닉네임은 필수입니다.";
+    private static final String NICKNAME_LENGTH_REASON = "닉네임은 2자 이상 10자 이하여야 합니다.";
+    private static final String NICKNAME_CHARACTER_SET_REASON = "닉네임은 한글, 영문, 숫자, 밑줄(_)만 사용할 수 있습니다.";
 
     private static final String LENGTH_REASON = "비밀번호는 8자 이상 64자 이하여야 합니다.";
     private static final String WHITESPACE_REASON = "비밀번호에 공백을 포함할 수 없습니다.";
@@ -67,6 +89,23 @@ class SignupRequestWebValidationTest {
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler(resolver))
                 .build();
+    }
+
+    // 각 인자는 JSON 값 표현이다(문자열은 json()으로 감싼다). null이면 해당 키를 본문에서 뺀다
+    private static String body(String passwordJson, String nicknameJson) {
+        List<String> members = new ArrayList<>();
+        if (passwordJson != null) {
+            members.add("\"password\":" + passwordJson);
+        }
+        if (nicknameJson != null) {
+            members.add("\"nickname\":" + nicknameJson);
+        }
+        return "{" + String.join(",", members) + "}";
+    }
+
+    // 따옴표·역슬래시처럼 JSON 이스케이프가 필요한 문자는 호출하는 쪽에서 이스케이프해 넘긴다
+    private static String json(String value) {
+        return "\"" + value + "\"";
     }
 
     private ResultActions postSignup(String body) throws Exception {
@@ -148,5 +187,207 @@ class SignupRequestWebValidationTest {
                 .andExpect(jsonPath("$.error.fieldErrors[0].reason").value(expectedReason));
 
         assertThat(controller.received).isNull();
+    }
+
+    // M08-05. 필수값 누락: 키 누락·null·빈 문자열, 닉네임은 앞뒤 공백 제거 후 빈 값까지 VALIDATION_FAILED다(M00-02)
+    static Stream<Arguments> requiredFieldViolations() {
+        return Stream.of(
+                Arguments.of("비밀번호 키 누락", body(null, json(VALID_NICKNAME)), "password", PASSWORD_REQUIRED_REASON),
+                Arguments.of("비밀번호 null", body("null", json(VALID_NICKNAME)), "password", PASSWORD_REQUIRED_REASON),
+                Arguments.of("비밀번호 빈 문자열", body(json(""), json(VALID_NICKNAME)), "password", PASSWORD_REQUIRED_REASON),
+                Arguments.of("닉네임 키 누락", body(json(VALID_PASSWORD), null), "nickname", NICKNAME_REQUIRED_REASON),
+                Arguments.of("닉네임 null", body(json(VALID_PASSWORD), "null"), "nickname", NICKNAME_REQUIRED_REASON),
+                Arguments.of("닉네임 빈 문자열", body(json(VALID_PASSWORD), json("")), "nickname", NICKNAME_REQUIRED_REASON),
+                Arguments.of("닉네임 스페이스만", body(json(VALID_PASSWORD), json("   ")), "nickname", NICKNAME_REQUIRED_REASON),
+                Arguments.of("닉네임 탭·스페이스만", body(json(VALID_PASSWORD), json(" \\t ")), "nickname", NICKNAME_REQUIRED_REASON),
+                Arguments.of("닉네임 전각 스페이스만", body(json(VALID_PASSWORD), json("　　")), "nickname", NICKNAME_REQUIRED_REASON)
+        );
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("requiredFieldViolations")
+    @DisplayName("필수값이 없으면 400, VALIDATION_FAILED, 해당 필드의 필수값 사유 하나로 응답한다")
+    void respondsWithValidationFailedForMissingRequiredField(
+            String description, String body, String expectedField, String expectedReason) throws Exception {
+        // when & then
+        postSignup(body)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.error.message").value(VALIDATION_FAILED_MESSAGE))
+                .andExpect(jsonPath("$.error.fieldErrors.length()").value(1))
+                .andExpect(jsonPath("$.error.fieldErrors[0].field").value(expectedField))
+                .andExpect(jsonPath("$.error.fieldErrors[0].reason").value(expectedReason));
+
+        assertThat(controller.received).isNull();
+    }
+
+    // M08-05. 닉네임 규칙: 앞뒤 공백 제거 후 코드 포인트 2~10자, 한글(완성형)·영문·숫자·밑줄만 허용한다
+    static Stream<Arguments> nicknamePolicyViolations() {
+        return Stream.of(
+                Arguments.of("1자", "드", NICKNAME_LENGTH_REASON),
+                Arguments.of("11자", "가".repeat(11), NICKNAME_LENGTH_REASON),
+                Arguments.of("앞뒤 공백 제거 후 1자", " 드 ", NICKNAME_LENGTH_REASON),
+                Arguments.of("중간 공백", "드롭 헌터", NICKNAME_CHARACTER_SET_REASON),
+                Arguments.of("허용 외 특수문자", "드롭-헌터", NICKNAME_CHARACTER_SET_REASON),
+                Arguments.of("자모만 있는 한글", "ㄱㄴ", NICKNAME_CHARACTER_SET_REASON),
+                Arguments.of("이모지", "드롭😀", NICKNAME_CHARACTER_SET_REASON)
+        );
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("nicknamePolicyViolations")
+    @DisplayName("닉네임 규칙만 위반하면 400, INVALID_NICKNAME, nickname 필드 오류 하나로 응답한다")
+    void respondsWithInvalidNicknameForNicknamePolicyViolation(
+            String description, String nickname, String expectedReason) throws Exception {
+        // when & then
+        postSignup(body(json(VALID_PASSWORD), json(nickname)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("INVALID_NICKNAME"))
+                .andExpect(jsonPath("$.error.message").value(INVALID_NICKNAME_MESSAGE))
+                .andExpect(jsonPath("$.error.fieldErrors.length()").value(1))
+                .andExpect(jsonPath("$.error.fieldErrors[0].field").value("nickname"))
+                .andExpect(jsonPath("$.error.fieldErrors[0].reason").value(expectedReason));
+
+        assertThat(controller.received).isNull();
+    }
+
+    // M08-06. 여러 필드 동시 위반: 필드마다 사유 하나, password → nickname 순서, 코드가 섞이면 VALIDATION_FAILED(M00-05, T09)
+    static Stream<Arguments> multipleFieldViolations() {
+        return Stream.of(
+                Arguments.of("비밀번호 문자 조합 + 닉네임 허용 문자",
+                        body(json("Password1"), json("드롭-헌터")), COMPOSITION_REASON, NICKNAME_CHARACTER_SET_REASON),
+                Arguments.of("비밀번호 누락 + 닉네임 누락",
+                        "{}", PASSWORD_REQUIRED_REASON, NICKNAME_REQUIRED_REASON),
+                Arguments.of("비밀번호 길이 + 닉네임 누락",
+                        body(json("Pass1!a"), null), LENGTH_REASON, NICKNAME_REQUIRED_REASON),
+                Arguments.of("비밀번호 null + 닉네임 길이",
+                        body("null", json("드")), PASSWORD_REQUIRED_REASON, NICKNAME_LENGTH_REASON),
+                Arguments.of("비밀번호 공백만 + 닉네임 공백만",
+                        body(json("        "), json("   ")), WHITESPACE_REASON, NICKNAME_REQUIRED_REASON),
+                // 본문의 키 순서와 관계없이 password → nickname 순서로 담는다
+                Arguments.of("본문에서 닉네임을 먼저 적은 경우",
+                        "{\"nickname\":\"드롭-헌터\",\"password\":\"Password1\"}", COMPOSITION_REASON, NICKNAME_CHARACTER_SET_REASON)
+        );
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("multipleFieldViolations")
+    @DisplayName("여러 필드가 함께 잘못되면 VALIDATION_FAILED와 password, nickname 순서의 사유를 누락 없이 담는다")
+    void respondsWithAllFieldReasonsForMultipleViolations(
+            String description, String body, String passwordReason, String nicknameReason) throws Exception {
+        // when & then
+        postSignup(body)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.error.message").value(VALIDATION_FAILED_MESSAGE))
+                .andExpect(jsonPath("$.error.fieldErrors.length()").value(2))
+                .andExpect(jsonPath("$.error.fieldErrors[0].field").value("password"))
+                .andExpect(jsonPath("$.error.fieldErrors[0].reason").value(passwordReason))
+                .andExpect(jsonPath("$.error.fieldErrors[1].field").value("nickname"))
+                .andExpect(jsonPath("$.error.fieldErrors[1].reason").value(nicknameReason));
+
+        assertThat(controller.received).isNull();
+    }
+
+    // M08-07. 요청 본문 오류: 본문이 없거나 JSON으로 해석할 수 없으면 INVALID_REQUEST, fieldErrors는 빈 배열이다(MEMBER_AUTH.md 1.2.3)
+    static Stream<Arguments> unreadableBodies() {
+        return Stream.of(
+                Arguments.of("빈 본문", ""),
+                Arguments.of("공백만 있는 본문", "   "),
+                Arguments.of("닫히지 않은 JSON", "{\"password\":\"" + SECRET_PASSWORD + "\",\"nickname\":\"드롭헌터\""),
+                Arguments.of("따옴표 없는 값", "{\"password\":" + SECRET_PASSWORD + ",\"nickname\":\"드롭헌터\"}"),
+                Arguments.of("객체가 아닌 배열", "[\"" + SECRET_PASSWORD + "\"]"),
+                Arguments.of("문자열 필드에 객체", "{\"password\":{\"value\":\"" + SECRET_PASSWORD + "\"},\"nickname\":\"드롭헌터\"}")
+        );
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("unreadableBodies")
+    @DisplayName("본문이 없거나 JSON으로 해석할 수 없으면 400, INVALID_REQUEST, 빈 fieldErrors의 공통 오류 구조로 응답한다")
+    void respondsWithInvalidRequestForUnreadableBody(String description, String body) throws Exception {
+        // when & then
+        postSignup(body)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.data").value(nullValue()))
+                .andExpect(jsonPath("$.error.length()").value(3))
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"))
+                .andExpect(jsonPath("$.error.message").value(INVALID_REQUEST_MESSAGE))
+                .andExpect(jsonPath("$.error.fieldErrors").isArray())
+                .andExpect(jsonPath("$.error.fieldErrors").isEmpty())
+                .andExpect(content().string(not(containsString(SECRET_TOKEN))));
+
+        assertThat(controller.received).isNull();
+    }
+
+    // M08-08. 비밀번호 원문이 섞인 요청: 성공과 아래 실패 요청을 모두 다룬다
+    static Stream<Arguments> requestsContainingSecretPassword() {
+        return Stream.concat(
+                Stream.of(Arguments.of("유효한 요청", body(json(SECRET_PASSWORD), json(VALID_NICKNAME)))),
+                invalidRequestsContainingSecretPassword());
+    }
+
+    // M08-08·09. 비밀번호 원문이 섞인 실패 요청: 규칙 위반, 다중 위반, 본문 해석 실패
+    static Stream<Arguments> invalidRequestsContainingSecretPassword() {
+        return Stream.of(
+                Arguments.of("비밀번호 공백 위반", body(json(SECRET_PASSWORD + " "), json(VALID_NICKNAME))),
+                Arguments.of("비밀번호 허용 문자 위반", body(json(SECRET_PASSWORD + "한"), json(VALID_NICKNAME))),
+                Arguments.of("비밀번호 길이 위반", body(json(SECRET_PASSWORD + "a".repeat(60)), json(VALID_NICKNAME))),
+                Arguments.of("비밀번호 유효 + 닉네임 위반", body(json(SECRET_PASSWORD), json("드롭-헌터"))),
+                Arguments.of("비밀번호·닉네임 동시 위반", body(json(SECRET_PASSWORD + " "), json("드"))),
+                Arguments.of("닫히지 않은 JSON", "{\"password\":\"" + SECRET_PASSWORD + "\",\"nickname\":\"드롭헌터\""),
+                Arguments.of("따옴표 없는 값", "{\"password\":" + SECRET_PASSWORD + ",\"nickname\":\"드롭헌터\"}"),
+                Arguments.of("닉네임 타입 불일치", "{\"password\":\"" + SECRET_PASSWORD + "\",\"nickname\":{\"value\":1}}")
+        );
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("requestsContainingSecretPassword")
+    @DisplayName("응답 본문에 비밀번호 원문과 비밀번호 해시 필드가 없다")
+    // 테스트 전용 Controller는 data를 비워 응답하므로, 실제 회원가입 응답 DTO의 해시 미포함은 GR-29·GR-30에서 확인한다
+    void excludesPasswordAndHashFromResponse(String description, String body) throws Exception {
+        // when & then
+        postSignup(body)
+                .andExpect(content().string(not(containsString(SECRET_TOKEN))))
+                .andExpect(content().string(not(containsString("passwordHash"))))
+                .andExpect(content().string(not(containsString("password_hash"))));
+    }
+
+    /*
+        운영 로그 레벨(org.springframework INFO)에서 검증·파싱 실패 로그에 비밀번호가 없는지 확인한다.
+        org.springframework를 DEBUG로 올리면 Spring 내부 로그가 검증 예외의 rejected value와 JSON 파싱 오류 토큰을 기록해
+        비밀번호가 남을 수 있다. 이 경로는 코드로 막지 않고 운영에서 프레임워크 DEBUG를 켜지 않는 정책으로 다룬다(GR-28 M07-07).
+     */
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("invalidRequestsContainingSecretPassword")
+    @DisplayName("운영 로그 레벨에서 검증·파싱 실패 로그에 비밀번호 원문이 없다")
+    void doesNotLogPassword(String description, String body) throws Exception {
+        // given
+        Logger rootLogger = (Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
+        Logger springLogger = (Logger) LoggerFactory.getLogger("org.springframework");
+        Level previousSpringLevel = springLogger.getLevel();
+        ListAppender<ILoggingEvent> logAppender = new ListAppender<>();
+        logAppender.start();
+        rootLogger.addAppender(logAppender);
+        springLogger.setLevel(Level.INFO);
+
+        // when
+        try {
+            postSignup(body);
+        } finally {
+            rootLogger.detachAppender(logAppender);
+            springLogger.setLevel(previousSpringLevel);
+        }
+
+        // then
+        // 전역 예외 처리기의 실패 로그가 실제로 캡처됐는지 함께 확인해, 로그가 없어서 통과하는 경우를 막는다
+        assertThat(logAppender.list)
+                .anyMatch(event -> event.getLoggerName().equals(GlobalExceptionHandler.class.getName()));
+        assertThat(logAppender.list)
+                .extracting(ILoggingEvent::getFormattedMessage)
+                .noneMatch(message -> message.contains(SECRET_TOKEN));
     }
 }
