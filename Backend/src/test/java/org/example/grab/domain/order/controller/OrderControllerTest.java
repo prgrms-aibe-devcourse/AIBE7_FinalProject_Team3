@@ -4,6 +4,8 @@ import org.example.grab.domain.order.dto.MyOrderDetailResponse;
 import org.example.grab.domain.order.dto.MyOrderListResponse;
 import org.example.grab.domain.order.dto.OrderCreateRequest;
 import org.example.grab.domain.order.dto.OrderCreateResponse;
+import org.example.grab.domain.order.dto.OrderItemResponse;
+import org.example.grab.domain.order.dto.OrderShippingResponse;
 import org.example.grab.domain.order.entity.OrderStatus;
 import org.example.grab.domain.order.entity.PaymentStatus;
 import org.example.grab.domain.order.error.OrderErrorCode;
@@ -152,13 +154,13 @@ class OrderControllerTest {
                 orderId,
                 "ORD-20260928-ABC",
                 OrderStatus.PAYMENT_PENDING,
-                List.of(new MyOrderDetailResponse.Item("상품", "블랙 / M", 129000, 2, 258000)),
+                List.of(new OrderItemResponse("상품", "블랙 / M", 129000, 2, 258000)),
                 258000,
                 3000,
                 261000,
                 PaymentStatus.PENDING,
                 OffsetDateTime.parse("2026-09-28T12:10:00Z"),
-                new MyOrderDetailResponse.Shipping(null, null, null),
+                new OrderShippingResponse(null, null, null, null),
                 OffsetDateTime.parse("2026-09-28T12:00:00Z")
         );
         given(currentUserIdProvider.currentUserId()).willReturn(1L);
