@@ -1,6 +1,7 @@
 package org.example.grab.global.error;
 
 import jakarta.validation.ConstraintViolation;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
@@ -29,6 +30,11 @@ public class ValidationErrorCodeResolver {
 
         for (ConstraintErrorCodeMapping mapping : mappings) {
             mapping.errorCodes().forEach((constraint, errorCode) -> {
+                // 요청 검증 실패는 HTTP 400으로 응답해야 하므로(COMMON.md 1.6), 다른 상태의 코드를 매핑하면 상태와 코드가 어긋난 응답이 나간다
+                if (errorCode.getStatus() != HttpStatus.BAD_REQUEST) {
+                    throw new IllegalStateException("제약 " + constraint.getName() + "에는 HTTP 400 오류 코드만 등록할 수 있습니다: "
+                            + errorCode.getCode() + "(" + errorCode.getStatus().value() + ")");
+                }
                 // 두 도메인이 같은 제약에 서로 다른 코드를 등록하면 응답 코드가 등록 순서에 따라 달라지므로 기동 시 실패시킨다
                 // putIfAbsent(키, 값)은 이 키가 merged 맵에 없을 때만 넣음
                 ErrorCode previous = merged.putIfAbsent(constraint, errorCode);

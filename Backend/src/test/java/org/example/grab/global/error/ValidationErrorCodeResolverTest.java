@@ -211,6 +211,20 @@ class ValidationErrorCodeResolverTest {
     }
 
     @Test
+    @DisplayName("HTTP 400이 아닌 오류 코드를 매핑하면 생성 시점에 실패한다")
+    // 검증 실패 응답의 상태가 항상 400이 되도록 기동 단계에서 막는지 확인하는 테스트(GR-28 M07-03)
+    void rejectsNonBadRequestMapping() {
+        // given
+        List<ConstraintErrorCodeMapping> mappings = List.of(mapping(CommonErrorCode.INVALID_STATE_TRANSITION));
+
+        // when & then
+        assertThatThrownBy(() -> new ValidationErrorCodeResolver(mappings))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("INVALID_STATE_TRANSITION")
+                .hasMessageContaining("409");
+    }
+
+    @Test
     @DisplayName("필드 오류의 코드가 모두 같으면 그 코드를 최상위 코드로 쓴다")
     void selectsCommonCodeWhenAllFieldErrorsMatch() {
         // when
