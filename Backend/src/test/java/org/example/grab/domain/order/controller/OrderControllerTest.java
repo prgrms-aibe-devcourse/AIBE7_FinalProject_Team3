@@ -14,6 +14,7 @@ import org.example.grab.domain.order.service.OrderQueryService;
 import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.GlobalExceptionHandler;
+import org.example.grab.global.error.ValidationErrorCodeResolver;
 import org.example.grab.global.security.CurrentUserIdProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -50,7 +51,7 @@ class OrderControllerTest {
         orderQueryService = mock(OrderQueryService.class);
         currentUserIdProvider = mock(CurrentUserIdProvider.class);
         mockMvc = MockMvcBuilders.standaloneSetup(new OrderController(orderCreateService, orderQueryService, currentUserIdProvider))
-                .setControllerAdvice(new GlobalExceptionHandler())
+                .setControllerAdvice(new GlobalExceptionHandler(new ValidationErrorCodeResolver(List.of())))
                 .build();
     }
 

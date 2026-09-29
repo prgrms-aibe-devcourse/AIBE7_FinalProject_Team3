@@ -7,6 +7,7 @@ import org.example.grab.domain.order.entity.OrderStatus;
 import org.example.grab.domain.order.entity.PaymentStatus;
 import org.example.grab.domain.order.service.SellerOrderService;
 import org.example.grab.global.error.GlobalExceptionHandler;
+import org.example.grab.global.error.ValidationErrorCodeResolver;
 import org.example.grab.global.security.CurrentSellerIdProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,7 @@ class SellerOrderControllerTest {
     private final CurrentSellerIdProvider currentSellerIdProvider = mock(CurrentSellerIdProvider.class);
     private final MockMvc mockMvc = MockMvcBuilders
             .standaloneSetup(new SellerOrderController(sellerOrderService, currentSellerIdProvider))
-            .setControllerAdvice(new GlobalExceptionHandler())
+            .setControllerAdvice(new GlobalExceptionHandler(new ValidationErrorCodeResolver(List.of())))
             .build();
 
     @Test
