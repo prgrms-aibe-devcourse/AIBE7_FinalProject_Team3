@@ -88,6 +88,8 @@ GET /api/v1/drops
 > - `wishCount`는 취소되지 않은(`canceled_at IS NULL`) WISH 수입니다.
 > - `thumbnailUrl`은 `sort_order`가 가장 작은 이미지이며, 이미지가 없으면 `null`입니다.
 > - 정렬 값이 같으면 `id` 내림차순으로 정렬합니다. `minPrice`·`wishCount` 정렬은 지원하지 않습니다.
+>
+> `status`는 저장된 DROP 상태 기준입니다. 판매 시작 시각(`saleStartsAt`)이 지나도 전환 배치(GR-18)가 실행되기 전까지 `WISH`로 보일 수 있으며, 이때 WISH 등록·취소는 `GRAB_ALREADY_STARTED`(409)로 거부됩니다.
 
 **오류 코드:**
 - `INVALID_REQUEST` — `page`가 0 미만, `size`가 1 미만 또는 100 초과, 허용되지 않은 `status`·`sort` 값, 숫자가 아닌 `categoryId`, `keyword` 100자 초과
