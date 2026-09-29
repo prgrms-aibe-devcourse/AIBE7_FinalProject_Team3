@@ -76,8 +76,8 @@ public record SellerDropDetailResponse(
                         .toList());
     }
 
-    // 목록과 같은 규칙: 활성 SKU 중 최저가, 활성 SKU가 없으면 null.
-    private static Long minPrice(Drop drop) {
+    // 목록과 같은 규칙: 활성 SKU 중 최저가, 활성 SKU가 없으면 null. 공개 상세(PublicDropDetailResponse)도 같은 규칙을 쓴다.
+    static Long minPrice(Drop drop) {
         return drop.getOptions().stream()
                 .filter(DropOption::isActive)
                 .map(DropOption::getUnitPrice)
@@ -85,8 +85,8 @@ public record SellerDropDetailResponse(
                 .orElse(null);
     }
 
-    // 값 매핑은 그룹 정렬 순서를 따른다.
-    private static List<Selection> selections(DropOption option) {
+    // 값 매핑은 그룹 정렬 순서를 따른다. 공개 상세(PublicDropDetailResponse)도 같은 변환을 쓴다.
+    static List<Selection> selections(DropOption option) {
         return option.getValueMaps().stream()
                 .sorted(Comparator.comparingInt(valueMap -> valueMap.getGroup().getSortOrder()))
                 .map(valueMap -> new Selection(valueMap.getGroup().getId(), valueMap.getValue().getId()))
