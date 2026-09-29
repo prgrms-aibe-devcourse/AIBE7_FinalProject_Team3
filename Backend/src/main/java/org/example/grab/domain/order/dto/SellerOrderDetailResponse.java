@@ -2,7 +2,7 @@ package org.example.grab.domain.order.dto;
 
 import org.example.grab.domain.order.entity.Order;
 import org.example.grab.domain.order.entity.OrderItem;
-import org.example.grab.domain.order.entity.Shipment;
+import org.example.grab.domain.shipment.entity.Shipment;
 
 import java.time.OffsetDateTime;
 import java.util.List;

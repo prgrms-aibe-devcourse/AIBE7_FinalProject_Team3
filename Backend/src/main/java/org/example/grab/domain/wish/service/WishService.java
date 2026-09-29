@@ -1,0 +1,71 @@
+package org.example.grab.domain.wish.service;
+
+import lombok.RequiredArgsConstructor;
+import org.example.grab.domain.drop.service.DropService;
+import org.example.grab.domain.wish.WishNotice;
+import org.example.grab.domain.wish.dto.response.WishResponse;
+import org.example.grab.domain.wish.entity.Wish;
+import org.example.grab.global.error.BusinessException;
+import org.example.grab.global.error.CommonErrorCode;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.stereotype.Service;
+
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
+
+/**
+ * WISH 등록·취소 파사드. DROP 판정은 DropService에 맡기고, 저장은 WishTransactionService에 위임한다.
+ * 시각은 요청당 한 번만 만들어 검증·저장에 같은 값을 쓴다.
+ */
+@Service
+@RequiredArgsConstructor
+public class WishService {
+
+    private final DropService dropService;
+    private final WishTransactionService wishTransactionService;
+
+    /**
+     * WISH를 등록한다. 이미 활성이면 기존 등록 시각을 그대로 반환하고(멱등),
+     * 취소된 WISH면 기존 행을 재활성화한다.
+     */
+    public WishResponse register(Long userId, Long dropId) {
+        OffsetDateTime now = now();
+        dropService.validateWishable(dropId, now);
+        try {
+            Wish wish = wishTransactionService.register(userId, dropId, now);
+            return toResponse(dropId, wish);
+        } catch (DataIntegrityViolationException ignored) {
+            return resolveConcurrentRequest(userId, dropId);
+        }
+    }
+
+    /** 활성 WISH가 없으면 아무 것도 하지 않는다(멱등 204). DROP 상태 검사가 먼저다. */
+    public void cancel(Long userId, Long dropId) {
+        OffsetDateTime now = now();
+        dropService.validateWishable(dropId, now);
+        wishTransactionService.cancel(userId, dropId, now);
+    }
+
+    /**
+     * PostgreSQL {@code timestamptz}는 마이크로초 정밀도까지만 저장한다. 나노초를 그대로 쓰면 첫 응답(메모리)과
+     * 재조회 응답(DB)의 값이 어긋나므로, 저장 전에 마이크로초로 절삭해 두 값을 일치시킨다.
+     */
+    private OffsetDateTime now() {
+        return OffsetDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.MICROS);
+    }
+
+    /**
+     * 유니크 제약 위반은 동시 등록 경합에서만 발생한다. 새 트랜잭션에서 활성 WISH를 찾으면 그 결과를 그대로 응답하고,
+     * 찾지 못하면(경합 상대가 그 사이 취소된 경우 등) 공통 오류 응답으로 변환될 수 있도록 도메인 예외를 던진다.
+     */
+    private WishResponse resolveConcurrentRequest(Long userId, Long dropId) {
+        return wishTransactionService.findActiveAfterConcurrentInsert(userId, dropId)
+                .map(wish -> toResponse(dropId, wish))
+                .orElseThrow(() -> new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION));
+    }
+
+    private WishResponse toResponse(Long dropId, Wish wish) {
+        return new WishResponse(dropId, true, wish.getActivatedAt(), WishNotice.MESSAGE);
+    }
+}

@@ -1,6 +1,6 @@
-package org.example.grab.domain.order.repository;
+package org.example.grab.domain.shipment.repository;
 
-import org.example.grab.domain.order.entity.Shipment;
+import org.example.grab.domain.shipment.entity.Shipment;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
