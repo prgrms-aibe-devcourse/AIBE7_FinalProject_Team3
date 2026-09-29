@@ -41,7 +41,7 @@ public class Shipment extends BaseEntity {
     @Column(name = "idempotency_key", nullable = false, length = 100)
     private String idempotencyKey;
 
-    @Column(name = "request_hash", nullable = false, length = 64, columnDefinition = "char(64)")
+    @Column(name = "request_hash", nullable = false, length = 64)
     private String requestHash;
 
     @Column(name = "shipped_at", nullable = false)
