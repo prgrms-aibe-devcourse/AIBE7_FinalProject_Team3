@@ -6,6 +6,7 @@ import org.example.grab.domain.wish.WishNotice;
 import org.example.grab.domain.wish.dto.response.WishResponse;
 import org.example.grab.domain.wish.entity.Wish;
 import org.example.grab.global.error.BusinessException;
+import org.example.grab.global.error.CommonErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -93,16 +94,19 @@ class WishServiceTest {
     }
 
     @Test
-    @DisplayName("동시 충돌 후에도 활성 WISH가 없으면 원래 예외를 다시 던진다")
-    void register_rethrowsWhenConcurrentWishMissing() {
+    @DisplayName("동시 충돌 후에도 활성 WISH가 없으면 공통 오류 코드로 변환한다")
+    void register_conflictsWhenConcurrentWishMissing() {
         // given
-        DataIntegrityViolationException original = new DataIntegrityViolationException("uq_wishes_user_drop");
-        given(wishTransactionService.register(eq(USER_ID), eq(DROP_ID), any())).willThrow(original);
+        given(wishTransactionService.register(eq(USER_ID), eq(DROP_ID), any()))
+                .willThrow(new DataIntegrityViolationException("uq_wishes_user_drop"));
         given(wishTransactionService.findActiveAfterConcurrentInsert(USER_ID, DROP_ID))
                 .willReturn(Optional.empty());
 
         // when & then
-        assertThatThrownBy(() -> wishService.register(USER_ID, DROP_ID)).isSameAs(original);
+        assertThatThrownBy(() -> wishService.register(USER_ID, DROP_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(CommonErrorCode.INVALID_STATE_TRANSITION);
     }
 
     @Test

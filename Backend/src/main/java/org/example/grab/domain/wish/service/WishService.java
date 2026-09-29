@@ -5,6 +5,8 @@ import org.example.grab.domain.drop.service.DropService;
 import org.example.grab.domain.wish.WishNotice;
 import org.example.grab.domain.wish.dto.response.WishResponse;
 import org.example.grab.domain.wish.entity.Wish;
+import org.example.grab.global.error.BusinessException;
+import org.example.grab.global.error.CommonErrorCode;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
@@ -32,8 +34,8 @@ public class WishService {
         try {
             Wish wish = wishTransactionService.register(userId, dropId, now);
             return toResponse(dropId, wish);
-        } catch (DataIntegrityViolationException exception) {
-            return resolveConcurrentRequest(userId, dropId, exception);
+        } catch (DataIntegrityViolationException ignored) {
+            return resolveConcurrentRequest(userId, dropId);
         }
     }
 
@@ -44,11 +46,14 @@ public class WishService {
         wishTransactionService.cancel(userId, dropId, now);
     }
 
-    private WishResponse resolveConcurrentRequest(
-            Long userId, Long dropId, DataIntegrityViolationException originalException) {
+    /**
+     * 유니크 제약 위반은 동시 등록 경합에서만 발생한다. 새 트랜잭션에서 활성 WISH를 찾으면 그 결과를 그대로 응답하고,
+     * 찾지 못하면(경합 상대가 그 사이 취소된 경우 등) 공통 오류 응답으로 변환될 수 있도록 도메인 예외를 던진다.
+     */
+    private WishResponse resolveConcurrentRequest(Long userId, Long dropId) {
         return wishTransactionService.findActiveAfterConcurrentInsert(userId, dropId)
                 .map(wish -> toResponse(dropId, wish))
-                .orElseThrow(() -> originalException);
+                .orElseThrow(() -> new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION));
     }
 
     private WishResponse toResponse(Long dropId, Wish wish) {
