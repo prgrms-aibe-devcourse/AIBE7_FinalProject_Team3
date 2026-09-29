@@ -2,6 +2,7 @@ package org.example.grab.domain.order.repository;
 
 import jakarta.persistence.LockModeType;
 import org.example.grab.domain.order.entity.Order;
+import org.example.grab.domain.order.entity.OrderStatus;
 import org.example.grab.domain.order.dto.SellerOrderListProjection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -12,7 +13,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.Optional;
 import java.util.UUID;
 
-// 주문 엔티티 저장과 판매자 주문 목록 조회 쿼리를 제공한다.
+// 주문 엔티티 저장과 구매자·판매자 주문 조회 쿼리를 제공한다.
 public interface OrderRepository extends JpaRepository<Order, Long> {
 
     @Query(value = """
@@ -73,6 +74,13 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     boolean existsDrop(@Param("dropId") long dropId);
 
     Optional<Order> findByUuid(UUID uuid);
+
+    Optional<Order> findByUuidAndBuyerId(UUID uuid, Long buyerId);
+
+    Page<Order> findByBuyerIdOrderByCreatedAtDescIdDesc(Long buyerId, Pageable pageable);
+
+    Page<Order> findByBuyerIdAndStatusOrderByCreatedAtDescIdDesc(
+            Long buyerId, OrderStatus status, Pageable pageable);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select o from Order o where o.uuid = :uuid")

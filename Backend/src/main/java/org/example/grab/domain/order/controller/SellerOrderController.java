@@ -1,12 +1,14 @@
 package org.example.grab.domain.order.controller;
 
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
 import org.example.grab.domain.order.dto.SellerOrderDetailResponse;
 import org.example.grab.domain.order.dto.SellerOrderListResponse;
 import org.example.grab.domain.order.dto.OrderStatusResponse;
 import org.example.grab.domain.order.entity.OrderStatus;
 import org.example.grab.domain.order.entity.PaymentStatus;
 import org.example.grab.domain.order.service.SellerOrderService;
+import org.example.grab.domain.shipment.dto.ShipmentRegisterRequest;
 import org.example.grab.global.common.ApiResponse;
 import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
@@ -15,6 +17,8 @@ import org.example.grab.global.security.CurrentSellerIdProvider;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -32,7 +36,7 @@ public class SellerOrderController {
 
     @GetMapping("/orders/{orderId}")
     public ApiResponse<SellerOrderDetailResponse> findOrder(@PathVariable String orderId) {
-        UUID uuid = parseOrderId(orderId);
+        UUID uuid = OrderIdParser.parse(orderId);
         return ApiResponse.success(
                 sellerOrderService.findOrder(currentSellerIdProvider.currentSellerId(), uuid));
     }
@@ -41,7 +45,16 @@ public class SellerOrderController {
     @PostMapping("/orders/{orderId}/prepare-shipment")
     public ApiResponse<OrderStatusResponse> prepareShipment(@PathVariable String orderId) {
         return ApiResponse.success(sellerOrderService.prepareShipment(
-                currentSellerIdProvider.currentSellerId(), parseOrderId(orderId)));
+                currentSellerIdProvider.currentSellerId(), OrderIdParser.parse(orderId)));
+    }
+
+    @PostMapping("/orders/{orderId}/shipment")
+    public ApiResponse<OrderStatusResponse> registerShipment(
+            @PathVariable String orderId,
+            @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
+            @Valid @RequestBody ShipmentRegisterRequest request) {
+        return ApiResponse.success(sellerOrderService.registerShipment(
+                currentSellerIdProvider.currentSellerId(), OrderIdParser.parse(orderId), idempotencyKey, request));
     }
 
     @GetMapping("/orders")
@@ -56,19 +69,6 @@ public class SellerOrderController {
         }
         return ApiResponse.success(sellerOrderService.findOrders(
                 currentSellerIdProvider.currentSellerId(), dropId, orderStatus, paymentStatus, page, size));
-    }
-
-    private static UUID parseOrderId(String orderId) {
-        UUID uuid;
-        try {
-            uuid = UUID.fromString(orderId);
-        } catch (IllegalArgumentException exception) {
-            throw new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND);
-        }
-        if (!uuid.toString().equalsIgnoreCase(orderId)) {
-            throw new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND);
-        }
-        return uuid;
     }
 
 }

@@ -35,7 +35,8 @@ class MockDeliveryServiceTest {
         UUID orderId = UUID.randomUUID();
         Order order = createOrder(OrderStatus.SHIPPED);
         ReflectionTestUtils.setField(order, "id", 100L);
-        Shipment shipment = Shipment.create(order, "MOCK", "GRAB-MOCK-1");
+        Shipment shipment = Shipment.register(order, "MOCK", "GRAB-MOCK-1",
+                UUID.randomUUID().toString(), "0".repeat(64), OffsetDateTime.now());
         when(orderRepository.findByUuidForUpdate(orderId)).thenReturn(Optional.of(order));
         when(shipmentRepository.findByOrderId(100L)).thenReturn(Optional.of(shipment));
 

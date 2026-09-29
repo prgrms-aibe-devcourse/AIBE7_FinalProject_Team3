@@ -78,10 +78,8 @@ public class PasswordValidator implements ConstraintValidator<ValidPassword, Str
         return password.chars().anyMatch(c -> SPECIAL_CHARACTERS.indexOf(c) >= 0);
     }
 
-    /*
-    검증이 끝나면 Hibernate Validator는 false를 받은 뒤 context에 등록된 위반을 모아 ConstraintViolation으로 만듦
-    컨트롤러 요청에서는 이 위반이 MethodArgumentNotValidException의 FieldError로 바뀌고 최종적으로 응답 fieldErrors로 출력
-     */
+    // Bean Validation 엔진은 isValid가 false일 때만 context에 쌓인 사유를 위반으로 만든다.
+    // 기본 위반을 끄지 않으면 애노테이션 기본 문구와 이 사유가 함께 보고돼 한 필드에 사유가 두 개가 된다.
     private boolean reject(ConstraintValidatorContext context, String message) {
         // 기본 위반 문구 비활성화
         context.disableDefaultConstraintViolation();

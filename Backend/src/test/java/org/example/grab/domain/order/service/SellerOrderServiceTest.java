@@ -1,5 +1,6 @@
 package org.example.grab.domain.order.service;
 
+import org.example.grab.domain.order.dto.OrderShippingResponse;
 import org.example.grab.domain.order.dto.SellerOrderListResponse;
 import org.example.grab.domain.order.dto.SellerOrderDetailResponse;
 import org.example.grab.domain.order.dto.SellerOrderListProjection;
@@ -11,7 +12,10 @@ import org.example.grab.domain.order.entity.ShippingAddress;
 import org.example.grab.domain.order.error.OrderErrorCode;
 import org.example.grab.domain.order.repository.OrderItemRepository;
 import org.example.grab.domain.order.repository.OrderRepository;
+import org.example.grab.domain.shipment.dto.ShipmentRegisterRequest;
+import org.example.grab.domain.shipment.entity.Shipment;
 import org.example.grab.domain.shipment.repository.ShipmentRepository;
+import org.example.grab.domain.shipment.service.ShipmentRequestHasher;
 import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
@@ -39,8 +43,12 @@ class SellerOrderServiceTest {
     private final OrderRepository orderRepository = mock(OrderRepository.class);
     private final OrderItemRepository orderItemRepository = mock(OrderItemRepository.class);
     private final ShipmentRepository shipmentRepository = mock(ShipmentRepository.class);
+    private final ShipmentRequestHasher shipmentRequestHasher = new ShipmentRequestHasher();
     private final SellerOrderService sellerOrderService = new SellerOrderService(
-            orderRepository, orderItemRepository, shipmentRepository);
+            orderRepository,
+            new OrderDetailReader(orderRepository, orderItemRepository, shipmentRepository),
+            shipmentRepository,
+            shipmentRequestHasher);
 
     @Test
     void returnsOrderDetailsForOwnedOrder() {
@@ -64,8 +72,8 @@ class SellerOrderServiceTest {
             assertThat(detail.optionName()).isEqualTo("검정 / L");
             assertThat(detail.subtotal()).isEqualTo(30000);
         });
-        assertThat(result.paymentStatus()).isEqualTo("SUCCEEDED");
-        assertThat(result.shipping()).isEqualTo(new SellerOrderDetailResponse.ShippingResponse(null, null, null));
+        assertThat(result.paymentStatus()).isEqualTo(PaymentStatus.SUCCEEDED);
+        assertThat(result.shipping()).isEqualTo(new OrderShippingResponse(null, null, null, null));
         verify(orderRepository).ownsDrop(SELLER_ID, 42L);
     }
 
@@ -162,6 +170,100 @@ class SellerOrderServiceTest {
                         actual -> assertThat(actual.getErrorCode())
                                 .isEqualTo(CommonErrorCode.INVALID_STATE_TRANSITION));
         verifyNoMoreInteractions(orderItemRepository, shipmentRepository);
+    }
+
+    @Test
+    void registersShipmentAndMovesOrderToShipped() {
+        // given
+        UUID orderId = UUID.randomUUID();
+        Order order = createOrder();
+        ReflectionTestUtils.setField(order, "id", 100L);
+        ReflectionTestUtils.setField(order, "status", OrderStatus.PREPARING);
+        when(orderRepository.findByUuidForUpdate(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.ownsDrop(SELLER_ID, 42L)).thenReturn(true);
+        when(shipmentRepository.findByOrderId(100L)).thenReturn(Optional.empty());
+
+        // when
+        var response = sellerOrderService.registerShipment(SELLER_ID, orderId,
+                "123e4567-e89b-12d3-a456-426614174000", new ShipmentRegisterRequest("CJ대한통운", "1234567890"));
+
+        // then
+        assertThat(response.orderId()).isEqualTo(order.getUuid());
+        assertThat(response.status()).isEqualTo("SHIPPED");
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.SHIPPED);
+        verify(shipmentRepository).save(org.mockito.ArgumentMatchers.argThat(shipment ->
+                shipment.getCarrierCode().equals("CJ대한통운")
+                        && shipment.getTrackingNumber().equals("1234567890")
+                        && shipment.getIdempotencyKey().equals("123e4567-e89b-12d3-a456-426614174000")
+                        && shipment.getRequestHash() != null
+                        && shipment.getShippedAt() != null));
+    }
+
+    @Test
+    void replaysSameShipmentRequest() {
+        // given
+        UUID orderId = UUID.randomUUID();
+        var request = new ShipmentRegisterRequest("CJ대한통운", "1234567890");
+        Order order = createOrder();
+        ReflectionTestUtils.setField(order, "id", 100L);
+        ReflectionTestUtils.setField(order, "status", OrderStatus.DELIVERED);
+        var hash = shipmentRequestHasher.hash(request).value();
+        Shipment shipment = Shipment.register(order, request.carrier(), request.trackingNumber(),
+                "123e4567-e89b-12d3-a456-426614174000", hash, OffsetDateTime.now());
+        when(orderRepository.findByUuidForUpdate(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.ownsDrop(SELLER_ID, 42L)).thenReturn(true);
+        when(shipmentRepository.findByOrderId(100L)).thenReturn(Optional.of(shipment));
+
+        // when
+        var response = sellerOrderService.registerShipment(SELLER_ID, orderId,
+                "123e4567-e89b-12d3-a456-426614174000", request);
+
+        // then
+        assertThat(response.status()).isEqualTo("SHIPPED");
+        verifyNoMoreInteractions(orderItemRepository);
+    }
+
+    @Test
+    void rejectsSameIdempotencyKeyWithDifferentShipmentRequest() {
+        // given
+        UUID orderId = UUID.randomUUID();
+        Order order = createOrder();
+        ReflectionTestUtils.setField(order, "id", 100L);
+        ReflectionTestUtils.setField(order, "status", OrderStatus.SHIPPED);
+        Shipment shipment = Shipment.register(order, "CJ대한통운", "1234567890",
+                "123e4567-e89b-12d3-a456-426614174000", "a".repeat(64), OffsetDateTime.now());
+        when(orderRepository.findByUuidForUpdate(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.ownsDrop(SELLER_ID, 42L)).thenReturn(true);
+        when(shipmentRepository.findByOrderId(100L)).thenReturn(Optional.of(shipment));
+
+        // when
+        Throwable exception = catchThrowable(() -> sellerOrderService.registerShipment(SELLER_ID, orderId,
+                "123e4567-e89b-12d3-a456-426614174000", new ShipmentRegisterRequest("CJ대한통운", "다른송장")));
+
+        // then
+        assertThat(exception).isInstanceOfSatisfying(BusinessException.class,
+                actual -> assertThat(actual.getErrorCode()).isEqualTo(CommonErrorCode.DUPLICATE_IDEMPOTENCY_KEY));
+    }
+
+    @Test
+    void rejectsShipmentWhenOrderIsNotPreparing() {
+        // given
+        UUID orderId = UUID.randomUUID();
+        Order order = createOrder();
+        ReflectionTestUtils.setField(order, "id", 100L);
+        ReflectionTestUtils.setField(order, "status", OrderStatus.PAID);
+        when(orderRepository.findByUuidForUpdate(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.ownsDrop(SELLER_ID, 42L)).thenReturn(true);
+        when(shipmentRepository.findByOrderId(100L)).thenReturn(Optional.empty());
+
+        // when
+        Throwable exception = catchThrowable(() -> sellerOrderService.registerShipment(SELLER_ID, orderId,
+                "123e4567-e89b-12d3-a456-426614174000", new ShipmentRegisterRequest("CJ대한통운", "1234567890")));
+
+        // then
+        assertThat(exception).isInstanceOfSatisfying(BusinessException.class,
+                actual -> assertThat(actual.getErrorCode()).isEqualTo(CommonErrorCode.ORDER_STATUS_CONFLICT));
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
     }
 
     @Test

@@ -38,20 +38,33 @@ public class Shipment extends BaseEntity {
     @Column(name = "tracking_number", nullable = false, length = 100)
     private String trackingNumber;
 
-    @Column(name = "shipped_at")
+    @Column(name = "idempotency_key", nullable = false, length = 100)
+    private String idempotencyKey;
+
+    @Column(name = "request_hash", nullable = false, length = 64)
+    private String requestHash;
+
+    @Column(name = "shipped_at", nullable = false)
     private OffsetDateTime shippedAt;
 
     @Column(name = "delivered_at")
     private OffsetDateTime deliveredAt;
 
-    private Shipment(Order order, String carrierCode, String trackingNumber) {
+    private Shipment(
+            Order order, String carrierCode, String trackingNumber,
+            String idempotencyKey, String requestHash, OffsetDateTime shippedAt) {
         this.order = Objects.requireNonNull(order);
         this.carrierCode = Objects.requireNonNull(carrierCode);
         this.trackingNumber = Objects.requireNonNull(trackingNumber);
+        this.idempotencyKey = Objects.requireNonNull(idempotencyKey);
+        this.requestHash = Objects.requireNonNull(requestHash);
+        this.shippedAt = Objects.requireNonNull(shippedAt);
     }
 
-    public static Shipment create(Order order, String carrierCode, String trackingNumber) {
-        return new Shipment(order, carrierCode, trackingNumber);
+    public static Shipment register(
+            Order order, String carrierCode, String trackingNumber,
+            String idempotencyKey, String requestHash, OffsetDateTime shippedAt) {
+        return new Shipment(order, carrierCode, trackingNumber, idempotencyKey, requestHash, shippedAt);
     }
 
     public void markDelivered(OffsetDateTime deliveredAt) {
