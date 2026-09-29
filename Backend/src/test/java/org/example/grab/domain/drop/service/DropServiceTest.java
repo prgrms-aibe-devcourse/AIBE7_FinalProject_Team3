@@ -9,7 +9,7 @@ import org.example.grab.domain.drop.dto.request.ShippingRequest;
 import org.example.grab.domain.category.dto.response.CategoryResponse;
 import org.example.grab.domain.category.service.CategoryService;
 import org.example.grab.domain.drop.dto.response.PublicDropDetailResponse;
-import org.example.grab.domain.drop.dto.response.PublicDropListResponse;
+import org.example.grab.domain.drop.dto.response.common.DropCategoryResponse;
 import org.example.grab.domain.wish.WishNotice;
 import org.example.grab.domain.wish.service.WishQueryService;
 import org.example.grab.domain.drop.entity.Drop;
@@ -373,7 +373,7 @@ class DropServiceTest {
 
         // then
         assertThat(response.status()).isEqualTo(DropStatus.CANCELED);
-        assertThat(response.category()).isEqualTo(new PublicDropListResponse.Category(1L, "패션"));
+        assertThat(response.category()).isEqualTo(new DropCategoryResponse(1L, "패션"));
         assertThat(response.wishCount()).isEqualTo(3L);
         assertThat(response.wishNotice()).isEqualTo(WishNotice.MESSAGE);
         assertThat(response.actions())

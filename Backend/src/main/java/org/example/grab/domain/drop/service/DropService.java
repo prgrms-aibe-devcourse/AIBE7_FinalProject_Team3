@@ -8,6 +8,7 @@ import org.example.grab.domain.drop.dto.request.DropDraftRequest;
 import org.example.grab.domain.drop.dto.request.ShippingRequest;
 import org.example.grab.domain.drop.dto.response.PublicDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.PublicDropListResponse;
+import org.example.grab.domain.drop.dto.response.common.DropCategoryResponse;
 import org.example.grab.domain.drop.dto.response.SellerDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.SellerDropListResponse;
 import org.example.grab.domain.drop.entity.Drop;
@@ -149,9 +150,9 @@ public class DropService {
     }
 
     // category_id는 NOT NULL·FK라 정상 데이터에서는 항상 존재한다. 정합성이 깨진 경우 DROP_NOT_FOUND로 숨긴다.
-    private PublicDropListResponse.Category toCategory(Long categoryId) {
+    private DropCategoryResponse toCategory(Long categoryId) {
         return categoryService.findCategory(categoryId)
-                .map(category -> new PublicDropListResponse.Category(category.categoryId(), category.name()))
+                .map(category -> new DropCategoryResponse(category.categoryId(), category.name()))
                 .orElseThrow(() -> new BusinessException(DropErrorCode.DROP_NOT_FOUND));
     }
 

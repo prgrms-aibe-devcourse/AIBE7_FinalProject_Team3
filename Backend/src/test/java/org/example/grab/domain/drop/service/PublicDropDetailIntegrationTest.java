@@ -10,7 +10,8 @@ import org.example.grab.domain.drop.dto.request.OptionValueRequest;
 import org.example.grab.domain.drop.dto.request.SelectionRequest;
 import org.example.grab.domain.drop.dto.request.ShippingRequest;
 import org.example.grab.domain.drop.dto.response.PublicDropDetailResponse;
-import org.example.grab.domain.drop.dto.response.SellerDropDetailResponse;
+import org.example.grab.domain.drop.dto.response.common.DropOptionGroupResponse;
+import org.example.grab.domain.drop.dto.response.common.DropOptionSelectionResponse;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.domain.wish.WishNotice;
@@ -98,14 +99,14 @@ class PublicDropDetailIntegrationTest {
         PublicDropDetailResponse detail = dropService.findPublicDrop(dropId);
 
         // then
-        assertThat(detail.optionGroups()).extracting(SellerDropDetailResponse.OptionGroup::name)
+        assertThat(detail.optionGroups()).extracting(DropOptionGroupResponse::name)
                 .containsExactly("소재", "길이");
-        assertThat(detail.optionGroups().get(0).values()).extracting(SellerDropDetailResponse.OptionValue::value)
+        assertThat(detail.optionGroups().get(0).values()).extracting(DropOptionGroupResponse.Value::value)
                 .containsExactly("코튼", "린넨");
         // 비활성 SKU(린넨/롱, 30000)는 제외되고 sortOrder 0, 1 순으로 온다.
         assertThat(detail.options()).extracting(PublicDropDetailResponse.Option::unitPrice)
                 .containsExactly(10000L, 20000L);
-        assertThat(detail.options().get(0).selections()).extracting(SellerDropDetailResponse.Selection::groupId)
+        assertThat(detail.options().get(0).selections()).extracting(DropOptionSelectionResponse::groupId)
                 .containsExactly(detail.optionGroups().get(0).groupId(), detail.optionGroups().get(1).groupId());
         assertThat(detail.minPrice()).isEqualTo(10000L);
         assertThat(detail.wishNotice()).isEqualTo(WishNotice.MESSAGE);

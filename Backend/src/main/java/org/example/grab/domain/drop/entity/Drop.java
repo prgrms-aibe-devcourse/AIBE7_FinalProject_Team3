@@ -28,6 +28,7 @@ import org.example.grab.global.error.ErrorCode;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -241,6 +242,18 @@ public class Drop extends BaseEntity {
                 .filter(DropOption::isActive)
                 .mapToInt(DropOption::getAvailableQuantity)
                 .sum() == 0;
+    }
+
+    /**
+     * 활성 SKU 중 최저가. 활성 SKU가 없으면 null이다.
+     * 판매자·공개 상세 응답이 공유하는 규칙이라 DTO가 아니라 도메인에 둔다(공개 목록은 SQL 서브쿼리로 계산).
+     */
+    public Long getMinPrice() {
+        return options.stream()
+                .filter(DropOption::isActive)
+                .map(DropOption::getUnitPrice)
+                .min(Comparator.naturalOrder())
+                .orElse(null);
     }
 
     // 필드명은 요청 DTO(DropDraftRequest) 기준으로 적어 클라이언트가 입력 위치를 바로 찾을 수 있게 한다.

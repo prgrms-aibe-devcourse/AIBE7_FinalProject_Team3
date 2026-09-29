@@ -298,6 +298,23 @@ class DropTest {
         assertThat(inactiveOnly.isSoldOut()).isTrue();
     }
 
+    @Test
+    @DisplayName("getMinPrice는 활성 SKU 중 최저가이고, 활성 SKU가 없으면 null")
+    void getMinPrice() {
+        // given
+        Drop drop = Drop.createDraft(SELLER_ID);
+        addOption(drop, 30000L, 5, true);
+        addOption(drop, 10000L, 5, true);
+        addOption(drop, 5000L, 5, false);
+
+        Drop inactiveOnly = Drop.createDraft(SELLER_ID);
+        addOption(inactiveOnly, 1000L, 5, false);
+
+        // when & then
+        assertThat(drop.getMinPrice()).isEqualTo(10000L);
+        assertThat(inactiveOnly.getMinPrice()).isNull();
+    }
+
     private Drop dropWith(DropStatus status, OffsetDateTime saleStartsAt, OffsetDateTime saleEndsAt) {
         Drop drop = Drop.createDraft(SELLER_ID);
         ReflectionTestUtils.setField(drop, "status", status);

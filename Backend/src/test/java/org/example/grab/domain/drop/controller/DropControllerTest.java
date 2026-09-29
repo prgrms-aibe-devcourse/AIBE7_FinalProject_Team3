@@ -2,7 +2,10 @@ package org.example.grab.domain.drop.controller;
 
 import org.example.grab.domain.drop.dto.response.PublicDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.PublicDropListResponse;
-import org.example.grab.domain.drop.dto.response.SellerDropDetailResponse;
+import org.example.grab.domain.drop.dto.response.common.DropCategoryResponse;
+import org.example.grab.domain.drop.dto.response.common.DropOptionGroupResponse;
+import org.example.grab.domain.drop.dto.response.common.DropOptionSelectionResponse;
+import org.example.grab.domain.drop.dto.response.common.DropShippingResponse;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.domain.drop.service.DropService;
@@ -48,7 +51,7 @@ class DropControllerTest {
         // given
         PublicDropListResponse item = new PublicDropListResponse(
                 100L, "상품", "https://img/1.jpg", 129000L,
-                new PublicDropListResponse.Category(1L, "패션"),
+                new DropCategoryResponse(1L, "패션"),
                 DropStatus.WISH, false, 152L,
                 OffsetDateTime.parse("2026-09-20T01:00:00Z"),
                 OffsetDateTime.parse("2026-09-20T03:00:00Z"));
@@ -137,15 +140,15 @@ class DropControllerTest {
         // given
         PublicDropDetailResponse response = new PublicDropDetailResponse(
                 100L, "상품", "설명", List.of("https://img/1.jpg"), 129000L,
-                new PublicDropListResponse.Category(1L, "패션"),
+                new DropCategoryResponse(1L, "패션"),
                 DropStatus.GRAB, false, 7L, "WISH 안내 문구",
                 OffsetDateTime.parse("2026-09-20T01:00:00Z"),
                 OffsetDateTime.parse("2026-09-20T03:00:00Z"),
-                new SellerDropDetailResponse.Shipping(3000L, "출고 안내"),
-                List.of(new SellerDropDetailResponse.OptionGroup(11L, "소재", 0,
-                        List.of(new SellerDropDetailResponse.OptionValue(111L, "코튼", 0)))),
+                new DropShippingResponse(3000L, "출고 안내"),
+                List.of(new DropOptionGroupResponse(11L, "소재", 0,
+                        List.of(new DropOptionGroupResponse.Value(111L, "코튼", 0)))),
                 List.of(new PublicDropDetailResponse.Option(1001L,
-                        List.of(new SellerDropDetailResponse.Selection(11L, 111L)), 129000L, 10, false)),
+                        List.of(new DropOptionSelectionResponse(11L, 111L)), 129000L, 10, false)),
                 new PublicDropDetailResponse.Actions(false, false, true),
                 OffsetDateTime.parse("2026-09-20T01:10:00Z"));
         given(dropService.findPublicDrop(100L)).willReturn(response);
