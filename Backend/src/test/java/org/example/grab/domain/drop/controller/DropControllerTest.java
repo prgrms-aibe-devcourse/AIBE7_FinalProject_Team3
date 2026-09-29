@@ -5,6 +5,7 @@ import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.service.DropService;
 import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.GlobalExceptionHandler;
+import org.example.grab.global.error.ValidationErrorCodeResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,7 +34,7 @@ class DropControllerTest {
         dropService = mock(DropService.class);
         DropController controller = new DropController(dropService);
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
-                .setControllerAdvice(new GlobalExceptionHandler())
+                .setControllerAdvice(new GlobalExceptionHandler(new ValidationErrorCodeResolver(List.of())))
                 .build();
     }
 
