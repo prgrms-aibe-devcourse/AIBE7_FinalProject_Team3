@@ -5,6 +5,7 @@ import org.example.grab.domain.order.dto.OrderCreateResponse;
 import org.example.grab.domain.order.entity.OrderStatus;
 import org.example.grab.domain.order.service.OrderCreateService;
 import org.example.grab.global.error.GlobalExceptionHandler;
+import org.example.grab.global.error.ValidationErrorCodeResolver;
 import org.example.grab.global.security.CurrentUserIdProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -38,7 +39,7 @@ class OrderControllerTest {
         orderCreateService = mock(OrderCreateService.class);
         currentUserIdProvider = mock(CurrentUserIdProvider.class);
         mockMvc = MockMvcBuilders.standaloneSetup(new OrderController(orderCreateService, currentUserIdProvider))
-                .setControllerAdvice(new GlobalExceptionHandler())
+                .setControllerAdvice(new GlobalExceptionHandler(new ValidationErrorCodeResolver(List.of())))
                 .build();
     }
 
