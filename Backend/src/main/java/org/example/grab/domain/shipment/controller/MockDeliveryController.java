@@ -1,8 +1,8 @@
-package org.example.grab.domain.order.controller;
+package org.example.grab.domain.shipment.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.example.grab.domain.order.dto.OrderStatusResponse;
-import org.example.grab.domain.order.service.MockDeliveryService;
+import org.example.grab.domain.shipment.service.MockDeliveryService;
 import org.example.grab.global.common.ApiResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.PathVariable;

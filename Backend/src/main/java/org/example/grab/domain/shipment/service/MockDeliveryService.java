@@ -1,12 +1,12 @@
-package org.example.grab.domain.order.service;
+package org.example.grab.domain.shipment.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.grab.domain.order.dto.OrderStatusResponse;
 import org.example.grab.domain.order.entity.Order;
 import org.example.grab.domain.order.entity.OrderStatus;
-import org.example.grab.domain.order.entity.Shipment;
+import org.example.grab.domain.shipment.entity.Shipment;
 import org.example.grab.domain.order.repository.OrderRepository;
-import org.example.grab.domain.order.repository.ShipmentRepository;
+import org.example.grab.domain.shipment.repository.ShipmentRepository;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
 import org.springframework.stereotype.Service;
