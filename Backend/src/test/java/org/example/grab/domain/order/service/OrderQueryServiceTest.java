@@ -42,7 +42,7 @@ class OrderQueryServiceTest {
     private final OrderItemRepository orderItemRepository = mock(OrderItemRepository.class);
     private final ShipmentRepository shipmentRepository = mock(ShipmentRepository.class);
     private final OrderQueryService orderQueryService = new OrderQueryService(
-            orderRepository, orderItemRepository, shipmentRepository);
+            orderRepository, new OrderDetailReader(orderRepository, orderItemRepository, shipmentRepository));
 
     @Test
     @DisplayName("상태 필터가 없으면 구매자의 전체 주문을 최신순으로 조회한다")

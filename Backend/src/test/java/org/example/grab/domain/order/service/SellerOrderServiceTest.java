@@ -41,7 +41,7 @@ class SellerOrderServiceTest {
     private final OrderItemRepository orderItemRepository = mock(OrderItemRepository.class);
     private final ShipmentRepository shipmentRepository = mock(ShipmentRepository.class);
     private final SellerOrderService sellerOrderService = new SellerOrderService(
-            orderRepository, orderItemRepository, shipmentRepository);
+            orderRepository, new OrderDetailReader(orderRepository, orderItemRepository, shipmentRepository));
 
     @Test
     void returnsOrderDetailsForOwnedOrder() {
