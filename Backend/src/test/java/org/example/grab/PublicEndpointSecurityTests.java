@@ -39,6 +39,15 @@ class PublicEndpointSecurityTests {
     }
 
     @Test
+    @DisplayName("비로그인 GET /api/v1/drops/{dropId}는 인증을 요구하지 않는다")
+    void exposesPublicDropDetailWithoutAuthentication() throws Exception {
+        // 존재하지 않는 id로 조회해도 401/302가 아니라 404(DROP_NOT_FOUND)까지 도달해야 개방된 것이다.
+        mockMvc.perform(get("/api/v1/drops/999999999").header("Accept", "application/json"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("DROP_NOT_FOUND"));
+    }
+
+    @Test
     @DisplayName("판매자 DROP 경로는 여전히 401")
     void keepsSellerDropRoutesProtected() throws Exception {
         mockMvc.perform(get("/api/v1/seller/drops").header("Accept", "application/json"))
