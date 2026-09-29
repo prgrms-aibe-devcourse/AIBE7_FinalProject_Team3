@@ -54,7 +54,7 @@ public class SellerOrderController {
             @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody ShipmentRegisterRequest request) {
         return ApiResponse.success(sellerOrderService.registerShipment(
-                currentSellerIdProvider.currentSellerId(), parseOrderId(orderId), idempotencyKey, request));
+                currentSellerIdProvider.currentSellerId(), OrderIdParser.parse(orderId), idempotencyKey, request));
     }
 
     @GetMapping("/orders")
