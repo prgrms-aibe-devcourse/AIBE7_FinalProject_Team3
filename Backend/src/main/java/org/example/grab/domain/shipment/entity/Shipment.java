@@ -1,4 +1,4 @@
-package org.example.grab.domain.order.entity;
+package org.example.grab.domain.shipment.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -12,6 +12,7 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.example.grab.domain.order.entity.Order;
 import org.example.grab.global.entity.BaseEntity;
 
 import java.time.OffsetDateTime;
@@ -51,5 +52,9 @@ public class Shipment extends BaseEntity {
 
     public static Shipment create(Order order, String carrierCode, String trackingNumber) {
         return new Shipment(order, carrierCode, trackingNumber);
+    }
+
+    public void markDelivered(OffsetDateTime deliveredAt) {
+        this.deliveredAt = Objects.requireNonNull(deliveredAt);
     }
 }

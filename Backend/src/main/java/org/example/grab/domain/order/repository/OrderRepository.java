@@ -1,11 +1,13 @@
 package org.example.grab.domain.order.repository;
 
+import jakarta.persistence.LockModeType;
 import org.example.grab.domain.order.entity.Order;
 import org.example.grab.domain.order.dto.SellerOrderListProjection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.repository.query.Param;
 import java.util.Optional;
 import java.util.UUID;
@@ -71,6 +73,26 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     boolean existsDrop(@Param("dropId") long dropId);
 
     Optional<Order> findByUuid(UUID uuid);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select o from Order o where o.uuid = :uuid")
+    Optional<Order> findByUuidForUpdate(@Param("uuid") UUID uuid);
+
+    /*
+    payments_cancellations에서 해당 주문의 purpose = 'ORDER_CANCEL', status = 'UNKNOWN'인 기록이 있는지 조회
+    -> 구매자가 취소를 요청했는데 PG 응답이 끊겨 취소됐는지 모르는 상태(UNKNOWN)
+    */
+    @Query(value = """
+            SELECT EXISTS (
+                SELECT 1
+                FROM payment_cancellations pc
+                JOIN payments p ON p.id = pc.payment_id
+                WHERE p.order_id = :orderId
+                  AND pc.purpose = 'ORDER_CANCEL'
+                  AND pc.status = 'UNKNOWN'
+            )
+            """, nativeQuery = true)
+    boolean hasUnknownOrderCancellation(@Param("orderId") Long orderId);
 
     Optional<Order> findByOrderNumber(String orderNumber);
 
