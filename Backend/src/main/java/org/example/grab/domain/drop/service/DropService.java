@@ -6,6 +6,7 @@ import org.example.grab.domain.drop.dto.PublicDropSort;
 import org.example.grab.domain.drop.dto.SellerDropListProjection;
 import org.example.grab.domain.drop.dto.request.DropDraftRequest;
 import org.example.grab.domain.drop.dto.request.ShippingRequest;
+import org.example.grab.domain.drop.dto.response.PublicDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.PublicDropListResponse;
 import org.example.grab.domain.drop.dto.response.SellerDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.SellerDropListResponse;
@@ -15,6 +16,7 @@ import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.domain.drop.repository.DropRepository;
 import org.example.grab.domain.category.service.CategoryService;
+import org.example.grab.domain.wish.service.WishQueryService;
 import org.example.grab.global.common.ErrorResponse;
 import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
@@ -43,6 +45,7 @@ public class DropService {
 
     private final DropRepository dropRepository;
     private final CategoryService categoryService;
+    private final WishQueryService wishQueryService;
 
     /** 새 DRAFT를 만들고 요청 값을 반영해 저장한다. */
     @Transactional
@@ -126,6 +129,30 @@ public class DropService {
     @Transactional(readOnly = true)
     public SellerDropDetailResponse findSellerDrop(Long sellerId, Long dropId) {
         return SellerDropDetailResponse.from(findOwnedDrop(sellerId, dropId));
+    }
+
+    /**
+     * 공개 DROP 상세. 비로그인 조회이며 DRAFT는 존재를 숨겨 DROP_NOT_FOUND로 응답한다.
+     * CANCELED는 0절 확정대로 200으로 보여 주고 actions가 모두 false가 된다.
+     * now는 actions 판정과 응답 serverTime에 같은 값을 쓴다.
+     */
+    @Transactional(readOnly = true)
+    public PublicDropDetailResponse findPublicDrop(Long dropId) {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        Drop drop = dropRepository.findById(dropId)
+                .orElseThrow(() -> new BusinessException(DropErrorCode.DROP_NOT_FOUND));
+        if (drop.getStatus() == DropStatus.DRAFT) {
+            throw new BusinessException(DropErrorCode.DROP_NOT_FOUND);
+        }
+        long wishCount = wishQueryService.countActiveByDropId(dropId);
+        return PublicDropDetailResponse.of(drop, toCategory(drop.getCategoryId()), wishCount, now);
+    }
+
+    // category_id는 NOT NULL·FK라 정상 데이터에서는 항상 존재한다. 정합성이 깨진 경우 DROP_NOT_FOUND로 숨긴다.
+    private PublicDropListResponse.Category toCategory(Long categoryId) {
+        return categoryService.findCategory(categoryId)
+                .map(category -> new PublicDropListResponse.Category(category.categoryId(), category.name()))
+                .orElseThrow(() -> new BusinessException(DropErrorCode.DROP_NOT_FOUND));
     }
 
     // status가 없으면 공개 상태 전체, DRAFT·CANCELED는 공개 목록에 넣을 수 없으므로 거부한다.

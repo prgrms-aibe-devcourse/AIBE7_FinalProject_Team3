@@ -7,6 +7,7 @@ import org.example.grab.domain.drop.dto.request.OptionValueRequest;
 import org.example.grab.domain.drop.dto.request.SelectionRequest;
 import org.example.grab.domain.drop.dto.request.ShippingRequest;
 import org.example.grab.domain.category.service.CategoryService;
+import org.example.grab.domain.wish.service.WishQueryService;
 import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.domain.drop.entity.DropImage;
 import org.example.grab.domain.drop.entity.DropStatus;
@@ -42,6 +43,9 @@ class DropServiceTest {
 
     @Mock
     private CategoryService categoryService;
+
+    @Mock
+    private WishQueryService wishQueryService;
 
     @InjectMocks
     private DropService dropService;

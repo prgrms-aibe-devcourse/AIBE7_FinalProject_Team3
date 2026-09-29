@@ -16,6 +16,7 @@ import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.domain.drop.repository.DropRepository;
 import org.example.grab.domain.category.service.CategoryService;
+import org.example.grab.domain.wish.service.WishQueryService;
 import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
@@ -45,7 +46,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
-@Import({JpaConfig.class, DropService.class, CategoryService.class})
+@Import({JpaConfig.class, DropService.class, CategoryService.class, WishQueryService.class})
 @Testcontainers
 class DropServiceIntegrationTest {
 
