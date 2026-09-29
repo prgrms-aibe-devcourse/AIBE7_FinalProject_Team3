@@ -1,12 +1,12 @@
 package org.example.grab.domain.order.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.example.grab.domain.order.dto.OrderStatusResponse;
 import org.example.grab.domain.order.dto.SellerOrderDetailResponse;
 import org.example.grab.domain.order.dto.SellerOrderListResponse;
-import org.example.grab.domain.order.dto.OrderStatusResponse;
 import org.example.grab.domain.order.entity.OrderStatus;
-import org.example.grab.domain.order.entity.PaymentStatus;
 import org.example.grab.domain.order.service.SellerOrderService;
+import org.example.grab.domain.payment.entity.PaymentStatus;
 import org.example.grab.global.common.ApiResponse;
 import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;

@@ -1,8 +1,8 @@
 package org.example.grab.domain.payment.repository;
 
-import org.example.grab.domain.order.entity.PaymentStatus;
 import org.example.grab.domain.payment.entity.Payment;
 import org.example.grab.domain.payment.entity.PaymentProvider;
+import org.example.grab.domain.payment.entity.PaymentStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Collection;

@@ -12,7 +12,6 @@ import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.example.grab.domain.order.entity.PaymentStatus;
 import org.example.grab.global.entity.UUIDEntity;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;

@@ -1,6 +1,5 @@
 package org.example.grab.domain.payment.entity;
 
-import org.example.grab.domain.order.entity.PaymentStatus;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
 import org.junit.jupiter.api.DisplayName;

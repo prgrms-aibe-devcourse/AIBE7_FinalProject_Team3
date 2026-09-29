@@ -1,13 +1,13 @@
 package org.example.grab.domain.payment.repository;
 
 import jakarta.persistence.EntityManager;
-import org.example.grab.domain.order.entity.PaymentStatus;
 import org.example.grab.domain.payment.entity.Payment;
 import org.example.grab.domain.payment.entity.PaymentEvent;
 import org.example.grab.domain.payment.entity.PaymentEventResult;
 import org.example.grab.domain.payment.entity.PaymentEventSource;
 import org.example.grab.domain.payment.entity.PaymentEventType;
 import org.example.grab.domain.payment.entity.PaymentProvider;
+import org.example.grab.domain.payment.entity.PaymentStatus;
 import org.example.grab.domain.payment.entity.ReconciliationStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
