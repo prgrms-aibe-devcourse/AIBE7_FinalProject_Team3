@@ -190,16 +190,57 @@ public class Drop extends BaseEntity {
      * WISH라도 판매 시작 시각이 지났으면 GRAB이 시작된 것으로 본다(GR-18 전환 배치 이전의 경합 대비).
      */
     public void validateWishable(OffsetDateTime now) {
-        switch (status) {
-            case DRAFT -> throw new BusinessException(DropErrorCode.DROP_NOT_FOUND);
-            case WISH -> {
-                if (saleStartsAt != null && !now.isBefore(saleStartsAt)) {
-                    throw new BusinessException(DropErrorCode.GRAB_ALREADY_STARTED);
-                }
-            }
-            case GRAB, ENDED -> throw new BusinessException(DropErrorCode.GRAB_ALREADY_STARTED);
-            case CANCELED -> throw new BusinessException(DropErrorCode.DROP_NOT_WISHABLE);
+        ErrorCode error = wishabilityError(now);
+        if (error != null) {
+            throw new BusinessException(error);
         }
+    }
+
+    /**
+     * 공개 상세의 actions.wishable·wishCancelable 판정. validateWishable과 같은 규칙을 공유한다.
+     * 비로그인 API이므로 사용자와 무관하게 DROP 상태·시각으로만 정한다.
+     */
+    public boolean isWishable(OffsetDateTime now) {
+        return wishabilityError(now) == null;
+    }
+
+    // WISH 가능 판정 규칙을 한 곳에 둔다. null이면 가능, 값이 있으면 그 오류로 거부한다.
+    private ErrorCode wishabilityError(OffsetDateTime now) {
+        return switch (status) {
+            case DRAFT -> DropErrorCode.DROP_NOT_FOUND;
+            case WISH -> saleStartsAt != null && !now.isBefore(saleStartsAt)
+                    ? DropErrorCode.GRAB_ALREADY_STARTED : null;
+            case GRAB, ENDED -> DropErrorCode.GRAB_ALREADY_STARTED;
+            case CANCELED -> DropErrorCode.DROP_NOT_WISHABLE;
+        };
+    }
+
+    /**
+     * 공개 상세의 actions.orderable 판정. 주문 생성 검증(OrderCreateTransactionService.validateSale)과
+     * 같은 상태·판매 시각 조건에 품절 여부를 더한다.
+     */
+    public boolean isOrderable(OffsetDateTime now) {
+        if (status != DropStatus.GRAB) {
+            return false;
+        }
+        if (saleStartsAt != null && now.isBefore(saleStartsAt)) {
+            return false;
+        }
+        if (saleEndsAt != null && !now.isBefore(saleEndsAt)) {
+            return false;
+        }
+        return !isSoldOut();
+    }
+
+    /**
+     * 활성 SKU의 가용 재고 합이 0이면 품절로 본다. 활성 SKU가 하나도 없어도 품절이다.
+     * 공개 목록 soldOut과 같은 규칙(STOCK-006).
+     */
+    public boolean isSoldOut() {
+        return options.stream()
+                .filter(DropOption::isActive)
+                .mapToInt(DropOption::getAvailableQuantity)
+                .sum() == 0;
     }
 
     // 필드명은 요청 DTO(DropDraftRequest) 기준으로 적어 클라이언트가 입력 위치를 바로 찾을 수 있게 한다.
