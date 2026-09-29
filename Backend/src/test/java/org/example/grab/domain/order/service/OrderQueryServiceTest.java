@@ -115,7 +115,7 @@ class OrderQueryServiceTest {
         assertThat(result.paymentStatus()).isEqualTo(PaymentStatus.PENDING);
         assertThat(result.paymentExpiresAt()).isEqualTo(PAYMENT_EXPIRES_AT);
         assertThat(result.shipping()).isEqualTo(
-                new OrderShippingResponse("PAYMENT_PENDING", "CJ", "1234567890"));
+                new OrderShippingResponse(OrderStatus.PAYMENT_PENDING, "CJ", "1234567890"));
     }
 
     @Test

@@ -42,7 +42,7 @@ public class SellerOrderService {
         return SellerOrderDetailResponse.from(
                 order,
                 detail.items(),
-                detail.paymentStatus() == null ? null : detail.paymentStatus().name(),
+                detail.paymentStatus(),
                 detail.shipment());
     }
 
