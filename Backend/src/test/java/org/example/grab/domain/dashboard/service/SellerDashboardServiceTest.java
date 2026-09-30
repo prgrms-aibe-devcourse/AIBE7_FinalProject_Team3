@@ -12,15 +12,21 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentCaptor.forClass;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 class SellerDashboardServiceTest {
 
     private SellerDashboardService sellerDashboardService;
-    private RecordingRepository sellerDashboardRepository;
+    private SellerDashboardRepository sellerDashboardRepository;
 
     @BeforeEach
     void setUp() {
-        sellerDashboardRepository = new RecordingRepository();
+        sellerDashboardRepository = mock(SellerDashboardRepository.class);
         sellerDashboardService = new SellerDashboardService(sellerDashboardRepository);
     }
 
@@ -30,7 +36,9 @@ class SellerDashboardServiceTest {
         // given
         UpcomingDropProjection projection = new UpcomingDropProjection(
                 10L, "시작 예정 상품", "WISH", OffsetDateTime.parse("2026-10-01T01:00:00Z"));
-        sellerDashboardRepository.projections = List.of(projection);
+        given(sellerDashboardRepository.findUpcomingDrops(
+                eq(3L), eq(UpcomingDropEventType.START), any(OffsetDateTime.class), any(OffsetDateTime.class)))
+                .willReturn(List.of(projection));
 
         // when
         List<UpcomingDropResponse> result = sellerDashboardService.findUpcomingDrops(
@@ -39,10 +47,11 @@ class SellerDashboardServiceTest {
         // then
         assertThat(result).containsExactly(new UpcomingDropResponse(
                 10L, "시작 예정 상품", "WISH", UpcomingDropEventType.START, projection.upcomingAt()));
-        assertThat(sellerDashboardRepository.sellerId).isEqualTo(3L);
-        assertThat(sellerDashboardRepository.eventType).isEqualTo(UpcomingDropEventType.START);
-        assertThat(sellerDashboardRepository.deadline)
-                .isEqualTo(sellerDashboardRepository.now.plusMinutes(60));
+        var now = forClass(OffsetDateTime.class);
+        var deadline = forClass(OffsetDateTime.class);
+        verify(sellerDashboardRepository).findUpcomingDrops(
+                eq(3L), eq(UpcomingDropEventType.START), now.capture(), deadline.capture());
+        assertThat(deadline.getValue()).isEqualTo(now.getValue().plusMinutes(60));
     }
 
     @Test
@@ -51,7 +60,9 @@ class SellerDashboardServiceTest {
         // given
         UpcomingDropProjection projection = new UpcomingDropProjection(
                 20L, "종료 예정 상품", "GRAB", OffsetDateTime.parse("2026-10-02T00:00:00Z"));
-        sellerDashboardRepository.projections = List.of(projection);
+        given(sellerDashboardRepository.findUpcomingDrops(
+                eq(3L), eq(UpcomingDropEventType.END), any(OffsetDateTime.class), any(OffsetDateTime.class)))
+                .willReturn(List.of(projection));
 
         // when
         List<UpcomingDropResponse> result = sellerDashboardService.findUpcomingDrops(
@@ -60,32 +71,10 @@ class SellerDashboardServiceTest {
         // then
         assertThat(result).containsExactly(new UpcomingDropResponse(
                 20L, "종료 예정 상품", "GRAB", UpcomingDropEventType.END, projection.upcomingAt()));
-        assertThat(sellerDashboardRepository.sellerId).isEqualTo(3L);
-        assertThat(sellerDashboardRepository.eventType).isEqualTo(UpcomingDropEventType.END);
-        assertThat(sellerDashboardRepository.deadline)
-                .isEqualTo(sellerDashboardRepository.now.plusMinutes(1440));
-    }
-
-    private static class RecordingRepository extends SellerDashboardRepository {
-
-        private List<UpcomingDropProjection> projections = List.of();
-        private Long sellerId;
-        private UpcomingDropEventType eventType;
-        private OffsetDateTime now;
-        private OffsetDateTime deadline;
-
-        private RecordingRepository() {
-            super(null);
-        }
-
-        @Override
-        public List<UpcomingDropProjection> findUpcomingDrops(
-                long sellerId, UpcomingDropEventType eventType, OffsetDateTime now, OffsetDateTime deadline) {
-            this.sellerId = sellerId;
-            this.eventType = eventType;
-            this.now = now;
-            this.deadline = deadline;
-            return projections;
-        }
+        var now = forClass(OffsetDateTime.class);
+        var deadline = forClass(OffsetDateTime.class);
+        verify(sellerDashboardRepository).findUpcomingDrops(
+                eq(3L), eq(UpcomingDropEventType.END), now.capture(), deadline.capture());
+        assertThat(deadline.getValue()).isEqualTo(now.getValue().plusMinutes(1440));
     }
 }
