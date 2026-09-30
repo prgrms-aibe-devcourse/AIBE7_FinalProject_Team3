@@ -1,4 +1,4 @@
-package org.example.grab.global.security;
+package org.example.grab.global.security.jwt;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

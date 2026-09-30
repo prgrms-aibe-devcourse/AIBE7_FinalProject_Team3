@@ -1,4 +1,4 @@
-package org.example.grab.global.security;
+package org.example.grab.global.security.jwt;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -33,7 +33,8 @@ public record AccessTokenProperties(
         this.secret = secret;
     }
 
-    // 서명 키 바이트. 호출할 때마다 새 배열을 돌려주므로 호출한 쪽이 값을 바꿔도 설정에 영향이 없다
+    // JWT_SECRET을 디코딩한 서명 키 바이트. byte[]는 받은 쪽에서 수정할 수 있으므로
+    // 호출할 때마다 새로 디코딩한 배열을 돌려줘서 받은 배열을 지우거나 바꿔도 설정의 키는 그대로다
     public byte[] secretBytes() {
         return Base64.getDecoder().decode(secret);
     }

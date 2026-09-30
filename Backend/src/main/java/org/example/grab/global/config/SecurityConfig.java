@@ -1,6 +1,6 @@
 package org.example.grab.global.config;
 
-import org.example.grab.global.security.AccessTokenProperties;
+import org.example.grab.global.security.jwt.AccessTokenProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
