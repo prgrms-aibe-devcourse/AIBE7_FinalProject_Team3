@@ -17,6 +17,7 @@ import java.time.temporal.ChronoUnit;
 /**
  * WISH 등록·취소 파사드. DROP 판정은 DropService에 맡기고, 저장은 WishTransactionService에 위임한다.
  * 시각은 요청당 한 번만 만들어 검증·저장에 같은 값을 쓴다.
+ * 트랜잭션 경계는 WishTransactionService가 가지며 이 클래스에는 트랜잭션을 두지 않는다.
  */
 @Service
 @RequiredArgsConstructor
