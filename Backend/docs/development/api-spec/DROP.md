@@ -305,6 +305,7 @@ GET /api/v1/seller/drops?status=DRAFT&page=0&size=20
       {
         "dropId": 100,
         "name": "한정판 스니커즈",
+        "thumbnailUrl": "https://example.com/image.jpg",
         "status": "DRAFT",
         "minPrice": 129000,
         "createdAt": "2026-09-18T14:00:00+09:00"
@@ -320,6 +321,7 @@ GET /api/v1/seller/drops?status=DRAFT&page=0&size=20
 ```
 
 > `minPrice`는 활성 SKU(`is_active = true`) 중 최저 `unitPrice`이며, 활성 SKU가 없으면 `null`입니다. 정렬은 `id` 내림차순(최근 생성 순)입니다.
+> `thumbnailUrl`은 `sort_order`가 가장 작은 이미지이며, 이미지가 없으면 `null`입니다. 이미지를 등록하지 않은 DRAFT는 `null`이 흔합니다.
 
 **오류 코드:**
 - `INVALID_REQUEST` — `page`가 0 미만, `size`가 1 미만 또는 100 초과, 잘못된 `status` 값
