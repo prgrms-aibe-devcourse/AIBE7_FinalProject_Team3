@@ -31,14 +31,7 @@ public class OrderQueryService {
         Page<Order> orders = status == null
                 ? orderRepository.findByBuyerIdOrderByCreatedAtDescIdDesc(buyerId, pageable)
                 : orderRepository.findByBuyerIdAndStatusOrderByCreatedAtDescIdDesc(buyerId, status, pageable);
-        return new PageResponse<>(
-                orders.map(MyOrderListResponse::from).getContent(),
-                page,
-                size,
-                orders.getTotalElements(),
-                orders.getTotalPages(),
-                orders.hasNext()
-        );
+        return PageResponse.from(orders.map(MyOrderListResponse::from));
     }
 
     /** 다른 구매자의 주문도 ORDER_NOT_FOUND로 응답해 주문 존재 여부를 노출하지 않는다. */

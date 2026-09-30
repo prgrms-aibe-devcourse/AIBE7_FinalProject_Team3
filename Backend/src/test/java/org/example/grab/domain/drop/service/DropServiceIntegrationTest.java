@@ -10,12 +10,15 @@ import org.example.grab.domain.drop.dto.request.SelectionRequest;
 import org.example.grab.domain.drop.dto.request.ShippingRequest;
 import org.example.grab.domain.drop.dto.response.SellerDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.SellerDropListResponse;
+import org.example.grab.domain.drop.dto.response.common.DropOptionGroupResponse;
+import org.example.grab.domain.drop.dto.response.common.DropOptionSelectionResponse;
 import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.domain.drop.entity.DropImage;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.domain.drop.repository.DropRepository;
 import org.example.grab.domain.category.service.CategoryService;
+import org.example.grab.domain.wish.service.WishQueryService;
 import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
@@ -45,7 +48,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
-@Import({JpaConfig.class, DropService.class, CategoryService.class})
+@Import({JpaConfig.class, DropService.class, CategoryService.class, WishQueryService.class})
 @Testcontainers
 class DropServiceIntegrationTest {
 
@@ -300,6 +303,27 @@ class DropServiceIntegrationTest {
     }
 
     @Test
+    @DisplayName("판매자 목록은 가장 앞선 이미지를 썸네일로 반환하고 이미지가 없으면 null이다")
+    void findSellerDrops_returnsThumbnail() {
+        // given
+        Long withImages = insertDrop(sellerId, "DRAFT");
+        jdbcTemplate.update("INSERT INTO drop_images (drop_id, image_url, sort_order, alt_text) VALUES (?, ?, ?, '상품')",
+                withImages, "https://example.com/later.jpg", 2);
+        jdbcTemplate.update("INSERT INTO drop_images (drop_id, image_url, sort_order, alt_text) VALUES (?, ?, ?, '상품')",
+                withImages, "https://example.com/first.jpg", 0);
+        Long withoutImages = insertDrop(sellerId, "DRAFT");
+
+        // when
+        PageResponse<SellerDropListResponse> result = dropService.findSellerDrops(sellerId, null, 0, 20);
+
+        // then
+        assertThat(result.content().stream().filter(item -> item.dropId().equals(withImages)).findFirst().orElseThrow()
+                .thumbnailUrl()).isEqualTo("https://example.com/first.jpg");
+        assertThat(result.content().stream().filter(item -> item.dropId().equals(withoutImages)).findFirst().orElseThrow()
+                .thumbnailUrl()).isNull();
+    }
+
+    @Test
     @DisplayName("minPrice는 활성 SKU 중 최저가이고, 활성 SKU가 없으면 null")
     void findSellerDrops_calculatesMinPrice() {
         // given
@@ -331,12 +355,12 @@ class DropServiceIntegrationTest {
         // then
         assertThat(detail.imageUrls())
                 .containsExactly("https://example.com/a.jpg", "https://example.com/b.jpg");
-        assertThat(detail.optionGroups()).extracting(SellerDropDetailResponse.OptionGroup::name)
+        assertThat(detail.optionGroups()).extracting(DropOptionGroupResponse::name)
                 .containsExactly("소재", "길이");
-        assertThat(detail.optionGroups().get(0).values()).extracting(SellerDropDetailResponse.OptionValue::value)
+        assertThat(detail.optionGroups().get(0).values()).extracting(DropOptionGroupResponse.Value::value)
                 .containsExactly("코튼", "린넨");
         assertThat(detail.options()).hasSize(2);
-        assertThat(detail.options().get(0).selections()).extracting(SellerDropDetailResponse.Selection::groupId)
+        assertThat(detail.options().get(0).selections()).extracting(DropOptionSelectionResponse::groupId)
                 .containsExactly(detail.optionGroups().get(0).groupId(), detail.optionGroups().get(1).groupId());
         assertThat(detail.minPrice()).isEqualTo(129000L);
     }
