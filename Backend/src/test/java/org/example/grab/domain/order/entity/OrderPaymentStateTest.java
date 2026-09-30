@@ -1,5 +1,6 @@
 package org.example.grab.domain.order.entity;
 
+import org.example.grab.domain.order.dto.PayableOrder;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
 import org.junit.jupiter.api.DisplayName;
@@ -17,15 +18,18 @@ class OrderPaymentStateTest {
     private static final OffsetDateTime NOW = OffsetDateTime.parse("2026-09-29T12:05:00Z");
 
     @Test
-    @DisplayName("결제 마감 시각 정각부터 만료로 본다")
+    @DisplayName("결제 마감 시각 정각부터 만료로 보고, 결제 요청 검증용 값도 같은 기준을 쓴다")
     void isPaymentExpired() {
         // given
         Order order = createOrder();
+        PayableOrder payable = PayableOrder.from(order);
 
         // when & then
         assertThat(order.isPaymentExpired(EXPIRES_AT.minusNanos(1_000))).isFalse();
         assertThat(order.isPaymentExpired(EXPIRES_AT)).isTrue();
         assertThat(order.isPaymentExpired(EXPIRES_AT.plusSeconds(1))).isTrue();
+        assertThat(payable.isPaymentExpired(EXPIRES_AT.minusNanos(1_000))).isFalse();
+        assertThat(payable.isPaymentExpired(EXPIRES_AT)).isTrue();
     }
 
     @Test

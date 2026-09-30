@@ -146,8 +146,13 @@ public class Order extends UUIDEntity {
     }
 
     // 결제 마감 시각 정각부터 만료로 본다. 결제 확정과 만료 처리가 같은 기준을 써야 두 경로가 동시에 성공하지 않는다.
-    public boolean isPaymentExpired(OffsetDateTime now) {
+    // 결제 요청 검증(PayableOrder)도 이 메서드를 쓴다. 기준을 바꿀 때는 여기만 고친다.
+    public static boolean isPaymentExpired(OffsetDateTime paymentExpiresAt, OffsetDateTime now) {
         return !now.isBefore(paymentExpiresAt);
+    }
+
+    public boolean isPaymentExpired(OffsetDateTime now) {
+        return isPaymentExpired(paymentExpiresAt, now);
     }
 
     public void markPaid(OffsetDateTime paidAt) {

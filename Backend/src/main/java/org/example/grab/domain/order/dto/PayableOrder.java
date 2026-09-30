@@ -33,7 +33,8 @@ public record PayableOrder(
         );
     }
 
+    // 결제 확정·만료와 같은 기준을 쓰도록 주문 엔티티의 판정을 그대로 따른다.
     public boolean isPaymentExpired(OffsetDateTime now) {
-        return !now.isBefore(paymentExpiresAt);
+        return Order.isPaymentExpired(paymentExpiresAt, now);
     }
 }
