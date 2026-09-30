@@ -329,6 +329,51 @@ class PaymentReconciliationIntegrationTest {
         assertThat(fixture.orderStatus(order)).isEqualTo(OrderStatus.PAYMENT_PENDING);
     }
 
+    @Test
+    @DisplayName("재전송 시점에 주문이 결제할 수 없는 상태면 승인 대기 결제에 승인을 다시 요청하지 않는다")
+    void replayDoesNotConfirmForUnpayableOrder() {
+        // given: 승인 요청이 PG에 닿지 않아 UNKNOWN으로 남은 뒤 주문이 취소됐다
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        String idempotencyKey = UUID.randomUUID().toString();
+        given(paymentGateway.confirm(any()))
+                .willReturn(PaymentGatewayResult.unknown(null, null, "결제 승인 응답을 확인하지 못했습니다."))
+                .willReturn(PaymentGatewayResult.approved(
+                        "DONE", order.getOrderNumber(), PaymentTestFixture.TOTAL_AMOUNT, now));
+        given(paymentGateway.lookup("payment-unknown"))
+                .willReturn(PaymentGatewayResult.awaitingConfirmation("IN_PROGRESS"));
+        payAt(now, "payment-unknown", idempotencyKey);
+        jdbcTemplate.update("UPDATE orders SET status = 'CANCELED', canceled_at = CURRENT_TIMESTAMP WHERE id = ?",
+                order.getId());
+
+        // when
+        PaymentResponse replay = payAt(now.plusSeconds(3), "payment-unknown", idempotencyKey);
+
+        // then: 취소된 주문에 새로 청구하지 않고, 결과는 확인되지 않은 채로 남는다
+        verify(paymentGateway, times(1)).confirm(any());
+        assertThat(replay.status()).isEqualTo(PaymentStatus.UNKNOWN);
+    }
+
+    @Test
+    @DisplayName("재전송 시점에 결제 마감이 지났으면 승인 대기 결제에 승인을 다시 요청하지 않는다")
+    void replayDoesNotConfirmAfterDeadline() {
+        // given
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        String idempotencyKey = UUID.randomUUID().toString();
+        given(paymentGateway.confirm(any()))
+                .willReturn(PaymentGatewayResult.unknown(null, null, "결제 승인 응답을 확인하지 못했습니다."));
+        given(paymentGateway.lookup("payment-unknown"))
+                .willReturn(PaymentGatewayResult.awaitingConfirmation("IN_PROGRESS"));
+        payAt(now, "payment-unknown", idempotencyKey);
+
+        // when: 주문은 아직 PAYMENT_PENDING이지만 마감 시각에 재전송한다
+        PaymentResponse replay = payAt(order.getPaymentExpiresAt(), "payment-unknown", idempotencyKey);
+
+        // then
+        verify(paymentGateway, times(1)).confirm(any());
+        assertThat(replay.status()).isEqualTo(PaymentStatus.UNKNOWN);
+        assertThat(fixture.orderStatus(order)).isEqualTo(OrderStatus.PAYMENT_PENDING);
+    }
+
     private void assertUnchangedOrder() {
         assertThat(fixture.orderStatus(order)).isEqualTo(OrderStatus.PAYMENT_PENDING);
         assertThat(fixture.reservationStatus(order)).isEqualTo("HELD");

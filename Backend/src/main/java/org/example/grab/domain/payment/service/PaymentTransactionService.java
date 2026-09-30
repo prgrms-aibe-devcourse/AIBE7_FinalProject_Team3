@@ -80,9 +80,12 @@ public class PaymentTransactionService {
             if (!payment.getRequestHash().equals(requestHash.value())) {
                 throw new BusinessException(CommonErrorCode.DUPLICATE_IDEMPOTENCY_KEY);
             }
-            // 주문 상태·마감과 관계없이 정리한다. 마감 뒤에 승인된 결제도 보정 대상으로 드러나야 한다.
+            // 조회는 주문 상태·마감과 관계없이 한다. 마감 뒤에 승인된 결제도 보정 대상으로 드러나야 한다.
+            // 승인 재요청은 새로 청구하는 동작이므로 아직 결제할 수 있는 주문에만 허용한다.
             if (payment.isInProgress() && isResolvable(payment, now)) {
-                return new PaymentPreparation.ResolveReplay(payment.getId(), confirmCommand(payment, order), order);
+                boolean confirmable = order.status() == OrderStatus.PAYMENT_PENDING && !order.isPaymentExpired(now);
+                return new PaymentPreparation.ResolveReplay(
+                        payment.getId(), confirmCommand(payment, order), order, confirmable);
             }
             return new PaymentPreparation.Replay(payment, order);
         }
