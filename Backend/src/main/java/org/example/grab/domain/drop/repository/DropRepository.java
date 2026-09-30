@@ -28,7 +28,10 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
      * status가 null이면 조건을 통과시켜 전체를, 값이 있으면 해당 상태만 조회한다.
      */
     @Query(value = """
-            SELECT d.id AS dropId, d.name AS name, d.status AS status,
+            SELECT d.id AS dropId, d.name AS name,
+                   (SELECT i.imageUrl FROM DropImage i
+                    WHERE i.drop = d AND i.sortOrder = (SELECT MIN(i2.sortOrder) FROM DropImage i2 WHERE i2.drop = d)) AS thumbnailUrl,
+                   d.status AS status,
                    (SELECT MIN(o.unitPrice) FROM DropOption o WHERE o.drop = d AND o.active = true) AS minPrice,
                    d.createdAt AS createdAt
             FROM Drop d

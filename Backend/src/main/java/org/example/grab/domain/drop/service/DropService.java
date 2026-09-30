@@ -38,6 +38,7 @@ import java.util.List;
  */
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class DropService {
 
     private static final List<String> PUBLIC_STATUSES = List.of(
@@ -81,29 +82,17 @@ public class DropService {
      * WISH 등록·취소 가능 여부를 판정한다. 등록과 취소의 규칙이 같아 하나의 메서드로 공유한다.
      * 존재하지 않거나 DRAFT인 DROP은 DROP_NOT_FOUND로 숨기고, 그 밖의 불가 상태는 도메인이 판정한다.
      */
-    @Transactional(readOnly = true)
     public void validateWishable(Long dropId, OffsetDateTime now) {
-        Drop drop = dropRepository.findById(dropId)
-                .orElseThrow(() -> new BusinessException(DropErrorCode.DROP_NOT_FOUND));
+        Drop drop = findDrop(dropId);
         drop.validateWishable(now);
     }
 
     // 목록은 조회 전용 트랜잭션에서 쿼리 한 번으로 가져오고, 프로젝션을 응답 DTO로 변환한다.
-    @Transactional(readOnly = true)
     public PageResponse<SellerDropListResponse> findSellerDrops(
             Long sellerId, DropStatus status, int page, int size) {
         Page<SellerDropListProjection> drops = dropRepository.findSellerDrops(
                 sellerId, status, PageRequest.of(page, size));
-        List<SellerDropListResponse> content = drops.getContent().stream()
-                .map(projection -> new SellerDropListResponse(
-                        projection.getDropId(),
-                        projection.getName(),
-                        projection.getStatus(),
-                        projection.getMinPrice(),
-                        projection.getCreatedAt()))
-                .toList();
-        return new PageResponse<>(content, page, size, drops.getTotalElements(),
-                drops.getTotalPages(), drops.hasNext());
+        return PageResponse.from(drops.map(SellerDropListResponse::from));
     }
 
     /*
@@ -111,7 +100,6 @@ public class DropService {
      * status가 없으면 WISH·GRAB·ENDED를 모두, 있으면 그 상태만 조회한다.
      * 정렬은 허용 속성을 컬럼명으로 매핑한 Sort를 쓰고, keyword는 trim·이스케이프해 넘긴다.
      */
-    @Transactional(readOnly = true)
     public PageResponse<PublicDropListResponse> findPublicDrops(
             DropStatus status, Long categoryId, String keyword, Boolean soldOut,
             PublicDropSort sort, int page, int size) {
@@ -120,14 +108,9 @@ public class DropService {
         Page<PublicDropListProjection> drops = dropRepository.findPublicDrops(
                 statuses, categoryId, normalizeKeyword(keyword), soldOut,
                 PageRequest.of(page, size, effectiveSort.toSort()));
-        List<PublicDropListResponse> content = drops.getContent().stream()
-                .map(PublicDropListResponse::from)
-                .toList();
-        return new PageResponse<>(content, page, size, drops.getTotalElements(),
-                drops.getTotalPages(), drops.hasNext());
+        return PageResponse.from(drops.map(PublicDropListResponse::from));
     }
 
-    @Transactional(readOnly = true)
     public SellerDropDetailResponse findSellerDrop(Long sellerId, Long dropId) {
         return SellerDropDetailResponse.from(findOwnedDrop(sellerId, dropId));
     }
@@ -137,12 +120,10 @@ public class DropService {
      * CANCELED는 0절 확정대로 200으로 보여 주고 actions가 모두 false가 된다.
      * now는 actions 판정과 응답 serverTime에 같은 값을 쓴다.
      */
-    @Transactional(readOnly = true)
     public PublicDropDetailResponse findPublicDrop(Long dropId) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        Drop drop = dropRepository.findById(dropId)
-                .orElseThrow(() -> new BusinessException(DropErrorCode.DROP_NOT_FOUND));
-        if (drop.getStatus() == DropStatus.DRAFT) {
+        Drop drop = findDrop(dropId);
+        if (!drop.isPublic()) {
             throw new BusinessException(DropErrorCode.DROP_NOT_FOUND);
         }
         long wishCount = wishQueryService.countActiveByDropId(dropId);
@@ -187,10 +168,14 @@ public class DropService {
     }
 
     private Drop findOwnedDrop(Long sellerId, Long dropId) {
-        Drop drop = dropRepository.findById(dropId)
-                .orElseThrow(() -> new BusinessException(DropErrorCode.DROP_NOT_FOUND));
+        Drop drop = findDrop(dropId);
         drop.validateOwner(sellerId);
         return drop;
+    }
+
+    private Drop findDrop(Long dropId) {
+        return dropRepository.findById(dropId)
+                .orElseThrow(() -> new BusinessException(DropErrorCode.DROP_NOT_FOUND));
     }
 
     private void applyDraft(Drop drop, DropDraftRequest request) {

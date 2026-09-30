@@ -16,6 +16,7 @@ import java.util.Optional;
  */
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class WishTransactionService {
 
     private final WishRepository wishRepository;

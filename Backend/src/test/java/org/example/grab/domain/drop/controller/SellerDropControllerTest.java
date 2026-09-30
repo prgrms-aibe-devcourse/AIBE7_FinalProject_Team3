@@ -225,7 +225,7 @@ class SellerDropControllerTest {
     void listDrops() throws Exception {
         // given
         given(currentSellerIdProvider.currentSellerId()).willReturn(1L);
-        SellerDropListResponse item = new SellerDropListResponse(100L, "상품", DropStatus.DRAFT, 10000L,
+        SellerDropListResponse item = new SellerDropListResponse(100L, "상품", "https://example.com/image.jpg", DropStatus.DRAFT, 10000L,
                 OffsetDateTime.parse("2026-09-18T07:00:00Z"));
         given(dropService.findSellerDrops(eq(1L), any(), eq(0), eq(20)))
                 .willReturn(new PageResponse<>(List.of(item), 0, 20, 1, 1, false));
@@ -234,6 +234,7 @@ class SellerDropControllerTest {
         mockMvc.perform(get("/api/v1/seller/drops"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].dropId").value(100))
+                .andExpect(jsonPath("$.data.content[0].thumbnailUrl").value("https://example.com/image.jpg"))
                 .andExpect(jsonPath("$.data.page").value(0))
                 .andExpect(jsonPath("$.data.size").value(20))
                 .andExpect(jsonPath("$.data.totalElements").value(1))

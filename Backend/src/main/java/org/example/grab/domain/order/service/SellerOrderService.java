@@ -25,7 +25,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 
 import java.time.OffsetDateTime;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -119,9 +118,7 @@ public class SellerOrderService {
                 sellerId, dropId, orderStatus == null ? null : orderStatus.name(),
                 paymentStatus == null ? null : paymentStatus.name(), PageRequest.of(page, size))
                 .map(SellerOrderService::toListResponse);
-        List<SellerOrderListResponse> content = orders.getContent();
-        return new PageResponse<>(content, page, size, orders.getTotalElements(),
-                orders.getTotalPages(), orders.hasNext());
+        return PageResponse.from(orders);
     }
 
     private static SellerOrderListResponse toListResponse(SellerOrderListProjection projection) {
