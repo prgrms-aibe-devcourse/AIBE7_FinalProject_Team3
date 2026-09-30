@@ -22,6 +22,10 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
     boolean existsByProviderAndProviderPaymentId(PaymentProvider provider, String providerPaymentId);
 
+    // 잠그기 전에 주문 ID만 읽는다. 엔티티로 읽으면 영속성 컨텍스트에 남은 옛 상태가 잠금 조회 결과를 대신한다.
+    @Query("select p.orderId from Payment p where p.id = :id")
+    Optional<Long> findOrderIdById(@Param("id") Long id);
+
     // 같은 결제 시도에 승인 응답과 상태 조회 결과가 동시에 반영되지 않도록 결제 행을 잠근다.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Payment p where p.id = :id")

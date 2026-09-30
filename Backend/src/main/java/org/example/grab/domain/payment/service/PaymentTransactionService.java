@@ -118,9 +118,8 @@ public class PaymentTransactionService {
             PaymentGatewayResult lookupResult,
             OffsetDateTime now
     ) {
-        Long orderId = paymentRepository.findById(paymentId)
-                .orElseThrow(() -> new IllegalStateException("결제 시도가 없습니다: " + paymentId))
-                .getOrderId();
+        Long orderId = paymentRepository.findOrderIdById(paymentId)
+                .orElseThrow(() -> new IllegalStateException("결제 시도가 없습니다: " + paymentId));
         PayableOrder order = orderPaymentService.lockForPaymentResult(orderId);
         Payment payment = paymentRepository.findByIdForUpdate(paymentId).orElseThrow();
         if (!payment.isInProgress()) {

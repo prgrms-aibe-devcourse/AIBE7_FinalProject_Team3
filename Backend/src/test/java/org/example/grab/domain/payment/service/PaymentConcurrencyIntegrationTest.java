@@ -131,6 +131,46 @@ class PaymentConcurrencyIntegrationTest {
                 .containsEntry("sold_quantity", 0);
     }
 
+    @Test
+    @DisplayName("같은 결제에 결과 반영이 겹치면 먼저 반영한 결과를 유지하고, 늦게 들어온 반영은 아무것도 바꾸지 않는다")
+    void concurrentResultsForSamePayment() throws Exception {
+        // given: 두 반영 요청이 모두 결제를 읽은 뒤 주문 잠금을 기다린다
+        Race race = prepareRace();
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        int baseline = waitingForLock();
+        Future<?> holder = executor.submit(() -> new TransactionTemplate(transactionManager).executeWithoutResult(
+                status -> {
+                    jdbcTemplate.queryForObject("SELECT id FROM orders WHERE id = ? FOR UPDATE", Long.class,
+                            race.order().getId());
+                    locked.countDown();
+                    await(release);
+                }));
+        assertThat(locked.await(10, TimeUnit.SECONDS)).isTrue();
+
+        // when
+        Future<?> first = executor.submit(
+                () -> transactionService.applyResult(race.paymentId, race.approved, null, race.beforeDeadline));
+        awaitWaitingForLock(baseline + 1);
+        Future<?> second = executor.submit(
+                () -> transactionService.applyResult(race.paymentId, race.approved, null, race.beforeDeadline));
+        awaitWaitingForLock(baseline + 2);
+        release.countDown();
+        holder.get(10, TimeUnit.SECONDS);
+        first.get(10, TimeUnit.SECONDS);
+        second.get(10, TimeUnit.SECONDS);
+
+        // then: 늦은 반영이 확정된 결제를 보정 대상으로 덮어쓰지 않는다
+        assertThat(fixture.orderStatus(race.order())).isEqualTo(OrderStatus.PAID);
+        assertThat(fixture.payments(race.order())).singleElement().satisfies(payment -> {
+            assertThat(payment.get("status")).isEqualTo("SUCCEEDED");
+            assertThat(payment.get("reconciliation_status")).isEqualTo("NONE");
+        });
+        assertThat(fixture.quantities())
+                .containsEntry("reserved_quantity", 0)
+                .containsEntry("sold_quantity", PaymentTestFixture.QUANTITY);
+    }
+
     // 결제 시도가 PENDING으로 저장되고 PG 승인이 끝난 직후, 결제 마감에 도달한 상황을 만든다.
     private Race prepareRace() {
         Order order = fixture.createOrder();
