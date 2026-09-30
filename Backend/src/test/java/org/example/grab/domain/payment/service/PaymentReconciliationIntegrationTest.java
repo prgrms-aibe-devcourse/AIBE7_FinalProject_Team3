@@ -13,6 +13,7 @@ import org.example.grab.domain.payment.gateway.PaymentConfirmCommand;
 import org.example.grab.domain.payment.gateway.PaymentGateway;
 import org.example.grab.domain.payment.gateway.PaymentGatewayResult;
 import org.example.grab.global.error.BusinessException;
+import org.example.grab.global.error.CommonErrorCode;
 import org.example.grab.global.idempotency.IdempotencyKey;
 import org.example.grab.global.idempotency.RequestHash;
 import org.example.grab.global.idempotency.RequestHashGenerator;
@@ -372,6 +373,34 @@ class PaymentReconciliationIntegrationTest {
         verify(paymentGateway, times(1)).confirm(any());
         assertThat(replay.status()).isEqualTo(PaymentStatus.UNKNOWN);
         assertThat(fixture.orderStatus(order)).isEqualTo(OrderStatus.PAYMENT_PENDING);
+    }
+
+    @Test
+    @DisplayName("결제 대기가 아닌 주문과 마감이 지난 주문은 상태에 맞는 오류로 PG 호출 없이 거부한다")
+    void rejectsUnpayableOrders() {
+        // given
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        OffsetDateTime afterDeadline = order.getPaymentExpiresAt().plusSeconds(1);
+
+        // when & then: 결제 대기인데 마감이 지남
+        assertPayRejected(afterDeadline, PaymentErrorCode.PAYMENT_EXPIRED);
+        // when & then: 만료 처리된 주문
+        jdbcTemplate.update("UPDATE orders SET status = 'EXPIRED' WHERE id = ?", order.getId());
+        assertPayRejected(now, PaymentErrorCode.PAYMENT_EXPIRED);
+        // when & then: 취소된 주문은 마감 전후와 관계없이 상태 전이 오류
+        jdbcTemplate.update("UPDATE orders SET status = 'CANCELED', canceled_at = CURRENT_TIMESTAMP WHERE id = ?",
+                order.getId());
+        assertPayRejected(now, CommonErrorCode.INVALID_STATE_TRANSITION);
+        assertPayRejected(afterDeadline, CommonErrorCode.INVALID_STATE_TRANSITION);
+        verify(paymentGateway, never()).confirm(any());
+        assertThat(fixture.payments(order)).isEmpty();
+    }
+
+    private void assertPayRejected(OffsetDateTime requestTime, Object errorCode) {
+        assertThatThrownBy(() -> payAt(requestTime, "payment-" + UUID.randomUUID()))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(errorCode);
     }
 
     private void assertUnchangedOrder() {

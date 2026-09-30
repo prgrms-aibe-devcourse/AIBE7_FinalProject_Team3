@@ -33,6 +33,11 @@ public record PayableOrder(
         );
     }
 
+    // 새 결제 승인과 승인 재요청을 받을 수 있는 주문인지. 두 경로가 같은 기준을 쓰도록 여기서만 판정한다.
+    public boolean isPayable(OffsetDateTime now) {
+        return status == OrderStatus.PAYMENT_PENDING && !isPaymentExpired(now);
+    }
+
     // 결제 확정·만료와 같은 기준을 쓰도록 주문 엔티티의 판정을 그대로 따른다.
     public boolean isPaymentExpired(OffsetDateTime now) {
         return Order.isPaymentExpired(paymentExpiresAt, now);

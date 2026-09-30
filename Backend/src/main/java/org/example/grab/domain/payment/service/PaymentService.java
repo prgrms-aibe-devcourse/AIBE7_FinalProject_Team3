@@ -62,16 +62,16 @@ public class PaymentService {
             PaymentPreparation preparation =
                     transactionService.prepare(buyerId, orderId, idempotencyKey, requestHash, request, now());
             if (preparation instanceof PaymentPreparation.Replay replay) {
-                return PaymentResponse.of(replay.payment(), replay.order().orderId(), replay.order().orderNumber());
+                return PaymentResponse.of(replay.payment(), replay.order());
             }
             if (preparation instanceof PaymentPreparation.ResolveReplay replay) {
                 // 정리해도 결과를 모르면 UNKNOWN을 그대로 돌려준다. 재전송이므로 409로 거부하지 않는다.
                 Payment payment = resolve(replay.paymentId(), replay.command(), replay.confirmable());
-                return PaymentResponse.of(payment, replay.order().orderId(), replay.order().orderNumber());
+                return PaymentResponse.of(payment, replay.order());
             }
             if (preparation instanceof PaymentPreparation.Ready ready) {
                 Payment payment = confirm(ready.paymentId(), ready.command());
-                return PaymentResponse.of(payment, ready.order().orderId(), ready.order().orderNumber());
+                return PaymentResponse.of(payment, ready.order());
             }
             // 새 결제 요청은 prepare에서 결제 가능한 주문임을 확인했으므로 승인 재요청을 허용한다.
             PaymentPreparation.Resolve resolve = (PaymentPreparation.Resolve) preparation;

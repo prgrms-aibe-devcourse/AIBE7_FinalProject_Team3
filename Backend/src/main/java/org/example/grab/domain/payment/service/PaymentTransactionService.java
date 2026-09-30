@@ -83,9 +83,8 @@ public class PaymentTransactionService {
             // 조회는 주문 상태·마감과 관계없이 한다. 마감 뒤에 승인된 결제도 보정 대상으로 드러나야 한다.
             // 승인 재요청은 새로 청구하는 동작이므로 아직 결제할 수 있는 주문에만 허용한다.
             if (payment.isInProgress() && isResolvable(payment, now)) {
-                boolean confirmable = order.status() == OrderStatus.PAYMENT_PENDING && !order.isPaymentExpired(now);
                 return new PaymentPreparation.ResolveReplay(
-                        payment.getId(), confirmCommand(payment, order), order, confirmable);
+                        payment.getId(), confirmCommand(payment, order), order, order.isPayable(now));
             }
             return new PaymentPreparation.Replay(payment, order);
         }
@@ -164,15 +163,16 @@ public class PaymentTransactionService {
         if (PAID_STATUSES.contains(order.status())) {
             throw new BusinessException(PaymentErrorCode.PAYMENT_ALREADY_PROCESSED);
         }
-        if (order.status() == OrderStatus.CANCELED) {
-            throw new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION);
-        }
-        if (order.status() == OrderStatus.EXPIRED || order.isPaymentExpired(now)) {
+        if (order.status() == OrderStatus.EXPIRED) {
             throw new BusinessException(PaymentErrorCode.PAYMENT_EXPIRED);
         }
-        // 위에서 거르지 않은 상태가 나중에 추가돼도 결제 대기가 아닌 주문은 PG 승인까지 가지 않게 한다.
+        // 취소된 주문, 이후 추가될 상태 등 결제 대기가 아닌 주문은 PG 승인까지 가지 않게 한다.
         if (order.status() != OrderStatus.PAYMENT_PENDING) {
             throw new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION);
+        }
+        // 결제 대기지만 마감이 지났다. 판정은 승인 재요청(ResolveReplay)과 같은 PayableOrder.isPayable을 쓴다.
+        if (!order.isPayable(now)) {
+            throw new BusinessException(PaymentErrorCode.PAYMENT_EXPIRED);
         }
         if (request.amount() != order.totalAmount()) {
             throw new BusinessException(PaymentErrorCode.PAYMENT_AMOUNT_MISMATCH);

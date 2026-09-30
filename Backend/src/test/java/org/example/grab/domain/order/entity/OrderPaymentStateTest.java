@@ -30,6 +30,11 @@ class OrderPaymentStateTest {
         assertThat(order.isPaymentExpired(EXPIRES_AT.plusSeconds(1))).isTrue();
         assertThat(payable.isPaymentExpired(EXPIRES_AT.minusNanos(1_000))).isFalse();
         assertThat(payable.isPaymentExpired(EXPIRES_AT)).isTrue();
+        // 결제 가능 여부는 결제 대기이면서 마감 전일 때만 참이다.
+        assertThat(payable.isPayable(EXPIRES_AT.minusNanos(1_000))).isTrue();
+        assertThat(payable.isPayable(EXPIRES_AT)).isFalse();
+        order.markPaid(NOW);
+        assertThat(PayableOrder.from(order).isPayable(NOW)).isFalse();
     }
 
     @Test

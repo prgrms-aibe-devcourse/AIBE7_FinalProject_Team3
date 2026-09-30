@@ -1,5 +1,6 @@
 package org.example.grab.domain.payment.dto;
 
+import org.example.grab.domain.order.dto.PayableOrder;
 import org.example.grab.domain.payment.entity.Payment;
 import org.example.grab.domain.payment.entity.PaymentStatus;
 import org.example.grab.domain.payment.entity.ReconciliationStatus;
@@ -18,15 +19,15 @@ public record PaymentResponse(
         Failure failure
 ) {
 
-    public static PaymentResponse of(Payment payment, UUID orderId, String orderNumber) {
+    public static PaymentResponse of(Payment payment, PayableOrder order) {
         Failure failure = payment.getStatus() == PaymentStatus.FAILED
                 ? new Failure(payment.getFailureCode(), payment.getFailureMessage())
                 : null;
         OffsetDateTime paidAt = payment.getStatus() == PaymentStatus.SUCCEEDED ? payment.getApprovedAt() : null;
         return new PaymentResponse(
                 payment.getUuid(),
-                orderId,
-                orderNumber,
+                order.orderId(),
+                order.orderNumber(),
                 payment.getAmount(),
                 payment.getStatus(),
                 payment.getReconciliationStatus(),
