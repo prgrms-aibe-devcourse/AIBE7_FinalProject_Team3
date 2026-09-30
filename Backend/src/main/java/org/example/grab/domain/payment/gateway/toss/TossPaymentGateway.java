@@ -42,6 +42,8 @@ public class TossPaymentGateway implements PaymentGateway {
 
     private static final String NOT_FOUND_PAYMENT_CODE = "NOT_FOUND_PAYMENT";
 
+    private static final String DUPLICATED_ORDER_ID_CODE = "DUPLICATED_ORDER_ID";
+
     private final RestClient restClient;
     private final boolean configured;
 
@@ -75,7 +77,7 @@ public class TossPaymentGateway implements PaymentGateway {
                         if (response.getStatusCode().is2xxSuccessful()) {
                             return fromPayment(response.bodyTo(TossPaymentResponse.class));
                         }
-                        return fromConfirmError(response.getStatusCode(), readError(response));
+                        return fromConfirmError(response.getStatusCode(), readError(response), command.orderId());
                     });
         } catch (RestClientException e) {
             // 타임아웃·연결 실패·응답 해석 실패. 토스에서 승인이 끝났을 수 있으므로 실패로 단정하지 않는다.
@@ -127,13 +129,18 @@ public class TossPaymentGateway implements PaymentGateway {
         return PaymentGatewayResult.unknown(payment.status(), null, "결제가 아직 확정되지 않았습니다.");
     }
 
-    private PaymentGatewayResult fromConfirmError(HttpStatusCode status, TossErrorResponse error) {
+    private PaymentGatewayResult fromConfirmError(HttpStatusCode status, TossErrorResponse error, String orderId) {
         if (status.is5xxServerError() || error.code() == null || UNCERTAIN_ERROR_CODES.contains(error.code())) {
             log.warn("토스페이먼츠 결제 승인 결과 불명: status={}, code={}", status.value(), error.code());
             return PaymentGatewayResult.unknown(null, error.code(), error.message());
         }
         if (status.value() == HttpStatus.UNAUTHORIZED.value()) {
             log.error("토스페이먼츠 인증 실패. 시크릿 키 설정을 확인해야 함: code={}", error.code());
+        }
+        // 이 요청은 승인되지 않았지만, 같은 주문번호로 토스에서 이미 승인된 결제가 있다는 뜻이다.
+        // 서버가 그 승인을 기록하지 못했을 수 있으므로 운영자가 토스 주문번호 조회로 확인해야 한다.
+        if (DUPLICATED_ORDER_ID_CODE.equals(error.code())) {
+            log.error("토스페이먼츠에 같은 주문번호의 승인 이력이 있음. 서버 결제 기록과 대조 필요: orderId={}", orderId);
         }
         return PaymentGatewayResult.notApproved(null, error.code(), error.message());
     }

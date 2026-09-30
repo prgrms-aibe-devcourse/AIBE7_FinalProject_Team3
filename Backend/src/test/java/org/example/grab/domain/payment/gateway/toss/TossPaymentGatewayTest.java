@@ -90,6 +90,23 @@ class TossPaymentGatewayTest {
     }
 
     @Test
+    @DisplayName("같은 주문번호의 승인 이력이 있다는 오류는 이 요청이 승인되지 않은 것이므로 미승인으로 돌려준다")
+    void confirmDuplicatedOrderId() {
+        // given: 2026-09-30 테스트 환경에서 이미 승인된 주문번호로 다른 결제를 승인하려 할 때 받은 응답
+        TossPaymentGateway gateway = new TossPaymentGateway(builder, SECRET_KEY);
+        server.expect(requestTo(BASE_URL + "/v1/payments/confirm"))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON)
+                        .body(error("DUPLICATED_ORDER_ID", "이미 승인 및 취소가 진행된 중복된 주문번호 입니다.")));
+
+        // when
+        PaymentGatewayResult result = gateway.confirm(COMMAND);
+
+        // then
+        assertThat(result.outcome()).isEqualTo(Outcome.NOT_APPROVED);
+        assertThat(result.failureCode()).isEqualTo("DUPLICATED_ORDER_ID");
+    }
+
+    @Test
     @DisplayName("이미 처리됐거나 처리 중일 수 있는 4xx 오류는 실패로 단정하지 않고 결과 불명으로 돌려준다")
     void confirmUncertainError() {
         // given

@@ -167,6 +167,10 @@ public class PaymentTransactionService {
         if (order.status() == OrderStatus.EXPIRED || order.isPaymentExpired(now)) {
             throw new BusinessException(PaymentErrorCode.PAYMENT_EXPIRED);
         }
+        // 위에서 거르지 않은 상태가 나중에 추가돼도 결제 대기가 아닌 주문은 PG 승인까지 가지 않게 한다.
+        if (order.status() != OrderStatus.PAYMENT_PENDING) {
+            throw new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION);
+        }
         if (request.amount() != order.totalAmount()) {
             throw new BusinessException(PaymentErrorCode.PAYMENT_AMOUNT_MISMATCH);
         }
