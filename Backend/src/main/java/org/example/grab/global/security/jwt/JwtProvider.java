@@ -49,9 +49,12 @@ public class JwtProvider {
         this.clock = clock;
         // 파서는 불변이고 여러 요청이 동시에 써도 안전하므로 한 번만 만든다
         this.parser = Jwts.parser()
-                .verifyWith(key)
-                .requireIssuer(properties.issuer())
-                .requireAudience(properties.audience())
+                // 헤더의 alg를 믿지 않고 HS256만 허용한다. 키가 64바이트 이상이면 같은 키로 서명한
+                // HS384·HS512 토큰도 서명 검증을 통과하므로, 허용 목록을 비우고 HS256 하나만 둔다
+                .sig().clear().add(Jwts.SIG.HS256).and()
+                .verifyWith(key) // 서명 확인에 쓸 키
+                .requireIssuer(properties.issuer()) // Issuer 검증
+                .requireAudience(properties.audience()) // Audience 검증
                 .clockSkewSeconds(CLOCK_SKEW.toSeconds())
                 // 만료 판단도 발급과 같은 시계를 쓴다. 테스트에서 고정 시각으로 만료를 확인할 수 있다
                 .clock(() -> Date.from(clock.instant()))
@@ -87,10 +90,9 @@ public class JwtProvider {
     }
 
     /*
-        서명(같은 키로 다시 계산해 비교), iss, aud, exp(leeway 30초)를 검증하고 Claim을 돌려준다.
+        알고리즘(HS256만), 서명(같은 키로 다시 계산해 비교), iss, aud, exp(leeway 30초)를 검증하고 Claim을 돌려준다.
         parseSignedClaims는 서명이 없는 토큰(alg: none)을 거부한다.
-        실패하면 jjwt의 JwtException 계열 예외가 그대로 나간다. 알고리즘 고정(M03-02)과
-        INVALID_TOKEN 변환(M03-03)은 이 메서드에 이어서 추가한다.
+        실패하면 jjwt의 JwtException 계열 예외가 그대로 나간다. INVALID_TOKEN 변환(M03-03)은 이어서 추가한다.
      */
     public Claims parse(String token) {
         return parser.parseSignedClaims(token).getPayload();

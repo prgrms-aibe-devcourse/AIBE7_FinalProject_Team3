@@ -131,6 +131,24 @@ class JwtProviderParseTest {
     }
 
     @Test
+    @DisplayName("같은 키로 서명했어도 HS256이 아닌 알고리즘(HS384·HS512)은 거부한다")
+    void rejectsAlgorithmOtherThanHs256() {
+        // given: 64바이트 키는 HS256·HS384·HS512 모두에 쓸 수 있어, 알고리즘을 고정하지 않으면 셋 다 서명 검증을 통과한다
+        String secret64 = Base64.getEncoder().encodeToString("k".repeat(64).getBytes(StandardCharsets.UTF_8));
+        AccessTokenProperties properties = new AccessTokenProperties(Duration.ofMinutes(15), "grab", "grab-api", secret64);
+        SecretKey key64 = Keys.hmacShaKeyFor(properties.secretBytes());
+        JwtProvider provider = new JwtProvider(properties, Clock.fixed(ISSUED_AT, ZoneOffset.UTC));
+        String hs256 = baseClaims().signWith(key64, Jwts.SIG.HS256).compact();
+        String hs384 = baseClaims().signWith(key64, Jwts.SIG.HS384).compact();
+        String hs512 = baseClaims().signWith(key64, Jwts.SIG.HS512).compact();
+
+        // when, then: 허용 목록에 없는 알고리즘은 jjwt가 SignatureException으로 거부한다
+        assertThat(provider.parse(hs256).getSubject()).isEqualTo(PUBLIC_ID.toString());
+        assertThatThrownBy(() -> provider.parse(hs384)).isInstanceOf(SignatureException.class);
+        assertThatThrownBy(() -> provider.parse(hs512)).isInstanceOf(SignatureException.class);
+    }
+
+    @Test
     @DisplayName("JWT 형식이 아닌 값은 거부한다")
     void rejectsMalformedToken() {
         assertThatThrownBy(() -> issuer.parse("not-a-jwt")).isInstanceOf(MalformedJwtException.class);
