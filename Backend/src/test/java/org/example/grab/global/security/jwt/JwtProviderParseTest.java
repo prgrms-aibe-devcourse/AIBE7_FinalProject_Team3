@@ -1,17 +1,18 @@
 package org.example.grab.global.security.jwt;
 
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.IncorrectClaimException;
 import io.jsonwebtoken.JwtBuilder;
-import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.security.Keys;
-import io.jsonwebtoken.security.SignatureException;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.example.grab.global.security.AuthRole;
+import org.example.grab.global.security.jwt.InvalidAccessTokenException.Reason;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.security.core.AuthenticationException;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
@@ -28,7 +29,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-// M03-01: JwtProvider.parse의 서명·iss·aud·exp(leeway) 검증
+// M03-01~03: JwtProvider.parse의 알고리즘·서명·iss·aud·exp(leeway) 검증과 실패 사유
 class JwtProviderParseTest {
 
     private static final String SECRET = Base64.getEncoder().encodeToString(
@@ -68,7 +69,7 @@ class JwtProviderParseTest {
         String tampered = parts[0] + "." + base64Url(payload) + "." + parts[2];
 
         // when, then
-        assertThatThrownBy(() -> issuer.parse(tampered)).isInstanceOf(SignatureException.class);
+        assertRejected(() -> issuer.parse(tampered), Reason.SIGNATURE);
     }
 
     @Test
@@ -78,7 +79,7 @@ class JwtProviderParseTest {
         String token = baseClaims().signWith(Jwts.SIG.HS256.key().build(), Jwts.SIG.HS256).compact();
 
         // when, then
-        assertThatThrownBy(() -> issuer.parse(token)).isInstanceOf(SignatureException.class);
+        assertRejected(() -> issuer.parse(token), Reason.SIGNATURE);
     }
 
     @Test
@@ -88,7 +89,7 @@ class JwtProviderParseTest {
         String token = baseClaims().issuer("other").signWith(KEY, Jwts.SIG.HS256).compact();
 
         // when, then
-        assertThatThrownBy(() -> issuer.parse(token)).isInstanceOf(IncorrectClaimException.class);
+        assertRejected(() -> issuer.parse(token), Reason.CLAIM);
     }
 
     @Test
@@ -104,7 +105,7 @@ class JwtProviderParseTest {
                 .compact();
 
         // when, then
-        assertThatThrownBy(() -> issuer.parse(token)).isInstanceOf(IncorrectClaimException.class);
+        assertRejected(() -> issuer.parse(token), Reason.CLAIM);
     }
 
     @Test
@@ -117,7 +118,7 @@ class JwtProviderParseTest {
 
         // when, then
         assertThat(withinSkew.parse(token).getSubject()).isEqualTo(PUBLIC_ID.toString());
-        assertThatThrownBy(() -> beyondSkew.parse(token)).isInstanceOf(ExpiredJwtException.class);
+        assertRejected(() -> beyondSkew.parse(token), Reason.EXPIRED);
     }
 
     @Test
@@ -127,7 +128,7 @@ class JwtProviderParseTest {
         String token = baseClaims().compact();
 
         // when, then
-        assertThatThrownBy(() -> issuer.parse(token)).isInstanceOf(JwtException.class);
+        assertRejected(() -> issuer.parse(token), Reason.UNSUPPORTED);
     }
 
     @Test
@@ -144,14 +145,43 @@ class JwtProviderParseTest {
 
         // when, then: 허용 목록에 없는 알고리즘은 jjwt가 SignatureException으로 거부한다
         assertThat(provider.parse(hs256).getSubject()).isEqualTo(PUBLIC_ID.toString());
-        assertThatThrownBy(() -> provider.parse(hs384)).isInstanceOf(SignatureException.class);
-        assertThatThrownBy(() -> provider.parse(hs512)).isInstanceOf(SignatureException.class);
+        assertRejected(() -> provider.parse(hs384), Reason.SIGNATURE);
+        assertRejected(() -> provider.parse(hs512), Reason.SIGNATURE);
     }
 
     @Test
     @DisplayName("JWT 형식이 아닌 값은 거부한다")
     void rejectsMalformedToken() {
-        assertThatThrownBy(() -> issuer.parse("not-a-jwt")).isInstanceOf(MalformedJwtException.class);
+        assertRejected(() -> issuer.parse("not-a-jwt"), Reason.MALFORMED);
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = "   ")
+    @DisplayName("토큰 값이 없거나 공백이면 거부한다(access_token= 처럼 값이 빈 쿠키)")
+    void rejectsEmptyToken(String empty) {
+        assertRejected(() -> issuer.parse(empty), Reason.EMPTY);
+    }
+
+    @Test
+    @DisplayName("거부 예외는 cause가 없고, 메시지에 토큰 원문이나 Claim 값이 남지 않는다")
+    void doesNotLeakTokenOrClaimsInException() {
+        // given: 만료된 토큰. jjwt의 ExpiredJwtException 메시지에는 만료 시각 등이 들어간다
+        String token = issuer.issue(PUBLIC_ID, Set.of(AuthRole.USER)).value();
+        JwtProvider later = providerAt(EXPIRES_AT.plusSeconds(60));
+
+        // when, then
+        assertThatThrownBy(() -> later.parse(token))
+                .isInstanceOf(InvalidAccessTokenException.class)
+                .hasNoCause()
+                .hasMessageNotContaining(token)
+                .hasMessageNotContaining(PUBLIC_ID.toString());
+    }
+
+    @Test
+    @DisplayName("거부 예외는 AuthenticationException이라 필터가 그대로 AuthenticationEntryPoint에 넘길 수 있다")
+    void throwsAuthenticationException() {
+        assertThatThrownBy(() -> issuer.parse("not-a-jwt")).isInstanceOf(AuthenticationException.class);
     }
 
     // iss·aud·exp가 정상인 Claim. 테스트마다 바꿀 부분만 덮어쓴다
@@ -161,6 +191,13 @@ class JwtProviderParseTest {
                 .issuer("grab")
                 .audience().add("grab-api").and()
                 .expiration(Date.from(EXPIRES_AT));
+    }
+
+    private static void assertRejected(ThrowingCallable parse, Reason reason) {
+        assertThatThrownBy(parse)
+                .isInstanceOf(InvalidAccessTokenException.class)
+                .extracting(e -> ((InvalidAccessTokenException) e).getReason())
+                .isEqualTo(reason);
     }
 
     private static JwtProvider providerAt(Instant now) {

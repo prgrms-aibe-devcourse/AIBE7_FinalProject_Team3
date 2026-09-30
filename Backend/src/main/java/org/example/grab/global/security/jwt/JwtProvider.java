@@ -1,10 +1,17 @@
 package org.example.grab.global.security.jwt;
 
+import io.jsonwebtoken.ClaimJwtException;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.MalformedJwtException;
+import io.jsonwebtoken.UnsupportedJwtException;
 import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.SignatureException;
 import org.example.grab.global.security.AuthRole;
+import org.example.grab.global.security.jwt.InvalidAccessTokenException.Reason;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -92,10 +99,39 @@ public class JwtProvider {
     /*
         알고리즘(HS256만), 서명(같은 키로 다시 계산해 비교), iss, aud, exp(leeway 30초)를 검증하고 Claim을 돌려준다.
         parseSignedClaims는 서명이 없는 토큰(alg: none)을 거부한다.
-        실패하면 jjwt의 JwtException 계열 예외가 그대로 나간다. INVALID_TOKEN 변환(M03-03)은 이어서 추가한다.
+        실패하면 사유와 관계없이 InvalidAccessTokenException 하나로 던진다(응답은 INVALID_TOKEN).
      */
     public Claims parse(String token) {
-        return parser.parseSignedClaims(token).getPayload();
+        // access_token= 처럼 값이 빈 쿠키도 올 수 있다. jjwt는 이때 IllegalArgumentException을 던지므로 먼저 거른다
+        if (token == null || token.isBlank()) {
+            throw new InvalidAccessTokenException(Reason.EMPTY);
+        }
+        try {
+            return parser.parseSignedClaims(token).getPayload();
+        } catch (JwtException | IllegalArgumentException e) {
+            // 원래 예외는 메시지에 Claim 값·토큰 일부가 있을 수 있어 cause로 연결하지 않는다
+            throw new InvalidAccessTokenException(reasonOf(e));
+        }
+    }
+
+    // ExpiredJwtException은 ClaimJwtException의 하위 타입이므로 먼저 확인한다
+    private static Reason reasonOf(RuntimeException e) {
+        if (e instanceof ExpiredJwtException) {
+            return Reason.EXPIRED;
+        }
+        if (e instanceof ClaimJwtException) {
+            return Reason.CLAIM;
+        }
+        if (e instanceof SignatureException) {
+            return Reason.SIGNATURE;
+        }
+        if (e instanceof MalformedJwtException || e instanceof IllegalArgumentException) {
+            return Reason.MALFORMED;
+        }
+        if (e instanceof UnsupportedJwtException) {
+            return Reason.UNSUPPORTED;
+        }
+        return Reason.OTHER;
     }
 
     // 입력 Set의 순서와 관계없이 같은 권한이면 같은 Claim이 나오도록 enum 선언 순서로 정렬한다
