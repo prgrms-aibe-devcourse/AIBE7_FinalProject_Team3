@@ -11,7 +11,7 @@ public record UpcomingDropResponse(
 ) {
 
     public static UpcomingDropResponse from(UpcomingDropProjection projection, UpcomingDropEventType eventType) {
-        return new UpcomingDropResponse(projection.getDropId(), projection.getName(), projection.getStatus(),
-                eventType, projection.getUpcomingAt());
+        return new UpcomingDropResponse(projection.dropId(), projection.name(), projection.status(),
+                eventType, projection.upcomingAt());
     }
 }
