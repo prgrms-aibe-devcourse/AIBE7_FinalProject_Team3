@@ -6,7 +6,12 @@ import org.example.grab.domain.drop.dto.request.OptionRequest;
 import org.example.grab.domain.drop.dto.request.OptionValueRequest;
 import org.example.grab.domain.drop.dto.request.SelectionRequest;
 import org.example.grab.domain.drop.dto.request.ShippingRequest;
+import org.example.grab.domain.category.dto.response.CategoryResponse;
 import org.example.grab.domain.category.service.CategoryService;
+import org.example.grab.domain.drop.dto.response.PublicDropDetailResponse;
+import org.example.grab.domain.drop.dto.response.common.DropCategoryResponse;
+import org.example.grab.domain.wish.WishNotice;
+import org.example.grab.domain.wish.service.WishQueryService;
 import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.domain.drop.entity.DropImage;
 import org.example.grab.domain.drop.entity.DropStatus;
@@ -42,6 +47,9 @@ class DropServiceTest {
 
     @Mock
     private CategoryService categoryService;
+
+    @Mock
+    private WishQueryService wishQueryService;
 
     @InjectMocks
     private DropService dropService;
@@ -318,6 +326,58 @@ class DropServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(DropErrorCode.DROP_ACCESS_DENIED);
+    }
+
+    @Test
+    @DisplayName("공개 상세: 없는 DROP은 DROP_NOT_FOUND")
+    void findPublicDrop_notFound() {
+        // given
+        given(dropRepository.findById(99L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> dropService.findPublicDrop(99L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(DropErrorCode.DROP_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("공개 상세: DRAFT는 DROP_NOT_FOUND로 숨기고 이후 조회를 하지 않는다")
+    void findPublicDrop_hidesDraft() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+
+        // when & then
+        assertThatThrownBy(() -> dropService.findPublicDrop(10L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(DropErrorCode.DROP_NOT_FOUND);
+        verifyNoInteractions(categoryService, wishQueryService);
+    }
+
+    @Test
+    @DisplayName("공개 상세: CANCELED는 200 응답을 만들고 actions가 모두 false다")
+    void findPublicDrop_allowsCanceled() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        ReflectionTestUtils.setField(drop, "status", DropStatus.CANCELED);
+        ReflectionTestUtils.setField(drop, "categoryId", 1L);
+        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+        given(categoryService.findCategory(1L))
+                .willReturn(Optional.of(new CategoryResponse(1L, "FASHION", "패션")));
+        given(wishQueryService.countActiveByDropId(10L)).willReturn(3L);
+
+        // when
+        PublicDropDetailResponse response = dropService.findPublicDrop(10L);
+
+        // then
+        assertThat(response.status()).isEqualTo(DropStatus.CANCELED);
+        assertThat(response.category()).isEqualTo(new DropCategoryResponse(1L, "패션"));
+        assertThat(response.wishCount()).isEqualTo(3L);
+        assertThat(response.wishNotice()).isEqualTo(WishNotice.MESSAGE);
+        assertThat(response.actions())
+                .isEqualTo(new PublicDropDetailResponse.Actions(false, false, false));
     }
 
     private DropDraftRequest requestWithOptions() {

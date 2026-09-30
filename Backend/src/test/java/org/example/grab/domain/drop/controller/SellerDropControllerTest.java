@@ -3,6 +3,9 @@ package org.example.grab.domain.drop.controller;
 import org.example.grab.domain.drop.dto.request.DropDraftRequest;
 import org.example.grab.domain.drop.dto.response.SellerDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.SellerDropListResponse;
+import org.example.grab.domain.drop.dto.response.common.DropOptionGroupResponse;
+import org.example.grab.domain.drop.dto.response.common.DropOptionSelectionResponse;
+import org.example.grab.domain.drop.dto.response.common.DropShippingResponse;
 import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.error.DropErrorCode;
@@ -222,7 +225,7 @@ class SellerDropControllerTest {
     void listDrops() throws Exception {
         // given
         given(currentSellerIdProvider.currentSellerId()).willReturn(1L);
-        SellerDropListResponse item = new SellerDropListResponse(100L, "상품", DropStatus.DRAFT, 10000L,
+        SellerDropListResponse item = new SellerDropListResponse(100L, "상품", "https://example.com/image.jpg", DropStatus.DRAFT, 10000L,
                 OffsetDateTime.parse("2026-09-18T07:00:00Z"));
         given(dropService.findSellerDrops(eq(1L), any(), eq(0), eq(20)))
                 .willReturn(new PageResponse<>(List.of(item), 0, 20, 1, 1, false));
@@ -231,6 +234,7 @@ class SellerDropControllerTest {
         mockMvc.perform(get("/api/v1/seller/drops"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].dropId").value(100))
+                .andExpect(jsonPath("$.data.content[0].thumbnailUrl").value("https://example.com/image.jpg"))
                 .andExpect(jsonPath("$.data.page").value(0))
                 .andExpect(jsonPath("$.data.size").value(20))
                 .andExpect(jsonPath("$.data.totalElements").value(1))
@@ -276,11 +280,11 @@ class SellerDropControllerTest {
         SellerDropDetailResponse detail = new SellerDropDetailResponse(
                 100L, "상품", "설명", List.of("https://example.com/a.jpg"), 10000L, 1L, DropStatus.DRAFT,
                 OffsetDateTime.parse("2026-09-18T07:00:00Z"), OffsetDateTime.parse("2026-09-18T09:00:00Z"),
-                new SellerDropDetailResponse.Shipping(3000L, "안내"),
-                List.of(new SellerDropDetailResponse.OptionGroup(11L, "소재", 0,
-                        List.of(new SellerDropDetailResponse.OptionValue(111L, "코튼", 0)))),
+                new DropShippingResponse(3000L, "안내"),
+                List.of(new DropOptionGroupResponse(11L, "소재", 0,
+                        List.of(new DropOptionGroupResponse.Value(111L, "코튼", 0)))),
                 List.of(new SellerDropDetailResponse.Option(1001L,
-                        List.of(new SellerDropDetailResponse.Selection(11L, 111L)),
+                        List.of(new DropOptionSelectionResponse(11L, 111L)),
                         129000L, 10, 0, 0, true, 0)));
         given(dropService.findSellerDrop(1L, 100L)).willReturn(detail);
 

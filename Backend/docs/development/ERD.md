@@ -328,7 +328,7 @@ UQ(`order_id`, `option_id`)를 둔다. `drop_id`를 포함한 복합 FK로 다�
 | `carrier_code` | VARCHAR(50) | O | 택배사 코드 |
 | `tracking_number` | VARCHAR(100) | O | 송장번호 |
 | `idempotency_key` | VARCHAR(100) | O | 송장 등록 요청의 멱등 키, 주문별 키 범위 |
-| `request_hash` | CHAR(64) | O | 송장 등록 요청 본문의 SHA-256 해시 |
+| `request_hash` | VARCHAR(64) | O | 송장 등록 요청 본문의 SHA-256 해시 |
 | `shipped_at` | TIMESTAMPTZ | O | 송장 등록·발송 처리 시각, 서버 시각 |
 | `delivered_at` | TIMESTAMPTZ | X | 배송 완료 시각 |
 
