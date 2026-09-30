@@ -12,8 +12,8 @@ import java.util.Base64;
 @ConfigurationProperties(prefix = "grab.auth.access-token")
 public record AccessTokenProperties(
         Duration ttl,
-        String issuer,
-        String audience,
+        String issuer, // 누가 발급했는가 -> grab
+        String audience, // 누가 사용하도록 발급했는가 -> grab-api
         // Base64로 인코딩한 HS256 서명 키. 디코딩한 값이 32바이트(256비트) 이상이어야 한다
         String secret
 ) {
