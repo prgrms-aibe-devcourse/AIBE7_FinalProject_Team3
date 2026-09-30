@@ -20,6 +20,7 @@ repositories {
 
 ext {
     set('datasourceMicrometerVersion', "2.3.0")
+    set('jjwtVersion', "0.13.0")
     // set('springAiVersion', "2.0.1")
 }
 
@@ -35,12 +36,15 @@ dependencies {
     implementation 'org.flywaydb:flyway-database-postgresql'
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation "io.jsonwebtoken:jjwt-api:${jjwtVersion}"
     // implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'
     // implementation 'org.springframework.ai:spring-ai-starter-model-google-genai-embedding'
     compileOnly 'org.projectlombok:lombok'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
     runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
     runtimeOnly 'org.postgresql:postgresql'
+    runtimeOnly "io.jsonwebtoken:jjwt-impl:${jjwtVersion}"
+    runtimeOnly "io.jsonwebtoken:jjwt-jackson:${jjwtVersion}"
     annotationProcessor 'org.projectlombok:lombok'
     testImplementation 'org.springframework.boot:spring-boot-starter-data-redis-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
