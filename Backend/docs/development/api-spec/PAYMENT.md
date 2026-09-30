@@ -16,6 +16,7 @@
 
 - 토스페이먼츠에 보내는 `orderId`는 서버 주문의 `orderNumber`입니다. 경로의 `{orderId}`(주문 UUID)와 다릅니다.
 - 토스는 결제 인증 후 10분 안에 승인하지 않은 결제를 만료시키므로, 프론트는 successUrl 도착 즉시 ④를 호출합니다.
+- 결제창은 `method: "CARD"`(카드·간편결제)로만 호출합니다. 가상계좌 등 입금을 기다리는 결제수단은 승인 응답이 `WAITING_FOR_DEPOSIT`으로 오며, 입금 결과를 받을 웹훅(1.2)이 없어 결과 불명으로 남고 주문이 막히므로 지원하지 않습니다.
 
 ### 1.1 Mock 결제 요청 (토스페이먼츠 결제 승인)
 
@@ -59,7 +60,7 @@ POST /api/v1/orders/{orderId}/payments
 - 결제 시도가 만들어진 뒤의 결과(`SUCCEEDED`, `FAILED`, `UNKNOWN`)는 모두 `200 OK`로 응답하고 `status`로 구분합니다.
 - `status`가 `SUCCEEDED`여도 `reconciliationStatus`가 `REQUIRED`면 PG 승인만 되고 주문은 확정되지 않은 상태입니다. 클라이언트는 두 값을 함께 보고, 이 경우 결제 완료가 아니라 확인 중으로 안내하고 재결제를 유도하지 않습니다.
 - `paidAt`은 `SUCCEEDED`일 때만 값이 있습니다.
-- `failure`는 `FAILED`일 때 `{ "code": "REJECT_CARD_PAYMENT", "message": "..." }` 형태로 PG 실패 코드와 민감정보를 제거한 메시지를 담고, 그 외에는 `null`입니다.
+- `failure`는 `FAILED`일 때 `{ "code": "REJECT_CARD_PAYMENT", "message": "..." }` 형태로 실패 코드와 메시지를 담고, 그 외에는 `null`입니다. 코드는 토스 오류 코드이거나, 결제가 끝나지 않은 상태(`ABORTED`, `EXPIRED` 등) 또는 서버 설정 오류(`PG_NOT_CONFIGURED`)입니다. 메시지는 토스 오류 메시지를 가공하지 않고 그대로 담습니다.
 
 **결과별 처리:**
 
