@@ -145,7 +145,7 @@ GET /api/v1/orders/{orderId}/payments
     {
       "paymentId": "e7d6c5b4-a392-4817-b6a5-4d3c2b1a0f9e",
       "orderId": "b2d4f6a8-1c3e-4a5b-8c7d-9e0f1a2b3c4d",
-      "paymentMethod": "MOCK_CARD",
+      "provider": "TOSS",
       "amount": 261000,
       "status": "SUCCEEDED",
       "paidAt": "2026-09-18T14:03:00+09:00"
@@ -153,6 +153,8 @@ GET /api/v1/orders/{orderId}/payments
   ]
 }
 ```
+
+- `provider`: 결제 PG (`payments.provider`). 결제수단(카드·간편결제 등)은 저장하지 않으므로 응답에 포함하지 않습니다.
 
 ---
 
