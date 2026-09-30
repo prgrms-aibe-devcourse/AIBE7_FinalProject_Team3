@@ -83,8 +83,7 @@ public class DropService {
      * 존재하지 않거나 DRAFT인 DROP은 DROP_NOT_FOUND로 숨기고, 그 밖의 불가 상태는 도메인이 판정한다.
      */
     public void validateWishable(Long dropId, OffsetDateTime now) {
-        Drop drop = dropRepository.findById(dropId)
-                .orElseThrow(() -> new BusinessException(DropErrorCode.DROP_NOT_FOUND));
+        Drop drop = findDrop(dropId);
         drop.validateWishable(now);
     }
 
@@ -93,11 +92,7 @@ public class DropService {
             Long sellerId, DropStatus status, int page, int size) {
         Page<SellerDropListProjection> drops = dropRepository.findSellerDrops(
                 sellerId, status, PageRequest.of(page, size));
-        List<SellerDropListResponse> content = drops.getContent().stream()
-                .map(SellerDropListResponse::from)
-                .toList();
-        return new PageResponse<>(content, page, size, drops.getTotalElements(),
-                drops.getTotalPages(), drops.hasNext());
+        return PageResponse.from(drops.map(SellerDropListResponse::from));
     }
 
     /*
@@ -113,11 +108,7 @@ public class DropService {
         Page<PublicDropListProjection> drops = dropRepository.findPublicDrops(
                 statuses, categoryId, normalizeKeyword(keyword), soldOut,
                 PageRequest.of(page, size, effectiveSort.toSort()));
-        List<PublicDropListResponse> content = drops.getContent().stream()
-                .map(PublicDropListResponse::from)
-                .toList();
-        return new PageResponse<>(content, page, size, drops.getTotalElements(),
-                drops.getTotalPages(), drops.hasNext());
+        return PageResponse.from(drops.map(PublicDropListResponse::from));
     }
 
     public SellerDropDetailResponse findSellerDrop(Long sellerId, Long dropId) {
@@ -131,9 +122,8 @@ public class DropService {
      */
     public PublicDropDetailResponse findPublicDrop(Long dropId) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        Drop drop = dropRepository.findById(dropId)
-                .orElseThrow(() -> new BusinessException(DropErrorCode.DROP_NOT_FOUND));
-        if (drop.getStatus() == DropStatus.DRAFT) {
+        Drop drop = findDrop(dropId);
+        if (!drop.isPublic()) {
             throw new BusinessException(DropErrorCode.DROP_NOT_FOUND);
         }
         long wishCount = wishQueryService.countActiveByDropId(dropId);
@@ -178,10 +168,14 @@ public class DropService {
     }
 
     private Drop findOwnedDrop(Long sellerId, Long dropId) {
-        Drop drop = dropRepository.findById(dropId)
-                .orElseThrow(() -> new BusinessException(DropErrorCode.DROP_NOT_FOUND));
+        Drop drop = findDrop(dropId);
         drop.validateOwner(sellerId);
         return drop;
+    }
+
+    private Drop findDrop(Long dropId) {
+        return dropRepository.findById(dropId)
+                .orElseThrow(() -> new BusinessException(DropErrorCode.DROP_NOT_FOUND));
     }
 
     private void applyDraft(Drop drop, DropDraftRequest request) {

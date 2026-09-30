@@ -199,9 +199,14 @@ public class Drop extends BaseEntity {
         return wishabilityError(now) == null;
     }
 
+    public boolean isPublic() {
+        return status != DropStatus.DRAFT;
+    }
+
     // WISH 가능 판정 규칙을 한 곳에 둔다. null이면 가능, 값이 있으면 그 오류로 거부한다.
     private ErrorCode wishabilityError(OffsetDateTime now) {
         return switch (status) {
+            // 공개 상세의 isPublic()과 같이 DRAFT의 존재를 숨긴다.
             case DRAFT -> DropErrorCode.DROP_NOT_FOUND;
             case WISH -> saleStartsAt != null && !now.isBefore(saleStartsAt)
                     ? DropErrorCode.GRAB_ALREADY_STARTED : null;
