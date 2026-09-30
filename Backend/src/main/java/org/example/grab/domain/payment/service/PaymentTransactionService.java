@@ -33,9 +33,12 @@ import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /*
     결제 요청의 DB 트랜잭션 두 개를 맡는다(ERD.md 3.2). PG 호출은 이 두 트랜잭션 사이, 트랜잭션 밖에서 PaymentService가 한다.
@@ -47,7 +50,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PaymentTransactionService {
 
-    // 승인 응답 타임아웃(10초)보다 넉넉히 길게 잡아, 아직 승인 요청 중인 PENDING을 조회로 먼저 확정하지 않게 한다.
+    // 승인과 즉시 조회의 최대 대기 시간((연결 + 응답 타임아웃) × 2)보다 길게 잡아, 아직 승인 요청 중인 PENDING을 정리하지 않게 한다.
+    // 이 관계는 PendingPaymentTimeoutCheck가 기동할 때 확인한다.
     static final Duration STALE_PENDING_AFTER = Duration.ofSeconds(60);
 
     private static final PaymentProvider PROVIDER = PaymentProvider.TOSS;
@@ -196,7 +200,7 @@ public class PaymentTransactionService {
                 yield PaymentEventResult.REJECTED;
             }
             case UNKNOWN -> {
-                payment.markUnknown("PG 승인 결과 확인 불가" + codeSuffix(result.failureCode()));
+                payment.markUnknown(unknownReason(result));
                 yield PaymentEventResult.RECONCILIATION_REQUIRED;
             }
         };
@@ -262,7 +266,15 @@ public class PaymentTransactionService {
         };
     }
 
-    private static String codeSuffix(String failureCode) {
-        return failureCode == null ? "" : " (" + failureCode + ")";
+    /*
+        운영자가 보정 대상을 보고 원인을 구분할 수 있게 PG 상태와 오류 코드를 사유에 남긴다.
+        승인 요청 전 상태는 PG가 곧 인증을 만료시키므로, 승인됐을 수 있는 결과 불명과 따로 표시한다.
+     */
+    private static String unknownReason(PaymentGatewayResult result) {
+        String reason = result.awaitingConfirmation() ? "PG 승인 요청 전 상태" : "PG 승인 결과 확인 불가";
+        String detail = Stream.of(result.pgStatus(), result.failureCode())
+                .filter(Objects::nonNull)
+                .collect(Collectors.joining(", "));
+        return detail.isEmpty() ? reason : reason + " (" + detail + ")";
     }
 }

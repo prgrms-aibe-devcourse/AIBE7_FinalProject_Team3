@@ -328,6 +328,12 @@ class PaymentReconciliationIntegrationTest {
         assertThat(fixture.payments(order)).singleElement()
                 .satisfies(payment -> assertThat(payment.get("status")).isEqualTo("UNKNOWN"));
         assertThat(fixture.orderStatus(order)).isEqualTo(OrderStatus.PAYMENT_PENDING);
+        assertThat(reconciliationReason()).isEqualTo("PG 승인 결과 확인 불가");
+    }
+
+    private String reconciliationReason() {
+        return jdbcTemplate.queryForObject(
+                "SELECT reconciliation_reason FROM payments WHERE order_id = ?", String.class, order.getId());
     }
 
     @Test
@@ -352,6 +358,8 @@ class PaymentReconciliationIntegrationTest {
         // then: 취소된 주문에 새로 청구하지 않고, 결과는 확인되지 않은 채로 남는다
         verify(paymentGateway, times(1)).confirm(any());
         assertThat(replay.status()).isEqualTo(PaymentStatus.UNKNOWN);
+        // 운영자가 승인됐을 수 있는 결과 불명과 구분할 수 있도록 PG 상태를 사유에 남긴다.
+        assertThat(reconciliationReason()).isEqualTo("PG 승인 요청 전 상태 (IN_PROGRESS)");
     }
 
     @Test
