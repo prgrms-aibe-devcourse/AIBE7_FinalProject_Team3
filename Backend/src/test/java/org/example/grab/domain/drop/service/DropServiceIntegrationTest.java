@@ -303,6 +303,27 @@ class DropServiceIntegrationTest {
     }
 
     @Test
+    @DisplayName("판매자 목록은 가장 앞선 이미지를 썸네일로 반환하고 이미지가 없으면 null이다")
+    void findSellerDrops_returnsThumbnail() {
+        // given
+        Long withImages = insertDrop(sellerId, "DRAFT");
+        jdbcTemplate.update("INSERT INTO drop_images (drop_id, image_url, sort_order, alt_text) VALUES (?, ?, ?, '상품')",
+                withImages, "https://example.com/later.jpg", 2);
+        jdbcTemplate.update("INSERT INTO drop_images (drop_id, image_url, sort_order, alt_text) VALUES (?, ?, ?, '상품')",
+                withImages, "https://example.com/first.jpg", 0);
+        Long withoutImages = insertDrop(sellerId, "DRAFT");
+
+        // when
+        PageResponse<SellerDropListResponse> result = dropService.findSellerDrops(sellerId, null, 0, 20);
+
+        // then
+        assertThat(result.content().stream().filter(item -> item.dropId().equals(withImages)).findFirst().orElseThrow()
+                .thumbnailUrl()).isEqualTo("https://example.com/first.jpg");
+        assertThat(result.content().stream().filter(item -> item.dropId().equals(withoutImages)).findFirst().orElseThrow()
+                .thumbnailUrl()).isNull();
+    }
+
+    @Test
     @DisplayName("minPrice는 활성 SKU 중 최저가이고, 활성 SKU가 없으면 null")
     void findSellerDrops_calculatesMinPrice() {
         // given

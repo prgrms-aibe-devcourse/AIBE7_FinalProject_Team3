@@ -95,12 +95,7 @@ public class DropService {
         Page<SellerDropListProjection> drops = dropRepository.findSellerDrops(
                 sellerId, status, PageRequest.of(page, size));
         List<SellerDropListResponse> content = drops.getContent().stream()
-                .map(projection -> new SellerDropListResponse(
-                        projection.getDropId(),
-                        projection.getName(),
-                        projection.getStatus(),
-                        projection.getMinPrice(),
-                        projection.getCreatedAt()))
+                .map(SellerDropListResponse::from)
                 .toList();
         return new PageResponse<>(content, page, size, drops.getTotalElements(),
                 drops.getTotalPages(), drops.hasNext());

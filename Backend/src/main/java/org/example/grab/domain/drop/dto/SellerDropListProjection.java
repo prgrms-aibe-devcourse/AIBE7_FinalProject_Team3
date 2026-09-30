@@ -14,6 +14,8 @@ public interface SellerDropListProjection {
 
     String getName();
 
+    String getThumbnailUrl();
+
     DropStatus getStatus();
 
     Long getMinPrice();
