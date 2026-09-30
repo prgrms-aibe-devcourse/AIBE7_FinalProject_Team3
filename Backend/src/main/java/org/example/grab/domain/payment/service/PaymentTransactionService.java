@@ -76,10 +76,15 @@ public class PaymentTransactionService {
         Optional<Payment> existing =
                 paymentRepository.findByOrderIdAndClientIdempotencyKey(order.id(), idempotencyKey.value());
         if (existing.isPresent()) {
-            if (!existing.get().getRequestHash().equals(requestHash.value())) {
+            Payment payment = existing.get();
+            if (!payment.getRequestHash().equals(requestHash.value())) {
                 throw new BusinessException(CommonErrorCode.DUPLICATE_IDEMPOTENCY_KEY);
             }
-            return new PaymentPreparation.Replay(existing.get(), order);
+            // 주문 상태·마감과 관계없이 정리한다. 마감 뒤에 승인된 결제도 보정 대상으로 드러나야 한다.
+            if (payment.isInProgress() && isResolvable(payment, now)) {
+                return new PaymentPreparation.ResolveReplay(payment.getId(), confirmCommand(payment, order), order);
+            }
+            return new PaymentPreparation.Replay(payment, order);
         }
 
         validatePayable(order, request, now);

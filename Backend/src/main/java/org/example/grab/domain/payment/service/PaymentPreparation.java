@@ -11,6 +11,12 @@ sealed interface PaymentPreparation {
     record Replay(Payment payment, PayableOrder order) implements PaymentPreparation {
     }
 
+    // 같은 요청의 재전송인데 그 결제가 아직 확정되지 않았다: PG 조회로 정리한 뒤 정리된 결과를 돌려준다.
+    // 정리하지 않고 돌려주면 같은 요청으로는 UNKNOWN·멈춘 PENDING의 확정 결과를 영영 받지 못한다.
+    record ResolveReplay(Long paymentId, PaymentConfirmCommand command, PayableOrder order)
+            implements PaymentPreparation {
+    }
+
     // PENDING을 저장했으니 PG 승인을 요청한다.
     record Ready(Long paymentId, PaymentConfirmCommand command, PayableOrder order) implements PaymentPreparation {
     }

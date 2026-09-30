@@ -64,11 +64,17 @@ public class PaymentService {
             if (preparation instanceof PaymentPreparation.Replay replay) {
                 return PaymentResponse.of(replay.payment(), replay.order().orderId(), replay.order().orderNumber());
             }
+            if (preparation instanceof PaymentPreparation.ResolveReplay replay) {
+                // 정리해도 결과를 모르면 UNKNOWN을 그대로 돌려준다. 재전송이므로 409로 거부하지 않는다.
+                Payment payment = resolve(replay.paymentId(), replay.command());
+                return PaymentResponse.of(payment, replay.order().orderId(), replay.order().orderNumber());
+            }
             if (preparation instanceof PaymentPreparation.Ready ready) {
                 Payment payment = confirm(ready.paymentId(), ready.command());
                 return PaymentResponse.of(payment, ready.order().orderId(), ready.order().orderNumber());
             }
-            resolve((PaymentPreparation.Resolve) preparation);
+            PaymentPreparation.Resolve resolve = (PaymentPreparation.Resolve) preparation;
+            resolve(resolve.paymentId(), resolve.command());
         }
         throw new BusinessException(PaymentErrorCode.PAYMENT_ALREADY_PROCESSED);
     }
@@ -88,13 +94,12 @@ public class PaymentService {
         조회만으로는 PG가 인증을 만료시킬 때까지 결과를 알 수 없으므로, 같은 서버 멱등 키로 승인을 다시 요청한다.
         먼저 보낸 승인이 PG에 닿았다면 PG는 같은 키의 최초 결과를 돌려주므로 중복 승인되지 않는다.
      */
-    private void resolve(PaymentPreparation.Resolve resolve) {
-        PaymentGatewayResult lookup = paymentGateway.lookup(resolve.command().paymentKey());
+    private Payment resolve(Long paymentId, PaymentConfirmCommand command) {
+        PaymentGatewayResult lookup = paymentGateway.lookup(command.paymentKey());
         if (lookup.awaitingConfirmation()) {
-            confirm(resolve.paymentId(), resolve.command());
-            return;
+            return confirm(paymentId, command);
         }
-        transactionService.applyResult(resolve.paymentId(), null, lookup, now());
+        return transactionService.applyResult(paymentId, null, lookup, now());
     }
 
     private OffsetDateTime now() {

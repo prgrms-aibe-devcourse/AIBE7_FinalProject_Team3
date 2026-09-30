@@ -226,9 +226,13 @@ class PaymentReconciliationIntegrationTest {
 
     // 결제 요청 시각을 고정한 PaymentService로 요청한다.
     private PaymentResponse payAt(OffsetDateTime requestTime, String paymentKey) {
+        return payAt(requestTime, paymentKey, UUID.randomUUID().toString());
+    }
+
+    private PaymentResponse payAt(OffsetDateTime requestTime, String paymentKey, String idempotencyKey) {
         Clock clock = Clock.fixed(requestTime.toInstant(), ZoneOffset.UTC);
         PaymentService service = new PaymentService(paymentGateway, transactionService, requestHashGenerator, clock);
-        return service.pay(fixture.buyerId(), order.getUuid(), UUID.randomUUID().toString(),
+        return service.pay(fixture.buyerId(), order.getUuid(), idempotencyKey,
                 new PaymentRequest(paymentKey, PaymentTestFixture.TOTAL_AMOUNT));
     }
 
@@ -274,6 +278,55 @@ class PaymentReconciliationIntegrationTest {
                 .satisfiesExactly(
                         key -> assertThat(key).isEqualTo("confirm"),
                         key -> assertThat(key).startsWith("confirm-retry:"));
+    }
+
+    @Test
+    @DisplayName("결과 불명인 결제를 같은 멱등 키로 다시 요청하면 조회로 정리한 확정 결과를 돌려준다")
+    void replayResolvesUnknownPayment() {
+        // given: 승인 응답도, 바로 이어진 조회도 실패해 UNKNOWN으로 남았다
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        String idempotencyKey = UUID.randomUUID().toString();
+        given(paymentGateway.confirm(any()))
+                .willReturn(PaymentGatewayResult.unknown(null, null, "결제 승인 응답을 확인하지 못했습니다."));
+        given(paymentGateway.lookup("payment-unknown"))
+                .willReturn(PaymentGatewayResult.unknown(null, null, "결제 상태를 확인하지 못했습니다."))
+                .willReturn(PaymentGatewayResult.approved(
+                        "DONE", order.getOrderNumber(), PaymentTestFixture.TOTAL_AMOUNT, now));
+        assertThat(payAt(now, "payment-unknown", idempotencyKey).status()).isEqualTo(PaymentStatus.UNKNOWN);
+
+        // when: 클라이언트가 같은 요청을 다시 보낸다
+        PaymentResponse replay = payAt(now.plusSeconds(3), "payment-unknown", idempotencyKey);
+
+        // then: 새 결제 시도 없이 이전 결제가 승인으로 확정된다
+        assertThat(replay.status()).isEqualTo(PaymentStatus.SUCCEEDED);
+        assertThat(replay.paidAt()).isNotNull();
+        verify(paymentGateway, times(1)).confirm(any());
+        assertThat(fixture.payments(order)).singleElement()
+                .satisfies(payment -> assertThat(payment.get("status")).isEqualTo("SUCCEEDED"));
+        assertThat(fixture.orderStatus(order)).isEqualTo(OrderStatus.PAID);
+    }
+
+    @Test
+    @DisplayName("같은 멱등 키로 다시 요청했는데 조회로도 결과를 모르면 409가 아니라 UNKNOWN을 그대로 돌려준다")
+    void replayKeepsUnknownWhenStillUnresolved() {
+        // given
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        String idempotencyKey = UUID.randomUUID().toString();
+        given(paymentGateway.confirm(any()))
+                .willReturn(PaymentGatewayResult.unknown(null, null, "결제 승인 응답을 확인하지 못했습니다."));
+        given(paymentGateway.lookup("payment-unknown"))
+                .willReturn(PaymentGatewayResult.unknown(null, null, "결제 상태를 확인하지 못했습니다."));
+        payAt(now, "payment-unknown", idempotencyKey);
+
+        // when
+        PaymentResponse replay = payAt(now.plusSeconds(3), "payment-unknown", idempotencyKey);
+
+        // then
+        assertThat(replay.status()).isEqualTo(PaymentStatus.UNKNOWN);
+        verify(paymentGateway, times(1)).confirm(any());
+        assertThat(fixture.payments(order)).singleElement()
+                .satisfies(payment -> assertThat(payment.get("status")).isEqualTo("UNKNOWN"));
+        assertThat(fixture.orderStatus(order)).isEqualTo(OrderStatus.PAYMENT_PENDING);
     }
 
     private void assertUnchangedOrder() {
