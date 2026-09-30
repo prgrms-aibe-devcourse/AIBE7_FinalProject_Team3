@@ -14,6 +14,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SellerDashboardRepository {
 
+    // dashboard 도메인이 drop 엔티티에 의존하지 않도록 JDBC로 필요한 컬럼만 조회한다
     private final NamedParameterJdbcTemplate jdbcTemplate;
 
     public List<UpcomingDropProjection> findUpcomingDrops(

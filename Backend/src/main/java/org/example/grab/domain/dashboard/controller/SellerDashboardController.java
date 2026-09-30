@@ -27,6 +27,7 @@ public class SellerDashboardController {
     public ApiResponse<List<UpcomingDropResponse>> findUpcomingDrops(
             @RequestParam(defaultValue = "START") UpcomingDropEventType eventType,
             @RequestParam(defaultValue = "60") int withinMinutes) {
+        // RequsetParam으로 받은 값이 1시간 또는 1일이 아니면 오류 발생
         if (withinMinutes != 60 && withinMinutes != 1440) {
             throw new BusinessException(CommonErrorCode.INVALID_REQUEST);
         }
