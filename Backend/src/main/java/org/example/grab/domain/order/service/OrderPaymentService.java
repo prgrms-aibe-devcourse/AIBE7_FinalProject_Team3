@@ -18,6 +18,10 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
 
 /*
@@ -73,9 +77,14 @@ public class OrderPaymentService {
         if (approvedAmount != order.getTotalAmount()) {
             return PaymentCompletionResult.AMOUNT_MISMATCH;
         }
+        // 재고 반영 중에 예외로 롤백되면 승인된 결제 기록까지 사라지므로, 아무것도 바꾸기 전에 선점 수량을 먼저 확인한다.
+        List<StockReservation> reservations = stockReservationRepository.findAllOfOrderSortedByOption(order.getId());
+        if (!hasEnoughReserved(reservations)) {
+            return PaymentCompletionResult.INVENTORY_INCONSISTENT;
+        }
 
         order.markPaid(approvedAt);
-        for (StockReservation reservation : stockReservationRepository.findAllOfOrderSortedByOption(order.getId())) {
+        for (StockReservation reservation : reservations) {
             reservation.commit(now);
             requireOneRow(inventoryRepository.commitReservedQuantity(
                     reservation.getOrderItem().getOptionId(), reservation.getOrderItem().getQuantity()));
@@ -103,12 +112,30 @@ public class OrderPaymentService {
         return true;
     }
 
+    // 옵션 행을 잠근 뒤 옵션별 예약 수량 합계만큼 선점 수량이 남아 있는지 확인한다.
+    private boolean hasEnoughReserved(List<StockReservation> reservations) {
+        Map<Long, Integer> required = new TreeMap<>();
+        for (StockReservation reservation : reservations) {
+            required.merge(reservation.getOrderItem().getOptionId(), reservation.getOrderItem().getQuantity(), Integer::sum);
+        }
+        if (required.isEmpty()) {
+            return true;
+        }
+        Map<Long, Integer> reserved = new HashMap<>();
+        for (OrderInventoryRepository.ReservedQuantity locked : inventoryRepository.lockReservedQuantities(required.keySet())) {
+            reserved.put(locked.getId(), locked.getReservedQuantity());
+        }
+        return required.entrySet().stream()
+                .allMatch(entry -> reserved.getOrDefault(entry.getKey(), 0) >= entry.getValue());
+    }
+
     private Order lockOrder(Long orderId) {
         return orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
     }
 
     // 선점 수량이 예약보다 적으면 재고 원장이 이미 어긋난 것이므로 트랜잭션 전체를 되돌린다.
+    // 결제 확정은 옵션 행을 잠그고 미리 확인하므로 여기까지 오지 않는다. 만료는 되돌려도 잃는 기록이 없다.
     private static void requireOneRow(int updatedRows) {
         if (updatedRows != 1) {
             throw new IllegalStateException("옵션 선점 수량이 예약 수량보다 적어 재고를 반영할 수 없습니다.");

@@ -125,6 +125,38 @@ class PaymentReconciliationIntegrationTest {
     }
 
     @Test
+    @DisplayName("승인은 됐지만 선점 재고가 어긋나 있으면 승인 기록을 남긴 채 주문을 확정하지 않고 보정 필요로 남긴다")
+    void approvalWithInconsistentInventory() {
+        // given
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        PaymentPreparation.Ready ready = prepare("payment-inventory", now);
+        jdbcTemplate.update("UPDATE drop_options SET reserved_quantity = ? WHERE id = ?",
+                PaymentTestFixture.QUANTITY - 1, fixture.optionId());
+        PaymentGatewayResult approved = PaymentGatewayResult.approved(
+                "DONE", order.getOrderNumber(), PaymentTestFixture.TOTAL_AMOUNT, now);
+
+        // when
+        transactionService.applyResult(ready.paymentId(), approved, null, now);
+
+        // then: 결제는 롤백되지 않고 SUCCEEDED·보정 필요로 남아, 이후 조회로 다시 정리할 대상이 되지 않는다
+        assertThat(fixture.payments(order)).singleElement().satisfies(payment -> {
+            assertThat(payment.get("status")).isEqualTo("SUCCEEDED");
+            assertThat(payment.get("reconciliation_status")).isEqualTo("REQUIRED");
+        });
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT reconciliation_reason FROM payments WHERE id = ?", String.class, ready.paymentId()))
+                .contains("재고");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM payment_events WHERE payment_id = ?", Integer.class, ready.paymentId()))
+                .isEqualTo(1);
+        assertThat(fixture.orderStatus(order)).isEqualTo(OrderStatus.PAYMENT_PENDING);
+        assertThat(fixture.reservationStatus(order)).isEqualTo("HELD");
+        assertThat(fixture.quantities())
+                .containsEntry("reserved_quantity", PaymentTestFixture.QUANTITY - 1)
+                .containsEntry("sold_quantity", 0);
+    }
+
+    @Test
     @DisplayName("이전 결제가 PENDING에 머물면 60초 전에는 새 결제를 거부하고, 지나면 조회로 정리한 뒤 새 결제를 진행한다")
     void stalePendingIsResolvedByLookup() {
         // given: 서버가 PG 승인 요청 전에 멈춰 PENDING만 남은 상황

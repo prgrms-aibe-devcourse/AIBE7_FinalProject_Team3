@@ -7,6 +7,7 @@ import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -52,6 +53,16 @@ public interface OrderInventoryRepository extends Repository<Order, Long> {
             """, nativeQuery = true)
     void increaseReservedQuantity(@Param("optionId") Long optionId, @Param("quantity") int quantity);
 
+    // 결제 확정 전에 옵션 행을 PK 오름차순으로 잠그고 선점 수량을 읽는다. 잠근 뒤라 확인한 수량이 확정 UPDATE까지 유지된다.
+    @Query(value = """
+            SELECT o.id AS "id", o.reserved_quantity AS "reservedQuantity"
+            FROM drop_options o
+            WHERE o.id IN (:optionIds)
+            ORDER BY o.id
+            FOR UPDATE OF o
+            """, nativeQuery = true)
+    List<ReservedQuantity> lockReservedQuantities(@Param("optionIds") Collection<Long> optionIds);
+
     // 결제 성공: 선점 수량을 판매 수량으로 옮긴다. 선점이 모자라면 0행을 돌려주고, 호출하는 쪽이 정합성 오류로 처리한다.
     @Modifying
     @Query(value = """
@@ -89,6 +100,13 @@ public interface OrderInventoryRepository extends Repository<Order, Long> {
         Instant getSaleStartsAt();
 
         Instant getSaleEndsAt();
+    }
+
+    interface ReservedQuantity {
+
+        Long getId();
+
+        int getReservedQuantity();
     }
 
     interface LockedOption {

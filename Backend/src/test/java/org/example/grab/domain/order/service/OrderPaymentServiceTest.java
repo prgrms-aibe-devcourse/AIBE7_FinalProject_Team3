@@ -154,6 +154,28 @@ class OrderPaymentServiceTest {
     }
 
     @Test
+    @DisplayName("한 옵션이라도 선점 수량이 예약보다 적으면 다른 옵션도 확정하지 않고 INVENTORY_INCONSISTENT를 돌려준다")
+    void doesNotCompleteWhenReservedQuantityIsShort() {
+        // given: 뒤쪽 옵션(secondOptionId)의 선점 수량만 어긋나 있다
+        jdbcTemplate.update("UPDATE drop_options SET reserved_quantity = 0 WHERE id = ?", secondOptionId);
+        OffsetDateTime approvedAt = expiresAt.minusMinutes(10);
+
+        // when
+        PaymentCompletionResult result = orderPaymentService.completePayment(
+                order.getId(), 48000, approvedAt, approvedAt.plusSeconds(1));
+        entityManager.flush();
+        entityManager.clear();
+
+        // then: 예외로 트랜잭션을 되돌리지 않고, 앞쪽 옵션도 판매 수량으로 옮기지 않는다
+        assertThat(result).isEqualTo(PaymentCompletionResult.INVENTORY_INCONSISTENT);
+        assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus())
+                .isEqualTo(OrderStatus.PAYMENT_PENDING);
+        assertThat(reservations()).extracting(StockReservation::getStatus).containsOnly(ReservationStatus.HELD);
+        assertThat(quantities(firstOptionId)).containsEntry("reserved_quantity", 2).containsEntry("sold_quantity", 0);
+        assertThat(quantities(secondOptionId)).containsEntry("reserved_quantity", 0).containsEntry("sold_quantity", 0);
+    }
+
+    @Test
     @DisplayName("결제 마감이 지난 결제 대기 주문을 만료하고 선점 재고를 가용 재고로 되돌린다")
     void expireIfDue() {
         // when

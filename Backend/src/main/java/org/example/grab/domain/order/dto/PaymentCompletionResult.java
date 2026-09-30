@@ -8,5 +8,7 @@ public enum PaymentCompletionResult {
     // PG 승인 금액이 주문 금액과 다르다(PAY-002)
     AMOUNT_MISMATCH,
     // 이미 결제됐거나 취소되는 등 결제 대기 상태가 아니다
-    NOT_PAYABLE
+    NOT_PAYABLE,
+    // 옵션의 선점 수량이 예약 수량보다 적어 재고 원장이 어긋났다
+    INVENTORY_INCONSISTENT
 }

@@ -234,6 +234,7 @@ public class PaymentTransactionService {
             case EXPIRED -> "결제 마감 후 승인";
             case AMOUNT_MISMATCH -> "주문 금액과 승인 금액 불일치";
             case NOT_PAYABLE -> "결제 대기 상태가 아닌 주문의 승인";
+            case INVENTORY_INCONSISTENT -> "선점 재고 부족으로 주문 확정 불가";
             case COMPLETED -> throw new IllegalArgumentException("완료된 결제는 보정 대상이 아닙니다.");
         };
     }
