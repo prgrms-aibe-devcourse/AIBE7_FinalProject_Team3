@@ -7,9 +7,11 @@ import org.example.grab.domain.order.entity.Order;
 import org.example.grab.domain.order.entity.OrderStatus;
 import org.example.grab.domain.order.entity.ReleaseDestination;
 import org.example.grab.domain.order.entity.ReleaseReason;
+import org.example.grab.domain.order.entity.ReservationStatus;
 import org.example.grab.domain.order.entity.StockReservation;
 import org.example.grab.domain.order.error.OrderErrorCode;
 import org.example.grab.domain.order.repository.OrderInventoryRepository;
+import org.example.grab.domain.order.repository.OrderItemRepository;
 import org.example.grab.domain.order.repository.OrderRepository;
 import org.example.grab.domain.order.repository.StockReservationRepository;
 import org.example.grab.global.error.BusinessException;
@@ -34,6 +36,7 @@ import java.util.UUID;
 public class OrderPaymentService {
 
     private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
     private final StockReservationRepository stockReservationRepository;
     private final OrderInventoryRepository inventoryRepository;
 
@@ -77,9 +80,9 @@ public class OrderPaymentService {
         if (approvedAmount != order.getTotalAmount()) {
             return PaymentCompletionResult.AMOUNT_MISMATCH;
         }
-        // 재고 반영 중에 예외로 롤백되면 승인된 결제 기록까지 사라지므로, 아무것도 바꾸기 전에 선점 수량을 먼저 확인한다.
+        // 예약 전이·재고 반영 중에 예외로 롤백되면 승인된 결제 기록까지 사라지므로, 아무것도 바꾸기 전에 원장을 먼저 확인한다.
         List<StockReservation> reservations = stockReservationRepository.findAllOfOrderSortedByOption(order.getId());
-        if (!hasEnoughReserved(reservations)) {
+        if (!isReservationConsistent(order, reservations) || !hasEnoughReserved(reservations)) {
             return PaymentCompletionResult.INVENTORY_INCONSISTENT;
         }
 
@@ -110,6 +113,13 @@ public class OrderPaymentService {
                     reservation.getOrderItem().getOptionId(), reservation.getOrderItem().getQuantity()));
         }
         return true;
+    }
+
+    // 주문 생성은 주문 항목마다 HELD 예약을 하나씩 만든다. 수가 다르거나 이미 확정·해제된 예약이 있으면 원장이 어긋난 것이다.
+    private boolean isReservationConsistent(Order order, List<StockReservation> reservations) {
+        return !reservations.isEmpty()
+                && reservations.size() == orderItemRepository.countByOrderId(order.getId())
+                && reservations.stream().allMatch(reservation -> reservation.getStatus() == ReservationStatus.HELD);
     }
 
     // 옵션 행을 잠근 뒤 옵션별 예약 수량 합계만큼 선점 수량이 남아 있는지 확인한다.

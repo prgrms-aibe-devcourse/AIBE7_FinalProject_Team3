@@ -176,6 +176,43 @@ class OrderPaymentServiceTest {
     }
 
     @Test
+    @DisplayName("예약이 이미 해제됐거나 주문 항목보다 적으면 예외 없이 INVENTORY_INCONSISTENT를 돌려주고 아무것도 바꾸지 않는다")
+    void doesNotCompleteWhenReservationIsInconsistent() {
+        // given
+        OffsetDateTime approvedAt = expiresAt.minusMinutes(10);
+        Long secondReservationId = jdbcTemplate.queryForObject("""
+                SELECT r.id FROM stock_reservations r JOIN order_items i ON i.id = r.order_item_id
+                WHERE i.order_id = ? AND i.option_id = ?
+                """, Long.class, order.getId(), secondOptionId);
+
+        // when: 한 예약이 이미 해제된 상태
+        jdbcTemplate.update("""
+                UPDATE stock_reservations
+                SET status = 'RELEASED', released_at = CURRENT_TIMESTAMP,
+                    release_reason = 'EXPIRED', release_destination = 'AVAILABLE'
+                WHERE id = ?
+                """, secondReservationId);
+        PaymentCompletionResult released = orderPaymentService.completePayment(
+                order.getId(), 48000, approvedAt, approvedAt.plusSeconds(1));
+        entityManager.flush();
+        entityManager.clear();
+        // when: 한 예약이 아예 없는 상태
+        jdbcTemplate.update("DELETE FROM stock_reservations WHERE id = ?", secondReservationId);
+        PaymentCompletionResult missing = orderPaymentService.completePayment(
+                order.getId(), 48000, approvedAt, approvedAt.plusSeconds(1));
+        entityManager.flush();
+        entityManager.clear();
+
+        // then: 남은 예약도 확정하지 않는다
+        assertThat(released).isEqualTo(PaymentCompletionResult.INVENTORY_INCONSISTENT);
+        assertThat(missing).isEqualTo(PaymentCompletionResult.INVENTORY_INCONSISTENT);
+        assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus())
+                .isEqualTo(OrderStatus.PAYMENT_PENDING);
+        assertThat(reservations()).extracting(StockReservation::getStatus).containsOnly(ReservationStatus.HELD);
+        assertThat(quantities(firstOptionId)).containsEntry("reserved_quantity", 2).containsEntry("sold_quantity", 0);
+    }
+
+    @Test
     @DisplayName("결제 마감이 지난 결제 대기 주문을 만료하고 선점 재고를 가용 재고로 되돌린다")
     void expireIfDue() {
         // when

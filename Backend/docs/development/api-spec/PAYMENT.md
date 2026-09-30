@@ -69,7 +69,7 @@ POST /api/v1/orders/{orderId}/payments
 | 승인 거절 (토스 오류 응답) | `FAILED`, 실패 코드·메시지 기록 | 변경 없음. 주문은 결제 마감 전까지 `PAYMENT_PENDING` 유지 |
 | 결과 불명 (타임아웃·응답 유실·토스 5xx) | 아래 즉시 조회 후 결정 | 조회로 확정되기 전에는 변경 없음 |
 | 승인 성공이지만 반영 시점에 결제 마감이 지남 | `SUCCEEDED`, 보정 `REQUIRED` | 주문을 자동 완료하지 않음 |
-| 승인 성공이지만 옵션의 `reserved_quantity`가 예약 수량보다 적음 | `SUCCEEDED`, 보정 `REQUIRED` | 변경 없음. 재고 원장 불일치로 보고 주문을 확정하지 않음 |
+| 승인 성공이지만 재고 원장이 어긋남 (예약이 주문 항목과 맞지 않거나 `HELD`가 아님, 옵션의 `reserved_quantity`가 예약 수량보다 적음) | `SUCCEEDED`, 보정 `REQUIRED` | 변경 없음. 주문을 확정하지 않음 |
 
 **결과 불명 시 즉시 조회:**
 - 승인 결과가 불명이면 `paymentKey`로 토스 결제 조회 API를 한 번 호출합니다.
