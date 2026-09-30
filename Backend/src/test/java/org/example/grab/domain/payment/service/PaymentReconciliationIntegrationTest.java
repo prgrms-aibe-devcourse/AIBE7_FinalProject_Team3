@@ -9,6 +9,7 @@ import org.example.grab.domain.payment.dto.PaymentRequest;
 import org.example.grab.domain.payment.dto.PaymentResponse;
 import org.example.grab.domain.payment.entity.PaymentStatus;
 import org.example.grab.domain.payment.error.PaymentErrorCode;
+import org.example.grab.domain.payment.gateway.PaymentConfirmCommand;
 import org.example.grab.domain.payment.gateway.PaymentGateway;
 import org.example.grab.domain.payment.gateway.PaymentGatewayResult;
 import org.example.grab.global.error.BusinessException;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -36,6 +38,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 // PG는 승인했지만 주문을 확정할 수 없는 경우와, 결과가 확정되지 않은 이전 결제를 정리하는 경우를 확인한다.
@@ -195,6 +198,50 @@ class PaymentReconciliationIntegrationTest {
         PaymentService service = new PaymentService(paymentGateway, transactionService, requestHashGenerator, clock);
         return service.pay(fixture.buyerId(), order.getUuid(), UUID.randomUUID().toString(),
                 new PaymentRequest(paymentKey, PaymentTestFixture.TOTAL_AMOUNT));
+    }
+
+    @Test
+    @DisplayName("승인 요청이 PG에 닿지 않아 UNKNOWN이 되면, 다음 요청이 같은 서버 멱등 키로 승인을 다시 요청해 확정한다")
+    void confirmNotReachingPgIsRetriedWithSameKey() {
+        // given: 첫 승인 요청은 연결 실패로 결과 불명이고, 조회해 보니 인증만 끝난 상태다
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        given(paymentGateway.confirm(any()))
+                .willReturn(PaymentGatewayResult.unknown(null, null, "결제 승인 응답을 확인하지 못했습니다."))
+                .willReturn(PaymentGatewayResult.approved(
+                        "DONE", order.getOrderNumber(), PaymentTestFixture.TOTAL_AMOUNT, now));
+        given(paymentGateway.lookup("payment-first"))
+                .willReturn(PaymentGatewayResult.awaitingConfirmation("IN_PROGRESS"));
+        PaymentResponse first = payAt(now, "payment-first");
+        assertThat(first.status()).isEqualTo(PaymentStatus.UNKNOWN);
+
+        // when: 사용자가 결제창을 다시 열어 새 paymentKey로 요청한다
+        assertThatThrownBy(() -> payAt(now.plusSeconds(5), "payment-second"))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(PaymentErrorCode.PAYMENT_ALREADY_PROCESSED);
+
+        // then: 이전 결제가 같은 서버 멱등 키의 재요청으로 확정되고, 새 paymentKey로는 승인을 요청하지 않는다
+        ArgumentCaptor<PaymentConfirmCommand> commands = ArgumentCaptor.forClass(PaymentConfirmCommand.class);
+        verify(paymentGateway, times(2)).confirm(commands.capture());
+        assertThat(commands.getAllValues()).allSatisfy(command -> {
+            assertThat(command.paymentKey()).isEqualTo("payment-first");
+            assertThat(command.orderId()).isEqualTo(order.getOrderNumber());
+        });
+        String serverKey = jdbcTemplate.queryForObject(
+                "SELECT idempotency_key FROM payments WHERE order_id = ?", String.class, order.getId());
+        assertThat(commands.getAllValues()).extracting(PaymentConfirmCommand::idempotencyKey).containsOnly(serverKey);
+        assertThat(fixture.payments(order)).singleElement().satisfies(payment -> {
+            assertThat(payment.get("status")).isEqualTo("SUCCEEDED");
+            // UNKNOWN으로 보정 대상이었다가 확정됐으므로 RESOLVED로 남는다.
+            assertThat(payment.get("reconciliation_status")).isEqualTo("RESOLVED");
+        });
+        assertThat(fixture.orderStatus(order)).isEqualTo(OrderStatus.PAID);
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT event_key FROM payment_events WHERE payment_id = (SELECT id FROM payments WHERE order_id = ?)"
+                        + " AND event_type = 'CONFIRM' ORDER BY id", String.class, order.getId()))
+                .satisfiesExactly(
+                        key -> assertThat(key).isEqualTo("confirm"),
+                        key -> assertThat(key).startsWith("confirm-retry:"));
     }
 
     private void assertUnchangedOrder() {

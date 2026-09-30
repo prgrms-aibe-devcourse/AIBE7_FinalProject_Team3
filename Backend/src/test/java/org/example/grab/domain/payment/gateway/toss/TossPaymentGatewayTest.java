@@ -138,7 +138,7 @@ class TossPaymentGatewayTest {
     }
 
     @Test
-    @DisplayName("승인 응답 상태가 종료 상태면 미승인, 진행 중 상태면 결과 불명으로 돌려준다")
+    @DisplayName("승인 응답 상태가 종료 상태면 미승인, 진행 중 상태면 승인 대기 표시가 붙은 결과 불명으로 돌려준다")
     void confirmNonDoneStatus() {
         // given
         TossPaymentGateway gateway = new TossPaymentGateway(builder, SECRET_KEY);
@@ -154,8 +154,11 @@ class TossPaymentGatewayTest {
         // then
         assertThat(aborted.outcome()).isEqualTo(Outcome.NOT_APPROVED);
         assertThat(aborted.pgStatus()).isEqualTo("ABORTED");
+        assertThat(aborted.awaitingConfirmation()).isFalse();
         assertThat(inProgress.outcome()).isEqualTo(Outcome.UNKNOWN);
         assertThat(inProgress.pgStatus()).isEqualTo("IN_PROGRESS");
+        // 인증만 끝나고 승인 요청을 받지 않은 상태라 같은 멱등 키로 다시 승인을 요청할 수 있다.
+        assertThat(inProgress.awaitingConfirmation()).isTrue();
     }
 
     @Test

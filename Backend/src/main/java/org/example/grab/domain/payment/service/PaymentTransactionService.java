@@ -90,7 +90,7 @@ public class PaymentTransactionService {
                     .filter(payment -> isResolvable(payment, now))
                     .findFirst()
                     .map(payment -> (PaymentPreparation) new PaymentPreparation.Resolve(
-                            payment.getId(), payment.getProviderPaymentId()))
+                            payment.getId(), confirmCommand(payment, order)))
                     .orElseThrow(() -> new BusinessException(PaymentErrorCode.PAYMENT_ALREADY_PROCESSED));
         }
         if (paymentRepository.existsByProviderAndProviderPaymentId(PROVIDER, request.paymentKey())) {
@@ -100,9 +100,12 @@ public class PaymentTransactionService {
         Payment payment = paymentRepository.save(Payment.request(
                 order.id(), PROVIDER, idempotencyKey.value(), requestHash.value(),
                 request.paymentKey(), request.amount()));
-        PaymentConfirmCommand command = new PaymentConfirmCommand(
-                request.paymentKey(), order.orderNumber(), payment.getAmount(), payment.getIdempotencyKey());
-        return new PaymentPreparation.Ready(payment.getId(), command, order);
+        return new PaymentPreparation.Ready(payment.getId(), confirmCommand(payment, order), order);
+    }
+
+    private static PaymentConfirmCommand confirmCommand(Payment payment, PayableOrder order) {
+        return new PaymentConfirmCommand(
+                payment.getProviderPaymentId(), order.orderNumber(), payment.getAmount(), payment.getIdempotencyKey());
     }
 
     /**
@@ -133,7 +136,11 @@ public class PaymentTransactionService {
             PaymentEventResult confirmProcessing = lookupResult != null
                     ? PaymentEventResult.RECONCILIATION_REQUIRED
                     : processing;
-            record(payment, CONFIRM_EVENT_KEY, PaymentEventType.CONFIRM, confirmResult, confirmProcessing);
+            // 이전 결제를 정리하며 승인을 다시 요청했다면 최초 승인 기록을 덮지 않고 별도 이벤트로 남긴다.
+            String confirmEventKey = paymentEventRepository.existsByPaymentIdAndEventKey(payment.getId(), CONFIRM_EVENT_KEY)
+                    ? "confirm-retry:" + UUID.randomUUID()
+                    : CONFIRM_EVENT_KEY;
+            record(payment, confirmEventKey, PaymentEventType.CONFIRM, confirmResult, confirmProcessing);
         }
         if (lookupResult != null) {
             record(payment, "lookup:" + UUID.randomUUID(), PaymentEventType.LOOKUP, lookupResult, processing);

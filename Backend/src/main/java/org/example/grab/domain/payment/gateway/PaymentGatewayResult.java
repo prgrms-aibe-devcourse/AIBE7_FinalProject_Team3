@@ -9,6 +9,7 @@ import java.util.Objects;
  * @param pgStatus    PG가 돌려준 결제 상태 원문(예: DONE, ABORTED). 오류 응답·통신 실패면 null
  * @param orderId     PG가 돌려준 주문 식별자. 서버 주문번호와 비교하는 데 쓴다
  * @param totalAmount PG가 돌려준 결제 금액. 서버 주문 금액과 비교하는 데 쓴다
+ * @param awaitingConfirmation 사용자 인증은 끝났지만 PG가 승인 요청을 받지 않은 상태. UNKNOWN일 때만 true일 수 있다
  */
 public record PaymentGatewayResult(
         Outcome outcome,
@@ -17,7 +18,8 @@ public record PaymentGatewayResult(
         Long totalAmount,
         OffsetDateTime approvedAt,
         String failureCode,
-        String failureMessage
+        String failureMessage,
+        boolean awaitingConfirmation
 ) {
 
     public enum Outcome {
@@ -34,18 +36,30 @@ public record PaymentGatewayResult(
         if (outcome == Outcome.APPROVED) {
             Objects.requireNonNull(approvedAt);
         }
+        if (awaitingConfirmation && outcome != Outcome.UNKNOWN) {
+            throw new IllegalArgumentException("승인 대기는 결과 불명에서만 표시한다.");
+        }
     }
 
     public static PaymentGatewayResult approved(
             String pgStatus, String orderId, Long totalAmount, OffsetDateTime approvedAt) {
-        return new PaymentGatewayResult(Outcome.APPROVED, pgStatus, orderId, totalAmount, approvedAt, null, null);
+        return new PaymentGatewayResult(
+                Outcome.APPROVED, pgStatus, orderId, totalAmount, approvedAt, null, null, false);
     }
 
     public static PaymentGatewayResult notApproved(String pgStatus, String failureCode, String failureMessage) {
-        return new PaymentGatewayResult(Outcome.NOT_APPROVED, pgStatus, null, null, null, failureCode, failureMessage);
+        return new PaymentGatewayResult(
+                Outcome.NOT_APPROVED, pgStatus, null, null, null, failureCode, failureMessage, false);
     }
 
     public static PaymentGatewayResult unknown(String pgStatus, String failureCode, String failureMessage) {
-        return new PaymentGatewayResult(Outcome.UNKNOWN, pgStatus, null, null, null, failureCode, failureMessage);
+        return new PaymentGatewayResult(
+                Outcome.UNKNOWN, pgStatus, null, null, null, failureCode, failureMessage, false);
+    }
+
+    // 승인 요청이 PG에 닿지 않았을 수 있다. 같은 서버 멱등 키로 다시 승인을 요청해도 중복 승인되지 않는다.
+    public static PaymentGatewayResult awaitingConfirmation(String pgStatus) {
+        return new PaymentGatewayResult(
+                Outcome.UNKNOWN, pgStatus, null, null, null, null, "승인 요청 전 상태입니다.", true);
     }
 }

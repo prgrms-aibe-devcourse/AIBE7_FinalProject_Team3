@@ -28,6 +28,8 @@ public class TossPaymentGateway implements PaymentGateway {
 
     private static final String APPROVED_STATUS = "DONE";
 
+    private static final String AWAITING_CONFIRMATION_STATUS = "IN_PROGRESS";
+
     // 결제가 진행되지 않고 끝난 상태. 이 상태의 결제는 다시 승인되지 않는다.
     private static final Set<String> TERMINATED_STATUSES = Set.of("ABORTED", "EXPIRED", "CANCELED");
 
@@ -117,7 +119,11 @@ public class TossPaymentGateway implements PaymentGateway {
         if (TERMINATED_STATUSES.contains(payment.status())) {
             return PaymentGatewayResult.notApproved(payment.status(), payment.status(), "결제가 완료되지 않았습니다.");
         }
-        // READY, IN_PROGRESS, PARTIAL_CANCELED 등: 승인 여부를 이 응답만으로 정할 수 없다.
+        // 결제창 인증까지만 끝나고 승인 요청을 받지 않은 상태. 승인 거절도 이 상태를 바꾸지 않는다(2026-09-30 테스트 환경 확인).
+        if (AWAITING_CONFIRMATION_STATUS.equals(payment.status())) {
+            return PaymentGatewayResult.awaitingConfirmation(payment.status());
+        }
+        // READY, PARTIAL_CANCELED 등: 승인 여부를 이 응답만으로 정할 수 없다.
         return PaymentGatewayResult.unknown(payment.status(), null, "결제가 아직 확정되지 않았습니다.");
     }
 

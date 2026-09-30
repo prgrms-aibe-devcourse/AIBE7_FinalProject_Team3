@@ -4,6 +4,7 @@ import org.example.grab.domain.payment.dto.PaymentRequest;
 import org.example.grab.domain.payment.dto.PaymentResponse;
 import org.example.grab.domain.payment.entity.Payment;
 import org.example.grab.domain.payment.error.PaymentErrorCode;
+import org.example.grab.domain.payment.gateway.PaymentConfirmCommand;
 import org.example.grab.domain.payment.gateway.PaymentGateway;
 import org.example.grab.domain.payment.gateway.PaymentGatewayResult;
 import org.example.grab.global.error.BusinessException;
@@ -64,24 +65,36 @@ public class PaymentService {
                 return PaymentResponse.of(replay.payment(), replay.order().orderId(), replay.order().orderNumber());
             }
             if (preparation instanceof PaymentPreparation.Ready ready) {
-                Payment payment = confirm(ready);
+                Payment payment = confirm(ready.paymentId(), ready.command());
                 return PaymentResponse.of(payment, ready.order().orderId(), ready.order().orderNumber());
             }
-            PaymentPreparation.Resolve resolve = (PaymentPreparation.Resolve) preparation;
-            PaymentGatewayResult lookup = paymentGateway.lookup(resolve.paymentKey());
-            transactionService.applyResult(resolve.paymentId(), null, lookup, now());
+            resolve((PaymentPreparation.Resolve) preparation);
         }
         throw new BusinessException(PaymentErrorCode.PAYMENT_ALREADY_PROCESSED);
     }
 
     // 승인 결과가 불명이면 바로 조회해 확정을 시도한다. 조회로도 모르면 UNKNOWN으로 남긴다.
-    private Payment confirm(PaymentPreparation.Ready ready) {
-        PaymentGatewayResult confirmResult = paymentGateway.confirm(ready.command());
+    private Payment confirm(Long paymentId, PaymentConfirmCommand command) {
+        PaymentGatewayResult confirmResult = paymentGateway.confirm(command);
         PaymentGatewayResult lookupResult = null;
         if (confirmResult.outcome() == PaymentGatewayResult.Outcome.UNKNOWN) {
-            lookupResult = paymentGateway.lookup(ready.command().paymentKey());
+            lookupResult = paymentGateway.lookup(command.paymentKey());
         }
-        return transactionService.applyResult(ready.paymentId(), confirmResult, lookupResult, now());
+        return transactionService.applyResult(paymentId, confirmResult, lookupResult, now());
+    }
+
+    /*
+        이전 결제를 조회로 정리한다. PG가 승인 요청을 받지 않은 상태라면(연결 실패, 승인 요청 전 서버 중단)
+        조회만으로는 PG가 인증을 만료시킬 때까지 결과를 알 수 없으므로, 같은 서버 멱등 키로 승인을 다시 요청한다.
+        먼저 보낸 승인이 PG에 닿았다면 PG는 같은 키의 최초 결과를 돌려주므로 중복 승인되지 않는다.
+     */
+    private void resolve(PaymentPreparation.Resolve resolve) {
+        PaymentGatewayResult lookup = paymentGateway.lookup(resolve.command().paymentKey());
+        if (lookup.awaitingConfirmation()) {
+            confirm(resolve.paymentId(), resolve.command());
+            return;
+        }
+        transactionService.applyResult(resolve.paymentId(), null, lookup, now());
     }
 
     private OffsetDateTime now() {
