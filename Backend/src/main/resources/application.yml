@@ -19,6 +19,13 @@ spring:
 grab:
   mock-delivery:
     enabled: ${GRAB_MOCK_DELIVERY_ENABLED:false}
+  auth:
+    access-token:
+      ttl: 15m
+      issuer: grab
+      audience: grab-api
+      # 서명 키는 저장소에 두지 않는다. 기본값이 없으므로 JWT_SECRET이 없으면 기동하지 않는다
+      secret: ${JWT_SECRET}
 
 management:
   endpoints:
