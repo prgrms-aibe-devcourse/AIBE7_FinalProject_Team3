@@ -103,28 +103,56 @@ class PaymentReconciliationIntegrationTest {
     @Test
     @DisplayName("PG 승인 응답의 주문번호나 금액이 서버 주문과 다르면 주문을 확정하지 않고 보정 필요로 남긴다")
     void approvalWithMismatchedResponse() {
-        // given
+        // given: 금액이 다른 승인 응답과 주문번호가 다른 승인 응답을 각각 다른 주문에 반영한다
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        PaymentPreparation.Ready wrongAmount = prepare("payment-amount", now);
-        PaymentGatewayResult amountMismatch = PaymentGatewayResult.approved(
-                "DONE", order.getOrderNumber(), PaymentTestFixture.TOTAL_AMOUNT - 1000, now);
+        Order otherOrder = fixture.createOrder();
+        PaymentPreparation.Ready wrongAmount = prepare(order, "payment-amount", now);
+        PaymentPreparation.Ready wrongOrder = prepare(otherOrder, "payment-order", now);
 
-        // when: 금액이 다른 승인 응답을 반영한 뒤, 주문번호가 다른 승인 응답으로 한 번 더 시도한다
-        transactionService.applyResult(wrongAmount.paymentId(), amountMismatch, null, now);
-        PaymentPreparation.Ready wrongOrder = prepare("payment-order", now);
-        PaymentGatewayResult orderMismatch = PaymentGatewayResult.approved(
-                "DONE", "ORD-OTHER-000001", PaymentTestFixture.TOTAL_AMOUNT, now);
-        transactionService.applyResult(wrongOrder.paymentId(), orderMismatch, null, now);
+        // when
+        transactionService.applyResult(wrongAmount.paymentId(), PaymentGatewayResult.approved(
+                "DONE", order.getOrderNumber(), PaymentTestFixture.TOTAL_AMOUNT - 1000, now), null, now);
+        transactionService.applyResult(wrongOrder.paymentId(), PaymentGatewayResult.approved(
+                "DONE", "ORD-OTHER-000001", PaymentTestFixture.TOTAL_AMOUNT, now), null, now);
 
         // then
-        assertThat(fixture.payments(order)).hasSize(2).allSatisfy(payment -> {
+        for (Order target : List.of(order, otherOrder)) {
+            assertThat(fixture.payments(target)).singleElement().satisfies(payment -> {
+                assertThat(payment.get("status")).isEqualTo("SUCCEEDED");
+                assertThat(payment.get("reconciliation_status")).isEqualTo("REQUIRED");
+            });
+            assertThat(fixture.orderStatus(target)).isEqualTo(OrderStatus.PAYMENT_PENDING);
+            assertThat(fixture.reservationStatus(target)).isEqualTo("HELD");
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT reconciliation_reason FROM payments WHERE order_id = ?", String.class, target.getId()))
+                    .contains("불일치");
+        }
+        assertThat(fixture.quantities())
+                .containsEntry("reserved_quantity", PaymentTestFixture.QUANTITY * 2)
+                .containsEntry("sold_quantity", 0);
+    }
+
+    @Test
+    @DisplayName("승인됐지만 주문을 확정하지 못한 결제가 있는 주문은 새 결제를 PG 호출 없이 거부한다")
+    void paymentAfterUnconfirmedApprovalIsRejected() {
+        // given: 첫 결제는 PG가 승인했지만 금액이 달라 주문을 확정하지 못하고 보정 대상으로 남았다
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        given(paymentGateway.confirm(any())).willReturn(PaymentGatewayResult.approved(
+                "DONE", order.getOrderNumber(), PaymentTestFixture.TOTAL_AMOUNT - 1000, now));
+        PaymentResponse first = payAt(now, "payment-first");
+        assertThat(first.status()).isEqualTo(PaymentStatus.SUCCEEDED);
+        assertThat(fixture.orderStatus(order)).isEqualTo(OrderStatus.PAYMENT_PENDING);
+
+        // when & then: 사용자가 결제창을 다시 열어 요청해도 이미 돈이 나간 주문이므로 새 승인을 요청하지 않는다
+        assertThatThrownBy(() -> payAt(now.plusSeconds(5), "payment-second"))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(PaymentErrorCode.PAYMENT_ALREADY_PROCESSED);
+        verify(paymentGateway, times(1)).confirm(any());
+        assertThat(fixture.payments(order)).singleElement().satisfies(payment -> {
             assertThat(payment.get("status")).isEqualTo("SUCCEEDED");
             assertThat(payment.get("reconciliation_status")).isEqualTo("REQUIRED");
         });
-        assertUnchangedOrder();
-        List<String> reasons = jdbcTemplate.queryForList(
-                "SELECT reconciliation_reason FROM payments WHERE order_id = ?", String.class, order.getId());
-        assertThat(reasons).allMatch(reason -> reason.contains("불일치"));
     }
 
     @Test
@@ -187,8 +215,12 @@ class PaymentReconciliationIntegrationTest {
     }
 
     private PaymentPreparation.Ready prepare(String paymentKey, OffsetDateTime now) {
+        return prepare(order, paymentKey, now);
+    }
+
+    private PaymentPreparation.Ready prepare(Order target, String paymentKey, OffsetDateTime now) {
         return (PaymentPreparation.Ready) transactionService.prepare(
-                fixture.buyerId(), order.getUuid(), IdempotencyKey.from(UUID.randomUUID().toString()),
+                fixture.buyerId(), target.getUuid(), IdempotencyKey.from(UUID.randomUUID().toString()),
                 RequestHash.from("d".repeat(64)), new PaymentRequest(paymentKey, PaymentTestFixture.TOTAL_AMOUNT), now);
     }
 

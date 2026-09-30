@@ -22,6 +22,9 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
     boolean existsByProviderAndProviderPaymentId(PaymentProvider provider, String providerPaymentId);
 
+    // 승인됐지만 주문을 확정하지 못한 결제가 있으면 주문이 결제 대기로 남아도 새 결제를 받지 않는다.
+    boolean existsByOrderIdAndStatus(Long orderId, PaymentStatus status);
+
     // 잠그기 전에 주문 ID만 읽는다. 엔티티로 읽으면 영속성 컨텍스트에 남은 옛 상태가 잠금 조회 결과를 대신한다.
     @Query("select p.orderId from Payment p where p.id = :id")
     Optional<Long> findOrderIdById(@Param("id") Long id);

@@ -83,6 +83,10 @@ public class PaymentTransactionService {
         }
 
         validatePayable(order, request, now);
+        // 승인은 됐지만 불일치로 주문을 확정하지 못해 보정 대상인 결제가 있다. 새로 승인하면 같은 주문에 청구가 쌓인다.
+        if (paymentRepository.existsByOrderIdAndStatus(order.id(), PaymentStatus.SUCCEEDED)) {
+            throw new BusinessException(PaymentErrorCode.PAYMENT_ALREADY_PROCESSED);
+        }
 
         List<Payment> inProgress = paymentRepository.findByOrderIdAndStatusInOrderByIdAsc(order.id(), IN_PROGRESS);
         if (!inProgress.isEmpty()) {

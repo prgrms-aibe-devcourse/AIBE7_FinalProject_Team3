@@ -57,6 +57,7 @@ POST /api/v1/orders/{orderId}/payments
 ```
 
 - 결제 시도가 만들어진 뒤의 결과(`SUCCEEDED`, `FAILED`, `UNKNOWN`)는 모두 `200 OK`로 응답하고 `status`로 구분합니다.
+- `status`가 `SUCCEEDED`여도 `reconciliationStatus`가 `REQUIRED`면 PG 승인만 되고 주문은 확정되지 않은 상태입니다. 클라이언트는 두 값을 함께 보고, 이 경우 결제 완료가 아니라 확인 중으로 안내하고 재결제를 유도하지 않습니다.
 - `paidAt`은 `SUCCEEDED`일 때만 값이 있습니다.
 - `failure`는 `FAILED`일 때 `{ "code": "REJECT_CARD_PAYMENT", "message": "..." }` 형태로 PG 실패 코드와 민감정보를 제거한 메시지를 담고, 그 외에는 `null`입니다.
 
@@ -81,6 +82,7 @@ POST /api/v1/orders/{orderId}/payments
 - 주문이 `PAYMENT_PENDING` 상태인지 여부
 - 결제 유효시간(`payment_expires_at`)이 지나지 않았는지 여부
 - 요청 `amount`와 서버에 저장된 주문 `total_amount`의 일치 여부
+- 같은 주문에 승인된 결제(`SUCCEEDED`)가 없는지 여부. 승인됐지만 불일치로 주문을 확정하지 못해 보정 대상(`REQUIRED`)인 결제도 포함하며, 새로 승인하면 같은 주문에 청구가 쌓이므로 거부합니다.
 - 같은 주문에 진행 중인 결제(`PENDING`, `UNKNOWN`)가 없는지 여부
 - 같은 `paymentKey`로 이미 처리된 결제가 없는지 여부
 
@@ -110,7 +112,7 @@ POST /api/v1/orders/{orderId}/payments
 | `RESOURCE_NOT_FOUND` | 404 | 경로의 주문 ID 형식이 올바르지 않음 |
 | `ORDER_NOT_FOUND` | 404 | 주문이 없거나 다른 사용자의 주문 |
 | `DUPLICATE_IDEMPOTENCY_KEY` | 409 | 같은 멱등 키에 다른 요청 본문 |
-| `PAYMENT_ALREADY_PROCESSED` | 409 | 이미 결제 완료된 주문, 진행 중인 결제가 있는 주문, 이미 처리된 `paymentKey` |
+| `PAYMENT_ALREADY_PROCESSED` | 409 | 이미 결제 완료된 주문, 승인됐지만 보정 대기 중인 결제가 있는 주문, 진행 중인 결제가 있는 주문, 이미 처리된 `paymentKey` |
 | `INVALID_STATE_TRANSITION` | 409 | 취소된 주문 |
 | `PAYMENT_AMOUNT_MISMATCH` | 422 | 요청 `amount`가 주문 금액과 다름 |
 | `PAYMENT_EXPIRED` | 422 | 결제 유효시간이 지났거나 만료된 주문 |
