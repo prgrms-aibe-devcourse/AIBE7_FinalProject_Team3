@@ -1,9 +1,16 @@
 package org.example.grab.domain.drop.controller;
 
+import org.example.grab.domain.drop.dto.response.PublicDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.PublicDropListResponse;
+import org.example.grab.domain.drop.dto.response.common.DropCategoryResponse;
+import org.example.grab.domain.drop.dto.response.common.DropOptionGroupResponse;
+import org.example.grab.domain.drop.dto.response.common.DropOptionSelectionResponse;
+import org.example.grab.domain.drop.dto.response.common.DropShippingResponse;
 import org.example.grab.domain.drop.entity.DropStatus;
+import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.domain.drop.service.DropService;
 import org.example.grab.global.common.PageResponse;
+import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.GlobalExceptionHandler;
 import org.example.grab.global.error.ValidationErrorCodeResolver;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,7 +51,7 @@ class DropControllerTest {
         // given
         PublicDropListResponse item = new PublicDropListResponse(
                 100L, "상품", "https://img/1.jpg", 129000L,
-                new PublicDropListResponse.Category(1L, "패션"),
+                new DropCategoryResponse(1L, "패션"),
                 DropStatus.WISH, false, 152L,
                 OffsetDateTime.parse("2026-09-20T01:00:00Z"),
                 OffsetDateTime.parse("2026-09-20T03:00:00Z"));
@@ -125,5 +132,78 @@ class DropControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
         verifyNoInteractions(dropService);
+    }
+
+    @Test
+    @DisplayName("공개 DROP 상세는 200과 명세 1.3 필드를 반환한다")
+    void getDrop() throws Exception {
+        // given
+        PublicDropDetailResponse response = new PublicDropDetailResponse(
+                100L, "상품", "설명", List.of("https://img/1.jpg"), 129000L,
+                new DropCategoryResponse(1L, "패션"),
+                DropStatus.GRAB, false, 7L, "WISH 안내 문구",
+                OffsetDateTime.parse("2026-09-20T01:00:00Z"),
+                OffsetDateTime.parse("2026-09-20T03:00:00Z"),
+                new DropShippingResponse(3000L, "출고 안내"),
+                List.of(new DropOptionGroupResponse(11L, "소재", 0,
+                        List.of(new DropOptionGroupResponse.Value(111L, "코튼", 0)))),
+                List.of(new PublicDropDetailResponse.Option(1001L,
+                        List.of(new DropOptionSelectionResponse(11L, 111L)), 129000L, 10, false)),
+                new PublicDropDetailResponse.Actions(false, false, true),
+                OffsetDateTime.parse("2026-09-20T01:10:00Z"));
+        given(dropService.findPublicDrop(100L)).willReturn(response);
+
+        // when & then
+        mockMvc.perform(get("/api/v1/drops/100"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.dropId").value(100))
+                .andExpect(jsonPath("$.data.name").value("상품"))
+                .andExpect(jsonPath("$.data.description").value("설명"))
+                .andExpect(jsonPath("$.data.imageUrls[0]").value("https://img/1.jpg"))
+                .andExpect(jsonPath("$.data.minPrice").value(129000))
+                .andExpect(jsonPath("$.data.category.categoryId").value(1))
+                .andExpect(jsonPath("$.data.category.name").value("패션"))
+                .andExpect(jsonPath("$.data.status").value("GRAB"))
+                .andExpect(jsonPath("$.data.soldOut").value(false))
+                .andExpect(jsonPath("$.data.wishCount").value(7))
+                .andExpect(jsonPath("$.data.wishNotice").value("WISH 안내 문구"))
+                .andExpect(jsonPath("$.data.saleStartsAt").exists())
+                .andExpect(jsonPath("$.data.saleEndsAt").exists())
+                .andExpect(jsonPath("$.data.shipping.shippingFee").value(3000))
+                .andExpect(jsonPath("$.data.shipping.shippingNotice").value("출고 안내"))
+                .andExpect(jsonPath("$.data.optionGroups[0].groupId").value(11))
+                .andExpect(jsonPath("$.data.optionGroups[0].name").value("소재"))
+                .andExpect(jsonPath("$.data.optionGroups[0].values[0].valueId").value(111))
+                .andExpect(jsonPath("$.data.optionGroups[0].values[0].value").value("코튼"))
+                .andExpect(jsonPath("$.data.options[0].optionId").value(1001))
+                .andExpect(jsonPath("$.data.options[0].selections[0].groupId").value(11))
+                .andExpect(jsonPath("$.data.options[0].unitPrice").value(129000))
+                .andExpect(jsonPath("$.data.options[0].availableStock").value(10))
+                .andExpect(jsonPath("$.data.options[0].soldOut").value(false))
+                .andExpect(jsonPath("$.data.actions.wishable").value(false))
+                .andExpect(jsonPath("$.data.actions.wishCancelable").value(false))
+                .andExpect(jsonPath("$.data.actions.orderable").value(true))
+                .andExpect(jsonPath("$.data.serverTime").exists());
+    }
+
+    @Test
+    @DisplayName("dropId가 숫자가 아니면 400 INVALID_REQUEST")
+    void rejectsNonNumericDropId() throws Exception {
+        mockMvc.perform(get("/api/v1/drops/abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        verifyNoInteractions(dropService);
+    }
+
+    @Test
+    @DisplayName("서비스가 DROP_NOT_FOUND를 던지면 404")
+    void returnsNotFoundForMissingDrop() throws Exception {
+        given(dropService.findPublicDrop(99L))
+                .willThrow(new BusinessException(DropErrorCode.DROP_NOT_FOUND));
+
+        mockMvc.perform(get("/api/v1/drops/99"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("DROP_NOT_FOUND"));
     }
 }

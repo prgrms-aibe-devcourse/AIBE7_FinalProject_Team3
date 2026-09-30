@@ -1,6 +1,7 @@
 package org.example.grab.domain.drop.dto.response;
 
 import org.example.grab.domain.drop.dto.PublicDropListProjection;
+import org.example.grab.domain.drop.dto.response.common.DropCategoryResponse;
 import org.example.grab.domain.drop.entity.DropStatus;
 
 import java.time.Instant;
@@ -12,7 +13,7 @@ public record PublicDropListResponse(
         String name,
         String thumbnailUrl,
         Long minPrice,
-        Category category,
+        DropCategoryResponse category,
         DropStatus status,
         boolean soldOut,
         long wishCount,
@@ -20,16 +21,13 @@ public record PublicDropListResponse(
         OffsetDateTime saleEndsAt
 ) {
 
-    public record Category(Long categoryId, String name) {
-    }
-
     public static PublicDropListResponse from(PublicDropListProjection projection) {
         return new PublicDropListResponse(
                 projection.getDropId(),
                 projection.getName(),
                 projection.getThumbnailUrl(),
                 projection.getMinPrice(),
-                new Category(projection.getCategoryId(), projection.getCategoryName()),
+                new DropCategoryResponse(projection.getCategoryId(), projection.getCategoryName()),
                 DropStatus.valueOf(projection.getStatus()),
                 Boolean.TRUE.equals(projection.getSoldOut()),
                 projection.getWishCount() == null ? 0L : projection.getWishCount(),

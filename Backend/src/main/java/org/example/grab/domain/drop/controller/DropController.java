@@ -2,6 +2,7 @@ package org.example.grab.domain.drop.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.example.grab.domain.drop.dto.PublicDropSort;
+import org.example.grab.domain.drop.dto.response.PublicDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.PublicDropListResponse;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.service.DropService;
@@ -10,6 +11,7 @@ import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -43,5 +45,11 @@ public class DropController {
         PublicDropSort publicSort = PublicDropSort.parse(sort);
         return ApiResponse.success(dropService.findPublicDrops(
                 status, categoryId, keyword, soldOut, publicSort, page, size));
+    }
+
+    // 공개 DROP 상세. 비로그인 조회이며 DRAFT는 서비스가 DROP_NOT_FOUND로 숨긴다.
+    @GetMapping("/{dropId}")
+    public ApiResponse<PublicDropDetailResponse> getDrop(@PathVariable Long dropId) {
+        return ApiResponse.success(dropService.findPublicDrop(dropId));
     }
 }
