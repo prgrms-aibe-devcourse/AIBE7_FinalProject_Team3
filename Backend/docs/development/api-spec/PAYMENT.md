@@ -117,7 +117,7 @@ POST /api/v1/orders/{orderId}/payments
 | `ORDER_NOT_FOUND` | 404 | 주문이 없거나 다른 사용자의 주문 |
 | `DUPLICATE_IDEMPOTENCY_KEY` | 409 | 같은 멱등 키에 다른 요청 본문 |
 | `PAYMENT_ALREADY_PROCESSED` | 409 | 이미 결제 완료된 주문, 승인됐지만 보정 대기 중인 결제가 있는 주문, 진행 중인 결제가 있는 주문, 이미 처리된 `paymentKey` |
-| `INVALID_STATE_TRANSITION` | 409 | 취소된 주문 |
+| `INVALID_STATE_TRANSITION` | 409 | 취소된 주문 등 결제 대기(`PAYMENT_PENDING`)가 아닌 주문 |
 | `PAYMENT_AMOUNT_MISMATCH` | 422 | 요청 `amount`가 주문 금액과 다름 |
 | `PAYMENT_EXPIRED` | 422 | 결제 유효시간이 지났거나 만료된 주문 |
 
