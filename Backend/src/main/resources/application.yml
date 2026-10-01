@@ -19,6 +19,9 @@ spring:
 grab:
   mock-delivery:
     enabled: ${GRAB_MOCK_DELIVERY_ENABLED:false}
+  drop-transition:
+    enabled: ${GRAB_DROP_TRANSITION_ENABLED:true}
+    fixed-delay: 10s
   auth:
     access-token:
       ttl: 15m
