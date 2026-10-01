@@ -12,8 +12,12 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-grab}
       # 기본값을 두지 않는다. .env에 없으면 빈 값이 전달되어 backend가 기동에 실패한다
       JWT_SECRET: ${JWT_SECRET}
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-grab}
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   postgres:
@@ -34,10 +38,20 @@ services:
 
   redis:
     image: redis:8-alpine
+    # backend와 같은 비밀번호를 쓴다. 비밀번호가 다르거나 한쪽에만 있으면 연결이 실패한다
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-grab}"]
+    environment:
+      # redis-cli가 이 환경변수로 인증한다(-a 옵션은 비밀번호가 명령줄에 남고 경고를 출력한다)
+      REDISCLI_AUTH: ${REDIS_PASSWORD:-grab}
     ports:
       - "127.0.0.1:6379:6379"
     volumes:
       - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   grafana:
     image: grafana/grafana:latest
