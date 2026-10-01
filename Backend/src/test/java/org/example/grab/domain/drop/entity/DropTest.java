@@ -3,6 +3,7 @@ package org.example.grab.domain.drop.entity;
 import org.example.grab.domain.drop.entity.option.DropOption;
 import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.global.error.BusinessException;
+import org.example.grab.global.error.CommonErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -63,6 +64,35 @@ class DropTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(DropErrorCode.DROP_NOT_EDITABLE);
+    }
+
+    @Test
+    @DisplayName("GRAB·ENDED는 수정과 옵션·이미지 초기화가 모두 거부된다(DROP-007)")
+    void updateDraft_rejectsGrabAndEnded() {
+        // given
+        for (DropStatus status : List.of(DropStatus.GRAB, DropStatus.ENDED)) {
+            Drop drop = dropWith(status, OffsetDateTime.now(), OffsetDateTime.now().plusHours(1));
+            drop.addImage(DropImage.create(drop, "https://example.com/a.jpg", 0, "상품"));
+            addOption(drop, 1000L, 5, true);
+
+            // when & then: 핵심 판매 조건 변경과 자식 초기화가 모두 막힌다
+            assertThatThrownBy(() -> drop.updateDraft("이름", null, null, null, null, null, null))
+                    .as("updateDraft status=%s", status)
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("errorCode").isEqualTo(DropErrorCode.DROP_NOT_EDITABLE);
+            assertThatThrownBy(drop::clearImages)
+                    .as("clearImages status=%s", status)
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("errorCode").isEqualTo(DropErrorCode.DROP_NOT_EDITABLE);
+            assertThatThrownBy(drop::clearOptions)
+                    .as("clearOptions status=%s", status)
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("errorCode").isEqualTo(DropErrorCode.DROP_NOT_EDITABLE);
+            assertThatThrownBy(drop::clearOptionGroups)
+                    .as("clearOptionGroups status=%s", status)
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("errorCode").isEqualTo(DropErrorCode.DROP_NOT_EDITABLE);
+        }
     }
 
     @Test
@@ -242,22 +272,77 @@ class DropTest {
     }
 
     @Test
-    @DisplayName("isOrderable은 GRAB + 판매 시각 범위 안 + 미품절일 때만 true")
+    @DisplayName("판매 시작 전 WISH를 취소하면 CANCELED와 종료·사유 필드가 저장된다")
+    void cancel_transitionsToCanceled() {
+        // given
+        OffsetDateTime now = OffsetDateTime.now();
+        Drop drop = wishDrop(now.plusHours(1));
+
+        // when
+        drop.cancel("재고 확보 실패", now);
+
+        // then
+        assertThat(drop.getStatus()).isEqualTo(DropStatus.CANCELED);
+        assertThat(drop.getClosedAt()).isEqualTo(now);
+        assertThat(drop.getCloseReason()).isEqualTo(DropCloseReason.SELLER_CANCELED);
+        assertThat(drop.getCancelReason()).isEqualTo("재고 확보 실패");
+    }
+
+    @Test
+    @DisplayName("판매 시작 시각이 지난 WISH는 stored 상태가 WISH여도 취소할 수 없다")
+    void cancel_rejectsAfterSaleStart() {
+        // given
+        OffsetDateTime start = OffsetDateTime.now();
+        Drop drop = wishDrop(start);
+
+        // when & then: 시작 시각과 같으면 취소 불가
+        assertThatThrownBy(() -> drop.cancel("사유", start))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(CommonErrorCode.INVALID_STATE_TRANSITION);
+        assertThatThrownBy(() -> drop.cancel("사유", start.plusSeconds(1)))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(CommonErrorCode.INVALID_STATE_TRANSITION);
+    }
+
+    @Test
+    @DisplayName("WISH가 아닌 DRAFT·GRAB·ENDED·CANCELED는 취소할 수 없다")
+    void cancel_rejectsNonWish() {
+        // given
+        OffsetDateTime now = OffsetDateTime.now();
+        for (DropStatus status : List.of(
+                DropStatus.DRAFT, DropStatus.GRAB, DropStatus.ENDED, DropStatus.CANCELED)) {
+            Drop drop = dropWith(status, now.plusHours(1), now.plusHours(2));
+
+            // when & then
+            assertThatThrownBy(() -> drop.cancel("사유", now))
+                    .as("status=%s", status)
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(CommonErrorCode.INVALID_STATE_TRANSITION);
+        }
+    }
+
+    @Test
+    @DisplayName("isOrderable은 WISH·GRAB + 판매 시각 범위 안 + 미품절일 때 true")
     void isOrderable_followsActionsTable() {
         // given
         OffsetDateTime start = OffsetDateTime.now();
         OffsetDateTime end = start.plusHours(1);
-        Drop grab = dropWith(DropStatus.GRAB, start, end);
-        addOption(grab, 1000L, 5, true);
 
-        // then: 시작 시각과 같으면 주문 가능, 종료 시각과 같으면 불가
-        assertThat(grab.isOrderable(start)).isTrue();
-        assertThat(grab.isOrderable(start.plusMinutes(30))).isTrue();
-        assertThat(grab.isOrderable(start.minusSeconds(1))).isFalse();
-        assertThat(grab.isOrderable(end)).isFalse();
-        assertThat(grab.isOrderable(end.plusSeconds(1))).isFalse();
+        // then: 시작 시각과 같으면 주문 가능, 종료 시각과 같으면 불가. WISH도 저장 상태 전환 지연과 무관하게 허용한다.
+        for (DropStatus status : List.of(DropStatus.WISH, DropStatus.GRAB)) {
+            Drop drop = dropWith(status, start, end);
+            addOption(drop, 1000L, 5, true);
+            assertThat(drop.isOrderable(start)).as("status=%s", status).isTrue();
+            assertThat(drop.isOrderable(start.plusMinutes(30))).as("status=%s", status).isTrue();
+            assertThat(drop.isOrderable(start.minusSeconds(1))).as("status=%s", status).isFalse();
+            assertThat(drop.isOrderable(end)).as("status=%s", status).isFalse();
+            assertThat(drop.isOrderable(end.plusSeconds(1))).as("status=%s", status).isFalse();
+        }
 
-        for (DropStatus status : List.of(DropStatus.WISH, DropStatus.ENDED, DropStatus.CANCELED)) {
+        for (DropStatus status : List.of(DropStatus.DRAFT, DropStatus.ENDED, DropStatus.CANCELED)) {
             Drop drop = dropWith(status, start, end);
             addOption(drop, 1000L, 5, true);
             assertThat(drop.isOrderable(start.plusMinutes(30))).as("status=%s", status).isFalse();
@@ -265,15 +350,17 @@ class DropTest {
     }
 
     @Test
-    @DisplayName("품절이면 GRAB이어도 isOrderable은 false")
+    @DisplayName("품절이면 WISH·GRAB이어도 isOrderable은 false")
     void isOrderable_falseWhenSoldOut() {
         // given
         OffsetDateTime start = OffsetDateTime.now();
-        Drop grab = dropWith(DropStatus.GRAB, start, start.plusHours(1));
-        addOption(grab, 1000L, 0, true);
+        for (DropStatus status : List.of(DropStatus.WISH, DropStatus.GRAB)) {
+            Drop drop = dropWith(status, start, start.plusHours(1));
+            addOption(drop, 1000L, 0, true);
 
-        // when & then
-        assertThat(grab.isOrderable(start.plusMinutes(1))).isFalse();
+            // when & then
+            assertThat(drop.isOrderable(start.plusMinutes(1))).as("status=%s", status).isFalse();
+        }
     }
 
     @Test

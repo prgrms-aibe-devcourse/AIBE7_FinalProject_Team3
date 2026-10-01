@@ -2,7 +2,9 @@ package org.example.grab.domain.drop.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.example.grab.domain.drop.dto.request.DropCancelRequest;
 import org.example.grab.domain.drop.dto.request.DropDraftRequest;
+import org.example.grab.domain.drop.dto.response.DropCancelResponse;
 import org.example.grab.domain.drop.dto.response.DropDraftResponse;
 import org.example.grab.domain.drop.dto.response.DropPublishResponse;
 import org.example.grab.domain.drop.dto.response.SellerDropDetailResponse;
@@ -57,6 +59,15 @@ public class SellerDropController {
         Long sellerId = currentSellerIdProvider.currentSellerId();
         Drop drop = dropService.publish(sellerId, dropId);
         return ApiResponse.success(DropPublishResponse.from(drop));
+    }
+
+    @PostMapping("/{dropId}/cancel")
+    public ApiResponse<DropCancelResponse> cancel(
+            @PathVariable Long dropId,
+            @Valid @RequestBody DropCancelRequest request) {
+        Long sellerId = currentSellerIdProvider.currentSellerId();
+        Drop drop = dropService.cancel(sellerId, dropId, request.reason());
+        return ApiResponse.success(DropCancelResponse.from(drop));
     }
 
     @GetMapping

@@ -6,11 +6,15 @@ import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,6 +22,15 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
 
     @EntityGraph(attributePaths = "options")
     Optional<Drop> findWithOptionsById(Long id);
+
+    /*
+     * 판매자 취소(GR-18)에서 DROP 행을 잠그고 조회한다.
+     * 취소 판정의 now는 이 잠금을 획득한 뒤에 만들어야 한다. 잠금 대기 중에 판매가 시작될 수 있기 때문이다.
+     * 잠금 해제 후 상태를 다시 읽게 되므로, 대기 후 재검증으로 취소 불가 상태를 확정한다.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT d FROM Drop d WHERE d.id = :dropId")
+    Optional<Drop> findByIdForUpdate(@Param("dropId") Long dropId);
 
     /*
      * 판매자 DROP 목록 조회.
@@ -96,4 +109,42 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
             @Param("keyword") String keyword,
             @Param("soldOut") Boolean soldOut,
             Pageable pageable);
+
+    /*
+     * 상태 전환 배치(GR-18). 후보 잠금·상태 조건 재검증·변경을 한 문장으로 원자 처리한다.
+     * 서브쿼리의 FOR UPDATE SKIP LOCKED가 후보 행을 잠그고, 바깥 UPDATE가 같은 트랜잭션에서 값을 바꾼다.
+     * 조건(status·sale_starts_at)이 다시 평가되므로 여러 인스턴스가 중복 실행해도 멱등하다.
+     * 엔티티 로딩·dirty checking을 거치지 않으므로 updated_at을 직접 갱신한다.
+     * ORDER BY는 인덱스(idx_drops_sale_start) 정렬과 맞춰 잠금 순서를 안정시킨다.
+     * 변경 건수를 반환해 호출자가 다음 배치 실행 여부를 판단한다.
+     */
+    @Modifying
+    @Query(value = """
+            UPDATE drops SET status = 'GRAB', grab_started_at = :now, updated_at = :now
+            WHERE id IN (
+                SELECT id FROM drops
+                WHERE status = 'WISH' AND sale_starts_at <= :now
+                ORDER BY sale_starts_at, id
+                LIMIT :batchSize
+                FOR UPDATE SKIP LOCKED
+            )
+            """, nativeQuery = true)
+    int startGrabBatch(@Param("now") OffsetDateTime now, @Param("batchSize") int batchSize);
+
+    /*
+     * 판매 종료 배치(GR-18). startGrabBatch와 잠금·멱등 규칙이 같다.
+     * 종료 사유는 TIME_EXPIRED로 고정한다(SOLD_OUT 조기 종료는 범위 밖).
+     */
+    @Modifying
+    @Query(value = """
+            UPDATE drops SET status = 'ENDED', closed_at = :now, close_reason = 'TIME_EXPIRED', updated_at = :now
+            WHERE id IN (
+                SELECT id FROM drops
+                WHERE status = 'GRAB' AND sale_ends_at <= :now
+                ORDER BY sale_ends_at, id
+                LIMIT :batchSize
+                FOR UPDATE SKIP LOCKED
+            )
+            """, nativeQuery = true)
+    int endGrabBatch(@Param("now") OffsetDateTime now, @Param("batchSize") int batchSize);
 }

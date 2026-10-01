@@ -29,6 +29,8 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -319,6 +321,146 @@ class DropRepositoryTest {
         assertThat(ascending).containsExactly(older, newer);
         assertThat(descending).containsExactly(newer, older);
         assertThat(defaultOrder).containsExactly(newer, older);
+    }
+
+    @Test
+    @DisplayName("시작 배치가 시작 시각이 지난 WISH만 GRAB으로 전환하고 전환 시각을 기록한다")
+    void startGrabBatchTransitionsDueWishOnly() {
+        // given
+        Long started = insertDrop(DropStatus.WISH, -1, 1);
+        Long notStarted = insertDrop(DropStatus.WISH, 1, 2);
+        Long alreadyGrab = insertDrop(DropStatus.GRAB, -2, -1);
+        Long canceled = insertDrop(DropStatus.CANCELED, -1, 1);
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+        // when
+        int updated = dropRepository.startGrabBatch(now, 500);
+        entityManager.flush();
+        entityManager.clear();
+
+        // then
+        assertThat(updated).isEqualTo(1);
+        Map<String, Object> row = dropRow(started);
+        assertThat(row.get("status")).isEqualTo("GRAB");
+        assertThat(row.get("grab_started_at")).isNotNull();
+        assertThat(row.get("sale_starts_at")).isNotNull();
+        assertThat(dropRow(notStarted).get("status")).isEqualTo("WISH");
+        assertThat(dropRow(alreadyGrab).get("status")).isEqualTo("GRAB");
+        assertThat(dropRow(canceled).get("status")).isEqualTo("CANCELED");
+    }
+
+    @Test
+    @DisplayName("같은 시작 배치를 두 번 실행하면 두 번째 반환 건수는 0이다")
+    void startGrabBatchIsIdempotent() {
+        // given
+        insertDrop(DropStatus.WISH, -1, 1);
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+        // when
+        int first = dropRepository.startGrabBatch(now, 500);
+        int second = dropRepository.startGrabBatch(now, 500);
+
+        // then
+        assertThat(first).isEqualTo(1);
+        assertThat(second).isZero();
+    }
+
+    @Test
+    @DisplayName("시작 배치가 batchSize만큼만 전환하고 같은 시각이면 id 오름차순으로 선점한다")
+    void startGrabBatchLimitsBatchSizeAndOrdersById() {
+        // given
+        Long first = insertDropWithSameStart(DropStatus.WISH);
+        Long second = insertDropWithSameStart(DropStatus.WISH);
+        Long third = insertDropWithSameStart(DropStatus.WISH);
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+        // when
+        int updated = dropRepository.startGrabBatch(now, 2);
+        entityManager.flush();
+        entityManager.clear();
+
+        // then
+        assertThat(updated).isEqualTo(2);
+        assertThat(dropRow(first).get("status")).isEqualTo("GRAB");
+        assertThat(dropRow(second).get("status")).isEqualTo("GRAB");
+        assertThat(dropRow(third).get("status")).isEqualTo("WISH");
+    }
+
+    @Test
+    @DisplayName("종료 배치가 종료 시각이 지난 GRAB만 ENDED·TIME_EXPIRED로 전환한다")
+    void endGrabBatchTransitionsDueGrabOnly() {
+        // given
+        Long ended = insertDrop(DropStatus.GRAB, -2, -1);
+        Long stillOnSale = insertDrop(DropStatus.GRAB, -1, 1);
+        Long wish = insertDrop(DropStatus.WISH, -1, 1);
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+        // when
+        int updated = dropRepository.endGrabBatch(now, 500);
+        entityManager.flush();
+        entityManager.clear();
+
+        // then
+        assertThat(updated).isEqualTo(1);
+        Map<String, Object> row = dropRow(ended);
+        assertThat(row.get("status")).isEqualTo("ENDED");
+        assertThat(row.get("closed_at")).isNotNull();
+        assertThat(row.get("close_reason")).isEqualTo("TIME_EXPIRED");
+        assertThat(dropRow(stillOnSale).get("status")).isEqualTo("GRAB");
+        assertThat(dropRow(wish).get("status")).isEqualTo("WISH");
+    }
+
+    @Test
+    @DisplayName("종료 배치는 같은 배치를 두 번 실행해도 중복 전환하지 않는다")
+    void endGrabBatchIsIdempotent() {
+        // given
+        insertDrop(DropStatus.GRAB, -2, -1);
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+        // when
+        int first = dropRepository.endGrabBatch(now, 500);
+        int second = dropRepository.endGrabBatch(now, 500);
+
+        // then
+        assertThat(first).isEqualTo(1);
+        assertThat(second).isZero();
+    }
+
+    private Long insertDrop(DropStatus status, long startHoursFromNow, long endHoursFromNow) {
+        boolean grab = status == DropStatus.GRAB || status == DropStatus.ENDED;
+        boolean closed = status == DropStatus.ENDED || status == DropStatus.CANCELED;
+        return jdbcTemplate.queryForObject(
+                """
+                INSERT INTO drops (seller_id, category_id, status, name, description,
+                                   shipping_fee, shipping_notice, sale_starts_at, sale_ends_at,
+                                   published_at, grab_started_at, closed_at, close_reason)
+                VALUES (?, ?, ?, ?, '설명', 3000, '안내',
+                        CURRENT_TIMESTAMP + (? || ' hours')::interval,
+                        CURRENT_TIMESTAMP + (? || ' hours')::interval,
+                        CURRENT_TIMESTAMP,
+                        CASE WHEN ? THEN CURRENT_TIMESTAMP - INTERVAL '1 hour' ELSE NULL END,
+                        CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE NULL END,
+                        CASE WHEN ? THEN 'TIME_EXPIRED' ELSE NULL END)
+                RETURNING id
+                """,
+                Long.class, sellerId, categoryId, status.name(), "상품-" + status, startHoursFromNow,
+                endHoursFromNow, grab, closed, closed);
+    }
+
+    private Long insertDropWithSameStart(DropStatus status) {
+        return jdbcTemplate.queryForObject(
+                """
+                INSERT INTO drops (seller_id, category_id, status, name, description, shipping_fee,
+                                   shipping_notice, sale_starts_at, sale_ends_at, published_at)
+                VALUES (?, ?, ?, ?, '설명', 3000, '안내', CURRENT_TIMESTAMP - INTERVAL '1 hour',
+                        CURRENT_TIMESTAMP + INTERVAL '1 hour', CURRENT_TIMESTAMP)
+                RETURNING id
+                """,
+                Long.class, sellerId, categoryId, status.name(), "상품-" + status);
+    }
+
+    private Map<String, Object> dropRow(Long dropId) {
+        return jdbcTemplate.queryForMap("SELECT * FROM drops WHERE id = ?", dropId);
     }
 
     private Long insertPublishedDrop(DropStatus status, String name) {

@@ -35,8 +35,9 @@ POST /api/v1/orders
 > 클라이언트는 가격이나 총결제금액을 전달하지 않습니다.
 
 **처리 조건:**
-- 서버 시각 기준 DROP 상태가 `GRAB`이어야 한다.
-- 판매 시작 이후, 종료 이전이어야 한다.
+- 구매 가능 여부는 저장 상태가 아니라 서버 시각과 판매 기간으로 판정한다. 저장 상태가 `WISH`여도 시작 전환 배치(GR-18) 이전이면 판매 시작 시각부터 주문할 수 있다.
+- DROP 상태가 `WISH` 또는 `GRAB`이어야 한다. `DRAFT`·`CANCELED`·`ENDED`는 시간과 무관하게 거부한다.
+- 판매 시작 시각(`now >= saleStartsAt`), 종료 이전(`now < saleEndsAt`)이어야 한다.
 - 요청한 모든 옵션에 충분한 가용 재고가 있어야 한다.
 - 재고 확보와 주문 생성은 하나의 트랜잭션으로 처리한다.
 
@@ -68,9 +69,9 @@ POST /api/v1/orders
 ```
 
 **오류 코드:**
-- `DROP_NOT_ON_SALE`
-- `SALE_NOT_STARTED`
-- `SALE_ENDED`
+- `DROP_NOT_ON_SALE` — `DRAFT`·`CANCELED`·`ENDED`이거나 없는 DROP
+- `SALE_NOT_STARTED` — 판매 시작 전
+- `SALE_ENDED` — 판매 종료 후
 - `OPTION_NOT_FOUND`
 - `INSUFFICIENT_STOCK`
 - `DUPLICATE_IDEMPOTENCY_KEY`

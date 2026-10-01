@@ -13,6 +13,7 @@ import org.example.grab.domain.drop.dto.response.SellerDropListResponse;
 import org.example.grab.domain.drop.dto.response.common.DropOptionGroupResponse;
 import org.example.grab.domain.drop.dto.response.common.DropOptionSelectionResponse;
 import org.example.grab.domain.drop.entity.Drop;
+import org.example.grab.domain.drop.entity.DropCloseReason;
 import org.example.grab.domain.drop.entity.DropImage;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.error.DropErrorCode;
@@ -254,6 +255,65 @@ class DropServiceIntegrationTest {
     }
 
     @Test
+    @DisplayName("판매 시작 전 WISH를 취소하면 CANCELED·종료 필드·사유가 저장된다")
+    void cancel_persistsCanceled() {
+        // given
+        OffsetDateTime start = OffsetDateTime.now().plusDays(1);
+        DropDraftRequest full = fullRequest();
+        DropDraftRequest request = new DropDraftRequest(full.name(), full.description(), full.imageUrls(),
+                categoryId, start, start.plusDays(1), new ShippingRequest(3000L, "안내"),
+                full.optionGroups(), full.options());
+        Long dropId = dropService.createDraft(sellerId, request).getId();
+        dropService.publish(sellerId, dropId);
+        entityManager.flush();
+        entityManager.clear();
+
+        // when
+        dropService.cancel(sellerId, dropId, "재고 확보 실패");
+        entityManager.flush();
+        entityManager.clear();
+
+        // then
+        Drop found = dropRepository.findById(dropId).orElseThrow();
+        assertThat(found.getStatus()).isEqualTo(DropStatus.CANCELED);
+        assertThat(found.getClosedAt()).isNotNull();
+        assertThat(found.getCloseReason()).isEqualTo(DropCloseReason.SELLER_CANCELED);
+        assertThat(found.getCancelReason()).isEqualTo("재고 확보 실패");
+    }
+
+    @Test
+    @DisplayName("판매 시작 시각이 지난 WISH 취소는 INVALID_STATE_TRANSITION이고 상태는 바뀌지 않는다")
+    void cancel_rejectsAfterSaleStart() {
+        // given
+        OffsetDateTime start = OffsetDateTime.now().minusMinutes(1);
+        Long dropId = insertWishDrop(sellerId, start, start.plusDays(1));
+        entityManager.clear();
+
+        // when & then
+        assertThatThrownBy(() -> dropService.cancel(sellerId, dropId, "사유"))
+                .isInstanceOfSatisfying(BusinessException.class, e ->
+                        assertThat(e.getErrorCode()).isEqualTo(CommonErrorCode.INVALID_STATE_TRANSITION));
+
+        entityManager.clear();
+        assertThat(dropRepository.findById(dropId).orElseThrow().getStatus()).isEqualTo(DropStatus.WISH);
+    }
+
+    @Test
+    @DisplayName("다른 판매자의 DROP 취소는 DROP_ACCESS_DENIED")
+    void cancel_rejectsOtherSeller() {
+        // given
+        OffsetDateTime start = OffsetDateTime.now().plusDays(1);
+        Long dropId = insertWishDrop(sellerId, start, start.plusDays(1));
+        Long otherSellerId = insertSeller();
+        entityManager.clear();
+
+        // when & then
+        assertThatThrownBy(() -> dropService.cancel(otherSellerId, dropId, "사유"))
+                .isInstanceOfSatisfying(BusinessException.class, e ->
+                        assertThat(e.getErrorCode()).isEqualTo(DropErrorCode.DROP_ACCESS_DENIED));
+    }
+
+    @Test
     @DisplayName("다른 판매자의 DROP은 목록에 나오지 않는다")
     void findSellerDrops_excludesOtherSeller() {
         // given
@@ -403,6 +463,21 @@ class DropServiceIntegrationTest {
                 Long.class,
                 ownerSellerId,
                 status);
+    }
+
+    private Long insertWishDrop(Long ownerSellerId, OffsetDateTime saleStartsAt, OffsetDateTime saleEndsAt) {
+        return jdbcTemplate.queryForObject(
+                """
+                INSERT INTO drops (seller_id, category_id, status, name, description, shipping_fee,
+                                   shipping_notice, sale_starts_at, sale_ends_at, published_at)
+                VALUES (?, ?, 'WISH', '상품', '설명', 3000, '안내', ?, ?, CURRENT_TIMESTAMP)
+                RETURNING id
+                """,
+                Long.class,
+                ownerSellerId,
+                categoryId,
+                saleStartsAt,
+                saleEndsAt);
     }
 
     private Long insertCanceledDrop(Long ownerSellerId) {

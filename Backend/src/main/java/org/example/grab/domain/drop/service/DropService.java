@@ -79,6 +79,18 @@ public class DropService {
     }
 
     /**
+     * 판매자가 공개한 WISH를 취소한다(GR-18).
+     * 조회 → 소유권 순서로 검증한 뒤 DROP 행 잠금을 획득하고, 잠금 이후에 now를 생성해 취소 가능 여부를 판정한다.
+     * 잠금 대기 중에 판매가 시작되면 취소가 거부되어야 하므로 잠금 전 시각으로 판정하지 않는다.
+     */
+    @Transactional
+    public Drop cancel(Long sellerId, Long dropId, String reason) {
+        Drop drop = findOwnedDropForUpdate(sellerId, dropId);
+        drop.cancel(reason, OffsetDateTime.now(ZoneOffset.UTC));
+        return drop;
+    }
+
+    /**
      * WISH 등록·취소 가능 여부를 판정한다. 등록과 취소의 규칙이 같아 하나의 메서드로 공유한다.
      * 존재하지 않거나 DRAFT인 DROP은 DROP_NOT_FOUND로 숨기고, 그 밖의 불가 상태는 도메인이 판정한다.
      */
@@ -169,6 +181,14 @@ public class DropService {
 
     private Drop findOwnedDrop(Long sellerId, Long dropId) {
         Drop drop = findDrop(dropId);
+        drop.validateOwner(sellerId);
+        return drop;
+    }
+
+    // 취소는 행 잠금이 필요하므로 findByIdForUpdate로 조회한다. 존재 확인 → 소유권 순서는 findOwnedDrop과 같다.
+    private Drop findOwnedDropForUpdate(Long sellerId, Long dropId) {
+        Drop drop = dropRepository.findByIdForUpdate(dropId)
+                .orElseThrow(() -> new BusinessException(DropErrorCode.DROP_NOT_FOUND));
         drop.validateOwner(sellerId);
         return drop;
     }

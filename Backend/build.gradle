@@ -71,4 +71,6 @@ dependencyManagement {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // 스케줄러 자동 실행을 끄고, 검증 시 transition(fixedNow)을 직접 호출한다.
+    systemProperty 'grab.drop-transition.enabled', 'false'
 }
