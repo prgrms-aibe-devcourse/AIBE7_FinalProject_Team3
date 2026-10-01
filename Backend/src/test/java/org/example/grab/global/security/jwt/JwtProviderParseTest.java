@@ -73,6 +73,33 @@ class JwtProviderParseTest {
     }
 
     @Test
+    @DisplayName("서명 부분을 바꾸면 거부한다")
+    void rejectsTamperedSignature() {
+        // given: 서명 가운데 한 글자를 바꾼다. 마지막 글자는 패딩 비트라 디코딩 결과가 같을 수 있어 피한다
+        String token = issuer.issue(PUBLIC_ID, Set.of(AuthRole.USER)).value();
+        String[] parts = token.split("\\.");
+        char[] signature = parts[2].toCharArray();
+        int middle = signature.length / 2;
+        signature[middle] = signature[middle] == 'A' ? 'B' : 'A';
+        String tampered = parts[0] + "." + parts[1] + "." + new String(signature);
+
+        // when, then
+        assertRejected(() -> issuer.parse(tampered), Reason.SIGNATURE);
+    }
+
+    @Test
+    @DisplayName("발급한 토큰의 헤더를 alg: none으로 바꾸고 서명을 떼어내면 거부한다")
+    void rejectsAlgNoneHeaderSwap() {
+        // given: 페이로드는 진짜 그대로 두고 "서명이 필요 없다"고 속이는 공격
+        String token = issuer.issue(PUBLIC_ID, Set.of(AuthRole.USER)).value();
+        String payload = token.split("\\.")[1];
+        String unsigned = base64Url("{\"alg\":\"none\"}") + "." + payload + ".";
+
+        // when, then
+        assertRejected(() -> issuer.parse(unsigned), Reason.UNSUPPORTED);
+    }
+
+    @Test
     @DisplayName("다른 키로 서명한 토큰은 거부한다")
     void rejectsTokenSignedWithAnotherKey() {
         // given
@@ -106,6 +133,41 @@ class JwtProviderParseTest {
 
         // when, then
         assertRejected(() -> issuer.parse(token), Reason.CLAIM);
+    }
+
+    @Test
+    @DisplayName("iss나 aud가 없으면 거부한다")
+    void rejectsMissingIssuerOrAudience() {
+        // given
+        String withoutIssuer = Jwts.builder()
+                .subject(PUBLIC_ID.toString())
+                .audience().add("grab-api").and()
+                .expiration(Date.from(EXPIRES_AT))
+                .signWith(KEY, Jwts.SIG.HS256)
+                .compact();
+        String withoutAudience = Jwts.builder()
+                .subject(PUBLIC_ID.toString())
+                .issuer("grab")
+                .expiration(Date.from(EXPIRES_AT))
+                .signWith(KEY, Jwts.SIG.HS256)
+                .compact();
+
+        // when, then
+        assertRejected(() -> issuer.parse(withoutIssuer), Reason.CLAIM);
+        assertRejected(() -> issuer.parse(withoutAudience), Reason.CLAIM);
+    }
+
+    @Test
+    @DisplayName("leeway 경계: 만료 후 정확히 30초까지는 통과하고, 1밀리초라도 넘으면 거부한다")
+    void clockSkewBoundaryIsInclusive() {
+        // given
+        String token = issuer.issue(PUBLIC_ID, Set.of(AuthRole.USER)).value();
+        JwtProvider atSkew = providerAt(EXPIRES_AT.plusSeconds(30));
+        JwtProvider justBeyondSkew = providerAt(EXPIRES_AT.plusSeconds(30).plusMillis(1));
+
+        // when, then
+        assertThat(atSkew.parse(token).getSubject()).isEqualTo(PUBLIC_ID.toString());
+        assertRejected(() -> justBeyondSkew.parse(token), Reason.EXPIRED);
     }
 
     @Test

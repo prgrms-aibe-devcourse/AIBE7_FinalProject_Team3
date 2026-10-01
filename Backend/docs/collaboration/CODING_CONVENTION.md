@@ -35,8 +35,10 @@ org.example.grab
     ├── config              SecurityConfig, JpaConfig
     ├── common              ApiResponse, PageResponse
     ├── error               ErrorCode, CommonErrorCode, BusinessException, GlobalExceptionHandler
-    └── security            AuthRole, CurrentUserIdProvider
-        └── jwt             JwtProvider, JwtAuthenticationFilter
+    └── security            AuthRole, AuthenticatedUser
+        ├── jwt             JwtProvider, JwtAuthenticationFilter
+        ├── identity        CurrentUserIdProvider, UserIdResolver
+        └── handler         RestAuthenticationEntryPoint, RestAccessDeniedHandler
 ```
 
 - 도메인 패키지는 다른 도메인의 `repository`, `entity`를 직접 참조하지 않는다. 필요하면 상대 도메인의 `service`를 통한다.

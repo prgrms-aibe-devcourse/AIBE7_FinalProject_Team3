@@ -4,10 +4,13 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.http.Cookie;
 import org.example.grab.global.security.AuthRole;
+import org.example.grab.global.security.AuthenticatedUser;
 import org.example.grab.global.security.jwt.InvalidAccessTokenException.Reason;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -24,6 +27,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Date;
 import java.util.List;
@@ -32,7 +36,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// M03-04·M03-05: 쿠키 추출, 제외 경로, 검증 실패 처리, Claims → 인증 정보 변환
+// M03-04·M03-05, U3: 쿠키 추출, 제외 경로, 검증 실패 처리, Claims(sub·roles) → principal·ROLE_* 권한 변환
 class JwtAuthenticationFilterTest {
 
     private static final String SECRET = Base64.getEncoder().encodeToString(
@@ -163,10 +167,55 @@ class JwtAuthenticationFilterTest {
         assertThat(commenced).isEmpty();
     }
 
+    @ParameterizedTest
+    @EnumSource(AuthRole.class)
+    @DisplayName("roles의 각 값은 ROLE_ 접두사가 붙은 권한 하나로 바뀐다")
+    void mapsEachRoleToPrefixedAuthority(AuthRole role) throws Exception {
+        // given
+        MockHttpServletRequest request = apiRequest();
+        request.setCookies(new Cookie("access_token", jwtProvider.issue(PUBLIC_ID, Set.of(role)).value()));
+
+        // when
+        filter.doFilter(request, new MockHttpServletResponse(), new MockFilterChain());
+
+        // then
+        assertThat(SecurityContextHolder.getContext().getAuthentication().getAuthorities())
+                .extracting(GrantedAuthority::getAuthority)
+                .containsExactly("ROLE_" + role.name());
+    }
+
     @Test
-    @DisplayName("서명은 맞아도 sub가 UUID가 아니면 거부한다")
+    @DisplayName("principal은 AuthenticatedUser 계약을 지켜 identity 쪽이 JWT를 몰라도 publicId를 얻는다")
+    void principalImplementsAuthenticatedUser() throws Exception {
+        // given
+        MockHttpServletRequest request = apiRequest();
+        request.setCookies(new Cookie("access_token", jwtProvider.issue(PUBLIC_ID, Set.of(AuthRole.USER)).value()));
+
+        // when
+        filter.doFilter(request, new MockHttpServletResponse(), new MockFilterChain());
+
+        // then
+        assertThat(SecurityContextHolder.getContext().getAuthentication().getPrincipal())
+                .isInstanceOfSatisfying(AuthenticatedUser.class,
+                        user -> assertThat(user.publicId()).isEqualTo(PUBLIC_ID));
+    }
+
+    @Test
+    @DisplayName("서명은 맞아도 sub가 UUID가 아니거나 없으면 거부한다")
     void rejectsNonUuidSubject() throws Exception {
         assertCommencedWithClaimReason(signed("user-7", List.of("USER")));
+        assertCommencedWithClaimReason(signed("", List.of("USER")));
+        // users.id 같은 내부 숫자 ID를 sub로 넣은 경우
+        assertCommencedWithClaimReason(signed("7", List.of("USER")));
+        assertCommencedWithClaimReason(signed(null, List.of("USER")));
+    }
+
+    @Test
+    @DisplayName("UUID로 해석되더라도 표준 소문자 36자 형식이 아니면 거부한다")
+    void rejectsNonCanonicalUuidSubject() throws Exception {
+        // UUID.fromString은 둘 다 받아들인다
+        assertCommencedWithClaimReason(signed("1-1-1-1-1", List.of("USER")));
+        assertCommencedWithClaimReason(signed(PUBLIC_ID.toString().toUpperCase(), List.of("USER")));
     }
 
     @Test
@@ -175,6 +224,18 @@ class JwtAuthenticationFilterTest {
         assertCommencedWithClaimReason(signed(PUBLIC_ID.toString(), null));
         assertCommencedWithClaimReason(signed(PUBLIC_ID.toString(), List.of()));
         assertCommencedWithClaimReason(signed(PUBLIC_ID.toString(), List.of("SUPER_ADMIN")));
+        // 접두사가 붙은 값은 Claim 형식이 아니다(JWT에는 접두사 없이 넣는다)
+        assertCommencedWithClaimReason(signed(PUBLIC_ID.toString(), List.of("ROLE_USER")));
+        // 알려진 값 사이에 모르는 값이 하나라도 섞이면 일부만 인정하지 않고 통째로 거부한다
+        assertCommencedWithClaimReason(signed(PUBLIC_ID.toString(), List.of("USER", "SUPER_ADMIN")));
+    }
+
+    @Test
+    @DisplayName("서명은 맞아도 roles가 목록이 아니거나 문자열이 아닌 요소가 있으면 거부한다")
+    void rejectsMalformedRoles() throws Exception {
+        assertCommencedWithClaimReason(signed(PUBLIC_ID.toString(), "USER"));
+        assertCommencedWithClaimReason(signed(PUBLIC_ID.toString(), List.of(1)));
+        assertCommencedWithClaimReason(signed(PUBLIC_ID.toString(), Arrays.asList("USER", null)));
     }
 
     private void assertCommencedWithClaimReason(String token) throws Exception {
@@ -193,7 +254,7 @@ class JwtAuthenticationFilterTest {
     }
 
     // 같은 키·iss·aud로 서명해 검증은 통과하지만 sub·roles만 원하는 값으로 만든 토큰
-    private static String signed(String subject, List<String> roles) {
+    private static String signed(String subject, Object roles) {
         var builder = Jwts.builder()
                 .subject(subject)
                 .issuer("grab")
