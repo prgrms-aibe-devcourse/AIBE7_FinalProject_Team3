@@ -267,6 +267,74 @@ class SellerOrderServiceTest {
     }
 
     @Test
+    void updatesTrackingWithoutChangingShippedAt() {
+        // given
+        UUID orderId = UUID.randomUUID();
+        Order order = createOrder();
+        ReflectionTestUtils.setField(order, "id", 100L);
+        ReflectionTestUtils.setField(order, "status", OrderStatus.SHIPPED);
+        OffsetDateTime shippedAt = OffsetDateTime.now().minusDays(1);
+        Shipment shipment = Shipment.register(order, "CJ대한통운", "482910355147",
+                "123e4567-e89b-12d3-a456-426614174000", "a".repeat(64), shippedAt);
+        when(orderRepository.findByUuidForUpdate(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.ownsDrop(SELLER_ID, 42L)).thenReturn(true);
+        when(shipmentRepository.findByOrderId(100L)).thenReturn(Optional.of(shipment));
+
+        // when
+        var response = sellerOrderService.updateShipment(SELLER_ID, orderId,
+                new ShipmentRegisterRequest("한진택배", "482910355174"));
+
+        // then
+        assertThat(response.orderId()).isEqualTo(order.getUuid());
+        assertThat(response.status()).isEqualTo("SHIPPED");
+        assertThat(response.carrier()).isEqualTo("한진택배");
+        assertThat(response.trackingNumber()).isEqualTo("482910355174");
+        assertThat(shipment.getShippedAt()).isEqualTo(shippedAt);
+        assertThat(shipment.getIdempotencyKey()).isEqualTo("123e4567-e89b-12d3-a456-426614174000");
+        assertThat(shipment.getRequestHash()).isEqualTo("a".repeat(64));
+    }
+
+    @Test
+    void rejectsTrackingUpdateAfterDelivered() {
+        // given
+        UUID orderId = UUID.randomUUID();
+        Order order = createOrder();
+        ReflectionTestUtils.setField(order, "id", 100L);
+        ReflectionTestUtils.setField(order, "status", OrderStatus.DELIVERED);
+        when(orderRepository.findByUuidForUpdate(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.ownsDrop(SELLER_ID, 42L)).thenReturn(true);
+
+        // when
+        Throwable exception = catchThrowable(() -> sellerOrderService.updateShipment(SELLER_ID, orderId,
+                new ShipmentRegisterRequest("한진택배", "482910355174")));
+
+        // then
+        assertThat(exception).isInstanceOfSatisfying(BusinessException.class,
+                actual -> assertThat(actual.getErrorCode()).isEqualTo(CommonErrorCode.ORDER_STATUS_CONFLICT));
+        verifyNoMoreInteractions(shipmentRepository);
+    }
+
+    @Test
+    void rejectsTrackingUpdateForAnotherSellersOrder() {
+        // given
+        UUID orderId = UUID.randomUUID();
+        Order order = createOrder();
+        ReflectionTestUtils.setField(order, "id", 100L);
+        ReflectionTestUtils.setField(order, "status", OrderStatus.SHIPPED);
+        when(orderRepository.findByUuidForUpdate(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.ownsDrop(SELLER_ID, 42L)).thenReturn(false);
+
+        // when
+        Throwable exception = catchThrowable(() -> sellerOrderService.updateShipment(SELLER_ID, orderId,
+                new ShipmentRegisterRequest("한진택배", "482910355174")));
+
+        // then
+        assertThat(exception).isInstanceOfSatisfying(BusinessException.class,
+                actual -> assertThat(actual.getErrorCode()).isEqualTo(OrderErrorCode.ORDER_ACCESS_DENIED));
+        verifyNoMoreInteractions(shipmentRepository);
+    }
+
+    @Test
     void rejectsDropNotOwnedBySellerBeforeSearchingOrders() {
         // given
         when(orderRepository.existsDrop(42L)).thenReturn(true);

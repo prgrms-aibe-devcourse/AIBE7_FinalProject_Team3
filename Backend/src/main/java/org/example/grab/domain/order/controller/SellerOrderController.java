@@ -9,6 +9,7 @@ import org.example.grab.domain.order.entity.OrderStatus;
 import org.example.grab.domain.order.service.SellerOrderService;
 import org.example.grab.domain.payment.entity.PaymentStatus;
 import org.example.grab.domain.shipment.dto.ShipmentRegisterRequest;
+import org.example.grab.domain.shipment.dto.ShipmentUpdateResponse;
 import org.example.grab.global.common.ApiResponse;
 import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.common.PublicIdParser;
@@ -16,6 +17,7 @@ import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
 import org.example.grab.global.security.identity.CurrentSellerIdProvider;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -56,6 +58,15 @@ public class SellerOrderController {
             @Valid @RequestBody ShipmentRegisterRequest request) {
         return ApiResponse.success(sellerOrderService.registerShipment(
                 currentSellerIdProvider.currentSellerId(), PublicIdParser.parse(orderId), idempotencyKey, request));
+    }
+
+    // 상태 전이 없이 송장 정보만 갱신하므로 Idempotency-Key를 받지 않는다.
+    @PatchMapping("/orders/{orderId}/shipment")
+    public ApiResponse<ShipmentUpdateResponse> updateShipment(
+            @PathVariable String orderId,
+            @Valid @RequestBody ShipmentRegisterRequest request) {
+        return ApiResponse.success(sellerOrderService.updateShipment(
+                currentSellerIdProvider.currentSellerId(), PublicIdParser.parse(orderId), request));
     }
 
     @GetMapping("/orders")
