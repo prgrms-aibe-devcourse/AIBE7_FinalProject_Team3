@@ -11,7 +11,9 @@ import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.idempotency.IdempotencyKey;
 import org.example.grab.global.idempotency.RequestHash;
 import org.example.grab.global.idempotency.RequestHashGenerator;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -27,6 +29,7 @@ public class PaymentService {
 
     // 진행 중인 이전 결제를 조회로 정리한 뒤 다시 검증하는 횟수. 정리되지 않으면 이중 결제를 막기 위해 거부한다.
     private static final int MAX_PREPARE_ATTEMPTS = 2;
+    private static final String PROVIDER_PAYMENT_CONSTRAINT = "uq_payments_provider_payment";
 
     private final PaymentGateway paymentGateway;
     private final PaymentTransactionService transactionService;
@@ -59,8 +62,7 @@ public class PaymentService {
         RequestHash requestHash = requestHashGenerator.generate(request);
 
         for (int attempt = 0; attempt < MAX_PREPARE_ATTEMPTS; attempt++) {
-            PaymentPreparation preparation =
-                    transactionService.prepare(buyerId, orderId, idempotencyKey, requestHash, request, now());
+            PaymentPreparation preparation = prepare(buyerId, orderId, idempotencyKey, requestHash, request);
             if (preparation instanceof PaymentPreparation.Replay replay) {
                 return PaymentResponse.of(replay.payment(), replay.order());
             }
@@ -78,6 +80,31 @@ public class PaymentService {
             resolve(resolve.paymentId(), resolve.command(), true);
         }
         throw new BusinessException(PaymentErrorCode.PAYMENT_ALREADY_PROCESSED);
+    }
+
+    /*
+        다른 주문이 같은 paymentKey로 동시에 요청하면 주문 잠금이 달라 둘 다 prepare의 중복 확인을 통과한다.
+        늦은 쪽은 저장에서 유니크 제약에 걸리므로 이미 처리된 paymentKey로 보고 거부한다.
+     */
+    private PaymentPreparation prepare(
+            long buyerId, UUID orderId, IdempotencyKey idempotencyKey, RequestHash requestHash, PaymentRequest request) {
+        try {
+            return transactionService.prepare(buyerId, orderId, idempotencyKey, requestHash, request, now());
+        } catch (DataIntegrityViolationException exception) {
+            if (violates(exception, PROVIDER_PAYMENT_CONSTRAINT)) {
+                throw new BusinessException(PaymentErrorCode.PAYMENT_ALREADY_PROCESSED);
+            }
+            throw exception;
+        }
+    }
+
+    private static boolean violates(DataIntegrityViolationException exception, String constraintName) {
+        for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+            if (cause instanceof ConstraintViolationException violation) {
+                return constraintName.equalsIgnoreCase(violation.getConstraintName());
+            }
+        }
+        return false;
     }
 
     // 승인 결과가 불명이면 바로 조회해 확정을 시도한다. 조회로도 모르면 UNKNOWN으로 남긴다.

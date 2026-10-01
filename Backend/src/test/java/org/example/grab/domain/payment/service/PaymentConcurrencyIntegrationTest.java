@@ -39,6 +39,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 // 결제 확정과 만료, 같은 주문의 동시 결제 요청이 실제 PostgreSQL 행 잠금 아래에서 한 경로만 성공하는지 확인한다.
 @SpringBootTest
@@ -306,5 +308,46 @@ class PaymentConcurrencyIntegrationTest {
         assertThat(fixture.quantities())
                 .containsEntry("reserved_quantity", 0)
                 .containsEntry("sold_quantity", PaymentTestFixture.QUANTITY);
+    }
+
+    @Test
+    @DisplayName("다른 주문이 같은 paymentKey로 동시에 결제 요청하면 늦은 요청은 PG를 부르지 않고 409로 거부한다")
+    void concurrentPaymentRequestsWithSamePaymentKey() throws Exception {
+        // given: 주문 A의 결제 시도가 paymentKey를 저장하고 아직 커밋하지 않았다
+        Order orderA = fixture.createOrder();
+        Order orderB = fixture.createOrder();
+        String paymentKey = "payment-shared";
+        CountDownLatch saved = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        int baseline = waitingForLock();
+        Future<?> holder = executor.submit(() -> new TransactionTemplate(transactionManager).executeWithoutResult(
+                status -> {
+                    transactionService.prepare(
+                            fixture.buyerId(), orderA.getUuid(), IdempotencyKey.from(UUID.randomUUID().toString()),
+                            RequestHash.from("d".repeat(64)),
+                            new PaymentRequest(paymentKey, PaymentTestFixture.TOTAL_AMOUNT),
+                            OffsetDateTime.now(ZoneOffset.UTC));
+                    saved.countDown();
+                    await(release);
+                }));
+        assertThat(saved.await(10, TimeUnit.SECONDS)).isTrue();
+
+        // when: 주문 B의 요청은 주문 잠금이 달라 사전 확인을 통과하고, 저장에서 유니크 인덱스를 기다린다
+        Future<PaymentResponse> late = executor.submit(() -> paymentService.pay(
+                fixture.buyerId(), orderB.getUuid(), UUID.randomUUID().toString(),
+                new PaymentRequest(paymentKey, PaymentTestFixture.TOTAL_AMOUNT)));
+        awaitWaitingForLock(baseline + 1);
+        release.countDown();
+        holder.get(10, TimeUnit.SECONDS);
+
+        // then
+        assertThatThrownBy(() -> late.get(10, TimeUnit.SECONDS))
+                .cause()
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(PaymentErrorCode.PAYMENT_ALREADY_PROCESSED);
+        verify(paymentGateway, never()).confirm(any());
+        assertThat(fixture.payments(orderB)).isEmpty();
+        assertThat(fixture.orderStatus(orderB)).isEqualTo(OrderStatus.PAYMENT_PENDING);
     }
 }
