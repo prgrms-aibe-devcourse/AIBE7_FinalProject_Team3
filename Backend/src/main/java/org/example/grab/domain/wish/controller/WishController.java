@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.grab.domain.wish.dto.response.WishResponse;
 import org.example.grab.domain.wish.service.WishService;
 import org.example.grab.global.common.ApiResponse;
-import org.example.grab.global.security.CurrentUserIdProvider;
+import org.example.grab.global.security.identity.CurrentUserIdProvider;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;

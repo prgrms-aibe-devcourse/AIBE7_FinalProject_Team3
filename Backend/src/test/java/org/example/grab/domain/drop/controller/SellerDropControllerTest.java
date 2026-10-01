@@ -16,7 +16,7 @@ import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
 import org.example.grab.global.error.GlobalExceptionHandler;
 import org.example.grab.global.error.ValidationErrorCodeResolver;
-import org.example.grab.global.security.CurrentSellerIdProvider;
+import org.example.grab.global.security.identity.CurrentSellerIdProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

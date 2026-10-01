@@ -7,7 +7,7 @@ import org.example.grab.domain.payment.dto.PaymentResponse;
 import org.example.grab.domain.payment.service.PaymentService;
 import org.example.grab.global.common.ApiResponse;
 import org.example.grab.global.common.PublicIdParser;
-import org.example.grab.global.security.CurrentUserIdProvider;
+import org.example.grab.global.security.identity.CurrentUserIdProvider;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;

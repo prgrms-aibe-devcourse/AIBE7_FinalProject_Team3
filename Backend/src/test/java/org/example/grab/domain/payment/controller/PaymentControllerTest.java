@@ -7,7 +7,7 @@ import org.example.grab.domain.payment.entity.ReconciliationStatus;
 import org.example.grab.domain.payment.service.PaymentService;
 import org.example.grab.global.error.GlobalExceptionHandler;
 import org.example.grab.global.error.ValidationErrorCodeResolver;
-import org.example.grab.global.security.CurrentUserIdProvider;
+import org.example.grab.global.security.identity.CurrentUserIdProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
