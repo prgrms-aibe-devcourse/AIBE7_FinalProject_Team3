@@ -1,4 +1,4 @@
-package org.example.grab.domain.order.entity;
+package org.example.grab.domain.payment.entity;
 
 // 주문에 연결된 결제 시도의 상태를 정의한다.
 public enum PaymentStatus {

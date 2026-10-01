@@ -187,15 +187,17 @@ class OrderRepositoryTest {
                 """, UUID.class, "GR-TEST-" + uniqueValue, sellerUserId, sellerDropId,
                 "key-" + uniqueValue);
         jdbcTemplate.update("""
-                INSERT INTO payments (order_id, provider, idempotency_key, amount, status, created_at)
-                SELECT id, 'MOCK', ?, 3500, 'FAILED', CURRENT_TIMESTAMP - INTERVAL '1 minute'
+                INSERT INTO payments (order_id, provider, idempotency_key, client_idempotency_key, request_hash,
+                                      amount, status, created_at)
+                SELECT id, 'MOCK', ?, ?, repeat('a', 64), 3500, 'FAILED', CURRENT_TIMESTAMP - INTERVAL '1 minute'
                 FROM orders WHERE public_id = ?
-                """, "payment-old-" + uniqueValue, orderId);
+                """, "payment-old-" + uniqueValue, "client-old-" + uniqueValue, orderId);
         jdbcTemplate.update("""
-                INSERT INTO payments (order_id, provider, idempotency_key, amount, status, approved_at)
-                SELECT id, 'MOCK', ?, 3500, 'SUCCEEDED', CURRENT_TIMESTAMP
+                INSERT INTO payments (order_id, provider, idempotency_key, client_idempotency_key, request_hash,
+                                      amount, status, approved_at)
+                SELECT id, 'MOCK', ?, ?, repeat('b', 64), 3500, 'SUCCEEDED', CURRENT_TIMESTAMP
                 FROM orders WHERE public_id = ?
-                """, "payment-new-" + uniqueValue, orderId);
+                """, "payment-new-" + uniqueValue, "client-new-" + uniqueValue, orderId);
 
         // when
         Page<SellerOrderListProjection> filtered = orderRepository.findSellerOrders(

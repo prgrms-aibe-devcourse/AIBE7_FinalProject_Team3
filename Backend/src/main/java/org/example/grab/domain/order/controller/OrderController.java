@@ -11,6 +11,7 @@ import org.example.grab.domain.order.service.OrderCreateService;
 import org.example.grab.domain.order.service.OrderQueryService;
 import org.example.grab.global.common.ApiResponse;
 import org.example.grab.global.common.PageResponse;
+import org.example.grab.global.common.PublicIdParser;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
 import org.example.grab.global.security.identity.CurrentUserIdProvider;
@@ -63,6 +64,6 @@ public class OrderController {
     @GetMapping("/{orderId}")
     public ApiResponse<MyOrderDetailResponse> findMyOrder(@PathVariable String orderId) {
         return ApiResponse.success(orderQueryService.findMyOrder(
-                currentUserIdProvider.currentUserId(), OrderIdParser.parse(orderId)));
+                currentUserIdProvider.currentUserId(), PublicIdParser.parse(orderId)));
     }
 }

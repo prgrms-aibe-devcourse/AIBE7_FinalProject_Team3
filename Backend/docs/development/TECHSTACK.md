@@ -87,6 +87,21 @@ LOCAL 회원가입의 이메일 인증 코드(`MEMBER_AUTH.md` 1.2절)는 SMTP�
 - SES 전환 전에 팀 도메인을 확보해 DKIM·SPF·DMARC를 설정하고, 샌드박스 해제(프로덕션 전환)를 신청한다.
 - 발송은 트랜잭션 커밋 후 비동기로 처리하고, SMTP 연결·읽기·쓰기 타임아웃을 지정한다. SMTP 장애가 Actuator Health 결과에 영향을 주지 않도록 메일 헬스 체크는 사용하지 않는다.
 
+### 4.4 결제 PG
+
+Mock 결제(`PAYMENT.md` 1.1절)는 토스페이먼츠 **테스트 환경**으로 진행한다. 테스트 API 키로 승인하므로 실제 결제는 일어나지 않는다. 애플리케이션은 결제 인터페이스(`PaymentGateway`)에만 의존하고, 토스페이먼츠 호출은 그 구현체에 둔다.
+
+| 환경 | 결제 대상 | 용도 |
+| --- | --- | --- |
+| 로컬 개발·시연 | 토스페이먼츠 테스트 환경 (결제창, API 개별 연동 테스트 키) | 결제창 인증과 결제 승인·조회 API를 실제 연동과 같은 흐름으로 확인한다. |
+| 자동 테스트·CI | 테스트용 `PaymentGateway` 구현 | 승인 성공·실패·결과 불명을 지정해 재현한다. 결제창 인증으로만 받을 수 있는 `paymentKey` 없이 결과 반영 로직과 동시성을 검증한다. |
+
+- 토스페이먼츠를 사용하는 이유: 사업자 등록 없이 개발자센터 가입만으로 테스트 키를 받아 실제 PG와 같은 승인 흐름(결제 인증 → 서버 승인)과 오류 응답을 경험할 수 있다. 결제 테스트 내역과 API 로그를 개발자센터에서 확인할 수 있다.
+- 결제위젯 대신 결제창(API 개별 연동)을 사용하는 이유: 결제위젯의 상점 전용 키는 이용 계약이 필요해 테스트 단계에서는 문서용 공용 키만 쓸 수 있고, 공용 키로는 개발자센터에 결제 내역과 로그가 남지 않는다.
+- 클라이언트 키(`test_ck_`)와 시크릿 키(`test_sk_`)는 같은 세트로 사용한다. 시크릿 키는 서버에서만 쓰고 환경변수(`TOSS_SECRET_KEY`)로 주입하며, 저장소·이미지·로그에 남기지 않는다. 배포 환경에서는 Parameter Store로 관리한다.
+- 결제 승인 API는 트랜잭션 밖에서 호출하고 연결·응답 타임아웃을 지정한다. 타임아웃·응답 유실은 실패로 단정하지 않고 결제 조회 API로 상태를 확인한다.
+- 오류 시나리오는 테스트 환경 전용 `TossPayments-Test-Code` 헤더로 재현할 수 있다.
+
 ## 5. CI/CD
 
 | 구분 | 기술 | 용도 | 선정 이유 |
@@ -172,6 +187,7 @@ MVP 초기에는 Actuator와 Prometheus를 연결해 JVM·HTTP·DB Connection Po
 - Java, Spring Boot, Spring MVC, JPA, Security, Validation
 - PostgreSQL, Flyway, Refresh Token·이메일 인증 저장용 Redis
 - Gmail SMTP 기반 이메일 인증 코드 발송, 로컬 Mailpit·테스트 GreenMail
+- 토스페이먼츠 테스트 환경 기반 Mock 결제 (결제창, 테스트 API 키)
 - React, TypeScript, Vite, Tailwind CSS, Axios, React Router
 - Docker, Docker Compose, GitHub Actions
 - GHCR 이미지 게시(`latest`, 커밋 SHA 태그)

@@ -19,6 +19,9 @@ spring:
 grab:
   mock-delivery:
     enabled: ${GRAB_MOCK_DELIVERY_ENABLED:false}
+  # 토스페이먼츠 테스트 환경(TECHSTACK.md 4.4). 시크릿 키는 환경변수로만 주입한다.
+  toss:
+    secret-key: ${TOSS_SECRET_KEY:}
   auth:
     access-token:
       ttl: 15m

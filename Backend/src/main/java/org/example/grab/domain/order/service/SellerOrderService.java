@@ -1,15 +1,15 @@
 package org.example.grab.domain.order.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.grab.domain.order.dto.OrderStatusResponse;
 import org.example.grab.domain.order.dto.SellerOrderDetailResponse;
 import org.example.grab.domain.order.dto.SellerOrderListProjection;
 import org.example.grab.domain.order.dto.SellerOrderListResponse;
-import org.example.grab.domain.order.dto.OrderStatusResponse;
 import org.example.grab.domain.order.entity.Order;
 import org.example.grab.domain.order.entity.OrderStatus;
-import org.example.grab.domain.order.entity.PaymentStatus;
 import org.example.grab.domain.order.error.OrderErrorCode;
 import org.example.grab.domain.order.repository.OrderRepository;
+import org.example.grab.domain.payment.entity.PaymentStatus;
 import org.example.grab.domain.shipment.dto.ShipmentRegisterRequest;
 import org.example.grab.domain.shipment.entity.Shipment;
 import org.example.grab.domain.shipment.repository.ShipmentRepository;
