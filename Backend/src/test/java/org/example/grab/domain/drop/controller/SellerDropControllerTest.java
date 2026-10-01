@@ -105,6 +105,47 @@ class SellerDropControllerTest {
     }
 
     @Test
+    @DisplayName("중첩 배열의 null 원소는 400 VALIDATION_FAILED와 경로 field를 반환한다")
+    void createDraft_rejectsNullElementsInNestedArrays() throws Exception {
+        // given: 옵션 조합 표시명 검증에서 NPE로 500이 나던 입력들
+        given(currentSellerIdProvider.currentSellerId()).willReturn(1L);
+
+        // when & then
+        mockMvc.perform(post("/api/v1/seller/drops")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"optionGroups\":[null],\"options\":[]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.error.fieldErrors[0].field").value("optionGroups[0]"));
+
+        mockMvc.perform(post("/api/v1/seller/drops")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"optionGroups\":[],\"options\":[null]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.error.fieldErrors[0].field").value("options[0]"));
+
+        mockMvc.perform(post("/api/v1/seller/drops")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"optionGroups\":[{\"key\":\"c\",\"name\":\"색상\",\"values\":[null]}],"
+                                + "\"options\":[]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.error.fieldErrors[0].field").value("optionGroups[0].values[0]"));
+
+        mockMvc.perform(post("/api/v1/seller/drops")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"optionGroups\":[],\"options\":[{\"selections\":[null],"
+                                + "\"unitPrice\":1000,\"totalQuantity\":5}]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.error.fieldErrors[0].field").value("options[0].selections[0]"));
+
+        // 검증 단계에서 거부되어 서비스(DB 변경)가 호출되지 않는다
+        verifyNoInteractions(dropService);
+    }
+
+    @Test
     @DisplayName("인증되지 않은 요청은 401 AUTHENTICATION_REQUIRED")
     void createDraft_authenticationRequired() throws Exception {
         // given
