@@ -911,19 +911,47 @@ main {
   align-items: center;
   margin-bottom: 32px;
 }
+.stats-caption {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.stats-caption button {
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 800;
+}
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(0, 220px));
   gap: 14px;
   margin-bottom: 24px;
 }
-.stats-grid article {
+.stats-grid article,
+.stats-grid > a,
+.stats-grid > button {
   display: grid;
   gap: 8px;
   min-height: 155px;
   padding: 22px;
   border: 1px solid var(--line);
   border-radius: 12px;
+  background: none;
+  text-align: left;
+}
+.stats-grid > button[aria-pressed='true'] {
+  border-color: var(--ink);
+  background: var(--lime);
+}
+.stats-grid > button:disabled {
+  color: var(--muted);
+  cursor: default;
 }
 .stats-grid span {
   color: var(--muted);
@@ -993,6 +1021,152 @@ main {
 .status-pill.grab {
   background: var(--ink);
   color: #fff;
+}
+.drop-list article.urgent {
+  border-bottom-color: transparent;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px var(--danger);
+}
+.order-tabs {
+  margin-bottom: 18px;
+}
+.order-list {
+  display: grid;
+}
+.order-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px 160px 28px;
+  gap: 18px;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.order-toggle {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 13px;
+}
+.order-detail {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--soft);
+}
+.order-detail table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.order-detail th {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-align: left;
+}
+.order-detail td {
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+.order-amounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+  margin: 0;
+  font-size: 12px;
+}
+.order-amounts div {
+  display: grid;
+  gap: 4px;
+}
+.order-amounts dt {
+  color: var(--muted);
+  font-size: 10px;
+}
+.order-amounts dd {
+  margin: 0;
+  font-weight: 800;
+}
+.order-shipping {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+}
+.order-row:last-child {
+  border-bottom: 0;
+}
+.order-main {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+.order-main strong {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.order-main small,
+.order-action small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.order-action {
+  display: flex;
+  justify-content: flex-end;
+}
+.shipment-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  grid-column: 1 / -1;
+  margin-top: 14px;
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--soft);
+}
+.shipment-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.shipment-form input {
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+.shipment-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.shipment-error {
+  grid-column: 1 / -1;
+  color: var(--danger);
+  font-size: 11px;
+}
+.urgent-tag {
+  justify-self: start;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
 }
 
 .form-page {
@@ -1317,7 +1491,9 @@ footer small {
     grid-template-columns: 1fr 1fr;
     gap: 9px;
   }
-  .stats-grid article {
+  .stats-grid article,
+  .stats-grid > a,
+  .stats-grid > button {
     min-height: 135px;
     padding: 17px;
   }
@@ -1326,6 +1502,19 @@ footer small {
   }
   .drop-list {
     min-width: 660px;
+  }
+  .order-row {
+    grid-template-columns: minmax(0, 1fr) auto 28px;
+  }
+  .order-detail {
+    overflow-x: auto;
+  }
+  .order-action {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+  .shipment-form {
+    grid-template-columns: 1fr;
   }
   .form-card {
     grid-template-columns: 1fr;

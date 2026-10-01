@@ -136,7 +136,7 @@ export const drops: Drop[] = [
     category: '패션',
     status: 'WISH',
     wishCount: 312,
-    saleStartsAt: dateFromNow(2),
+    saleStartsAt: dateFromNow(0.3),
     saleEndsAt: dateFromNow(9),
     shippingFee: 3000,
     shippingNotice: '결제 완료 후 3~5 영업일 이내 출고',
@@ -256,7 +256,7 @@ export const drops: Drop[] = [
     status: 'GRAB',
     wishCount: 142,
     saleStartsAt: dateFromNow(-1),
-    saleEndsAt: dateFromNow(7),
+    saleEndsAt: dateFromNow(0.6),
     shippingFee: 3000,
     shippingNotice: '주문 후 순차 제작, 5영업일 이내 출고',
     optionGroups: [

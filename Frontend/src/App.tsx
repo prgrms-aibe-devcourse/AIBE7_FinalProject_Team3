@@ -12,6 +12,7 @@ import MyPage from './pages/MyPage/MyPage'
 import NotFoundPage from './pages/NotFound/NotFoundPage'
 import SellerDashboardPage from './pages/SellerDashboard/SellerDashboardPage'
 import SellerDropFormPage from './pages/SellerDropForm/SellerDropFormPage'
+import SellerOrdersPage from './pages/SellerOrders/SellerOrdersPage'
 import type { SharedProps } from './types/store'
 
 export default function App() {
@@ -64,6 +65,10 @@ export default function App() {
             }
           />
           <Route path="/seller" element={<SellerDashboardPage />} />
+          <Route
+            path="/seller/orders"
+            element={<SellerOrdersPage notify={notify} />}
+          />
           <Route
             path="/seller/drops/new"
             element={<SellerDropFormPage notify={notify} />}
