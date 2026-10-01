@@ -34,7 +34,7 @@ class WishTransactionServiceTest {
     void register_createsNewWish() {
         // given
         OffsetDateTime now = OffsetDateTime.now();
-        given(wishRepository.findByUserIdAndDropId(USER_ID, DROP_ID)).willReturn(Optional.empty());
+        given(wishRepository.findByUserIdAndDropIdForUpdate(USER_ID, DROP_ID)).willReturn(Optional.empty());
         given(wishRepository.saveAndFlush(any(Wish.class))).willAnswer(invocation -> invocation.getArgument(0));
 
         // when
@@ -55,7 +55,7 @@ class WishTransactionServiceTest {
         OffsetDateTime now = OffsetDateTime.now();
         Wish canceled = Wish.activate(USER_ID, DROP_ID, activatedAt);
         canceled.cancel(activatedAt.plusMinutes(1));
-        given(wishRepository.findByUserIdAndDropId(USER_ID, DROP_ID)).willReturn(Optional.of(canceled));
+        given(wishRepository.findByUserIdAndDropIdForUpdate(USER_ID, DROP_ID)).willReturn(Optional.of(canceled));
         given(wishRepository.saveAndFlush(any(Wish.class))).willAnswer(invocation -> invocation.getArgument(0));
 
         // when
@@ -74,7 +74,7 @@ class WishTransactionServiceTest {
         OffsetDateTime activatedAt = OffsetDateTime.now().minusHours(1);
         OffsetDateTime now = OffsetDateTime.now();
         Wish active = Wish.activate(USER_ID, DROP_ID, activatedAt);
-        given(wishRepository.findByUserIdAndDropId(USER_ID, DROP_ID)).willReturn(Optional.of(active));
+        given(wishRepository.findByUserIdAndDropIdForUpdate(USER_ID, DROP_ID)).willReturn(Optional.of(active));
         given(wishRepository.saveAndFlush(any(Wish.class))).willAnswer(invocation -> invocation.getArgument(0));
 
         // when
@@ -93,7 +93,7 @@ class WishTransactionServiceTest {
         OffsetDateTime activatedAt = OffsetDateTime.now().minusHours(1);
         OffsetDateTime now = OffsetDateTime.now();
         Wish active = Wish.activate(USER_ID, DROP_ID, activatedAt);
-        given(wishRepository.findByUserIdAndDropId(USER_ID, DROP_ID)).willReturn(Optional.of(active));
+        given(wishRepository.findByUserIdAndDropIdForUpdate(USER_ID, DROP_ID)).willReturn(Optional.of(active));
 
         // when
         wishTransactionService.cancel(USER_ID, DROP_ID, now);
@@ -107,7 +107,7 @@ class WishTransactionServiceTest {
     @DisplayName("활성 WISH가 없으면 취소는 아무 것도 하지 않는다(멱등)")
     void cancel_doesNothingWithoutActiveWish() {
         // given
-        given(wishRepository.findByUserIdAndDropId(USER_ID, DROP_ID)).willReturn(Optional.empty());
+        given(wishRepository.findByUserIdAndDropIdForUpdate(USER_ID, DROP_ID)).willReturn(Optional.empty());
 
         // when & then
         assertThatCode(() -> wishTransactionService.cancel(USER_ID, DROP_ID, OffsetDateTime.now()))
@@ -122,7 +122,7 @@ class WishTransactionServiceTest {
         OffsetDateTime canceledAt = activatedAt.plusMinutes(1);
         Wish canceled = Wish.activate(USER_ID, DROP_ID, activatedAt);
         canceled.cancel(canceledAt);
-        given(wishRepository.findByUserIdAndDropId(USER_ID, DROP_ID)).willReturn(Optional.of(canceled));
+        given(wishRepository.findByUserIdAndDropIdForUpdate(USER_ID, DROP_ID)).willReturn(Optional.of(canceled));
 
         // when
         wishTransactionService.cancel(USER_ID, DROP_ID, OffsetDateTime.now());
