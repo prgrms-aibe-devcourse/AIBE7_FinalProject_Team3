@@ -221,6 +221,76 @@ class SellerDropControllerTest {
     }
 
     @Test
+    @DisplayName("취소는 200과 CANCELED·canceledAt을 반환한다")
+    void cancel() throws Exception {
+        // given
+        Drop drop = draftWithId(100L);
+        ReflectionTestUtils.setField(drop, "status", DropStatus.CANCELED);
+        ReflectionTestUtils.setField(drop, "closedAt", OffsetDateTime.parse("2026-09-18T07:00:00Z"));
+        given(currentSellerIdProvider.currentSellerId()).willReturn(1L);
+        given(dropService.cancel(1L, 100L, "재고 확보 실패")).willReturn(drop);
+
+        // when & then
+        mockMvc.perform(post("/api/v1/seller/drops/100/cancel")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"재고 확보 실패\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.dropId").value(100))
+                .andExpect(jsonPath("$.data.status").value("CANCELED"))
+                .andExpect(jsonPath("$.data.canceledAt").exists());
+    }
+
+    @Test
+    @DisplayName("취소 사유가 없거나 공백이거나 500자를 넘으면 400 VALIDATION_FAILED")
+    void cancel_rejectsInvalidReason() throws Exception {
+        // when & then
+        mockMvc.perform(post("/api/v1/seller/drops/100/cancel")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+        mockMvc.perform(post("/api/v1/seller/drops/100/cancel")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"   \"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+        mockMvc.perform(post("/api/v1/seller/drops/100/cancel")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"" + "x".repeat(501) + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+        verifyNoInteractions(dropService);
+    }
+
+    @Test
+    @DisplayName("없는 DROP 취소는 404, 다른 판매자 DROP은 403, 취소 불가 상태는 409")
+    void cancel_errorMappings() throws Exception {
+        // given
+        given(currentSellerIdProvider.currentSellerId()).willReturn(1L);
+        given(dropService.cancel(1L, 999L, "사유"))
+                .willThrow(new BusinessException(DropErrorCode.DROP_NOT_FOUND));
+        given(dropService.cancel(1L, 100L, "사유"))
+                .willThrow(new BusinessException(DropErrorCode.DROP_ACCESS_DENIED));
+        given(dropService.cancel(1L, 101L, "사유"))
+                .willThrow(new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION));
+
+        // when & then
+        mockMvc.perform(post("/api/v1/seller/drops/999/cancel")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"사유\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("DROP_NOT_FOUND"));
+        mockMvc.perform(post("/api/v1/seller/drops/100/cancel")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"사유\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("DROP_ACCESS_DENIED"));
+        mockMvc.perform(post("/api/v1/seller/drops/101/cancel")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"사유\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("INVALID_STATE_TRANSITION"));
+    }
+
+    @Test
     @DisplayName("판매자 DROP 목록은 페이지 형식으로 반환한다")
     void listDrops() throws Exception {
         // given

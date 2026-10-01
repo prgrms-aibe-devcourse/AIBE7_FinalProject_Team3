@@ -80,6 +80,9 @@ public class Drop extends BaseEntity {
     @Column(name = "close_reason", length = 30)
     private DropCloseReason closeReason;
 
+    @Column(name = "cancel_reason", length = 500)
+    private String cancelReason;
+
     @OneToMany(mappedBy = "drop", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sortOrder ASC")
     @BatchSize(size = 100)
@@ -177,6 +180,21 @@ public class Drop extends BaseEntity {
         DropPublishValidator.validateOptions(this);
         this.status = DropStatus.WISH;
         this.publishedAt = now;
+    }
+
+    /**
+     * 판매자가 공개한 WISH를 취소한다(GR-18). 취소는 판매 시작 전 WISH에서만 가능하다.
+     * 저장 상태가 아직 WISH여도 판매 시작 시각이 지났으면 취소할 수 없다.
+     * now는 반드시 DROP 행 잠금(findByIdForUpdate)을 획득한 뒤 생성한 값을 넘겨야 한다.
+     */
+    public void cancel(String reason, OffsetDateTime now) {
+        if (status != DropStatus.WISH || (saleStartsAt != null && !now.isBefore(saleStartsAt))) {
+            throw new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION);
+        }
+        this.status = DropStatus.CANCELED;
+        this.closedAt = now;
+        this.closeReason = DropCloseReason.SELLER_CANCELED;
+        this.cancelReason = reason;
     }
 
     /**

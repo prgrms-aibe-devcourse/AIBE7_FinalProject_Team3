@@ -6,8 +6,10 @@ import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -20,6 +22,15 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
 
     @EntityGraph(attributePaths = "options")
     Optional<Drop> findWithOptionsById(Long id);
+
+    /*
+     * 판매자 취소(GR-18)에서 DROP 행을 잠그고 조회한다.
+     * 취소 판정의 now는 이 잠금을 획득한 뒤에 만들어야 한다. 잠금 대기 중에 판매가 시작될 수 있기 때문이다.
+     * 잠금 해제 후 상태를 다시 읽게 되므로, 대기 후 재검증으로 취소 불가 상태를 확정한다.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT d FROM Drop d WHERE d.id = :dropId")
+    Optional<Drop> findByIdForUpdate(@Param("dropId") Long dropId);
 
     /*
      * 판매자 DROP 목록 조회.

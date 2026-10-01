@@ -3,6 +3,7 @@ package org.example.grab.domain.drop.entity;
 import org.example.grab.domain.drop.entity.option.DropOption;
 import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.global.error.BusinessException;
+import org.example.grab.global.error.CommonErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -238,6 +239,59 @@ class DropTest {
                 }
                 assertThat(wishable).as("status=%s, now=%s", status, now).isEqualTo(!rejected);
             }
+        }
+    }
+
+    @Test
+    @DisplayName("판매 시작 전 WISH를 취소하면 CANCELED와 종료·사유 필드가 저장된다")
+    void cancel_transitionsToCanceled() {
+        // given
+        OffsetDateTime now = OffsetDateTime.now();
+        Drop drop = wishDrop(now.plusHours(1));
+
+        // when
+        drop.cancel("재고 확보 실패", now);
+
+        // then
+        assertThat(drop.getStatus()).isEqualTo(DropStatus.CANCELED);
+        assertThat(drop.getClosedAt()).isEqualTo(now);
+        assertThat(drop.getCloseReason()).isEqualTo(DropCloseReason.SELLER_CANCELED);
+        assertThat(drop.getCancelReason()).isEqualTo("재고 확보 실패");
+    }
+
+    @Test
+    @DisplayName("판매 시작 시각이 지난 WISH는 stored 상태가 WISH여도 취소할 수 없다")
+    void cancel_rejectsAfterSaleStart() {
+        // given
+        OffsetDateTime start = OffsetDateTime.now();
+        Drop drop = wishDrop(start);
+
+        // when & then: 시작 시각과 같으면 취소 불가
+        assertThatThrownBy(() -> drop.cancel("사유", start))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(CommonErrorCode.INVALID_STATE_TRANSITION);
+        assertThatThrownBy(() -> drop.cancel("사유", start.plusSeconds(1)))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(CommonErrorCode.INVALID_STATE_TRANSITION);
+    }
+
+    @Test
+    @DisplayName("WISH가 아닌 DRAFT·GRAB·ENDED·CANCELED는 취소할 수 없다")
+    void cancel_rejectsNonWish() {
+        // given
+        OffsetDateTime now = OffsetDateTime.now();
+        for (DropStatus status : List.of(
+                DropStatus.DRAFT, DropStatus.GRAB, DropStatus.ENDED, DropStatus.CANCELED)) {
+            Drop drop = dropWith(status, now.plusHours(1), now.plusHours(2));
+
+            // when & then
+            assertThatThrownBy(() -> drop.cancel("사유", now))
+                    .as("status=%s", status)
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(CommonErrorCode.INVALID_STATE_TRANSITION);
         }
     }
 
