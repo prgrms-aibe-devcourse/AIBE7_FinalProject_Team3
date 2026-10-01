@@ -931,7 +931,7 @@ main {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(0, 220px));
   gap: 14px;
-  margin-bottom: 24px;
+  margin-bottom: 18px;
 }
 .stats-grid article,
 .stats-grid > a,
@@ -972,10 +972,10 @@ main {
 }
 .drop-list article {
   display: grid;
-  grid-template-columns: 64px minmax(200px, 1.4fr) 90px 70px 70px 28px;
+  grid-template-columns: 64px minmax(180px, 1.4fr) 90px 60px 60px 92px 28px;
   gap: 18px;
   align-items: center;
-  padding: 14px 20px;
+  padding: 16px 22px;
   border-bottom: 1px solid var(--line);
 }
 .drop-list article:last-child {
@@ -1038,7 +1038,7 @@ main {
   grid-template-columns: minmax(0, 1fr) 110px 160px 28px;
   gap: 18px;
   align-items: center;
-  padding: 16px 20px;
+  padding: 16px 22px;
   border-bottom: 1px solid var(--line);
 }
 .order-toggle {
@@ -1158,6 +1158,144 @@ main {
   grid-column: 1 / -1;
   color: var(--danger);
   font-size: 11px;
+}
+.drop-tabs {
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--line);
+}
+.drop-tabs button {
+  padding: 7px 13px;
+  font-size: 12px;
+}
+.drop-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.drop-actions .secondary-button {
+  padding: 6px 10px;
+  font-size: 11px;
+}
+.drop-list-empty {
+  margin: 0;
+  padding: 32px 22px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+.drop-list-more {
+  margin: 0;
+  padding: 13px 22px;
+  border-top: 1px solid var(--line);
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+}
+.detail-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.option-stock {
+  overflow-x: auto;
+  padding: 6px 22px 18px;
+}
+.option-stock table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.option-stock th {
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-align: left;
+}
+.option-stock td {
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+}
+.option-stock tr:last-child td {
+  border-bottom: 0;
+}
+.drop-info {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 20px;
+  padding: 18px 22px;
+}
+.drop-info img {
+  width: 100%;
+  border-radius: 10px;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+.drop-info dl {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  align-content: start;
+}
+.drop-info dt {
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.drop-info dd {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.seller-page .panel + .panel {
+  margin-top: 18px;
+}
+.sales-list article {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(120px, 2fr) 150px;
+  gap: 18px;
+  align-items: center;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--line);
+}
+.sales-list article:last-child {
+  border-bottom: 0;
+}
+.sales-name {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+.sales-name strong {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sales-name small,
+.sales-amount small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.sales-bar {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--soft);
+}
+.sales-bar span {
+  display: block;
+  min-width: 4px;
+  height: 100%;
+  border-radius: 5px;
+  background: var(--lime);
+}
+.sales-amount {
+  display: grid;
+  gap: 4px;
+  justify-items: end;
+  text-align: right;
 }
 .urgent-tag {
   justify-self: start;
@@ -1360,7 +1498,7 @@ footer small {
     grid-template-columns: repeat(2, 1fr);
   }
   .drop-list article {
-    grid-template-columns: 56px minmax(180px, 1fr) 80px 60px 28px;
+    grid-template-columns: 56px minmax(160px, 1fr) 80px 60px 92px 28px;
   }
   .drop-list article > div:nth-of-type(2) {
     display: none;
@@ -1500,11 +1638,26 @@ footer small {
   .drop-table-panel {
     overflow-x: auto;
   }
+  .drop-tabs {
+    padding: 12px 16px;
+  }
   .drop-list {
     min-width: 660px;
   }
   .order-row {
     grid-template-columns: minmax(0, 1fr) auto 28px;
+  }
+  .sales-list article {
+    grid-template-columns: minmax(0, 1fr) 120px;
+  }
+  .drop-info {
+    grid-template-columns: 1fr;
+  }
+  .detail-actions {
+    flex-wrap: wrap;
+  }
+  .sales-bar {
+    grid-column: 1 / -1;
   }
   .order-detail {
     overflow-x: auto;
