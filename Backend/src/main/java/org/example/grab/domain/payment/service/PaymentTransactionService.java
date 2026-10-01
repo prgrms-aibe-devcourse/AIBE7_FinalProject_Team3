@@ -29,13 +29,11 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.Duration;
 import java.time.OffsetDateTime;
-import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -56,8 +54,6 @@ public class PaymentTransactionService {
 
     private static final PaymentProvider PROVIDER = PaymentProvider.TOSS;
     private static final List<PaymentStatus> IN_PROGRESS = List.of(PaymentStatus.PENDING, PaymentStatus.UNKNOWN);
-    private static final Set<OrderStatus> PAID_STATUSES =
-            EnumSet.of(OrderStatus.PAID, OrderStatus.PREPARING, OrderStatus.SHIPPED, OrderStatus.DELIVERED);
     private static final String CONFIRM_EVENT_KEY = "confirm";
 
     private final PaymentRepository paymentRepository;
@@ -184,7 +180,7 @@ public class PaymentTransactionService {
     }
 
     private void validatePayable(PayableOrder order, PaymentRequest request, OffsetDateTime now) {
-        if (PAID_STATUSES.contains(order.status())) {
+        if (order.isPaid()) {
             throw new BusinessException(PaymentErrorCode.PAYMENT_ALREADY_PROCESSED);
         }
         if (order.status() == OrderStatus.EXPIRED) {
@@ -237,7 +233,7 @@ public class PaymentTransactionService {
         }
 
         PaymentCompletionResult completion = orderPaymentService.completePayment(
-                order.id(), result.totalAmount(), result.approvedAt(), now);
+                order, result.totalAmount(), result.approvedAt(), now);
         if (completion == PaymentCompletionResult.COMPLETED) {
             payment.succeed(result.approvedAt());
             return PaymentEventResult.APPLIED;
@@ -248,6 +244,7 @@ public class PaymentTransactionService {
         return PaymentEventResult.RECONCILIATION_REQUIRED;
     }
 
+    // 이벤트 키는 호출하는 쪽이 정한다. 조회는 매번 새 키를 쓰고, 승인은 applyResult가 기존 기록을 보고 키를 고른다.
     private void record(
             Payment payment,
             String eventKey,
@@ -255,9 +252,6 @@ public class PaymentTransactionService {
             PaymentGatewayResult result,
             PaymentEventResult processing
     ) {
-        if (paymentEventRepository.existsByPaymentIdAndEventKey(payment.getId(), eventKey)) {
-            return;
-        }
         paymentEventRepository.save(PaymentEvent.record(
                 payment.getId(), eventKey, type, PaymentEventSource.API, processing,
                 payload(result), result.approvedAt()));

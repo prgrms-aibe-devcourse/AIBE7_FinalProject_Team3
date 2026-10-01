@@ -4,6 +4,8 @@ import org.example.grab.domain.order.entity.Order;
 import org.example.grab.domain.order.entity.OrderStatus;
 
 import java.time.OffsetDateTime;
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -22,6 +24,9 @@ public record PayableOrder(
         OffsetDateTime paymentExpiresAt
 ) {
 
+    private static final Set<OrderStatus> PAID_STATUSES =
+            EnumSet.of(OrderStatus.PAID, OrderStatus.PREPARING, OrderStatus.SHIPPED, OrderStatus.DELIVERED);
+
     public static PayableOrder from(Order order) {
         return new PayableOrder(
                 order.getId(),
@@ -31,6 +36,11 @@ public record PayableOrder(
                 order.getTotalAmount(),
                 order.getPaymentExpiresAt()
         );
+    }
+
+    // 결제가 끝나 배송 단계로 넘어간 주문인지. 이런 주문에 온 결제 요청은 이미 처리된 결제로 거부한다.
+    public boolean isPaid() {
+        return PAID_STATUSES.contains(status);
     }
 
     // 새 결제 승인과 승인 재요청을 받을 수 있는 주문인지. 두 경로가 같은 기준을 쓰도록 여기서만 판정한다.

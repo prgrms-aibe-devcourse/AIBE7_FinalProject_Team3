@@ -8,6 +8,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
+import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -49,7 +50,7 @@ public class TossPaymentGateway implements PaymentGateway {
 
     // requestFactory(타임아웃)와 baseUrl은 설정 클래스가 builder에 넣는다. 테스트는 같은 builder에 MockRestServiceServer를 묶는다.
     public TossPaymentGateway(RestClient.Builder restClientBuilder, String secretKey) {
-        this.configured = secretKey != null && !secretKey.isBlank();
+        this.configured = StringUtils.hasText(secretKey);
         RestClient.Builder builder = restClientBuilder.clone();
         if (configured) {
             builder.defaultHeader(HttpHeaders.AUTHORIZATION, basicAuthorization(secretKey));

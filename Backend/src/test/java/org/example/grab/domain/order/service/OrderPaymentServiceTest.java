@@ -115,7 +115,7 @@ class OrderPaymentServiceTest {
 
         // when
         PaymentCompletionResult result = orderPaymentService.completePayment(
-                order.getId(), 48000, approvedAt, approvedAt.plusSeconds(1));
+                lockedOrder(), 48000, approvedAt, approvedAt.plusSeconds(1));
         entityManager.flush();
         entityManager.clear();
 
@@ -135,14 +135,14 @@ class OrderPaymentServiceTest {
     void doesNotCompleteWhenNotPayable() {
         // when
         PaymentCompletionResult expired = orderPaymentService.completePayment(
-                order.getId(), 48000, expiresAt, expiresAt);
+                lockedOrder(), 48000, expiresAt, expiresAt);
         PaymentCompletionResult mismatch = orderPaymentService.completePayment(
-                order.getId(), 47000, expiresAt.minusMinutes(1), expiresAt.minusMinutes(1));
+                lockedOrder(), 47000, expiresAt.minusMinutes(1), expiresAt.minusMinutes(1));
         jdbcTemplate.update("UPDATE orders SET status = 'CANCELED', canceled_at = CURRENT_TIMESTAMP WHERE id = ?",
                 order.getId());
         entityManager.clear();
         PaymentCompletionResult canceled = orderPaymentService.completePayment(
-                order.getId(), 48000, expiresAt.minusMinutes(1), expiresAt.minusMinutes(1));
+                lockedOrder(), 48000, expiresAt.minusMinutes(1), expiresAt.minusMinutes(1));
         entityManager.flush();
 
         // then
@@ -162,7 +162,7 @@ class OrderPaymentServiceTest {
 
         // when
         PaymentCompletionResult result = orderPaymentService.completePayment(
-                order.getId(), 48000, approvedAt, approvedAt.plusSeconds(1));
+                lockedOrder(), 48000, approvedAt, approvedAt.plusSeconds(1));
         entityManager.flush();
         entityManager.clear();
 
@@ -193,13 +193,13 @@ class OrderPaymentServiceTest {
                 WHERE id = ?
                 """, secondReservationId);
         PaymentCompletionResult released = orderPaymentService.completePayment(
-                order.getId(), 48000, approvedAt, approvedAt.plusSeconds(1));
+                lockedOrder(), 48000, approvedAt, approvedAt.plusSeconds(1));
         entityManager.flush();
         entityManager.clear();
         // when: 한 예약이 아예 없는 상태
         jdbcTemplate.update("DELETE FROM stock_reservations WHERE id = ?", secondReservationId);
         PaymentCompletionResult missing = orderPaymentService.completePayment(
-                order.getId(), 48000, approvedAt, approvedAt.plusSeconds(1));
+                lockedOrder(), 48000, approvedAt, approvedAt.plusSeconds(1));
         entityManager.flush();
         entityManager.clear();
 
@@ -240,7 +240,7 @@ class OrderPaymentServiceTest {
 
         // when
         boolean beforeDeadline = orderPaymentService.expireIfDue(order.getId(), expiresAt.minusSeconds(1));
-        orderPaymentService.completePayment(order.getId(), 48000, approvedAt, approvedAt);
+        orderPaymentService.completePayment(lockedOrder(), 48000, approvedAt, approvedAt);
         boolean afterPaid = orderPaymentService.expireIfDue(order.getId(), expiresAt.plusMinutes(1));
         entityManager.flush();
         entityManager.clear();
@@ -265,6 +265,11 @@ class OrderPaymentServiceTest {
     private void holdItem(Long optionId, int quantity) {
         OrderItem item = orderItemRepository.saveAndFlush(OrderItem.create(order, optionId, "옵션", 15000, quantity));
         stockReservationRepository.saveAndFlush(StockReservation.hold(item, expiresAt));
+    }
+
+    // 결제 확정은 결제 결과 반영처럼 같은 트랜잭션에서 주문을 먼저 잠근 뒤 호출한다.
+    private PayableOrder lockedOrder() {
+        return orderPaymentService.lockForPaymentResult(order.getId());
     }
 
     private List<StockReservation> reservations() {

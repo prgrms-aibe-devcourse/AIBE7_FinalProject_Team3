@@ -62,11 +62,15 @@ public class OrderPaymentService {
     /**
      * PG 승인 성공을 주문에 반영한다. COMPLETED일 때만 주문 PAID, 예약 COMMITTED, 선점 수량을 판매 수량으로 옮긴다.
      * 결제 상태 기록과 같은 트랜잭션에서 실행돼야 하므로 호출하는 쪽의 트랜잭션을 요구한다.
+     *
+     * @param lockedOrder 같은 트랜잭션에서 lockForPaymentResult로 잠근 주문. 이미 잠근 행이므로 다시 잠그지 않고
+     *                    영속성 컨텍스트의 주문 엔티티를 그대로 쓴다
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public PaymentCompletionResult completePayment(
-            Long orderId, long approvedAmount, OffsetDateTime approvedAt, OffsetDateTime now) {
-        Order order = lockOrder(orderId);
+            PayableOrder lockedOrder, long approvedAmount, OffsetDateTime approvedAt, OffsetDateTime now) {
+        Order order = orderRepository.findById(lockedOrder.id())
+                .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
         if (order.getStatus() == OrderStatus.EXPIRED) {
             return PaymentCompletionResult.EXPIRED;
         }
@@ -127,9 +131,6 @@ public class OrderPaymentService {
         Map<Long, Integer> required = new TreeMap<>();
         for (StockReservation reservation : reservations) {
             required.merge(reservation.getOrderItem().getOptionId(), reservation.getOrderItem().getQuantity(), Integer::sum);
-        }
-        if (required.isEmpty()) {
-            return true;
         }
         Map<Long, Integer> reserved = new HashMap<>();
         for (OrderInventoryRepository.ReservedQuantity locked : inventoryRepository.lockReservedQuantities(required.keySet())) {

@@ -2,6 +2,7 @@ package org.example.grab.domain.payment.gateway.toss;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.util.StringUtils;
 
 import java.time.Duration;
 
@@ -18,15 +19,11 @@ public record TossPaymentsProperties(
         @DefaultValue("10s") Duration readTimeout
 ) {
 
-    public boolean hasSecretKey() {
-        return secretKey != null && !secretKey.isBlank();
-    }
-
     // record 기본 toString은 시크릿 키 원문을 출력하므로 로그·예외 메시지에 새지 않도록 가린다.
     @Override
     public String toString() {
         return "TossPaymentsProperties[baseUrl=" + baseUrl
-                + ", secretKey=" + (hasSecretKey() ? "masked" : "empty")
+                + ", secretKey=" + (StringUtils.hasText(secretKey) ? "masked" : "empty")
                 + ", connectTimeout=" + connectTimeout
                 + ", readTimeout=" + readTimeout + "]";
     }
