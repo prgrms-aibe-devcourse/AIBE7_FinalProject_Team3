@@ -36,6 +36,10 @@ grab:
       audience: grab-api
       # 서명 키는 저장소에 두지 않는다. 기본값이 없으므로 JWT_SECRET이 없으면 기동하지 않는다
       secret: ${JWT_SECRET}
+    refresh-token:
+      # 비활동 14일 + 절대 30일(GR-33 M00-01). idle-ttl이 absolute-ttl보다 길면 기동하지 않는다
+      idle-ttl: 14d
+      absolute-ttl: 30d
 
 management:
   endpoints:
