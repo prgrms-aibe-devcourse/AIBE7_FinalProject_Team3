@@ -55,8 +55,8 @@ class PublicEndpointSecurityTests {
     }
 
     // GR-16은 GET /api/v1/drops만 permitAll로 열었다. 아래 두 API는 인증이 필요하다.
-    // CSRF가 켜져 있어 비인증 비안전 메서드는 토큰 없으면 403이 먼저 나므로, csrf()로 토큰을 채워
-    // 인가 단계까지 보낸 뒤 인증 요구(401)를 확인한다. 추후 matcher가 /api/v1/drops/** 로
+    // CSRF는 GR-44 전까지 임시 해제 상태지만, 재활성화 후에도 인가 단계까지 가도록 csrf()로 토큰을 채워
+    // 인증 요구(401)를 확인한다. 추후 matcher가 /api/v1/drops/** 로
     // 넓어져 이 경로가 permitAll이 되면 이 테스트가 깨져야 한다.
     @Test
     @DisplayName("비로그인 PUT /api/v1/drops/{dropId}/wish는 401")

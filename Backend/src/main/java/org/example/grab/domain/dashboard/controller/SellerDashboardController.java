@@ -6,7 +6,7 @@ import org.example.grab.domain.dashboard.service.SellerDashboardService;
 import org.example.grab.global.common.ApiResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
-import org.example.grab.global.security.CurrentSellerIdProvider;
+import org.example.grab.global.security.identity.CurrentSellerIdProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

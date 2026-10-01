@@ -1,8 +1,9 @@
-package org.example.grab.global.security;
+package org.example.grab.global.security.identity;
 
 import lombok.RequiredArgsConstructor;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
+import org.example.grab.global.security.AuthenticatedUser;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;

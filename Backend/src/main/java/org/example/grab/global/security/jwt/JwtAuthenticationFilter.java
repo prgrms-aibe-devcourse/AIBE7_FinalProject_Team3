@@ -91,11 +91,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     // claims의 sub(public_id) 추출
     private static UUID publicIdOf(Claims claims) {
+        String subject = claims.getSubject();
+        UUID publicId;
         try {
-            return UUID.fromString(claims.getSubject());
+            publicId = UUID.fromString(subject);
         } catch (IllegalArgumentException | NullPointerException e) {
             throw new InvalidAccessTokenException(Reason.CLAIM);
         }
+        // UUID.fromString은 대문자도 받아들인다. JwtProvider가 발급하는 표준 소문자 36자 형식만 허용한다
+        if (!publicId.toString().equals(subject)) {
+            throw new InvalidAccessTokenException(Reason.CLAIM);
+        }
+        return publicId;
     }
 
     // roles Claim을 읽고 검증해서 List<AuthRole>로 반환
