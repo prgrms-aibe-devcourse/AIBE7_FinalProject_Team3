@@ -126,6 +126,65 @@ class OrderCreateTransactionServiceTest {
                         .isEqualTo(OrderErrorCode.SALE_NOT_STARTED));
     }
 
+    @Test
+    @DisplayName("저장 상태가 WISH여도 판매 기간이면 주문을 허용한다")
+    void allowsWishWithinSaleWindow() {
+        // given: 시작 전환 배치가 아직 WISH를 GRAB으로 바꾸지 못한 상태
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        given(inventoryRepository.findDrop(100L)).willReturn(java.util.Optional.of(
+                dropSnapshot(100L, "WISH", "한정판", "판매자", 3000, now.minusMinutes(1), now.plusHours(1))
+        ));
+        given(inventoryRepository.lockOptions(100L, List.of(1001L))).willReturn(List.of(
+                lockedOption(1001L, 129000, 10, 0, 0, 0, true, "블랙 / M")
+        ));
+        given(orderRepository.saveAndFlush(any(Order.class))).willAnswer(invocation -> {
+            Order order = invocation.getArgument(0);
+            ReflectionTestUtils.setField(order, "id", 1L);
+            return order;
+        });
+
+        // when
+        Order order = service.create(1L, idempotencyKey(), requestHash(), request(1));
+
+        // then
+        assertThat(order).isNotNull();
+        verify(inventoryRepository).increaseReservedQuantity(1001L, 1);
+    }
+
+    @Test
+    @DisplayName("저장 상태가 GRAB이어도 종료 시각이 지났으면 주문을 거부한다")
+    void rejectsGrabAfterSaleEnd() {
+        // given: 종료 전환 배치가 아직 GRAB을 ENDED로 바꾸지 못한 상태
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        given(inventoryRepository.findDrop(100L)).willReturn(java.util.Optional.of(
+                dropSnapshot(100L, "GRAB", "한정판", "판매자", 3000, now.minusHours(2), now.minusMinutes(1))
+        ));
+
+        // when & then
+        assertThatThrownBy(() -> service.create(1L, idempotencyKey(), requestHash(), request(1)))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(exception -> assertThat(((BusinessException) exception).getErrorCode())
+                        .isEqualTo(OrderErrorCode.SALE_ENDED));
+    }
+
+    @Test
+    @DisplayName("DRAFT·CANCELED·ENDED는 판매 기간과 관계없이 주문을 거부한다")
+    void rejectsNonSaleStatuses() {
+        // given
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        for (String status : List.of("DRAFT", "CANCELED", "ENDED")) {
+            given(inventoryRepository.findDrop(100L)).willReturn(java.util.Optional.of(
+                    dropSnapshot(100L, status, "한정판", "판매자", 3000, now.minusMinutes(1), now.plusHours(1))
+            ));
+
+            // when & then
+            assertThatThrownBy(() -> service.create(1L, idempotencyKey(), requestHash(), request(1)))
+                    .isInstanceOf(BusinessException.class)
+                    .satisfies(exception -> assertThat(((BusinessException) exception).getErrorCode())
+                            .isEqualTo(OrderErrorCode.DROP_NOT_ON_SALE));
+        }
+    }
+
     private OrderCreateRequest request(int quantity) {
         return new OrderCreateRequest(
                 100L,

@@ -242,22 +242,24 @@ class DropTest {
     }
 
     @Test
-    @DisplayName("isOrderable은 GRAB + 판매 시각 범위 안 + 미품절일 때만 true")
+    @DisplayName("isOrderable은 WISH·GRAB + 판매 시각 범위 안 + 미품절일 때 true")
     void isOrderable_followsActionsTable() {
         // given
         OffsetDateTime start = OffsetDateTime.now();
         OffsetDateTime end = start.plusHours(1);
-        Drop grab = dropWith(DropStatus.GRAB, start, end);
-        addOption(grab, 1000L, 5, true);
 
-        // then: 시작 시각과 같으면 주문 가능, 종료 시각과 같으면 불가
-        assertThat(grab.isOrderable(start)).isTrue();
-        assertThat(grab.isOrderable(start.plusMinutes(30))).isTrue();
-        assertThat(grab.isOrderable(start.minusSeconds(1))).isFalse();
-        assertThat(grab.isOrderable(end)).isFalse();
-        assertThat(grab.isOrderable(end.plusSeconds(1))).isFalse();
+        // then: 시작 시각과 같으면 주문 가능, 종료 시각과 같으면 불가. WISH도 저장 상태 전환 지연과 무관하게 허용한다.
+        for (DropStatus status : List.of(DropStatus.WISH, DropStatus.GRAB)) {
+            Drop drop = dropWith(status, start, end);
+            addOption(drop, 1000L, 5, true);
+            assertThat(drop.isOrderable(start)).as("status=%s", status).isTrue();
+            assertThat(drop.isOrderable(start.plusMinutes(30))).as("status=%s", status).isTrue();
+            assertThat(drop.isOrderable(start.minusSeconds(1))).as("status=%s", status).isFalse();
+            assertThat(drop.isOrderable(end)).as("status=%s", status).isFalse();
+            assertThat(drop.isOrderable(end.plusSeconds(1))).as("status=%s", status).isFalse();
+        }
 
-        for (DropStatus status : List.of(DropStatus.WISH, DropStatus.ENDED, DropStatus.CANCELED)) {
+        for (DropStatus status : List.of(DropStatus.DRAFT, DropStatus.ENDED, DropStatus.CANCELED)) {
             Drop drop = dropWith(status, start, end);
             addOption(drop, 1000L, 5, true);
             assertThat(drop.isOrderable(start.plusMinutes(30))).as("status=%s", status).isFalse();
@@ -265,15 +267,17 @@ class DropTest {
     }
 
     @Test
-    @DisplayName("품절이면 GRAB이어도 isOrderable은 false")
+    @DisplayName("품절이면 WISH·GRAB이어도 isOrderable은 false")
     void isOrderable_falseWhenSoldOut() {
         // given
         OffsetDateTime start = OffsetDateTime.now();
-        Drop grab = dropWith(DropStatus.GRAB, start, start.plusHours(1));
-        addOption(grab, 1000L, 0, true);
+        for (DropStatus status : List.of(DropStatus.WISH, DropStatus.GRAB)) {
+            Drop drop = dropWith(status, start, start.plusHours(1));
+            addOption(drop, 1000L, 0, true);
 
-        // when & then
-        assertThat(grab.isOrderable(start.plusMinutes(1))).isFalse();
+            // when & then
+            assertThat(drop.isOrderable(start.plusMinutes(1))).as("status=%s", status).isFalse();
+        }
     }
 
     @Test

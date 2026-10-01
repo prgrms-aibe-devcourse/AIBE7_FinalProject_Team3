@@ -218,9 +218,10 @@ public class Drop extends BaseEntity {
     /**
      * 공개 상세의 actions.orderable 판정. 주문 생성 검증(OrderCreateTransactionService.validateSale)과
      * 같은 상태·판매 시각 조건에 품절 여부를 더한다.
+     * 저장 상태는 최대 폴링 주기만큼 늦을 수 있으므로 WISH·GRAB을 모두 판매 후보로 보고 서버 시각으로 확정한다.
      */
     public boolean isOrderable(OffsetDateTime now) {
-        if (status != DropStatus.GRAB) {
+        if (status != DropStatus.WISH && status != DropStatus.GRAB) {
             return false;
         }
         if (saleStartsAt != null && now.isBefore(saleStartsAt)) {

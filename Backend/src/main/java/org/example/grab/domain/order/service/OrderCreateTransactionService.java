@@ -109,8 +109,14 @@ public class OrderCreateTransactionService {
         return order;
     }
 
+    /*
+     * 구매 가능 여부는 저장 상태가 아니라 서버 시각과 판매 기간으로 판정한다(GR-18).
+     * 저장 상태 전환은 최대 폴링 주기만큼 늦을 수 있으므로, WISH여도 판매 기간이면 허용한다.
+     * DRAFT·CANCELED·ENDED는 시간과 무관하게 판매 대상이 아니다.
+     */
     private void validateSale(DropSnapshot drop, OffsetDateTime now) {
-        if (!"GRAB".equals(drop.getStatus())) {
+        String status = drop.getStatus();
+        if (!"WISH".equals(status) && !"GRAB".equals(status)) {
             throw new BusinessException(OrderErrorCode.DROP_NOT_ON_SALE);
         }
         Instant current = now.toInstant();
