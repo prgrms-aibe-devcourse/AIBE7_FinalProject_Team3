@@ -117,6 +117,20 @@ class  UserRepositoryTest {
         assertThat(found.getUpdatedAt()).isCloseTo(user.getUpdatedAt(), within(1, ChronoUnit.MILLIS));
     }
 
+    // Access Token의 sub(public_id)를 내부 ID로 바꾸는 조회(GR-32 M03-05-1)
+    @Test
+    @DisplayName("public_id로 회원의 내부 id만 조회하고, 없는 public_id는 빈 결과다")
+    void findsIdByPublicId() {
+        // given
+        User user = userRepository.save(User.createLocal("user@example.com", PASSWORD_HASH, "홍길동"));
+        entityManager.flush();
+        entityManager.clear();
+
+        // when, then
+        assertThat(userRepository.findIdByPublicId(user.getUuid())).contains(user.getId());
+        assertThat(userRepository.findIdByPublicId(UUID.randomUUID())).isEmpty();
+    }
+
     // 이메일 조회 테스트
     @Test
     @DisplayName("정규화된 이메일로 저장된 회원을 조회하고 존재 여부를 확인한다")

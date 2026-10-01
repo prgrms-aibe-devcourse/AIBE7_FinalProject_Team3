@@ -234,12 +234,35 @@ GET /api/v1/seller/dashboard/drops?page=0&size=20
 ### 2.3 임박 DROP 조회
 
 ```http
-GET /api/v1/seller/dashboard/upcoming-drops?withinMinutes=60
+GET /api/v1/seller/dashboard/upcoming-drops?eventType=START&withinMinutes=60
 ```
 
 - **인증**: `SELLER`
 
-> 시작 또는 종료까지 지정한 시간 이하로 남은 DROP을 반환합니다.
+**쿼리 파라미터:**
+- `eventType`: `START`(판매 시작 임박) 또는 `END`(판매 종료 임박), 기본값 `START`
+- `withinMinutes`: `60`(1시간) 또는 `1440`(1일), 기본값 `60`
+
+현재 시각보다 뒤이고 선택한 기간 이내에 일정이 있는 본인 DROP을 임박 시각 오름차순으로 반환합니다. 시작 임박은 `WISH` 상태의 `saleStartsAt`, 종료 임박은 `GRAB` 상태의 `saleEndsAt`을 기준으로 합니다. 이미 시작하거나 종료된 일정은 제외합니다.
+
+**응답:**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "dropId": 100,
+      "name": "한정판 스니커즈",
+      "status": "WISH",
+      "eventType": "START",
+      "upcomingAt": "2026-09-18T17:00:00+09:00"
+    }
+  ]
+}
+```
+
+`dropId`로 기존 판매자 DROP 상세 조회 API를 호출할 수 있습니다.
 
 ---
 
