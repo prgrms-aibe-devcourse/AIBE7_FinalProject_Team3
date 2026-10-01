@@ -14,7 +14,7 @@ import org.example.grab.global.common.ApiResponse;
 import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
-import org.example.grab.global.security.CurrentSellerIdProvider;
+import org.example.grab.global.security.identity.CurrentSellerIdProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;

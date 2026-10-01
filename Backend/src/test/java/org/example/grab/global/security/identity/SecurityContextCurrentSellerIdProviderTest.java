@@ -1,4 +1,4 @@
-package org.example.grab.global.security;
+package org.example.grab.global.security.identity;
 
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;

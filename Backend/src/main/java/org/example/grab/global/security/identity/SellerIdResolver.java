@@ -1,4 +1,4 @@
-package org.example.grab.global.security;
+package org.example.grab.global.security.identity;
 
 import java.util.Optional;
 import java.util.UUID;
