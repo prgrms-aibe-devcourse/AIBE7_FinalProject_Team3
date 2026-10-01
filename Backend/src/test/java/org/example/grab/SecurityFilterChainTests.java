@@ -9,17 +9,22 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Set;
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// M03-06: SecurityConfig가 세션·폼 로그인 없이 JWT 필터 하나로 인증하는지 실제 필터 체인으로 확인한다
+// M03-06·07: SecurityConfig가 세션·폼 로그인 없이 JWT 필터 하나로 인증하고, 실패를 공통 오류 형식으로 응답하는지 실제 필터 체인으로 확인한다
 @SpringBootTest
 @AutoConfigureMockMvc
 class SecurityFilterChainTests {
@@ -45,10 +50,39 @@ class SecurityFilterChainTests {
     }
 
     @Test
-    @DisplayName("변조된 access_token 쿠키는 401")
+    @DisplayName("쿠키 없이 보호 경로에 접근하면 공통 오류 형식의 401 AUTHENTICATION_REQUIRED")
+    void rejectsMissingCookie() throws Exception {
+        mockMvc.perform(get(UNMAPPED_PROTECTED_PATH))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.data").doesNotExist())
+                .andExpect(jsonPath("$.error.code").value("AUTHENTICATION_REQUIRED"))
+                .andExpect(jsonPath("$.error.message").value("인증이 필요합니다."))
+                .andExpect(jsonPath("$.error.fieldErrors").isEmpty());
+    }
+
+    @Test
+    @DisplayName("변조된 access_token 쿠키는 401 INVALID_TOKEN이고 응답 본문에 토큰이 없다")
     void rejectsInvalidCookie() throws Exception {
-        mockMvc.perform(get(UNMAPPED_PROTECTED_PATH).cookie(new Cookie("access_token", "not-a-jwt")))
-                .andExpect(status().isUnauthorized());
+        // given
+        String token = jwtProvider.issue(UUID.randomUUID(), Set.of(AuthRole.USER)).value();
+        String tampered = token.substring(0, token.length() - 2) + (token.endsWith("AA") ? "BB" : "AA");
+
+        // when, then
+        mockMvc.perform(get(UNMAPPED_PROTECTED_PATH).cookie(new Cookie("access_token", tampered)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"))
+                .andExpect(content().string(not(containsString(tampered.substring(0, 20)))));
+    }
+
+    @Test
+    @DisplayName("공개 경로라도 잘못된 쿠키는 익명으로 통과시키지 않고 401 INVALID_TOKEN")
+    void rejectsInvalidCookieOnPublicPath() throws Exception {
+        mockMvc.perform(get("/api/v1/categories").cookie(new Cookie("access_token", "not-a-jwt")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
     }
 
     @Test
