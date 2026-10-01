@@ -165,6 +165,53 @@ class DropTransitionServiceIntegrationTest {
         assertThat(second).isZero();
     }
 
+    @Test
+    @DisplayName("now가 시작 시각과 같으면 시작 전환, 종료 시각과 같으면 종료 전환이 일어나고 updated_at이 now로 갱신된다")
+    void transitionUsesInclusiveBoundariesAndUpdatesTimestamp() {
+        // given: 시작 시각 == now인 WISH, 종료 시각 == now인 GRAB을 정확히 설정한다
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        Long startsExactlyNow = insertDropAt(DropStatus.WISH, now, now.plusHours(1));
+        Long endsExactlyNow = insertDropAt(DropStatus.GRAB, now.minusHours(1), now);
+
+        // when
+        long transitioned = dropTransitionService.transition(now);
+        entityManager.flush();
+        entityManager.clear();
+
+        // then
+        assertThat(transitioned).isEqualTo(2);
+        Map<String, Object> started = dropRow(startsExactlyNow);
+        assertThat(started.get("status")).isEqualTo("GRAB");
+        assertThat(started.get("grab_started_at")).isNotNull();
+        assertThat(updatedAtEquals(startsExactlyNow, now)).isTrue();
+
+        Map<String, Object> ended = dropRow(endsExactlyNow);
+        assertThat(ended.get("status")).isEqualTo("ENDED");
+        assertThat(ended.get("close_reason")).isEqualTo("TIME_EXPIRED");
+        assertThat(updatedAtEquals(endsExactlyNow, now)).isTrue();
+    }
+
+    private boolean updatedAtEquals(Long dropId, OffsetDateTime expected) {
+        return jdbcTemplate.queryForObject(
+                "SELECT updated_at = ? FROM drops WHERE id = ?", Boolean.class,
+                expected.atZoneSameInstant(ZoneOffset.UTC).toOffsetDateTime(), dropId);
+    }
+
+    private Long insertDropAt(DropStatus status, OffsetDateTime saleStartsAt, OffsetDateTime saleEndsAt) {
+        boolean grab = status == DropStatus.GRAB || status == DropStatus.ENDED;
+        return jdbcTemplate.queryForObject(
+                """
+                INSERT INTO drops (seller_id, category_id, status, name, description,
+                                   shipping_fee, shipping_notice, sale_starts_at, sale_ends_at,
+                                   published_at, grab_started_at)
+                VALUES (?, ?, ?, ?, '설명', 3000, '안내', ?, ?, CURRENT_TIMESTAMP,
+                        CASE WHEN ? THEN ? ELSE NULL END)
+                RETURNING id
+                """,
+                Long.class, sellerId, categoryId, status.name(), "상품-" + status, saleStartsAt, saleEndsAt,
+                grab, saleStartsAt);
+    }
+
     private Long insertDrop(DropStatus status, long startHoursFromNow, long endHoursFromNow) {
         boolean grab = status == DropStatus.GRAB || status == DropStatus.ENDED;
         boolean closed = status == DropStatus.ENDED || status == DropStatus.CANCELED;

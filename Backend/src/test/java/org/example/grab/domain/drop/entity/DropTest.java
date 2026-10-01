@@ -67,6 +67,35 @@ class DropTest {
     }
 
     @Test
+    @DisplayName("GRAB·ENDED는 수정과 옵션·이미지 초기화가 모두 거부된다(DROP-007)")
+    void updateDraft_rejectsGrabAndEnded() {
+        // given
+        for (DropStatus status : List.of(DropStatus.GRAB, DropStatus.ENDED)) {
+            Drop drop = dropWith(status, OffsetDateTime.now(), OffsetDateTime.now().plusHours(1));
+            drop.addImage(DropImage.create(drop, "https://example.com/a.jpg", 0, "상품"));
+            addOption(drop, 1000L, 5, true);
+
+            // when & then: 핵심 판매 조건 변경과 자식 초기화가 모두 막힌다
+            assertThatThrownBy(() -> drop.updateDraft("이름", null, null, null, null, null, null))
+                    .as("updateDraft status=%s", status)
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("errorCode").isEqualTo(DropErrorCode.DROP_NOT_EDITABLE);
+            assertThatThrownBy(drop::clearImages)
+                    .as("clearImages status=%s", status)
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("errorCode").isEqualTo(DropErrorCode.DROP_NOT_EDITABLE);
+            assertThatThrownBy(drop::clearOptions)
+                    .as("clearOptions status=%s", status)
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("errorCode").isEqualTo(DropErrorCode.DROP_NOT_EDITABLE);
+            assertThatThrownBy(drop::clearOptionGroups)
+                    .as("clearOptionGroups status=%s", status)
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("errorCode").isEqualTo(DropErrorCode.DROP_NOT_EDITABLE);
+        }
+    }
+
+    @Test
     @DisplayName("소유자가 아니면 DROP_ACCESS_DENIED")
     void validateOwner_rejectsOtherSeller() {
         // given

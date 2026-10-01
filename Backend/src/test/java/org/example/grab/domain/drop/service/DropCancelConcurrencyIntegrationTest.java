@@ -38,6 +38,9 @@ class DropCancelConcurrencyIntegrationTest {
     private DropService dropService;
 
     @Autowired
+    private DropTransitionService dropTransitionService;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
@@ -68,6 +71,40 @@ class DropCancelConcurrencyIntegrationTest {
     @AfterEach
     void tearDown() {
         executor.shutdownNow();
+        // @SpringBootTest는 롤백하지 않으므로 이 테스트가 만든 DROP만 정리한다.
+        jdbcTemplate.update("DELETE FROM drops WHERE seller_id = ?", sellerId);
+    }
+
+    @Test
+    @DisplayName("취소와 시작 전환이 경합하면 행 잠금으로 유효한 최종 상태 하나만 남는다")
+    void cancelAndStartTransitionRaceLeavesSingleValidState() throws Exception {
+        // given: 판매 시작 시각이 이미 지난 WISH. 전환은 GRAB, 취소는 시작 후라 거부되어야 한다.
+        Long dropId = insertWishDrop(OffsetDateTime.now(ZoneOffset.UTC).minusSeconds(1));
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+        CountDownLatch start = new CountDownLatch(1);
+        Future<Long> transition = executor.submit(() -> {
+            start.await(10, TimeUnit.SECONDS);
+            return dropTransitionService.transition(now);
+        });
+        Future<Drop> cancel = executor.submit(() -> {
+            start.await(10, TimeUnit.SECONDS);
+            try {
+                return dropService.cancel(sellerId, dropId, "재고 확보 실패");
+            } catch (BusinessException e) {
+                return null;
+            }
+        });
+        start.countDown();
+
+        // when
+        long transitioned = transition.get(10, TimeUnit.SECONDS);
+        Drop canceled = cancel.get(10, TimeUnit.SECONDS);
+
+        // then: 취소는 거부되고(잠금 순서와 무관하게 시작 후 상태) 최종 상태는 GRAB 하나뿐이다
+        assertThat(canceled).isNull();
+        assertThat(transitioned).isEqualTo(1);
+        assertThat(statusOf(dropId)).isEqualTo(DropStatus.GRAB);
     }
 
     @Test
