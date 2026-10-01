@@ -136,6 +136,22 @@ public class PaymentTransactionService {
             PaymentGatewayResult lookupResult,
             OffsetDateTime now
     ) {
+        return applyResult(paymentId, null, confirmResult, lookupResult, now);
+    }
+
+    /**
+     * 이전 결제를 조회로 정리하다 승인을 다시 요청했을 때 쓴다. 재요청을 판단한 조회도 판단 근거가 아닌 응답으로 기록한다.
+     *
+     * @param priorLookup 승인 재요청 전에 한 조회 응답. 없으면 null
+     */
+    @Transactional
+    public Payment applyResult(
+            Long paymentId,
+            PaymentGatewayResult priorLookup,
+            PaymentGatewayResult confirmResult,
+            PaymentGatewayResult lookupResult,
+            OffsetDateTime now
+    ) {
         Long orderId = paymentRepository.findOrderIdById(paymentId)
                 .orElseThrow(() -> new IllegalStateException("결제 시도가 없습니다: " + paymentId));
         PayableOrder order = orderPaymentService.lockForPaymentResult(orderId);
@@ -147,6 +163,10 @@ public class PaymentTransactionService {
 
         PaymentGatewayResult decisive = lookupResult != null ? lookupResult : confirmResult;
         PaymentEventResult processing = apply(payment, order, decisive, now);
+        if (priorLookup != null) {
+            record(payment, "lookup:" + UUID.randomUUID(), PaymentEventType.LOOKUP, priorLookup,
+                    PaymentEventResult.RECONCILIATION_REQUIRED);
+        }
         if (confirmResult != null) {
             PaymentEventResult confirmProcessing = lookupResult != null
                     ? PaymentEventResult.RECONCILIATION_REQUIRED

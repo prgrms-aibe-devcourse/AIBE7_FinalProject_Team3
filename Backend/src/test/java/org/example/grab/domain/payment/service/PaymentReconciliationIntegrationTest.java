@@ -279,6 +279,16 @@ class PaymentReconciliationIntegrationTest {
                 .satisfiesExactly(
                         key -> assertThat(key).isEqualTo("confirm"),
                         key -> assertThat(key).startsWith("confirm-retry:"));
+        // 승인 재요청을 판단한 조회도 기록한다. 판단 근거가 아니었던 응답은 보정 필요로 남긴다.
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT event_type || ':' || processing_result FROM payment_events"
+                        + " WHERE payment_id = (SELECT id FROM payments WHERE order_id = ?) ORDER BY id",
+                String.class, order.getId()))
+                .containsExactly(
+                        "CONFIRM:RECONCILIATION_REQUIRED",
+                        "LOOKUP:RECONCILIATION_REQUIRED",
+                        "LOOKUP:RECONCILIATION_REQUIRED",
+                        "CONFIRM:APPLIED");
     }
 
     @Test

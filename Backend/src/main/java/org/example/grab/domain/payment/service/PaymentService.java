@@ -109,12 +109,17 @@ public class PaymentService {
 
     // 승인 결과가 불명이면 바로 조회해 확정을 시도한다. 조회로도 모르면 UNKNOWN으로 남긴다.
     private Payment confirm(Long paymentId, PaymentConfirmCommand command) {
+        return confirm(paymentId, command, null);
+    }
+
+    // priorLookup: 이전 결제를 정리하며 승인 재요청을 판단한 조회 응답. 처음 승인하는 결제는 null
+    private Payment confirm(Long paymentId, PaymentConfirmCommand command, PaymentGatewayResult priorLookup) {
         PaymentGatewayResult confirmResult = paymentGateway.confirm(command);
         PaymentGatewayResult lookupResult = null;
         if (confirmResult.outcome() == PaymentGatewayResult.Outcome.UNKNOWN) {
             lookupResult = paymentGateway.lookup(command.paymentKey());
         }
-        return transactionService.applyResult(paymentId, confirmResult, lookupResult, now());
+        return transactionService.applyResult(paymentId, priorLookup, confirmResult, lookupResult, now());
     }
 
     /*
@@ -126,7 +131,7 @@ public class PaymentService {
     private Payment resolve(Long paymentId, PaymentConfirmCommand command, boolean confirmable) {
         PaymentGatewayResult lookup = paymentGateway.lookup(command.paymentKey());
         if (confirmable && lookup.awaitingConfirmation()) {
-            return confirm(paymentId, command);
+            return confirm(paymentId, command, lookup);
         }
         return transactionService.applyResult(paymentId, null, lookup, now());
     }
