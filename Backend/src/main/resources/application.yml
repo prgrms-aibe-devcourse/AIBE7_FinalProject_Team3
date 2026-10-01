@@ -7,6 +7,16 @@ spring:
     username: ${DB_USERNAME:grab}
     password: ${DB_PASSWORD:grab}
 
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      # 로컬 compose의 Redis는 비밀번호가 없다. 빈 값이면 인증 없이 연결한다
+      password: ${REDIS_PASSWORD:}
+      # Lettuce 기본값(연결 10초·명령 60초)이면 Redis가 멈췄을 때 로그인·재발급 요청이 스레드를 오래 붙잡는다
+      connect-timeout: 2s
+      timeout: 2s
+
   flyway:
     enabled: true
     locations: classpath:db/migration
