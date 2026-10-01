@@ -99,8 +99,20 @@ MVP에서는 판매자 신청과 프로필을 한 테이블에서 관리한다. 
 | `grab_started_at` | TIMESTAMPTZ | X | 실제 GRAB 시작 시각 |
 | `closed_at` | TIMESTAMPTZ | X | 종료 시각 |
 | `close_reason` | VARCHAR(30) | X | `TIME_EXPIRED`, `SOLD_OUT`, `SELLER_CANCELED` |
+| `cancel_reason` | VARCHAR(500) | X | 판매자 취소 사유(`SELLER_CANCELED`일 때만 값) |
 
 가격은 실제 구매 단위인 `drop_options.unit_price`에서 관리한다. DROP 목록의 대표 가격은 활성 옵션의 최저가로 계산한다.
+
+상태 전환 규칙(GR-18):
+
+- `DRAFT → WISH`는 판매자 공개(`publish`)로만 일어난다.
+- `WISH → GRAB`은 `status = WISH AND sale_starts_at <= now`인 DROP을 전환 배치가 `grab_started_at = now`와 함께 처리한다.
+- `GRAB → ENDED`는 `status = GRAB AND sale_ends_at <= now`인 DROP을 전환 배치가 `closed_at = now`, `close_reason = TIME_EXPIRED`로 처리한다.
+- `WISH → CANCELED`는 `status = WISH AND now < sale_starts_at`일 때 판매자 취소가 `closed_at = now`, `close_reason = SELLER_CANCELED`, `cancel_reason`을 기록해 처리한다.
+- 구매 가능 여부는 저장 상태가 아니라 서버 시각과 판매 기간(`WISH`·`GRAB` && `sale_starts_at <= now < sale_ends_at`)으로 판정한다. 저장 상태 전환은 최대 폴링 주기(약 10초)만큼 늦을 수 있다.
+- 전환 배치는 기존 인덱스 `idx_drops_sale_start (status, sale_starts_at)`와 `idx_drops_sale_end (status, sale_ends_at)`를 사용하고, `FOR UPDATE SKIP LOCKED`로 회당 최대 500건을 처리한다.
+- 배치 전환은 후보 잠금·상태 조건 재검증·변경을 한 문장으로 원자 처리한다. 잠금이 없는 일반 상황에서도 저장 상태와 상태 기반 통계는 최대 약 10초 늦고, 주문이 행을 계속 잠그면 더 늦어질 수 있다.
+- `SOLD_OUT`은 결제 실패·만료로 해소될 수 있으므로 GR-18에서 조기 종료를 사용하지 않는다. `close_reason`의 `SOLD_OUT` 값은 스키마에만 남겨 두고, 품절 여부는 조회 시 가용 재고로 계산한다.
 
 공개 시 다음 조건을 검증한다.
 
@@ -430,7 +442,8 @@ PK와 UQ에서 자동 생성되는 인덱스는 중복 생성하지 않는다.
 | `sellers` | (`status`, `submitted_at`, `id`) | 판매자 신청 심사 |
 | `drops` | (`status`, `category_id`, `published_at`, `id`) | 공개 DROP 목록 |
 | `drops` | (`seller_id`, `status`, `id`) | 판매자 DROP 관리 |
-| `drops` | (`status`, `sale_starts_at`), (`status`, `sale_ends_at`) | 판매 시작·종료 배치 |
+| `drops` | `idx_drops_sale_start` (`status`, `sale_starts_at`) | 시작 전환 배치(`WISH AND sale_starts_at <= now`) |
+| `drops` | `idx_drops_sale_end` (`status`, `sale_ends_at`) | 종료 전환 배치(`GRAB AND sale_ends_at <= now`) |
 | `drop_options` | (`drop_id`, `is_active`, `id`) | 옵션 및 재고 조회 |
 | `wishes` | (`drop_id`, `canceled_at`, `id`) | 활성 WISH 조회·집계 |
 | `wishes` | (`user_id`, `activated_at`, `id`) | 소비자 마이페이지 |

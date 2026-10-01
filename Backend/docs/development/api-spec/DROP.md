@@ -179,16 +179,18 @@ GET /api/v1/drops/{dropId}
 > `wishNotice`는 WISH 안내 문구이고, `serverTime`은 `actions`를 판정한 서버 시각입니다.
 >
 > `actions`는 비로그인 API이므로 사용자와 무관하게 DROP 상태·시각으로만 정합니다.
+> `orderable`은 저장 상태가 아니라 서버 시각(`serverTime`)과 판매 기간으로 판정합니다. 시작 전환 배치(GR-18)가 아직 실행되지 않아 저장 상태가 `WISH`여도 `saleStartsAt <= now < saleEndsAt`이면 `true`입니다.
 >
 > | DROP 상태·시각 | `wishable` | `wishCancelable` | `orderable` |
 > | --- | --- | --- | --- |
 > | `WISH`, 현재 시각 < `saleStartsAt` | true | true | false |
-> | `WISH`, 현재 시각 ≥ `saleStartsAt` (전환 배치 이전) | false | false | false |
-> | `GRAB`, 현재 시각 < `saleEndsAt`, 품절 아님 | false | false | true |
-> | `GRAB`, 품절 또는 현재 시각 ≥ `saleEndsAt` | false | false | false |
+> | `WISH`, 판매 기간 내(`saleStartsAt <= now < saleEndsAt`), 품절 아님 | false | false | true |
+> | `WISH`, 현재 시각 ≥ `saleEndsAt` (전환 배치 이전) | false | false | false |
+> | `GRAB`, 판매 기간 내, 품절 아님 | false | false | true |
+> | `WISH`/`GRAB`, 품절 또는 현재 시각 ≥ `saleEndsAt` | false | false | false |
 > | `ENDED`, `CANCELED` | false | false | false |
 >
-> `orderable`은 주문 생성 검증(상태 `GRAB` + 판매 시각 범위)과 같으며 품절이면 `false`입니다.
+> `orderable`은 주문 생성 검증(공개 상태 `WISH`·`GRAB` + 판매 시각 범위)과 같은 규칙이며 품절이면 `false`입니다.
 
 **오류 코드:**
 - `DROP_NOT_FOUND` — 없는 DROP, `DRAFT`
@@ -481,8 +483,16 @@ POST /api/v1/seller/drops/{dropId}/cancel
 }
 ```
 
+- `reason`은 `@NotBlank`이며 최대 500자입니다. 원문은 로그에 남기지 않습니다.
+
 **상태 전이:**
 - `WISH` → `CANCELED`
+
+**취소 조건:**
+- `status == WISH && now < saleStartsAt`일 때만 취소할 수 있습니다.
+- 저장 상태가 아직 `WISH`여도 판매 시작 시각이 지났으면 취소할 수 없습니다.
+- `now`는 DROP 행 잠금(`SELECT ... FOR UPDATE`)을 획득한 뒤 생성하므로, 잠금 대기 중 판매가 시작되면 취소가 거부됩니다.
+- 취소 시 `closedAt`, `closeReason = SELLER_CANCELED`, `cancelReason`을 함께 기록합니다. 기존 WISH 행은 수정하지 않습니다.
 
 **응답:**
 
@@ -496,6 +506,12 @@ POST /api/v1/seller/drops/{dropId}/cancel
   }
 }
 ```
+
+**오류 코드:**
+- `DROP_NOT_FOUND` — 없는 DROP
+- `DROP_ACCESS_DENIED` — 다른 판매자의 DROP
+- `INVALID_STATE_TRANSITION` — `WISH`가 아니거나 판매 시작 시각이 지난 DROP
+- `VALIDATION_FAILED` — `reason` 누락·공백·500자 초과
 
 ### 2.7 판매자 재고 현황 조회
 
