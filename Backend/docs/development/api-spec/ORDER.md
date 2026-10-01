@@ -288,7 +288,53 @@ POST /api/v1/seller/orders/{orderId}/shipment
 - 주문 행을 잠근 트랜잭션에서 소유권·`PREPARING` 상태를 확인하고 배송 정보와 상태를 함께 저장한다. `shipped_at`은 이 요청을 처리한 서버 시각으로 기록한다.
 - 발송 상태는 주문의 `SHIPPED` 상태와 일치한다. 취소와 동시에 요청되면 먼저 커밋한 상태 전이만 성공한다.
 
-### 2.5 Mock 배송 완료 반영
+### 2.5 송장 정보 수정
+
+```http
+PATCH /api/v1/seller/orders/{orderId}/shipment
+```
+
+- **인증**: `SELLER`
+
+**요청:**
+
+```json
+{
+  "carrier": "CJ대한통운",
+  "trackingNumber": "482910355174"
+}
+```
+
+> 판매자가 송장번호를 직접 입력하므로 오기가 발생할 수 있습니다. 잘못 등록된 송장은 소비자 배송 조회를 계속 실패시키고 2.4는 이미 등록된 주문을 거부하므로, 정정 경로를 별도로 둡니다.
+
+**처리 규칙:**
+- 해당 주문의 DROP 소유자인 판매자만 요청할 수 있다.
+- `SHIPPED` 주문만 수정한다. `DELIVERED` 주문은 배송이 끝나 조회할 이유가 없으므로 거부한다.
+- `carrier`와 `trackingNumber`의 검증은 2.4와 같다.
+- 상태 전이가 없으므로 `Idempotency-Key`를 요구하지 않는다. 같은 값으로 반복 요청해도 결과가 같다.
+- `shipments`의 `carrier_code`와 `tracking_number`만 갱신한다. `shipped_at`, `idempotency_key`, `request_hash`는 최초 등록 값을 유지한다.
+- 주문 행을 잠그고 상태를 확인해 상태 변경과 경합해도 한 쪽만 반영된다.
+
+**응답:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "orderId": "b2d4f6a8-1c3e-4a5b-8c7d-9e0f1a2b3c4d",
+    "status": "SHIPPED",
+    "carrier": "CJ대한통운",
+    "trackingNumber": "482910355174"
+  }
+}
+```
+
+**오류 코드:**
+- `ORDER_NOT_FOUND`: 주문이 없는 경우
+- `ORDER_ACCESS_DENIED`: 본인 DROP의 주문이 아닌 경우
+- `ORDER_STATUS_CONFLICT`: `SHIPPED`가 아닌 주문이거나 배송 정보가 없는 경우
+
+### 2.6 Mock 배송 완료 반영
 
 ```http
 POST /api/v1/mock/orders/{orderId}/delivery/complete

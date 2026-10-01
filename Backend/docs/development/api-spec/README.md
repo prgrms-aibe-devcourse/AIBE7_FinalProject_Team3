@@ -127,6 +127,7 @@
 | GET | `/api/v1/seller/orders/{orderId}` | SELLER | 본인 DROP의 주문 상세 조회 |
 | POST | `/api/v1/seller/orders/{orderId}/prepare-shipment` | SELLER | 결제 완료 주문을 배송 준비 상태로 변경 |
 | POST | `/api/v1/seller/orders/{orderId}/shipment` | SELLER | 택배사와 송장번호를 등록하고 발송 처리 |
+| PATCH | `/api/v1/seller/orders/{orderId}/shipment` | SELLER | 등록한 택배사·송장번호 수정 (`SHIPPED`만) |
 | POST | `/api/v1/mock/orders/{orderId}/delivery/complete` | 로컬·테스트 전용 | Mock 배송 완료 결과를 주문에 반영 |
 
 > 판매자는 자신이 생성한 DROP의 주문만 조회하거나 변경할 수 있습니다.
