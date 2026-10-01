@@ -60,18 +60,22 @@ public class DropService {
     /**
      * DRAFT를 수정한다. 조회 → 소유권 → 상태 순서로 검증해,
      * 존재하지 않음(404)을 먼저 확정한 뒤 권한(403)과 편집 가능 상태(409)를 판단한다.
+     * 행 잠금으로 공개와 직렬화해, 공개 검증 뒤 자식이 바뀌는 경합을 막는다(GR-64 R03).
      */
     @Transactional
     public Drop updateDraft(Long sellerId, Long dropId, DropDraftRequest request) {
-        Drop drop = findOwnedDrop(sellerId, dropId);
+        Drop drop = findOwnedDropForUpdate(sellerId, dropId);
         applyDraft(drop, request);
         return drop;
     }
 
-    /** DRAFT를 WISH로 공개한다. 수정과 같은 순서(조회 → 소유권)로 검증한 뒤 공개 검증은 도메인에 맡긴다. */
+    /**
+     * DRAFT를 WISH로 공개한다. 수정과 같은 순서(조회 → 소유권)로 검증한 뒤 공개 검증은 도메인에 맡긴다.
+     * 행 잠금으로 수정과 직렬화하고, 공개 시각은 잠금을 얻은 뒤 생성한다(GR-64 R03).
+     */
     @Transactional
     public Drop publish(Long sellerId, Long dropId) {
-        Drop drop = findOwnedDrop(sellerId, dropId);
+        Drop drop = findOwnedDropForUpdate(sellerId, dropId);
         drop.publish(OffsetDateTime.now(ZoneOffset.UTC));
         // 공개 이후 카테고리 활성 여부를 마지막으로 확인한다. 실패하면 트랜잭션 롤백으로 WISH 전환이 취소된다.
         validateCategory(drop.getCategoryId());
@@ -185,7 +189,7 @@ public class DropService {
         return drop;
     }
 
-    // 취소는 행 잠금이 필요하므로 findByIdForUpdate로 조회한다. 존재 확인 → 소유권 순서는 findOwnedDrop과 같다.
+    // 수정·공개·취소는 행 잠금이 필요하므로 findByIdForUpdate로 조회한다. 존재 확인 → 소유권 순서는 findOwnedDrop과 같다.
     private Drop findOwnedDropForUpdate(Long sellerId, Long dropId) {
         Drop drop = dropRepository.findByIdForUpdate(dropId)
                 .orElseThrow(() -> new BusinessException(DropErrorCode.DROP_NOT_FOUND));

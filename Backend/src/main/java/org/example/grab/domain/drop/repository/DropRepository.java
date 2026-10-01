@@ -24,9 +24,9 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
     Optional<Drop> findWithOptionsById(Long id);
 
     /*
-     * 판매자 취소(GR-18)에서 DROP 행을 잠그고 조회한다.
-     * 취소 판정의 now는 이 잠금을 획득한 뒤에 만들어야 한다. 잠금 대기 중에 판매가 시작될 수 있기 때문이다.
-     * 잠금 해제 후 상태를 다시 읽게 되므로, 대기 후 재검증으로 취소 불가 상태를 확정한다.
+     * DROP 행의 쓰기 경로(수정·공개·취소)에서 행을 잠그고 조회한다(GR-18, GR-64 R03).
+     * 판정 시각·검증은 이 잠금을 획득한 뒤에 수행해야 한다. 잠금 대기 중에 상태가 바뀔 수 있기 때문이다.
+     * 잠금 해제 후 상태를 다시 읽게 되므로, 대기 후 재검증으로 최종 상태를 확정한다.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT d FROM Drop d WHERE d.id = :dropId")
