@@ -11,6 +11,7 @@ import org.example.grab.domain.order.error.OrderErrorCode;
 import org.example.grab.domain.order.repository.OrderRepository;
 import org.example.grab.domain.payment.entity.PaymentStatus;
 import org.example.grab.domain.shipment.dto.ShipmentRegisterRequest;
+import org.example.grab.domain.shipment.dto.ShipmentUpdateResponse;
 import org.example.grab.domain.shipment.entity.Shipment;
 import org.example.grab.domain.shipment.repository.ShipmentRepository;
 import org.example.grab.domain.shipment.service.ShipmentRequestHasher;
@@ -102,6 +103,30 @@ public class SellerOrderService {
         shipmentRepository.save(Shipment.register(order, request.carrier(), request.trackingNumber(),
                 idempotencyKey.value(), requestHash.value(), OffsetDateTime.now()));
         return new OrderStatusResponse(order.getUuid(), order.getStatus().name());
+    }
+
+    /**
+     * 판매자가 직접 입력한 송장번호의 오기를 정정한다(ORDER.md 2.5).
+     * 상태 전이가 없어 멱등 키를 받지 않는다. 같은 값으로 반복 요청해도 결과가 같다.
+     * 배송이 끝난 DELIVERED는 조회할 이유가 없고 완료 기록을 보존해야 하므로 거부한다.
+     */
+    @Transactional
+    public ShipmentUpdateResponse updateShipment(
+            long sellerId, UUID orderId, ShipmentRegisterRequest request) {
+        Order order = orderRepository.findByUuidForUpdate(orderId)
+                .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+        if (!orderRepository.ownsDrop(sellerId, order.getDropId())) {
+            throw new BusinessException(OrderErrorCode.ORDER_ACCESS_DENIED);
+        }
+        if (order.getStatus() != OrderStatus.SHIPPED) {
+            throw new BusinessException(CommonErrorCode.ORDER_STATUS_CONFLICT);
+        }
+
+        Shipment shipment = shipmentRepository.findByOrderId(order.getId())
+                .orElseThrow(() -> new BusinessException(CommonErrorCode.ORDER_STATUS_CONFLICT));
+        shipment.updateTracking(request.carrier(), request.trackingNumber());
+        return new ShipmentUpdateResponse(order.getUuid(), order.getStatus().name(),
+                shipment.getCarrierCode(), shipment.getTrackingNumber());
     }
 
     public PageResponse<SellerOrderListResponse> findOrders(

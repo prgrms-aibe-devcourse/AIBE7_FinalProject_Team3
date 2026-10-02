@@ -16,7 +16,12 @@ export default function Header({ authenticated }: { authenticated: boolean }) {
       </Link>
       <nav aria-label="주요 메뉴">
         {sellerMode ? (
-          <NavLink to="/seller">DROP STUDIO</NavLink>
+          <>
+            <NavLink end to="/seller">
+              DROP STUDIO
+            </NavLink>
+            <NavLink to="/seller/orders">주문 관리</NavLink>
+          </>
         ) : (
           <>
             <NavLink to="/wish">WISH</NavLink>

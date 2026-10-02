@@ -11,7 +11,9 @@ import LoginPage from './pages/Login/LoginPage'
 import MyPage from './pages/MyPage/MyPage'
 import NotFoundPage from './pages/NotFound/NotFoundPage'
 import SellerDashboardPage from './pages/SellerDashboard/SellerDashboardPage'
+import SellerDropDetailPage from './pages/SellerDropDetail/SellerDropDetailPage'
 import SellerDropFormPage from './pages/SellerDropForm/SellerDropFormPage'
+import SellerOrdersPage from './pages/SellerOrders/SellerOrdersPage'
 import type { SharedProps } from './types/store'
 
 export default function App() {
@@ -63,10 +65,21 @@ export default function App() {
               <LoginPage mode="signup" onLogin={login} notify={notify} />
             }
           />
-          <Route path="/seller" element={<SellerDashboardPage />} />
+          <Route
+            path="/seller"
+            element={<SellerDashboardPage notify={notify} />}
+          />
+          <Route
+            path="/seller/orders"
+            element={<SellerOrdersPage notify={notify} />}
+          />
           <Route
             path="/seller/drops/new"
             element={<SellerDropFormPage notify={notify} />}
+          />
+          <Route
+            path="/seller/drops/:dropId"
+            element={<SellerDropDetailPage />}
           />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>

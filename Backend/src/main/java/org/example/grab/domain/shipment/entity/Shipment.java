@@ -67,6 +67,15 @@ public class Shipment extends BaseEntity {
         return new Shipment(order, carrierCode, trackingNumber, idempotencyKey, requestHash, shippedAt);
     }
 
+    /**
+     * 택배사·송장번호 오기를 정정한다.
+     * shippedAt·idempotencyKey·requestHash는 최초 등록 값을 유지한다(ORDER.md 2.5).
+     */
+    public void updateTracking(String carrierCode, String trackingNumber) {
+        this.carrierCode = Objects.requireNonNull(carrierCode);
+        this.trackingNumber = Objects.requireNonNull(trackingNumber);
+    }
+
     public void markDelivered(OffsetDateTime deliveredAt) {
         this.deliveredAt = Objects.requireNonNull(deliveredAt);
     }
