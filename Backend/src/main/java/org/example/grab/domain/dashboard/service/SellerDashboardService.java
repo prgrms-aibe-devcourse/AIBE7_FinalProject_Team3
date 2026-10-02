@@ -1,5 +1,6 @@
 package org.example.grab.domain.dashboard.service;
 
+import org.example.grab.domain.dashboard.dto.SellerDashboardSummaryResponse;
 import org.example.grab.domain.dashboard.dto.UpcomingDropEventType;
 import org.example.grab.domain.dashboard.dto.UpcomingDropProjection;
 import org.example.grab.domain.dashboard.dto.UpcomingDropResponse;
@@ -26,5 +27,15 @@ public class SellerDashboardService {
         List<UpcomingDropProjection> drops = sellerDashboardRepository.findUpcomingDrops(
                 sellerId, eventType, now, deadline);
         return drops.stream().map(drop -> UpcomingDropResponse.from(drop, eventType)).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public SellerDashboardSummaryResponse findSummary(long sellerId, OffsetDateTime from, OffsetDateTime to) {
+        return SellerDashboardSummaryResponse.of(
+                sellerDashboardRepository.countDropsByStatus(sellerId),
+                sellerDashboardRepository.countOrdersByStatus(sellerId, from, to),
+                sellerDashboardRepository.countPaymentsByStatus(sellerId, from, to),
+                sellerDashboardRepository.countReconciliationRequired(sellerId),
+                sellerDashboardRepository.sumStock(sellerId));
     }
 }
