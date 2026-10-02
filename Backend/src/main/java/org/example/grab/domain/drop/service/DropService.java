@@ -288,6 +288,11 @@ public class DropService {
      */
     private void validateImages(List<DropImageRequest> images, Long dropId) {
         List<ErrorResponse.FieldError> fieldErrors = new ArrayList<>();
+        Set<UUID> requestedImageIds = new HashSet<>();
+        images.forEach(image -> requestedImageIds.add(image.imageId()));
+        Set<UUID> usedByOtherDrop = requestedImageIds.isEmpty()
+                ? Set.of()
+                : dropImageRepository.findUuidsUsedByOtherDrop(requestedImageIds, dropId);
         Set<UUID> seenImageIds = new HashSet<>();
         for (int index = 0; index < images.size(); index++) {
             DropImageRequest image = images.get(index);
@@ -300,7 +305,7 @@ public class DropService {
                 fieldErrors.add(new ErrorResponse.FieldError(
                         "images[" + index + "].imageUrl", "imageId와 일치하는 공개 이미지 URL이 아닙니다."));
             }
-            if (dropImageRepository.existsByUuidUsedByOtherDrop(image.imageId(), dropId)) {
+            if (usedByOtherDrop.contains(image.imageId())) {
                 fieldErrors.add(new ErrorResponse.FieldError(
                         "images[" + index + "].imageId", "다른 DROP이 이미 사용 중인 imageId입니다."));
             }

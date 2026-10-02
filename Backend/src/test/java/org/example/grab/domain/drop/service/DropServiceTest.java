@@ -38,6 +38,7 @@ import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -479,7 +480,7 @@ class DropServiceTest {
         UUID imageId = UUID.randomUUID();
         DropDraftRequest request = new DropDraftRequest(
                 null, null, List.of(image(imageId)), null, null, null, null, null, null);
-        given(dropImageRepository.existsByUuidUsedByOtherDrop(imageId, null)).willReturn(true);
+        given(dropImageRepository.findUuidsUsedByOtherDrop(Set.of(imageId), null)).willReturn(Set.of(imageId));
 
         // when & then
         assertThatThrownBy(() -> dropService.createDraft(1L, request))
@@ -501,13 +502,30 @@ class DropServiceTest {
         UUID imageId = UUID.randomUUID();
         DropDraftRequest request = new DropDraftRequest(
                 null, null, List.of(image(imageId)), null, null, null, null, null, null);
-        given(dropImageRepository.existsByUuidUsedByOtherDrop(eq(imageId), anyLong())).willReturn(false);
+        given(dropImageRepository.findUuidsUsedByOtherDrop(eq(Set.of(imageId)), anyLong())).willReturn(Set.of());
 
         // when
         dropService.updateDraft(1L, 10L, request);
 
         // then
         assertThat(drop.getImages()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("여러 imageId의 다른 DROP 사용 여부를 한 번에 조회한다")
+    void createDraft_checksImageIdsInSingleQuery() {
+        // given
+        UUID firstImageId = UUID.randomUUID();
+        UUID secondImageId = UUID.randomUUID();
+        DropDraftRequest request = new DropDraftRequest(
+                null, null, List.of(image(firstImageId), image(secondImageId)),
+                null, null, null, null, null, null);
+
+        // when
+        dropService.createDraft(1L, request);
+
+        // then
+        verify(dropImageRepository).findUuidsUsedByOtherDrop(Set.of(firstImageId, secondImageId), null);
     }
 
     @Test
