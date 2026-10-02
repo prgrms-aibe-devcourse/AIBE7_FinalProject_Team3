@@ -99,8 +99,20 @@ MVP에서는 판매자 신청과 프로필을 한 테이블에서 관리한다. 
 | `grab_started_at` | TIMESTAMPTZ | X | 실제 GRAB 시작 시각 |
 | `closed_at` | TIMESTAMPTZ | X | 종료 시각 |
 | `close_reason` | VARCHAR(30) | X | `TIME_EXPIRED`, `SOLD_OUT`, `SELLER_CANCELED` |
+| `cancel_reason` | VARCHAR(500) | X | 판매자 취소 사유(`SELLER_CANCELED`일 때만 값) |
 
 가격은 실제 구매 단위인 `drop_options.unit_price`에서 관리한다. DROP 목록의 대표 가격은 활성 옵션의 최저가로 계산한다.
+
+상태 전환 규칙(GR-18):
+
+- `DRAFT → WISH`는 판매자 공개(`publish`)로만 일어난다.
+- `WISH → GRAB`은 `status = WISH AND sale_starts_at <= now`인 DROP을 전환 배치가 `grab_started_at = now`와 함께 처리한다.
+- `GRAB → ENDED`는 `status = GRAB AND sale_ends_at <= now`인 DROP을 전환 배치가 `closed_at = now`, `close_reason = TIME_EXPIRED`로 처리한다.
+- `WISH → CANCELED`는 `status = WISH AND now < sale_starts_at`일 때 판매자 취소가 `closed_at = now`, `close_reason = SELLER_CANCELED`, `cancel_reason`을 기록해 처리한다.
+- 구매 가능 여부는 저장 상태가 아니라 서버 시각과 판매 기간(`WISH`·`GRAB` && `sale_starts_at <= now < sale_ends_at`)으로 판정한다. 저장 상태 전환은 최대 폴링 주기(약 10초)만큼 늦을 수 있다.
+- 전환 배치는 기존 인덱스 `idx_drops_sale_start (status, sale_starts_at)`와 `idx_drops_sale_end (status, sale_ends_at)`를 사용하고, `FOR UPDATE SKIP LOCKED`로 회당 최대 500건을 처리한다.
+- 배치 전환은 후보 잠금·상태 조건 재검증·변경을 한 문장으로 원자 처리한다. 잠금이 없는 일반 상황에서도 저장 상태와 상태 기반 통계는 최대 약 10초 늦고, 주문이 행을 계속 잠그면 더 늦어질 수 있다.
+- `SOLD_OUT`은 결제 실패·만료로 해소될 수 있으므로 GR-18에서 조기 종료를 사용하지 않는다. `close_reason`의 `SOLD_OUT` 값은 스키마에만 남겨 두고, 품절 여부는 조회 시 가용 재고로 계산한다.
 
 공개 시 다음 조건을 검증한다.
 
@@ -268,8 +280,10 @@ UQ(`order_id`, `option_id`)를 둔다. `drop_id`를 포함한 복합 FK로 다�
 | `public_id` | UUID | O | UQ, 외부 노출 식별자 |
 | `order_id` | BIGINT | O | FK orders, 주문당 여러 결제 시도 가능 |
 | `provider` | VARCHAR(30) | O | `MOCK`, `TOSS` |
-| `idempotency_key` | VARCHAR(100) | O | UQ(provider, idempotency_key) |
-| `provider_payment_id` | VARCHAR(200) | X | PG 결제 식별자 |
+| `idempotency_key` | VARCHAR(100) | O | UQ(provider, idempotency_key), 서버가 생성해 PG 승인 요청에 붙이는 UUID |
+| `client_idempotency_key` | VARCHAR(100) | O | UQ(order_id, client_idempotency_key), 클라이언트 `Idempotency-Key` |
+| `request_hash` | VARCHAR(64) | O | 같은 클라이언트 키의 다른 요청 탐지 |
+| `provider_payment_id` | VARCHAR(200) | X | PG 결제 식별자 (토스페이먼츠 `paymentKey`) |
 | `amount` | BIGINT | O | 승인 요청 금액 |
 | `status` | VARCHAR(30) | O | `PENDING`, `SUCCEEDED`, `FAILED`, `UNKNOWN`, `CANCELED` |
 | `reconciliation_status` | VARCHAR(20) | O | `NONE`, `REQUIRED`, `RESOLVED` |
@@ -280,6 +294,8 @@ UQ(`order_id`, `option_id`)를 둔다. `drop_id`를 포함한 복합 FK로 다�
 | `failure_message` | TEXT | X | 민감정보를 제거한 실패 내용 |
 
 개별 결제 시도가 실패해도 주문은 결제 마감 전까지 `PAYMENT_PENDING`을 유지할 수 있다. 주문은 결제 성공, 사용자 취소 또는 만료 시 최종 상태로 전환한다.
+
+같은 주문에 진행 중인 결제 시도(`PENDING`, `UNKNOWN`)가 있으면 새 결제 시도를 만들지 않는다. 결제 PG는 토스페이먼츠 테스트 환경을 사용하며 `provider`는 `TOSS`로 저장한다.
 
 #### `payment_events`
 
@@ -400,7 +416,10 @@ COMMITTED → RELEASED
 
 - 성공: 주문 `PAID`, 예약 `COMMITTED`, reserved 감소, sold 증가
 - 확정 실패: 결제 시도 `FAILED`; 주문은 정책에 따라 재시도 또는 만료 대기
-- 통신 결과 불명: 결제 `UNKNOWN`, 보정 `REQUIRED`; PG 조회 전 실패로 단정하지 않음
+- 통신 결과 불명: PG 결제 조회로 즉시 확인한다. 승인 확인 시 성공과 같이 반영하고, 미승인 확인 시 `FAILED`로 기록한다. 조회도 실패하면 결제 `UNKNOWN`, 보정 `REQUIRED`; PG 조회 전 실패로 단정하지 않음
+- 승인 요청이 PG에 닿지 않음(조회 결과가 인증만 된 `IN_PROGRESS`): 결제 `UNKNOWN`으로 두고, 이후 정리할 때 주문이 `PAYMENT_PENDING`이고 마감 전이면 최초 요청과 같은 서버 멱등 키로 승인을 다시 요청한다. 결제할 수 없는 주문에는 다시 요청하지 않는다
+- 결제 마감 후 도착한 승인 성공: 결제 `SUCCEEDED`, 보정 `REQUIRED`; 주문을 자동 완료하지 않음
+- 승인 성공이지만 주문번호·금액이 다르거나 재고 원장이 어긋남(예약이 주문 항목과 맞지 않거나 `HELD`가 아님, 선점 수량 부족): 결제 `SUCCEEDED`, 보정 `REQUIRED`; 주문·예약·재고를 바꾸지 않음. 재고 원장은 옵션 행을 잠그고 먼저 확인해, 반영 도중 예외로 승인 기록이 롤백되지 않게 한다
 - 만료: 주문 `EXPIRED`, 예약 `RELEASED`, reserved 감소
 
 결제 성공과 만료 처리는 같은 주문 행을 잠가 한 경로만 재고를 변경하도록 한다.
@@ -423,7 +442,8 @@ PK와 UQ에서 자동 생성되는 인덱스는 중복 생성하지 않는다.
 | `sellers` | (`status`, `submitted_at`, `id`) | 판매자 신청 심사 |
 | `drops` | (`status`, `category_id`, `published_at`, `id`) | 공개 DROP 목록 |
 | `drops` | (`seller_id`, `status`, `id`) | 판매자 DROP 관리 |
-| `drops` | (`status`, `sale_starts_at`), (`status`, `sale_ends_at`) | 판매 시작·종료 배치 |
+| `drops` | `idx_drops_sale_start` (`status`, `sale_starts_at`) | 시작 전환 배치(`WISH AND sale_starts_at <= now`) |
+| `drops` | `idx_drops_sale_end` (`status`, `sale_ends_at`) | 종료 전환 배치(`GRAB AND sale_ends_at <= now`) |
 | `drop_options` | (`drop_id`, `is_active`, `id`) | 옵션 및 재고 조회 |
 | `wishes` | (`drop_id`, `canceled_at`, `id`) | 활성 WISH 조회·집계 |
 | `wishes` | (`user_id`, `activated_at`, `id`) | 소비자 마이페이지 |
@@ -442,7 +462,7 @@ PK와 UQ에서 자동 생성되는 인덱스는 중복 생성하지 않는다.
 | --- | --- | --- |
 | 판매자 신청 정보 | 브랜드명·연락 이메일 | 사업자 정보와 증빙 필수 여부 |
 | 결제 대기 시간 | DB에 절대 만료 시각 저장 | 구체적인 만료 시간 |
-| 결제 재시도 | 결제 마감 전 허용 | 최대 횟수 또는 제한 없음 여부 |
+| 결제 재시도 | 결제 마감 전까지 횟수 제한 없이 허용, 진행 중인 결제(`PENDING`, `UNKNOWN`)나 승인된 결제(`SUCCEEDED`, 보정 대기 포함)가 있으면 거부 (확정) | - |
 | 판매 종료 후 결제 | 선점 주문은 결제 마감까지 허용 | 최종 허용 여부 |
 | 구매 제한 | 재고 범위만 검증 | 주문별·회원 누적 제한 |
 | 주문 취소 | PAID까지 허용 | 시간 제한과 PREPARING 취소 여부 |

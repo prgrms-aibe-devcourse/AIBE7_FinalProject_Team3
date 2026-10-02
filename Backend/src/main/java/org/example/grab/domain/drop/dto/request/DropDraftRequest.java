@@ -2,6 +2,7 @@ package org.example.grab.domain.drop.dto.request;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
@@ -16,7 +17,7 @@ public record DropDraftRequest(
         OffsetDateTime saleStartsAt,
         OffsetDateTime saleEndsAt,
         @Valid ShippingRequest shipping,
-        List<@Valid OptionGroupRequest> optionGroups,
-        List<@Valid OptionRequest> options
+        List<@NotNull @Valid OptionGroupRequest> optionGroups,
+        List<@NotNull @Valid OptionRequest> options
 ) {
 }

@@ -80,6 +80,9 @@ public class Drop extends BaseEntity {
     @Column(name = "close_reason", length = 30)
     private DropCloseReason closeReason;
 
+    @Column(name = "cancel_reason", length = 500)
+    private String cancelReason;
+
     @OneToMany(mappedBy = "drop", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sortOrder ASC")
     @BatchSize(size = 100)
@@ -180,6 +183,21 @@ public class Drop extends BaseEntity {
     }
 
     /**
+     * 판매자가 공개한 WISH를 취소한다(GR-18). 취소는 판매 시작 전 WISH에서만 가능하다.
+     * 저장 상태가 아직 WISH여도 판매 시작 시각이 지났으면 취소할 수 없다.
+     * now는 반드시 DROP 행 잠금(findByIdForUpdate)을 획득한 뒤 생성한 값을 넘겨야 한다.
+     */
+    public void cancel(String reason, OffsetDateTime now) {
+        if (status != DropStatus.WISH || (saleStartsAt != null && !now.isBefore(saleStartsAt))) {
+            throw new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION);
+        }
+        this.status = DropStatus.CANCELED;
+        this.closedAt = now;
+        this.closeReason = DropCloseReason.SELLER_CANCELED;
+        this.cancelReason = reason;
+    }
+
+    /**
      * WISH 등록·취소 가능 여부를 판정한다. 등록과 취소의 규칙이 같다.
      * 공개되지 않았거나 존재 자체를 숨겨야 하는 DRAFT는 DROP_NOT_FOUND로 응답한다(공개 상세 조회와 동일).
      * WISH라도 판매 시작 시각이 지났으면 GRAB이 시작된 것으로 본다(GR-18 전환 배치 이전의 경합 대비).
@@ -218,9 +236,10 @@ public class Drop extends BaseEntity {
     /**
      * 공개 상세의 actions.orderable 판정. 주문 생성 검증(OrderCreateTransactionService.validateSale)과
      * 같은 상태·판매 시각 조건에 품절 여부를 더한다.
+     * 저장 상태는 최대 폴링 주기만큼 늦을 수 있으므로 WISH·GRAB을 모두 판매 후보로 보고 서버 시각으로 확정한다.
      */
     public boolean isOrderable(OffsetDateTime now) {
-        if (status != DropStatus.GRAB) {
+        if (status != DropStatus.WISH && status != DropStatus.GRAB) {
             return false;
         }
         if (saleStartsAt != null && now.isBefore(saleStartsAt)) {

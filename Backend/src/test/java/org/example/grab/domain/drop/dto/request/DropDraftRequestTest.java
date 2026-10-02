@@ -72,6 +72,37 @@ class DropDraftRequestTest {
     }
 
     @Test
+    @DisplayName("중첩 배열의 null 원소는 모두 검증에 실패한다")
+    void rejectsNullElementsInNestedArrays() {
+        // optionGroups: [null]
+        assertThat(validator.validate(new DropDraftRequest(
+                null, null, null, null, null, null, null, singleNullElement(), null)))
+                .isNotEmpty();
+        // options: [null]
+        assertThat(validator.validate(new DropDraftRequest(
+                null, null, null, null, null, null, null, null, singleNullElement())))
+                .isNotEmpty();
+        // values: [null]
+        OptionGroupRequest groupWithNullValueElement = new OptionGroupRequest(
+                "material", "소재", 0, java.util.Collections.singletonList(null));
+        assertThat(validator.validate(new DropDraftRequest(
+                null, null, null, null, null, null, null, List.of(groupWithNullValueElement), null)))
+                .isNotEmpty();
+        // selections: [null]
+        OptionRequest optionWithNullSelection = new OptionRequest(
+                java.util.Collections.singletonList(null), 1000L, 5, true, 0);
+        assertThat(validator.validate(new DropDraftRequest(
+                null, null, null, null, null, null, null, null, List.of(optionWithNullSelection))))
+                .isNotEmpty();
+    }
+
+    private static <T> List<T> singleNullElement() {
+        java.util.List<T> list = new java.util.ArrayList<>();
+        list.add(null);
+        return list;
+    }
+
+    @Test
     @DisplayName("유효한 요청은 검증을 통과한다")
     void acceptsValidRequest() {
         // given

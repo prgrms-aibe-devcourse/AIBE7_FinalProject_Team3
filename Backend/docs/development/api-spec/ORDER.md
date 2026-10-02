@@ -35,8 +35,9 @@ POST /api/v1/orders
 > 클라이언트는 가격이나 총결제금액을 전달하지 않습니다.
 
 **처리 조건:**
-- 서버 시각 기준 DROP 상태가 `GRAB`이어야 한다.
-- 판매 시작 이후, 종료 이전이어야 한다.
+- 구매 가능 여부는 저장 상태가 아니라 서버 시각과 판매 기간으로 판정한다. 저장 상태가 `WISH`여도 시작 전환 배치(GR-18) 이전이면 판매 시작 시각부터 주문할 수 있다.
+- DROP 상태가 `WISH` 또는 `GRAB`이어야 한다. `DRAFT`·`CANCELED`·`ENDED`는 시간과 무관하게 거부한다.
+- 판매 시작 시각(`now >= saleStartsAt`), 종료 이전(`now < saleEndsAt`)이어야 한다.
 - 요청한 모든 옵션에 충분한 가용 재고가 있어야 한다.
 - 재고 확보와 주문 생성은 하나의 트랜잭션으로 처리한다.
 
@@ -68,9 +69,9 @@ POST /api/v1/orders
 ```
 
 **오류 코드:**
-- `DROP_NOT_ON_SALE`
-- `SALE_NOT_STARTED`
-- `SALE_ENDED`
+- `DROP_NOT_ON_SALE` — `DRAFT`·`CANCELED`·`ENDED`이거나 없는 DROP
+- `SALE_NOT_STARTED` — 판매 시작 전
+- `SALE_ENDED` — 판매 종료 후
 - `OPTION_NOT_FOUND`
 - `INSUFFICIENT_STOCK`
 - `DUPLICATE_IDEMPOTENCY_KEY`
@@ -288,7 +289,53 @@ POST /api/v1/seller/orders/{orderId}/shipment
 - 주문 행을 잠근 트랜잭션에서 소유권·`PREPARING` 상태를 확인하고 배송 정보와 상태를 함께 저장한다. `shipped_at`은 이 요청을 처리한 서버 시각으로 기록한다.
 - 발송 상태는 주문의 `SHIPPED` 상태와 일치한다. 취소와 동시에 요청되면 먼저 커밋한 상태 전이만 성공한다.
 
-### 2.5 Mock 배송 완료 반영
+### 2.5 송장 정보 수정
+
+```http
+PATCH /api/v1/seller/orders/{orderId}/shipment
+```
+
+- **인증**: `SELLER`
+
+**요청:**
+
+```json
+{
+  "carrier": "CJ대한통운",
+  "trackingNumber": "482910355174"
+}
+```
+
+> 판매자가 송장번호를 직접 입력하므로 오기가 발생할 수 있습니다. 잘못 등록된 송장은 소비자 배송 조회를 계속 실패시키고 2.4는 이미 등록된 주문을 거부하므로, 정정 경로를 별도로 둡니다.
+
+**처리 규칙:**
+- 해당 주문의 DROP 소유자인 판매자만 요청할 수 있다.
+- `SHIPPED` 주문만 수정한다. `DELIVERED` 주문은 배송이 끝나 조회할 이유가 없으므로 거부한다.
+- `carrier`와 `trackingNumber`의 검증은 2.4와 같다.
+- 상태 전이가 없으므로 `Idempotency-Key`를 요구하지 않는다. 같은 값으로 반복 요청해도 결과가 같다.
+- `shipments`의 `carrier_code`와 `tracking_number`만 갱신한다. `shipped_at`, `idempotency_key`, `request_hash`는 최초 등록 값을 유지한다.
+- 주문 행을 잠그고 상태를 확인해 상태 변경과 경합해도 한 쪽만 반영된다.
+
+**응답:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "orderId": "b2d4f6a8-1c3e-4a5b-8c7d-9e0f1a2b3c4d",
+    "status": "SHIPPED",
+    "carrier": "CJ대한통운",
+    "trackingNumber": "482910355174"
+  }
+}
+```
+
+**오류 코드:**
+- `ORDER_NOT_FOUND`: 주문이 없는 경우
+- `ORDER_ACCESS_DENIED`: 본인 DROP의 주문이 아닌 경우
+- `ORDER_STATUS_CONFLICT`: `SHIPPED`가 아닌 주문이거나 배송 정보가 없는 경우
+
+### 2.6 Mock 배송 완료 반영
 
 ```http
 POST /api/v1/mock/orders/{orderId}/delivery/complete

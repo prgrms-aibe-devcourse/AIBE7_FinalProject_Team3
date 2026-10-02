@@ -27,7 +27,7 @@ public class WishTransactionService {
      */
     @Transactional
     public Wish register(Long userId, Long dropId, OffsetDateTime now) {
-        Wish wish = wishRepository.findByUserIdAndDropId(userId, dropId)
+        Wish wish = wishRepository.findByUserIdAndDropIdForUpdate(userId, dropId)
                 .map(existing -> reactivateIfCanceled(existing, now))
                 .orElseGet(() -> Wish.activate(userId, dropId, now));
         return wishRepository.saveAndFlush(wish);
@@ -35,7 +35,7 @@ public class WishTransactionService {
 
     @Transactional
     public void cancel(Long userId, Long dropId, OffsetDateTime now) {
-        wishRepository.findByUserIdAndDropId(userId, dropId)
+        wishRepository.findByUserIdAndDropIdForUpdate(userId, dropId)
                 .filter(Wish::isActive)
                 .ifPresent(wish -> wish.cancel(now));
     }

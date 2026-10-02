@@ -86,6 +86,16 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query("select o from Order o where o.uuid = :uuid")
     Optional<Order> findByUuidForUpdate(@Param("uuid") UUID uuid);
 
+    // 결제 요청 검증: 같은 주문의 결제 요청을 직렬화해 진행 중인 결제 확인과 PENDING 저장 사이에 다른 요청이 끼지 못하게 한다.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select o from Order o where o.uuid = :uuid and o.buyerId = :buyerId")
+    Optional<Order> findByUuidAndBuyerIdForUpdate(@Param("uuid") UUID uuid, @Param("buyerId") Long buyerId);
+
+    // 결제 확정·만료: 같은 주문 행을 잠가 둘 중 한 경로만 재고를 바꾸게 한다(ERD.md 3.2).
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select o from Order o where o.id = :id")
+    Optional<Order> findByIdForUpdate(@Param("id") Long id);
+
     /*
     payments_cancellations에서 해당 주문의 purpose = 'ORDER_CANCEL', status = 'UNKNOWN'인 기록이 있는지 조회
     -> 구매자가 취소를 요청했는데 PG 응답이 끊겨 취소됐는지 모르는 상태(UNKNOWN)

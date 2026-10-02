@@ -42,6 +42,9 @@ public class SecurityConfig {
                         // /api/v1/drops/{id}/wish(WISH API)와 판매자 경로는 계속 인증이 필요하다.
                         .requestMatchers(HttpMethod.GET, "/api/v1/categories", "/api/v1/drops", "/api/v1/drops/*")
                         .permitAll()
+                        // 판매자 API는 URL에서 SELLER를 먼저 거르고, 승인 상태는 CurrentSellerIdProvider가 DB로 다시 확인한다.
+                        // 세그먼트 단위 매칭이라 /api/v1/seller-applications(USER의 판매자 신청)에는 걸리지 않는다.
+                        .requestMatchers("/api/v1/seller/**").hasRole("SELLER")
                         .anyRequest().authenticated()
                 )
                 // 인증되지 않은 사용자가 보호된 api에 접근하면 authenticationEntryPoint가,

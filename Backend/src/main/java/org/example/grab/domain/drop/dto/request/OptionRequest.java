@@ -7,7 +7,7 @@ import jakarta.validation.constraints.PositiveOrZero;
 import java.util.List;
 
 public record OptionRequest(
-        List<@Valid SelectionRequest> selections,
+        List<@NotNull @Valid SelectionRequest> selections,
         @NotNull @PositiveOrZero Long unitPrice,
         @NotNull @PositiveOrZero Integer totalQuantity,
         Boolean active,

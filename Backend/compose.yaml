@@ -10,6 +10,7 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/grab
       DB_USERNAME: grab
       DB_PASSWORD: ${DB_PASSWORD:-grab}
+      TOSS_SECRET_KEY: ${TOSS_SECRET_KEY:-}
       # 기본값을 두지 않는다. .env에 없으면 빈 값이 전달되어 backend가 기동에 실패한다
       JWT_SECRET: ${JWT_SECRET}
       REDIS_HOST: redis

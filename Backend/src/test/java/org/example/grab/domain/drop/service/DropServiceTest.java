@@ -119,7 +119,7 @@ class DropServiceTest {
     @DisplayName("존재하지 않는 DROP 공개는 DROP_NOT_FOUND")
     void publish_notFound() {
         // given
-        given(dropRepository.findById(99L)).willReturn(Optional.empty());
+        given(dropRepository.findByIdForUpdate(99L)).willReturn(Optional.empty());
 
         // when & then
         assertThatThrownBy(() -> dropService.publish(1L, 99L))
@@ -161,7 +161,7 @@ class DropServiceTest {
         // given
         Drop drop = Drop.createDraft(1L);
         ReflectionTestUtils.setField(drop, "status", DropStatus.WISH);
-        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+        given(dropRepository.findByIdForUpdate(10L)).willReturn(Optional.of(drop));
 
         // when & then
         assertThatThrownBy(() -> dropService.publish(2L, 10L))
@@ -174,7 +174,7 @@ class DropServiceTest {
     @DisplayName("존재하지 않는 DROP 수정은 DROP_NOT_FOUND")
     void updateDraft_notFound() {
         // given
-        given(dropRepository.findById(99L)).willReturn(Optional.empty());
+        given(dropRepository.findByIdForUpdate(99L)).willReturn(Optional.empty());
 
         // when & then
         assertThatThrownBy(() -> dropService.updateDraft(1L, 99L, emptyRequest()))
@@ -188,7 +188,7 @@ class DropServiceTest {
     void updateDraft_accessDenied() {
         // given
         Drop drop = Drop.createDraft(1L);
-        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+        given(dropRepository.findByIdForUpdate(10L)).willReturn(Optional.of(drop));
 
         // when & then
         assertThatThrownBy(() -> dropService.updateDraft(2L, 10L, emptyRequest()))
@@ -237,7 +237,7 @@ class DropServiceTest {
         // given
         Drop drop = Drop.createDraft(1L);
         ReflectionTestUtils.setField(drop, "status", DropStatus.WISH);
-        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+        given(dropRepository.findByIdForUpdate(10L)).willReturn(Optional.of(drop));
         DropDraftRequest request = new DropDraftRequest(
                 null, null, null, 999L, null, null, null, null, null);
 
@@ -271,7 +271,7 @@ class DropServiceTest {
     void updateDraft_skipsCategoryValidationWhenCategoryIdIsNull() {
         // given
         Drop drop = Drop.createDraft(1L);
-        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+        given(dropRepository.findByIdForUpdate(10L)).willReturn(Optional.of(drop));
 
         // when
         dropService.updateDraft(1L, 10L, emptyRequest());
@@ -289,7 +289,7 @@ class DropServiceTest {
                 OffsetDateTime.now().plusDays(1), OffsetDateTime.now().plusDays(2));
         drop.addImage(DropImage.create(drop, "https://example.com/a.jpg", 0, "상품"));
         drop.addOption(DropOption.create(drop, 1000L, 5, 0));
-        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+        given(dropRepository.findByIdForUpdate(10L)).willReturn(Optional.of(drop));
         given(categoryService.isActive(1L)).willReturn(false);
 
         // when & then

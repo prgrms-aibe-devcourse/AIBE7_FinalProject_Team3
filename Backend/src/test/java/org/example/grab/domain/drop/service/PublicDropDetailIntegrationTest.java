@@ -209,6 +209,29 @@ class PublicDropDetailIntegrationTest {
     }
 
     @Test
+    @DisplayName("저장 상태가 WISH여도 판매 기간이면 actions.orderable이 true다")
+    void findPublicDrop_wishInSaleWindowIsOrderable() {
+        // given: 시작 전환 배치가 아직 WISH를 GRAB으로 바꾸지 못한 상태
+        Long dropId = publishDrop();
+        jdbcTemplate.update(
+                """
+                UPDATE drops
+                SET sale_starts_at = CURRENT_TIMESTAMP - INTERVAL '1 hour',
+                    sale_ends_at = CURRENT_TIMESTAMP + INTERVAL '1 hour'
+                WHERE id = ?
+                """, dropId);
+        entityManager.clear();
+
+        // when
+        PublicDropDetailResponse detail = dropService.findPublicDrop(dropId);
+
+        // then
+        assertThat(detail.status()).isEqualTo(DropStatus.WISH);
+        assertThat(detail.actions().orderable()).isTrue();
+        assertThat(detail.actions().wishable()).isFalse();
+    }
+
+    @Test
     @DisplayName("DRAFT 상세 조회는 DROP_NOT_FOUND로 숨긴다")
     void findPublicDrop_hidesDraft() {
         // given

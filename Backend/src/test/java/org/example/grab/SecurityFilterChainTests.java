@@ -196,11 +196,61 @@ class SecurityFilterChainTests {
         // given
         String token = jwtProvider.issue(UUID.randomUUID(), Set.of(AuthRole.USER)).value();
 
-        // when, then: ROLE_SELLER가 없어 판매자 조회 전에 거부된다
+        // when, then: ROLE_SELLER가 없어 URL 규칙에서 거부된다(컨트롤러·DB 조회 이전)
         mockMvc.perform(get("/api/v1/seller/drops").cookie(new Cookie("access_token", token)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("ACCESS_DENIED"));
+    }
+
+    // GR-64: 판매자 경로 권한은 컨트롤러가 아니라 필터에서 먼저 걸러야 한다.
+    @Test
+    @DisplayName("쿠키 없이 /api/v1/seller/drops는 401 AUTHENTICATION_REQUIRED")
+    void rejectsUnauthenticatedSellerApi() throws Exception {
+        mockMvc.perform(get("/api/v1/seller/drops"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("AUTHENTICATION_REQUIRED"));
+    }
+
+    @Test
+    @DisplayName("USER 토큰 + 검증에 실패하는 body로 취소 API를 호출하면 400이 아니라 403 ACCESS_DENIED")
+    void rejectsUserTokenBeforeValidationOnSellerApi() throws Exception {
+        // given
+        String token = jwtProvider.issue(UUID.randomUUID(), Set.of(AuthRole.USER)).value();
+
+        // when, then: @Valid보다 인가가 먼저 실행되어 body 검증 결과가 노출되지 않는다
+        mockMvc.perform(post("/api/v1/seller/drops/1/cancel")
+                        .cookie(new Cookie("access_token", token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("ACCESS_DENIED"));
+    }
+
+    @Test
+    @DisplayName("USER 토큰은 판매자 경로 전체에서 403 (주문·대시보드 포함)")
+    void rejectsUserTokenOnAllSellerPaths() throws Exception {
+        // given
+        String token = jwtProvider.issue(UUID.randomUUID(), Set.of(AuthRole.USER)).value();
+
+        // when, then
+        mockMvc.perform(get("/api/v1/seller/orders").cookie(new Cookie("access_token", token)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("ACCESS_DENIED"));
+        mockMvc.perform(get("/api/v1/seller/dashboard/upcoming-drops").cookie(new Cookie("access_token", token)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("ACCESS_DENIED"));
+    }
+
+    @Test
+    @DisplayName("USER 토큰으로 /api/v1/seller-applications에 접근해도 401·403이 아니다")
+    void doesNotApplySellerRuleToSellerApplications() throws Exception {
+        // given
+        String token = jwtProvider.issue(UUID.randomUUID(), Set.of(AuthRole.USER)).value();
+
+        // when, then: 경로 세그먼트 매칭이라 판매자 신청 API는 URL 규칙에 걸리지 않는다
+        mockMvc.perform(get("/api/v1/seller-applications").cookie(new Cookie("access_token", token)))
+                .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotIn(401, 403));
     }
 
     // S6: 토큰 원문은 응답 본문에도 로그에도 남지 않는다

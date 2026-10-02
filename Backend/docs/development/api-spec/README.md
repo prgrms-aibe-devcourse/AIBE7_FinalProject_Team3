@@ -112,11 +112,12 @@
 
 | Method | Endpoint | 인증 | 용도 |
 | --- | --- | --- | --- |
-| POST | `/api/v1/orders/{orderId}/payments` | USER | 결제 대기 주문에 대해 Mock 결제 실행 |
+| POST | `/api/v1/orders/{orderId}/payments` | USER | 결제창 인증 결과(`paymentKey`)로 토스페이먼츠 테스트 결제 승인 |
 | GET | `/api/v1/orders/{orderId}/payments` | USER/SELLER | 주문에 대한 결제 시도 및 결과 이력 조회 |
-| POST | `/api/v1/payments/mock/webhook` | PG 검증 | Mock PG에서 전달한 결제 결과 수신 |
+| POST | `/api/v1/payments/toss/webhook` | 토스 조회 재확인 | 토스페이먼츠 결제 상태 변경 웹훅 수신 (후속 구현) |
 
-> 결제 결과 수신 시 주문번호, 금액, 결제 상태, 결제 유효시간을 검증합니다. 중복 통지가 도착해도 주문과 재고는 한 번만 변경합니다.
+> Mock 결제는 토스페이먼츠 테스트 환경(테스트 API 키)으로 진행하며 실제 결제는 일어나지 않습니다.
+> 결제 결과 반영 시 주문번호, 금액, 결제 상태, 결제 유효시간을 검증합니다. 같은 결과가 반복 도착해도 주문과 재고는 한 번만 변경합니다.
 
 ### 2.8 판매자 주문 및 배송 관리
 
@@ -126,6 +127,7 @@
 | GET | `/api/v1/seller/orders/{orderId}` | SELLER | 본인 DROP의 주문 상세 조회 |
 | POST | `/api/v1/seller/orders/{orderId}/prepare-shipment` | SELLER | 결제 완료 주문을 배송 준비 상태로 변경 |
 | POST | `/api/v1/seller/orders/{orderId}/shipment` | SELLER | 택배사와 송장번호를 등록하고 발송 처리 |
+| PATCH | `/api/v1/seller/orders/{orderId}/shipment` | SELLER | 등록한 택배사·송장번호 수정 (`SHIPPED`만) |
 | POST | `/api/v1/mock/orders/{orderId}/delivery/complete` | 로컬·테스트 전용 | Mock 배송 완료 결과를 주문에 반영 |
 
 > 판매자는 자신이 생성한 DROP의 주문만 조회하거나 변경할 수 있습니다.
@@ -159,7 +161,7 @@
 | 판매자 DROP 관리 | 8 | 생성, 수정, 공개, 취소, 통계 |
 | WISH | 3 | 등록, 취소, 내 목록 |
 | 주문 | 4 | 주문 생성, 조회, 취소 |
-| 결제 | 3 | Mock 결제, 결과 수신, 이력 조회 |
+| 결제 | 3 | 토스페이먼츠 테스트 결제 승인, 웹훅 수신, 이력 조회 |
 | 배송 | 5 | 판매자 주문 조회 및 배송 상태 관리 |
 | 대시보드 | 3 | 판매자 운영 통계 |
 | 이미지 | 1 | 상품 이미지 업로드 |

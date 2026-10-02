@@ -177,6 +177,7 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 | 오류 코드 | HTTP 상태 | 설명 |
 | --- | --- | --- |
 | `INVALID_REQUEST` | 400 | 요청 형식 오류 |
+| `INVALID_IDEMPOTENCY_KEY` | 400 | `Idempotency-Key` 헤더 누락 또는 UUID 형식 오류 |
 | `VALIDATION_FAILED` | 400 | 필드 검증 실패 |
 | `INVALID_EMAIL` | 400 | 이메일 형식·길이 규칙 위반 |
 | `INVALID_PASSWORD` | 400 | 비밀번호 길이·공백·허용 문자·문자 조합 규칙 위반 |
@@ -198,11 +199,13 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 | `DROP_NOT_EDITABLE` | 409 | 수정할 수 없는 DROP |
 | `DROP_NOT_WISHABLE` | 409 | WISH 불가능 상태 |
 | `GRAB_ALREADY_STARTED` | 409 | 이미 GRAB이 시작된 DROP |
-| `DROP_NOT_ON_SALE` | 409 | 판매 상태가 아님 |
+| `DROP_NOT_ON_SALE` | 409 | 판매 상태가 아님 (`DRAFT`·`CANCELED`·`ENDED`) |
+| `SALE_NOT_STARTED` | 409 | 판매 시작 전 |
+| `SALE_ENDED` | 409 | 판매 종료 후 |
 | `DUPLICATE_OPTION_COMBINATION` | 409 | 동일한 옵션값 조합의 SKU 중복 |
 | `ORDER_NOT_CANCELABLE` | 409 | 취소할 수 없는 주문 |
 | `ORDER_STATUS_CONFLICT` | 409 | 주문 상태 동시 변경 충돌 |
-| `PAYMENT_ALREADY_PROCESSED` | 409 | 이미 처리된 결제 |
+| `PAYMENT_ALREADY_PROCESSED` | 409 | 이미 처리된 결제 (결제 완료 주문, 진행 중인 결제가 있는 주문, 이미 처리된 `paymentKey`) |
 | `INSUFFICIENT_STOCK` | 422 | 재고 부족 |
 | `INVALID_OPTION_COMBINATION` | 422 | 옵션 그룹·값·SKU 조합 검증 실패 |
 | `PAYMENT_AMOUNT_MISMATCH` | 422 | 결제 금액 불일치 |
@@ -236,10 +239,12 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 
 > 동일 키와 동일 요청 본문이 다시 전달되면 최초 처리 결과를 반환합니다. 동일 키에 서로 다른 요청 본문이 전달되면 `409 Conflict`를 반환합니다.
 >
-> Mock PG 웹훅은 `Idempotency-Key` 헤더 대신 PG가 전달한 `eventId`를 고유 키로 사용합니다.
+> 토스페이먼츠 웹훅은 `Idempotency-Key` 헤더 대신 `paymentKey`와 이벤트 식별 값을 고유 키(`payment_events.event_key`)로 사용합니다.
 >
 > 서버가 PG로 나가는 결제·결제 취소 요청에 붙이는 멱등키(`payments.idempotency_key`, `payment_cancellations.idempotency_key`)는
-> 클라이언트 헤더 값을 재사용하지 않고 서버가 UUID로 새로 생성해 저장합니다.
+> 클라이언트 헤더 값을 재사용하지 않고 서버가 UUID로 새로 생성해 저장합니다. 토스페이먼츠 결제 승인 API의 `Idempotency-Key` 헤더에 이 값을 넣습니다.
+>
+> 결제 요청의 클라이언트 `Idempotency-Key`와 요청 해시는 `payments.client_idempotency_key`, `payments.request_hash`에 저장하며, 키 범위는 주문별입니다.
 
 ---
 

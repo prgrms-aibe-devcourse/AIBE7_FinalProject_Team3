@@ -60,21 +60,37 @@ public class DropService {
     /**
      * DRAFT를 수정한다. 조회 → 소유권 → 상태 순서로 검증해,
      * 존재하지 않음(404)을 먼저 확정한 뒤 권한(403)과 편집 가능 상태(409)를 판단한다.
+     * 행 잠금으로 공개와 직렬화해, 공개 검증 뒤 자식이 바뀌는 경합을 막는다(GR-64 R03).
      */
     @Transactional
     public Drop updateDraft(Long sellerId, Long dropId, DropDraftRequest request) {
-        Drop drop = findOwnedDrop(sellerId, dropId);
+        Drop drop = findOwnedDropForUpdate(sellerId, dropId);
         applyDraft(drop, request);
         return drop;
     }
 
-    /** DRAFT를 WISH로 공개한다. 수정과 같은 순서(조회 → 소유권)로 검증한 뒤 공개 검증은 도메인에 맡긴다. */
+    /**
+     * DRAFT를 WISH로 공개한다. 수정과 같은 순서(조회 → 소유권)로 검증한 뒤 공개 검증은 도메인에 맡긴다.
+     * 행 잠금으로 수정과 직렬화하고, 공개 시각은 잠금을 얻은 뒤 생성한다(GR-64 R03).
+     */
     @Transactional
     public Drop publish(Long sellerId, Long dropId) {
-        Drop drop = findOwnedDrop(sellerId, dropId);
+        Drop drop = findOwnedDropForUpdate(sellerId, dropId);
         drop.publish(OffsetDateTime.now(ZoneOffset.UTC));
         // 공개 이후 카테고리 활성 여부를 마지막으로 확인한다. 실패하면 트랜잭션 롤백으로 WISH 전환이 취소된다.
         validateCategory(drop.getCategoryId());
+        return drop;
+    }
+
+    /**
+     * 판매자가 공개한 WISH를 취소한다(GR-18).
+     * 조회 → 소유권 순서로 검증한 뒤 DROP 행 잠금을 획득하고, 잠금 이후에 now를 생성해 취소 가능 여부를 판정한다.
+     * 잠금 대기 중에 판매가 시작되면 취소가 거부되어야 하므로 잠금 전 시각으로 판정하지 않는다.
+     */
+    @Transactional
+    public Drop cancel(Long sellerId, Long dropId, String reason) {
+        Drop drop = findOwnedDropForUpdate(sellerId, dropId);
+        drop.cancel(reason, OffsetDateTime.now(ZoneOffset.UTC));
         return drop;
     }
 
@@ -169,6 +185,14 @@ public class DropService {
 
     private Drop findOwnedDrop(Long sellerId, Long dropId) {
         Drop drop = findDrop(dropId);
+        drop.validateOwner(sellerId);
+        return drop;
+    }
+
+    // 수정·공개·취소는 행 잠금이 필요하므로 findByIdForUpdate로 조회한다. 존재 확인 → 소유권 순서는 findOwnedDrop과 같다.
+    private Drop findOwnedDropForUpdate(Long sellerId, Long dropId) {
+        Drop drop = dropRepository.findByIdForUpdate(dropId)
+                .orElseThrow(() -> new BusinessException(DropErrorCode.DROP_NOT_FOUND));
         drop.validateOwner(sellerId);
         return drop;
     }
