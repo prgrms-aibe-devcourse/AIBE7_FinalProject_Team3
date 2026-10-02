@@ -74,5 +74,6 @@ Mailpit은 인증과 STARTTLS 없이 메일을 받으므로 기본값을 그대�
 메일 본문(인증 코드 포함), 받는 주소, SMTP 비밀번호는 로그에 남기지 않는다(NFR-011).
 
 - `EmailMessage.toString()`은 제목만 출력한다. 따라서 메일 제목에 인증 코드를 넣지 않는다.
-- `EmailSendException`의 메시지는 고정 문구다. 원인 예외(cause)의 SMTP 서버 응답에는 받는 주소가 들어갈 수 있으므로, 실패 로그에 cause를 그대로 남길지는 호출하는 쪽에서 정한다.
+- `EmailSendException`의 메시지는 고정 문구다. 원인 예외(cause)의 SMTP 서버 응답에는 받는 주소가 들어갈 수 있으므로, 발송 실패 로그에는 스택 트레이스와 예외 메시지 대신 원인 예외 이름만 남긴다(예: `cause=MailSendException > SocketTimeoutException`).
+- 비동기 발송은 `AsyncEmailDispatcher.dispatch()`로 한다. 큐 거부와 발송 실패는 `WARN` 로그만 남기고 호출하는 쪽에 예외를 던지지 않는다. 사용자는 재발송 간격 뒤 다시 요청한다.
 - JavaMail 디버그 출력(`spring.mail.properties.mail.debug=true`)은 켜지 않는다. SMTP 대화 전체가 출력되어 Base64로 인코딩된 로그인 정보와 메일 본문이 그대로 남는다.
