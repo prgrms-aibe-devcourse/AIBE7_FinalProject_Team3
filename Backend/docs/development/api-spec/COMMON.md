@@ -210,6 +210,7 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 | `INVALID_SCHEDULE` | 422 | 판매 일정 오류 |
 | `EMAIL_VERIFICATION_ATTEMPTS_EXCEEDED` | 429 | 이메일 인증 코드 확인 시도 횟수 초과 |
 | `EMAIL_VERIFICATION_RESEND_TOO_SOON` | 429 | 이메일 인증 코드 재발송 간격 또는 발송 한도 초과 |
+| `INTERNAL_SERVER_ERROR` | 500 | 처리하지 못한 서버 오류 (Redis·DB 장애 등). 인증 실패가 아니므로 클라이언트는 로그아웃하지 않는다 |
 
 ---
 
