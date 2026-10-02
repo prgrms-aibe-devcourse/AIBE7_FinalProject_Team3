@@ -45,6 +45,8 @@ public class SecurityConfig {
                         // 판매자 API는 URL에서 SELLER를 먼저 거르고, 승인 상태는 CurrentSellerIdProvider가 DB로 다시 확인한다.
                         // 세그먼트 단위 매칭이라 /api/v1/seller-applications(USER의 판매자 신청)에는 걸리지 않는다.
                         .requestMatchers("/api/v1/seller/**").hasRole("SELLER")
+                        // 지금은 판매자 이미지 업로드만 있다. 회원 프로필 업로드가 생기면 이 규칙을 /api/v1/uploads/images/**로 좁히거나 경로를 나눈다.
+                        .requestMatchers("/api/v1/uploads/**").hasRole("SELLER")
                         .anyRequest().authenticated()
                 )
                 // 인증되지 않은 사용자가 보호된 api에 접근하면 authenticationEntryPoint가,

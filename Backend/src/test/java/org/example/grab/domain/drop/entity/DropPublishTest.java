@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.OffsetDateTime;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -79,7 +80,7 @@ class DropPublishTest {
                     assertThat(e.getErrorCode()).isEqualTo(CommonErrorCode.VALIDATION_FAILED);
                     assertThat(e.getFieldErrors()).extracting(ErrorResponse.FieldError::field)
                             .containsExactly("name", "description", "categoryId", "shipping.shippingFee",
-                                    "shipping.shippingNotice", "saleStartsAt", "saleEndsAt", "imageUrls", "options");
+                                    "shipping.shippingNotice", "saleStartsAt", "saleEndsAt", "images", "options");
                 });
     }
 
@@ -186,7 +187,7 @@ class DropPublishTest {
     private Drop readyDrop() {
         Drop drop = Drop.createDraft(1L);
         drop.updateDraft("상품", "설명", 1L, 3000L, "안내", NOW.plusDays(1), NOW.plusDays(2));
-        drop.addImage(DropImage.create(drop, "https://example.com/a.jpg", 0, "상품"));
+        drop.addImage(DropImage.create(drop, UUID.randomUUID(), "https://example.com/a.jpg", 0, "상품"));
         return drop;
     }
 

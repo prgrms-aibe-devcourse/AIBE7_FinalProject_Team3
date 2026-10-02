@@ -76,9 +76,9 @@ class DropCancelConcurrencyIntegrationTest {
     }
 
     @Test
-    @DisplayName("취소와 시작 전환이 경합하면 행 잠금으로 유효한 최종 상태 하나만 남는다")
+    @DisplayName("취소와 시작 전환이 경합해도 취소는 거부되고, 이후 전환 실행에서 GRAB으로 수렴한다")
     void cancelAndStartTransitionRaceLeavesSingleValidState() throws Exception {
-        // given: 판매 시작 시각이 이미 지난 WISH. 전환은 GRAB, 취소는 시작 후라 거부되어야 한다.
+        // given: 판매 시작 시각이 이미 지난 WISH. 취소는 시작 후라 거부되어야 한다.
         Long dropId = insertWishDrop(OffsetDateTime.now(ZoneOffset.UTC).minusSeconds(1));
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
@@ -101,8 +101,11 @@ class DropCancelConcurrencyIntegrationTest {
         transition.get(10, TimeUnit.SECONDS);
         Drop canceled = cancel.get(10, TimeUnit.SECONDS);
 
-        // then: 취소는 거부되고(잠금 순서와 무관하게 시작 후 상태) 대상 DROP의 최종 상태는 GRAB 하나뿐이다
+        // then: 취소는 거부된다(잠금 순서와 무관하게 시작 후 상태)
         assertThat(canceled).isNull();
+        // 취소가 행 잠금을 먼저 잡으면 전환 조회가 SKIP LOCKED로 이 행을 건너뛰어 저장 상태가 잠시 WISH로 남을 수 있다.
+        // 저장 상태 전환 지연은 설계상 허용 범위(TECHSTACK 1.1)이므로, 다음 실행에서 GRAB으로 수렴하는 것만 확인한다.
+        dropTransitionService.transition(now);
         assertThat(statusOf(dropId)).isEqualTo(DropStatus.GRAB);
     }
 
