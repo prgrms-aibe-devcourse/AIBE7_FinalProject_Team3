@@ -65,6 +65,10 @@ grab:
       absolute-ttl: 30d
 
 management:
+  # SMTP 장애가 health 전체를 DOWN으로 만들어 메일과 무관한 요청까지 막지 않도록 메일 헬스 체크는 끈다(TECHSTACK 4.3)
+  health:
+    mail:
+      enabled: false
   endpoints:
     web:
       exposure:
