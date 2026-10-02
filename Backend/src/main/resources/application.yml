@@ -17,6 +17,22 @@ spring:
       connect-timeout: 2s
       timeout: 2s
 
+  # 기본값은 로컬 compose Mailpit이다. 운영 Gmail 계정과 앱 비밀번호는 환경변수로만 주입한다
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:false}
+          # required를 함께 켜야 서버가 STARTTLS를 제공하지 않을 때 평문으로 내려가 계정 정보를 보내지 않는다
+          # 운영 단계에서 true로 전환
+          starttls:
+            enable: ${MAIL_STARTTLS:false}
+            required: ${MAIL_STARTTLS:false}
+
   flyway:
     enabled: true
     locations: classpath:db/migration
