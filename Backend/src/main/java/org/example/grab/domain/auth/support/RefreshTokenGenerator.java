@@ -14,14 +14,16 @@ import java.util.Base64;
 public class RefreshTokenGenerator {
 
     private static final int TOKEN_BYTES = 32;
+    // 무작위 바이트를 문자열로 바꾸는 변환 도구를 생성
     private static final Base64.Encoder ENCODER = Base64.getUrlEncoder().withoutPadding();
-
-    // 생성할 때마다 운영체제에서 시드를 다시 받지 않도록 하나를 재사용한다. 여러 스레드가 함께 써도 안전하다
     private final SecureRandom secureRandom = new SecureRandom();
 
     public String generate() {
+        // 32바이트 공간 생성
         byte[] bytes = new byte[TOKEN_BYTES];
+        // 바이트 배열에 무작위 값 채움
         secureRandom.nextBytes(bytes);
+        // 배열을 43자 Base64URL 문자열로 변환해서 반환
         return ENCODER.encodeToString(bytes);
     }
 }
