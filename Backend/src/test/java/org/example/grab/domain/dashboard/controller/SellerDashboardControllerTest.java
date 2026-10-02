@@ -1,5 +1,7 @@
 package org.example.grab.domain.dashboard.controller;
 
+import org.example.grab.domain.dashboard.dto.SellerDashboardSummaryResponse;
+import org.example.grab.domain.dashboard.dto.SellerDashboardSummaryResponse.StockSummary;
 import org.example.grab.domain.dashboard.dto.UpcomingDropEventType;
 import org.example.grab.domain.dashboard.dto.UpcomingDropResponse;
 import org.example.grab.domain.dashboard.service.SellerDashboardService;
@@ -14,6 +16,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
@@ -85,5 +88,34 @@ class SellerDashboardControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
         verifyNoInteractions(sellerDashboardService, currentSellerIdProvider);
+    }
+
+    @Test
+    @DisplayName("기간을 생략하면 제한 없이 요약을 조회한다")
+    void findSummary_withoutPeriod() throws Exception {
+        // given
+        given(sellerDashboardService.findSummary(3L, null, null)).willReturn(new SellerDashboardSummaryResponse(
+                Map.of("WISH", 2L), Map.of("PAID", 1L), Map.of("SUCCEEDED", 1L), 4L,
+                new StockSummary(10L, 2L, 3L)));
+
+        // when & then
+        mockMvc.perform(get("/api/v1/seller/dashboard/summary"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.dropCounts.WISH").value(2))
+                .andExpect(jsonPath("$.data.reconciliationRequired").value(4))
+                .andExpect(jsonPath("$.data.stockSummary.available").value(10));
+        verify(sellerDashboardService).findSummary(3L, null, null);
+    }
+
+    @Test
+    @DisplayName("from이 to보다 뒤면 400을 반환한다")
+    void findSummary_rejectsReversedPeriod() throws Exception {
+        // when & then
+        mockMvc.perform(get("/api/v1/seller/dashboard/summary")
+                        .param("from", "2026-10-02T00:00:00+09:00")
+                        .param("to", "2026-10-01T00:00:00+09:00"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(sellerDashboardService);
     }
 }
