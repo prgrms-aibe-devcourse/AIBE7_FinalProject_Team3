@@ -118,4 +118,15 @@ class SellerDashboardControllerTest {
                 .andExpect(status().isBadRequest());
         verifyNoInteractions(sellerDashboardService);
     }
+
+    @Test
+    @DisplayName("오프셋 없는 기간은 400을 반환한다")
+    void findSummary_rejectsDateTimeWithoutOffset() throws Exception {
+        // when & then
+        mockMvc.perform(get("/api/v1/seller/dashboard/summary").param("from", "2026-10-01"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/v1/seller/dashboard/summary").param("from", "2026-10-01T00:00:00"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(sellerDashboardService);
+    }
 }
