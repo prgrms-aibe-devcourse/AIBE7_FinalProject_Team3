@@ -20,7 +20,6 @@ public class SupabaseStorageConfig {
                 .build();
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
         requestFactory.setReadTimeout(properties.readTimeout());
-
         RestClient.Builder builder = RestClient.builder()
                 .requestFactory(requestFactory);
         return new SupabaseStorageClient(builder, properties);
