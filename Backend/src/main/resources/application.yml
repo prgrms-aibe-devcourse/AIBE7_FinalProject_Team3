@@ -31,7 +31,7 @@ grab:
     supabase:
       url: ${SUPABASE_URL:}
       service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:}
-      bucket: ${SUPABASE_STORAGE_BUCKET:drop-images}
+      bucket: ${SUPABASE_DROP_IMAGE_BUCKET:drop-images}
       connect-timeout: 3s
       read-timeout: 5s
   auth:
