@@ -68,3 +68,11 @@ Mailpit은 인증과 STARTTLS 없이 메일을 받으므로 기본값을 그대�
 - `MAIL_PASSWORD`에는 Google 계정 비밀번호가 아니라 앱 비밀번호를 넣는다. 앱 비밀번호는 계정에 2단계 인증을 설정해야 발급할 수 있다.
 - Gmail은 로그인 계정과 다른 발신 주소를 계정 주소로 바꿔 보내므로 `MAIL_FROM`에 같은 주소를 넣는다.
 - `MAIL_USERNAME`과 `MAIL_PASSWORD`는 AWS Parameter Store의 SecureString으로 관리하고 배포 시 환경변수로 주입한다. 실제 계정 정보와 앱 비밀번호는 저장소, 이 문서, `.env.example`, 이미지에 기록하지 않는다.
+
+## 5. 로그와 민감정보
+
+메일 본문(인증 코드 포함), 받는 주소, SMTP 비밀번호는 로그에 남기지 않는다(NFR-011).
+
+- `EmailMessage.toString()`은 제목만 출력한다. 따라서 메일 제목에 인증 코드를 넣지 않는다.
+- `EmailSendException`의 메시지는 고정 문구다. 원인 예외(cause)의 SMTP 서버 응답에는 받는 주소가 들어갈 수 있으므로, 실패 로그에 cause를 그대로 남길지는 호출하는 쪽에서 정한다.
+- JavaMail 디버그 출력(`spring.mail.properties.mail.debug=true`)은 켜지 않는다. SMTP 대화 전체가 출력되어 Base64로 인코딩된 로그인 정보와 메일 본문이 그대로 남는다.

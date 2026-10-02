@@ -19,6 +19,8 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessagePreparator;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.ServerSocket;
 import java.util.ArrayList;
 import java.util.List;
@@ -115,6 +117,25 @@ class SmtpEmailSenderTest {
     }
 
     @Test
+    @DisplayName("발송 실패 예외의 스택 트레이스에 본문·인증 코드·SMTP 비밀번호가 없다")
+    // 호출하는 쪽이 log.error("...", e)로 남기면 cause까지 출력되므로, 그 출력 전체에 민감정보가 없는지 확인하는 테스트
+    void excludesSecretsFromFailureStackTrace() throws Exception {
+        // given
+        JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
+        mailSender.setHost("127.0.0.1");
+        mailSender.setPort(closedPort());
+        mailSender.setUsername("grab.team@example.com");
+        mailSender.setPassword("app-password-secret");
+        mailSender.getJavaMailProperties().setProperty("mail.smtp.auth", "true");
+        SmtpEmailSender sender = new SmtpEmailSender(mailSender, FROM);
+
+        // when & then
+        assertThatThrownBy(() -> sender.send(message()))
+                .isInstanceOf(EmailSendException.class)
+                .satisfies(e -> assertThat(stackTraceOf(e)).doesNotContain("482913", "<p>", "app-password-secret"));
+    }
+
+    @Test
     @DisplayName("메일 구성 중 실패해도 EmailSendException을 던진다")
     // 잘못된 주소로 MessagingException이 나면 JavaMailSender가 MailParseException으로 바꾸고, 이것도 감싸는지 확인하는 테스트
     void throwsEmailSendExceptionWhenPreparationFails() {
@@ -148,6 +169,12 @@ class SmtpEmailSenderTest {
                 .run(context -> assertThat(context).doesNotHaveBean(EmailSender.class));
         contextRunner()
                 .run(context -> assertThat(context).doesNotHaveBean(EmailSender.class));
+    }
+
+    private static String stackTraceOf(Throwable throwable) {
+        StringWriter stackTrace = new StringWriter();
+        throwable.printStackTrace(new PrintWriter(stackTrace));
+        return stackTrace.toString();
     }
 
     private static EmailMessage message() {
