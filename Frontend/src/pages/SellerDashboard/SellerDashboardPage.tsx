@@ -6,17 +6,44 @@ import { drops } from '../../features/drop/mockDrops'
 import { stock, upcoming } from '../../features/drop/selectors'
 import type { DropStatus } from '../../types/drop'
 import { sellerOrders } from '../../features/order/mockSellerOrders'
-import { dateLabel } from '../../utils/date'
+import { dateLabel, dayEnd, dayStart, inputDate } from '../../utils/date'
 import { won } from '../../utils/price'
 
 // 상단은 "지금 손대야 하는 것"만 둔다. 읽고 끝나는 합계는 아래 DROP 목록이 상품별로 보여준다.
 // 발송 대기: GET /seller/dashboard/summary (GR-41) 의 orderCounts.PAID
 // 임박: GET /seller/dashboard/upcoming-drops (GR-38) 를 eventType=START·END 두 번 불러 합친 건수.
 // 시작인지 종료인지는 카드가 아니라 아래 DROP 행의 태그에서 구분한다.
+// 보정 필요: summary.reconciliationRequired. 승인은 됐는데 주문이 확정되지 않은 결제라 기간과 무관하게 센다.
+// 목에는 보정 상태가 없어 결제 UNKNOWN 주문 수로 대신한다.
 const loadSummary = () => ({
   pendingShipment: sellerOrders.filter((o) => o.orderStatus === 'PAID').length,
   upcomingCount: drops.filter((drop) => upcoming(drop)).length,
+  reconciliationRequired: sellerOrders.filter((o) => o.paymentStatus === 'UNKNOWN').length,
 })
+
+/*
+  기간 필터는 orderCounts·paymentCounts에만 적용된다(SELLER.md 2.1).
+  dropCounts·stockSummary·reconciliationRequired는 현재 시점 값이라 날짜를 바꿨도 그대로다.
+  그래서 날짜 선택기를 상단 전역 필터로 두지 않고 기간 실적 패널 안에 넣어 영향 범위를 보여 준다.
+ */
+const ORDER_STATUSES = [
+  'PAYMENT_PENDING',
+  'PAID',
+  'PREPARING',
+  'SHIPPED',
+  'DELIVERED',
+  'EXPIRED',
+  'CANCELED',
+] as const
+const PAYMENT_STATUSES = ['PENDING', 'SUCCEEDED', 'FAILED', 'UNKNOWN', 'CANCELED'] as const
+
+// 전체는 기간을 보내지 않는다는 뜻이다. 서버도 from·to를 생략하면 제한하지 않는다.
+const PRESETS = [
+  { key: 'ALL', label: '전체', days: null },
+  { key: 'TODAY', label: '오늘', days: 0 },
+  { key: 'WEEK', label: '7일', days: 6 },
+  { key: 'MONTH', label: '30일', days: 29 },
+] as const
 
 // 전체·임박은 상태가 아니라 보는 방식이라 같은 필터 하나로 묶는다.
 type DropFilter = 'ALL' | 'UPCOMING' | DropStatus
@@ -39,7 +66,50 @@ export default function SellerDashboardPage({
   const [refreshedAt, setRefreshedAt] = useState(() => new Date())
   const [items, setItems] = useState(drops)
   const [filter, setFilter] = useState<DropFilter>('ALL')
+  const [preset, setPreset] = useState<string>('ALL')
+  const [range, setRange] = useState({ from: '', to: '' })
   const summary = loadSummary()
+
+  const applyPreset = (key: string, days: number | null) => {
+    setPreset(key)
+    if (days === null) {
+      setRange({ from: '', to: '' })
+      return
+    }
+    const end = new Date()
+    const start = new Date()
+    start.setDate(end.getDate() - days)
+    setRange({ from: inputDate(start), to: inputDate(end) })
+  }
+
+  // 날짜를 직접 고치면 프리셋 선택은 해제한다
+  const editRange = (next: { from: string; to: string }) => {
+    setPreset('CUSTOM')
+    setRange(next)
+  }
+
+  /*
+    연동 시에는 이 블록 전체를 GET /seller/dashboard/summary?from=&to= (GR-41) 응답으로 갈아끼운다.
+    쿼리 값은 dayStart(range.from).toISOString() 형태로 보낸다.
+    toISOString()은 항상 UTC Z 형식이라 쿼리 스트링에서 +가 공백으로 해석되는 문제가 없다.
+    서버는 건수가 없는 상태도 0으로 채워 주므로 키는 항상 전부 온다.
+   */
+  const inRange = (value: string) => {
+    const at = new Date(value).getTime()
+    if (range.from && at < dayStart(range.from).getTime()) return false
+    if (range.to && at > dayEnd(range.to).getTime()) return false
+    return true
+  }
+  const periodOrders = sellerOrders.filter((order) => inRange(order.orderedAt))
+  const orderCounts = ORDER_STATUSES.map(
+    (status) =>
+      [status, periodOrders.filter((order) => order.orderStatus === status).length] as const,
+  )
+  // 결제는 주문이 아니라 시도 건수라 재시도가 있으면 주문 합계보다 크다. 목은 시도 이력이 없어 1:1로 보인다.
+  const paymentCounts = PAYMENT_STATUSES.map(
+    (status) =>
+      [status, periodOrders.filter((order) => order.paymentStatus === status).length] as const,
+  )
 
   const onlyUpcoming = filter === 'UPCOMING'
   const countOf = (key: DropFilter) =>
@@ -113,6 +183,16 @@ export default function SellerDashboardPage({
           </strong>
           <small>24시간 내 시작 또는 종료</small>
         </button>
+        {summary.reconciliationRequired > 0 && (
+          <article className="warning">
+            <span>⚠ 확인 필요 결제</span>
+            <strong>
+              {summary.reconciliationRequired}
+              <em>건</em>
+            </strong>
+            <small>승인됐으나 주문 미확정 · 운영 문의</small>
+          </article>
+        )}
       </div>
       <section className="panel drop-table-panel">
         <div className="panel-heading">
@@ -210,6 +290,64 @@ export default function SellerDashboardPage({
               {matched.length}개 중 {visible.length}개를 보고 있어요.
             </p>
           )}
+        </div>
+      </section>
+      <section className="panel period-panel">
+        <div className="panel-heading">
+          <div>
+            <h2>기간 실적</h2>
+            <p>
+              주문·결제 건수만 기간의 영향을 받아요. 위 현황과 DROP 목록은 현재 시점
+              값입니다.
+            </p>
+          </div>
+        </div>
+        <div className="period-picker">
+          <div className="chips">
+            {PRESETS.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                className={preset === item.key ? 'active' : undefined}
+                onClick={() => applyPreset(item.key, item.days)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <input
+            type="date"
+            aria-label="시작일"
+            value={range.from}
+            max={range.to || undefined}
+            onChange={(e) => editRange({ from: e.target.value, to: range.to })}
+          />
+          <span aria-hidden="true">~</span>
+          <input
+            type="date"
+            aria-label="종료일"
+            value={range.to}
+            min={range.from || undefined}
+            onChange={(e) => editRange({ from: range.from, to: e.target.value })}
+          />
+        </div>
+        <p className="count-label">주문 {periodOrders.length}건</p>
+        <div className="count-grid">
+          {orderCounts.map(([status, count]) => (
+            <div key={status}>
+              <small>{status}</small>
+              <b className={count === 0 ? 'zero' : undefined}>{count}</b>
+            </div>
+          ))}
+        </div>
+        <p className="count-label">결제 시도</p>
+        <div className="count-grid">
+          {paymentCounts.map(([status, count]) => (
+            <div key={status}>
+              <small>{status}</small>
+              <b className={count === 0 ? 'zero' : undefined}>{count}</b>
+            </div>
+          ))}
         </div>
       </section>
       <section className="panel sales-panel">

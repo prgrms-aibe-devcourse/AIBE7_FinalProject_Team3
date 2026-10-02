@@ -7,6 +7,16 @@ spring:
     username: ${DB_USERNAME:grab}
     password: ${DB_PASSWORD:grab}
 
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      # 기본값은 로컬 compose Redis의 개발용 비밀번호다(DB_PASSWORD와 같은 방식). 운영 값은 환경변수로만 주입한다
+      password: ${REDIS_PASSWORD:grab}
+      # Lettuce 기본값(연결 10초·명령 60초)이면 Redis가 멈췄을 때 로그인·재발급 요청이 스레드를 오래 붙잡는다
+      connect-timeout: 2s
+      timeout: 2s
+
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -41,6 +51,10 @@ grab:
       audience: grab-api
       # 서명 키는 저장소에 두지 않는다. 기본값이 없으므로 JWT_SECRET이 없으면 기동하지 않는다
       secret: ${JWT_SECRET}
+    refresh-token:
+      # 비활동 14일 + 절대 30일(GR-33 M00-01). idle-ttl이 absolute-ttl보다 길면 기동하지 않는다
+      idle-ttl: 14d
+      absolute-ttl: 30d
 
 management:
   endpoints:

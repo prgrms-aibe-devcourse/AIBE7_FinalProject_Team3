@@ -1,5 +1,6 @@
 package org.example.grab.global.error;
 
+import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
@@ -17,6 +18,8 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,6 +28,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -32,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -283,8 +288,64 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.error.fieldErrors").isEmpty());
     }
 
+    @Test
+    @DisplayName("처리하지 못한 예외는 500 INTERNAL_SERVER_ERROR로 응답하고 예외 메시지를 담지 않는다")
+    void handlesUnexpectedException() throws Exception {
+        mockMvc.perform(get("/test/unexpected"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.data").doesNotExist())
+                .andExpect(jsonPath("$.error.code").value("INTERNAL_SERVER_ERROR"))
+                .andExpect(jsonPath("$.error.message").value("서버 내부 오류가 발생했습니다."))
+                .andExpect(jsonPath("$.error.fieldErrors").isEmpty())
+                .andExpect(content().string(not(containsString(SECRET_INPUT))));
+
+        // 원인을 찾을 수 있도록 서버 로그에는 예외를 ERROR로 남긴다
+        assertThat(logAppender.list)
+                .anyMatch(event -> event.getLevel() == Level.ERROR && event.getThrowableProxy() != null);
+    }
+
+    @Test
+    @DisplayName("상태 코드를 가진 Spring MVC 예외는 500으로 바꾸지 않고 원래 상태로 응답한다")
+    void keepsStatusOfSpringErrorResponseException() throws Exception {
+        mockMvc.perform(get("/test/response-status"))
+                .andExpect(status().isNotFound());
+
+        // 정상 처리 경로이므로 서버 오류로 기록하지 않는다
+        assertThat(logAppender.list).noneMatch(event -> event.getLevel() == Level.ERROR);
+    }
+
+    @Test
+    @DisplayName("Security 예외는 500으로 바꾸지 않고 Security 필터가 처리하도록 다시 던진다")
+    void rethrowsSecurityExceptions() {
+        assertThatThrownBy(() -> mockMvc.perform(get("/test/access-denied")))
+                .hasRootCauseInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> mockMvc.perform(get("/test/authentication")))
+                .hasRootCauseInstanceOf(InsufficientAuthenticationException.class);
+    }
+
     @RestController
     static class TestController {
+
+        @GetMapping("/test/unexpected")
+        void unexpected() {
+            throw new IllegalStateException(SECRET_INPUT);
+        }
+
+        @GetMapping("/test/response-status")
+        void responseStatus() {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+
+        @GetMapping("/test/access-denied")
+        void accessDenied() {
+            throw new AccessDeniedException("거부");
+        }
+
+        @GetMapping("/test/authentication")
+        void authentication() {
+            throw new InsufficientAuthenticationException("인증 필요");
+        }
 
         @PostMapping("/test/business")
         void business() {
