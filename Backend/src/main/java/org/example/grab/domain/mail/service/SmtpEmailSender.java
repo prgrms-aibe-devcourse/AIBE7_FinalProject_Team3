@@ -28,6 +28,7 @@ public class SmtpEmailSender implements EmailSender {
     @Override
     public void send(EmailMessage message) {
         // 메시지 구성 중 발생한 MessagingException도 JavaMailSender가 MailException으로 바꿔 던진다
+        // JavaMailSender.send() 가 만든 MimeMessage에 prepare()가 내용을 채우고, send() 직접 해당 객체 전송
         mailSender.send(mimeMessage -> prepare(mimeMessage, message));
     }
 
