@@ -198,6 +198,7 @@ GET /api/v1/drops/{dropId}
 
 ---
 
+
 ## 2. 판매자 DROP 관리 API
 
 > 모든 API는 `SELLER` 인증과 DROP 소유권 검증이 필요합니다.
@@ -291,13 +292,14 @@ POST /api/v1/seller/drops
 >
 > `images`는 이미지 업로드 URL 발급(IMAGE_UPLOAD.md 1.1)에서 받은 `{ imageId, imageUrl }` 객체 배열입니다.
 > - `images`를 생략(null)하면 기존 이미지를 변경하지 않고, `[]`이면 전부 삭제합니다.
+> - 상품 이미지는 최대 10개까지 등록할 수 있습니다.
 > - `sort_order`는 배열 인덱스, `alt_text`는 상품명(없으면 빈 문자열)입니다.
 > - `imageUrl`은 `imageId`와의 관계를 검증합니다. 정확히 `{공개 URL 접두사}images/{imageId}.{jpg|png|webp}` 형식이어야 하며, 다른 사이트 URL이나 다른 이미지의 URL은 거부합니다.
 > - 같은 요청 안에서 `imageId`가 중복되면 거부합니다.
 > - 다른 DROP이 이미 사용 중인 `imageId`는 거부합니다. 같은 DROP의 이미지를 다시 보내는 수정은 허용하며 `public_id`는 유지됩니다.
 
 **오류 코드:**
-- `VALIDATION_FAILED` — 존재하지 않거나 비활성인 카테고리(`fieldErrors`의 `field`는 `categoryId`), `images` 원소 누락(null), `imageUrl` 형식 불일치(`images[i].imageUrl`), 같은 요청 안 `imageId` 중복 또는 다른 DROP이 사용 중인 `imageId`(`images[i].imageId`)
+- `VALIDATION_FAILED` — 존재하지 않거나 비활성인 카테고리(`fieldErrors`의 `field`는 `categoryId`), 이미지 10개 초과·원소 누락(null), `imageUrl` 형식 불일치(`images[i].imageUrl`), 같은 요청 안 `imageId` 중복 또는 다른 DROP이 사용 중인 `imageId`(`images[i].imageId`)
 
 ### 2.2 판매자 DROP 목록
 
@@ -431,7 +433,7 @@ PATCH /api/v1/seller/drops/{dropId}
 - `DROP_ACCESS_DENIED`
 - `DROP_NOT_EDITABLE`
 - `INVALID_SCHEDULE`
-- `VALIDATION_FAILED` — 존재하지 않거나 비활성인 카테고리(`fieldErrors`의 `field`는 `categoryId`), `images` 원소 누락(null), `imageUrl` 형식 불일치(`images[i].imageUrl`), `imageId` 중복·타 DROP 사용(`images[i].imageId`)
+- `VALIDATION_FAILED` — 존재하지 않거나 비활성인 카테고리(`fieldErrors`의 `field`는 `categoryId`), 이미지 10개 초과·원소 누락(null), `imageUrl` 형식 불일치(`images[i].imageUrl`), `imageId` 중복·타 DROP 사용(`images[i].imageId`)
 
 ### 2.5 DROP 공개
 
@@ -557,4 +559,3 @@ GET /api/v1/seller/drops/{dropId}/stocks
 ```
 
 ---
-

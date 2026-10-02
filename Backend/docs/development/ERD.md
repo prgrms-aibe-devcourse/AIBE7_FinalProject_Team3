@@ -132,6 +132,8 @@ MVP에서는 판매자 신청과 프로필을 한 테이블에서 관리한다. 
 | `sort_order` | INT | O | 0 이상, UQ(drop_id, sort_order) |
 | `alt_text` | VARCHAR(300) | O | 대체 설명 |
 
+DROP 하나에는 상품 이미지를 최대 10개까지 등록한다.
+
 #### `drop_option_groups`
 
 판매자가 상품 특성에 맞게 자유롭게 정의하는 옵션 축이다. 그룹명은 색상·사이즈 등으로 고정하지 않는다.

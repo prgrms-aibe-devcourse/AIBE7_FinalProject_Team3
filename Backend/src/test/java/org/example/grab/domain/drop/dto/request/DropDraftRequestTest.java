@@ -88,6 +88,18 @@ class DropDraftRequestTest {
     }
 
     @Test
+    @DisplayName("상품 이미지는 10개를 초과하면 검증에 실패한다")
+    void rejectsMoreThanTenImages() {
+        // given
+        DropImageRequest image = new DropImageRequest(UUID.randomUUID(), "https://example.com/a.jpg");
+        DropDraftRequest request = new DropDraftRequest(
+                null, null, java.util.Collections.nCopies(11, image), null, null, null, null, null, null);
+
+        // when & then
+        assertThat(validator.validate(request)).isNotEmpty();
+    }
+
+    @Test
     @DisplayName("중첩 배열의 null 원소는 모두 검증에 실패한다")
     void rejectsNullElementsInNestedArrays() {
         // optionGroups: [null]
