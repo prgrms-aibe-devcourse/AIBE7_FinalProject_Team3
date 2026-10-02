@@ -23,6 +23,7 @@ spring:
 
 grab:
   mail:
+    # 발송 구현체를 선택한다. 현재 구현은 smtp뿐이다(GRAB_MAIL_PROVIDER로 변경)
     provider: smtp
     # 메일에 표시되는 발신 주소. SMTP 로그인 계정(MAIL_USERNAME)과 별개다
     # Gmail은 로그인 계정과 다른 주소를 계정 주소로 바꿔 보내므로 운영에서는 같은 주소를 넣는다

@@ -23,9 +23,11 @@
 | `MAIL_SMTP_AUTH` | `spring.mail.properties.mail.smtp.auth` | `false` | SMTP 로그인 여부 |
 | `MAIL_STARTTLS` | `spring.mail.properties.mail.smtp.starttls.enable`, `.required` | `false` | STARTTLS 사용 및 강제 여부 |
 | `MAIL_FROM` | `grab.mail.from` | `no-reply@grab.local` | 메일에 표시되는 발신 주소 |
+| `GRAB_MAIL_PROVIDER` | `grab.mail.provider` | `smtp` | 발송 구현체 선택 |
 
 - 기본값은 로컬 Mailpit 기준이다. 로컬에서는 환경변수를 설정하지 않아도 된다.
 - `MAIL_STARTTLS`는 `starttls.enable`과 `starttls.required`를 함께 바꾼다. 켜면 서버가 STARTTLS를 제공하지 않을 때 평문으로 로그인하지 않고 발송이 실패한다.
+- `grab.mail.provider`는 `EmailSender` 구현체를 고른다. 현재 구현은 `smtp`뿐이므로 모든 환경에서 기본값을 쓴다. 설정 파일에 고정값으로 두며, 바꿀 때는 `GRAB_MAIL_PROVIDER` 환경변수로 덮어쓴다. SES API처럼 다른 발송 방식을 추가하면 이 값으로 전환한다.
 - `MAIL_USERNAME`은 SMTP 로그인 계정이고 `MAIL_FROM`은 메일에 표시되는 주소다. 서버에 따라 두 값이 다를 수 있다(예: SES SMTP).
 
 다음 값은 환경과 관계없이 고정한다.
