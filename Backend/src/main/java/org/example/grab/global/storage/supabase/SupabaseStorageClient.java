@@ -3,7 +3,6 @@ package org.example.grab.global.storage.supabase;
 import lombok.extern.slf4j.Slf4j;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
-import org.springframework.http.HttpHeaders;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -29,12 +28,11 @@ public class SupabaseStorageClient {
     public SupabaseStorageClient(RestClient.Builder restClientBuilder, SupabaseStorageProperties properties) {
         this.baseUrl = stripTrailingSlash(properties.url());
         this.bucket = properties.bucket();
-        this.configured = StringUtils.hasText(baseUrl) && StringUtils.hasText(properties.serviceRoleKey());
+        this.configured = StringUtils.hasText(baseUrl) && StringUtils.hasText(properties.secretKey());
 
         RestClient.Builder builder = restClientBuilder.clone();
-        if (StringUtils.hasText(properties.serviceRoleKey())) {
-            builder.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + properties.serviceRoleKey())
-                    .defaultHeader(API_KEY_HEADER, properties.serviceRoleKey());
+        if (StringUtils.hasText(properties.secretKey())) {
+            builder.defaultHeader(API_KEY_HEADER, properties.secretKey());
         }
         this.restClient = builder.build();
     }
@@ -55,7 +53,7 @@ public class SupabaseStorageClient {
             }
             return new SignedUploadUrl(baseUrl + STORAGE_PATH + normalize(response.url()), publicUrl(objectKey));
         } catch (RestClientException e) {
-            // 타임아웃·4xx·5xx. 응답·예외 메시지에 서명 토큰과 서비스 롤 키를 넣지 않는다.
+            // 타임아웃·4xx·5xx. 응답·예외 메시지에 서명 토큰과 Secret Key를 넣지 않는다.
             log.warn("Supabase Storage 업로드 URL 발급 실패: cause={}", e.getClass().getSimpleName());
             throw new BusinessException(CommonErrorCode.EXTERNAL_SERVICE_ERROR);
         }

@@ -51,9 +51,8 @@ POST /api/v1/uploads/images/presigned-url
 
 **오류 코드:**
 - `VALIDATION_FAILED` — `fileName` 누락·255자 초과, 허용하지 않는 `contentType`, `fileSize` 누락·0 이하·최대 초과. `fieldErrors`의 `field`는 각각 `fileName`, `contentType`, `fileSize`입니다.
-- Supabase 호출 실패(타임아웃·4xx·5xx)는 공통 오류 응답으로 변환합니다. `service_role` 키와 서명 토큰은 응답·로그·예외 메시지에 포함하지 않습니다.
+- Supabase 호출 실패(타임아웃·4xx·5xx)는 공통 오류 응답으로 변환합니다. Secret Key와 서명 토큰은 응답·로그·예외 메시지에 포함하지 않습니다.
 
 > 회원 프로필 이미지는 이 API 범위 밖이며, 추후 별도 경로·버킷으로 다룹니다.
 
 ---
-

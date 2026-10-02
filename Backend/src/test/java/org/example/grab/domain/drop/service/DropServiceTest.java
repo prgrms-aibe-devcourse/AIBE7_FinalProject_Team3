@@ -72,7 +72,7 @@ class DropServiceTest {
     // imageUrl 검증은 실제 공개 URL 조립이 필요하므로 진짜 클라이언트를 쓴다(HTTP 호출은 하지 않는다).
     private final SupabaseStorageClient supabaseStorageClient = new SupabaseStorageClient(
             RestClient.builder(),
-            new SupabaseStorageProperties("https://project.supabase.co", "service-role-key", "drop-images",
+            new SupabaseStorageProperties("https://project.supabase.co", "sb_secret_test", "drop-images",
                     Duration.ofSeconds(3), Duration.ofSeconds(5)));
 
     private DropService dropService;
