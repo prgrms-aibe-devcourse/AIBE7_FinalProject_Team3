@@ -145,9 +145,9 @@
 
 | Method | Endpoint | 인증 | 용도 |
 | --- | --- | --- | --- |
-| POST | `/api/v1/uploads/images/presigned-url` | SELLER | 상품 이미지 업로드용 Presigned URL 발급 |
+| POST | `/api/v1/uploads/images/presigned-url` | SELLER | 상품 이미지 업로드용 Supabase 서명 업로드 URL 발급 |
 
-> 발급된 URL로 스토리지에 이미지를 직접 업로드하고, 반환된 이미지 주소를 DROP 생성·수정 요청에 사용합니다.
+> 발급된 `uploadUrl`로 클라이언트가 Supabase Storage에 이미지를 직접 업로드하고, 응답의 `{ imageId, imageUrl }`을 DROP 생성·수정 요청의 `images`에 그대로 사용합니다.
 
 ---
 

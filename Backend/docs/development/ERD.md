@@ -126,9 +126,9 @@ MVP에서는 판매자 신청과 프로필을 한 테이블에서 관리한다. 
 | 컬럼 | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |
 | `id` | BIGINT | O | PK |
-| `public_id` | UUID | O | UQ, 외부 노출 식별자 겸 이미지 객체 키 |
+| `public_id` | UUID | O | UQ, 외부 노출 식별자(객체 키 `images/{public_id}.{ext}`에 사용) |
 | `drop_id` | BIGINT | O | FK drops |
-| `image_url` | VARCHAR(500) | O | 객체 키 또는 영속 URL |
+| `image_url` | VARCHAR(500) | O | Supabase Storage 공개 URL |
 | `sort_order` | INT | O | 0 이상, UQ(drop_id, sort_order) |
 | `alt_text` | VARCHAR(300) | O | 대체 설명 |
 

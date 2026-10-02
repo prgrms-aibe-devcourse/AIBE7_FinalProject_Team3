@@ -216,8 +216,11 @@ POST /api/v1/seller/drops
 {
   "name": "한정판 스니커즈",
   "description": "상품 설명",
-  "imageUrls": [
-    "https://example.com/image1.jpg"
+  "images": [
+    {
+      "imageId": "1d0f9e8c-7b6a-4539-8412-6c5d4e3f2a1b",
+      "imageUrl": "https://<project>.supabase.co/storage/v1/object/public/drop-images/images/1d0f9e8c-7b6a-4539-8412-6c5d4e3f2a1b.jpg"
+    }
   ],
   "categoryId": 1,
   "saleStartsAt": "2026-09-20T10:00:00+09:00",
@@ -285,9 +288,16 @@ POST /api/v1/seller/drops
 ```
 
 > 임시 저장은 일부 필수 정보가 없어도 허용할 수 있으나 공개 시 전체 항목을 검증합니다. 요청의 `key`, `groupKey`, `valueKey`는 같은 요청 안에서 그룹·값·SKU를 연결하기 위한 클라이언트 키이며 저장 후 응답에서는 서버 ID를 사용합니다.
+>
+> `images`는 이미지 업로드 URL 발급(IMAGE_UPLOAD.md 1.1)에서 받은 `{ imageId, imageUrl }` 객체 배열입니다.
+> - `images`를 생략(null)하면 기존 이미지를 변경하지 않고, `[]`이면 전부 삭제합니다.
+> - `sort_order`는 배열 인덱스, `alt_text`는 상품명(없으면 빈 문자열)입니다.
+> - `imageUrl`은 `imageId`와의 관계를 검증합니다. 정확히 `{공개 URL 접두사}images/{imageId}.{jpg|png|webp}` 형식이어야 하며, 다른 사이트 URL이나 다른 이미지의 URL은 거부합니다.
+> - 같은 요청 안에서 `imageId`가 중복되면 거부합니다.
+> - 다른 DROP이 이미 사용 중인 `imageId`는 거부합니다. 같은 DROP의 이미지를 다시 보내는 수정은 허용하며 `public_id`는 유지됩니다.
 
 **오류 코드:**
-- `VALIDATION_FAILED` — 존재하지 않거나 비활성인 카테고리(`fieldErrors`의 `field`는 `categoryId`)
+- `VALIDATION_FAILED` — 존재하지 않거나 비활성인 카테고리(`fieldErrors`의 `field`는 `categoryId`), `images` 원소 누락(null), `imageUrl` 형식 불일치(`images[i].imageUrl`), 같은 요청 안 `imageId` 중복 또는 다른 DROP이 사용 중인 `imageId`(`images[i].imageId`)
 
 ### 2.2 판매자 DROP 목록
 
@@ -345,8 +355,11 @@ GET /api/v1/seller/drops/{dropId}
     "dropId": 100,
     "name": "한정판 스니커즈",
     "description": "상품 설명",
-    "imageUrls": [
-      "https://example.com/image1.jpg"
+    "images": [
+      {
+        "imageId": "1d0f9e8c-7b6a-4539-8412-6c5d4e3f2a1b",
+        "imageUrl": "https://<project>.supabase.co/storage/v1/object/public/drop-images/images/1d0f9e8c-7b6a-4539-8412-6c5d4e3f2a1b.jpg"
+      }
     ],
     "minPrice": 129000,
     "categoryId": 1,
@@ -397,6 +410,7 @@ GET /api/v1/seller/drops/{dropId}
 ```
 
 > `minPrice`는 목록과 같은 규칙(활성 SKU 중 최저 `unitPrice`, 활성 SKU가 없으면 `null`)입니다. 옵션 그룹·값·SKU와 각 `selections`는 `sortOrder` 순으로 반환합니다.
+> `images`는 `{ imageId, imageUrl }` 객체를 `sort_order` 순으로 반환합니다. 수정 화면이 받은 값을 그대로 다시 보낼 수 있습니다. 공개 상세(1.3)·공개 목록(1.2)은 기존 `imageUrls`·`thumbnailUrl` 형식을 유지합니다.
 
 **오류 코드:**
 - `DROP_NOT_FOUND`
@@ -410,14 +424,14 @@ PATCH /api/v1/seller/drops/{dropId}
 
 - **인증**: `SELLER`
 
-> 요청 본문은 생성 API와 동일하며 변경할 필드만 전달합니다.
+> 요청 본문은 생성 API와 동일하며 변경할 필드만 전달합니다. `images`의 생략·빈 배열 의미와 `imageId`·`imageUrl` 검증 규칙도 2.1과 같습니다.
 
 **오류 코드:**
 - `DROP_NOT_FOUND`
 - `DROP_ACCESS_DENIED`
 - `DROP_NOT_EDITABLE`
 - `INVALID_SCHEDULE`
-- `VALIDATION_FAILED` — 존재하지 않거나 비활성인 카테고리(`fieldErrors`의 `field`는 `categoryId`)
+- `VALIDATION_FAILED` — 존재하지 않거나 비활성인 카테고리(`fieldErrors`의 `field`는 `categoryId`), `images` 원소 누락(null), `imageUrl` 형식 불일치(`images[i].imageUrl`), `imageId` 중복·타 DROP 사용(`images[i].imageId`)
 
 ### 2.5 DROP 공개
 
