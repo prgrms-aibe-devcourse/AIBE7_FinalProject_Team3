@@ -12,11 +12,21 @@ spring:
         smtp:
           auth: ${MAIL_SMTP_AUTH:false}
           # SMTP 장애 시 발송 작업이 무한 대기하지 않도록 각 타임아웃을 5초로 제한한다
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
           # required를 함께 켜야 서버가 STARTTLS를 제공하지 않을 때 평문으로 내려가 계정 정보를 보내지 않는다
           # 운영 단계에서 true로 전환, STARTTLS -> 평문으로 시작한 연결을 암호화 연결로 바꾸는 방식
           starttls:
             enable: ${MAIL_STARTTLS:false}
             required: ${MAIL_STARTTLS:false}
+
+grab:
+  mail:
+    provider: smtp
+    # 메일에 표시되는 발신 주소. SMTP 로그인 계정(MAIL_USERNAME)과 별개다
+    # Gmail은 로그인 계정과 다른 주소를 계정 주소로 바꿔 보내므로 운영에서는 같은 주소를 넣는다
+    from: ${MAIL_FROM:no-reply@grab.local}
 
 management:
   # SMTP 장애가 health 전체를 DOWN으로 만들어 메일과 무관한 요청까지 막지 않도록 메일 헬스 체크는 끈다(TECHSTACK 4.3)

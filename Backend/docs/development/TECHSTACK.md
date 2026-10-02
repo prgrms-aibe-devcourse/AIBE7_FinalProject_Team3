@@ -104,7 +104,7 @@ RDS와 S3를 기본 운영안으로 사용한다. 비용이나 운영 일정 때
 
 ### 4.3 이메일 발송
 
-LOCAL 회원가입의 이메일 인증 코드(`MEMBER_AUTH.md` 1.2절)는 SMTP로 발송한다. 애플리케이션은 발송 인터페이스(`EmailSender`)에만 의존하고, 실제 발송 구현은 `app.mail.provider` 설정으로 선택한다.
+LOCAL 회원가입의 이메일 인증 코드(`MEMBER_AUTH.md` 1.2절)는 SMTP로 발송한다. 애플리케이션은 발송 인터페이스(`EmailSender`)에만 의존하고, 실제 발송 구현은 `grab.mail.provider` 설정으로 선택한다.
 
 | 환경 | 발송 대상 | 용도 |
 | --- | --- | --- |
