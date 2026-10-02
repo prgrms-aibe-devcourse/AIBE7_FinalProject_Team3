@@ -8,17 +8,26 @@ import jakarta.mail.Part;
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
 import org.example.grab.domain.mail.dto.EmailMessage;
+import org.example.grab.domain.mail.error.EmailSendException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.mail.MailParseException;
+import org.springframework.mail.MailSendException;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessagePreparator;
 
+import java.net.ServerSocket;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -69,6 +78,94 @@ class SmtpEmailSenderTest {
         assertThat(mimeMessage.getHeader("Subject", null)).startsWithIgnoringCase("=?UTF-8?");
         assertThat(textParts(mimeMessage))
                 .allSatisfy(part -> assertThat(part.getContentType()).containsIgnoringCase("charset=UTF-8"));
+    }
+
+    @Test
+    @DisplayName("발송 중 MailException이 발생하면 재시도하지 않고 EmailSendException으로 감싸 던진다")
+    // 호출하는 쪽이 Spring Mail 예외 타입을 몰라도 실패를 확인할 수 있는지, 재시도는 구현체 밖의 책임인지 확인하는 테스트
+    void wrapsMailExceptionWithEmailSendException() {
+        // given
+        JavaMailSender mailSender = mock(JavaMailSender.class);
+        MailSendException cause = new MailSendException("SMTP 응답 오류");
+        doThrow(cause).when(mailSender).send(any(MimeMessagePreparator.class));
+        SmtpEmailSender sender = new SmtpEmailSender(mailSender, FROM);
+
+        // when & then
+        assertThatThrownBy(() -> sender.send(message()))
+                .isInstanceOf(EmailSendException.class)
+                .hasCause(cause)
+                .hasMessageNotContainingAny("user@example.com", "482913");
+        verify(mailSender).send(any(MimeMessagePreparator.class));
+    }
+
+    @Test
+    @DisplayName("SMTP 서버에 연결할 수 없으면 EmailSendException을 던진다")
+    // 실제 JavaMailSenderImpl로 닫힌 포트에 접속해, 연결 실패가 Spring Mail 예외로 새지 않는지 확인하는 테스트
+    void throwsEmailSendExceptionWhenConnectionFails() throws Exception {
+        // given
+        JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
+        mailSender.setHost("127.0.0.1");
+        mailSender.setPort(closedPort());
+        SmtpEmailSender sender = new SmtpEmailSender(mailSender, FROM);
+
+        // when & then
+        assertThatThrownBy(() -> sender.send(message()))
+                .isInstanceOf(EmailSendException.class)
+                .hasCauseInstanceOf(MailSendException.class);
+    }
+
+    @Test
+    @DisplayName("메일 구성 중 실패해도 EmailSendException을 던진다")
+    // 잘못된 주소로 MessagingException이 나면 JavaMailSender가 MailParseException으로 바꾸고, 이것도 감싸는지 확인하는 테스트
+    void throwsEmailSendExceptionWhenPreparationFails() {
+        // given
+        JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
+        mailSender.setHost("127.0.0.1");
+        SmtpEmailSender sender = new SmtpEmailSender(mailSender, "잘못된 주소 <");
+
+        // when & then
+        assertThatThrownBy(() -> sender.send(message()))
+                .isInstanceOf(EmailSendException.class)
+                .hasCauseInstanceOf(MailParseException.class);
+    }
+
+    @Test
+    @DisplayName("grab.mail.provider가 smtp이면 SMTP 구현체를 EmailSender로 등록한다")
+    void registersWhenProviderIsSmtp() {
+        // given & when & then
+        contextRunner()
+                .withPropertyValues("grab.mail.provider=smtp")
+                .run(context -> assertThat(context).getBean(EmailSender.class).isInstanceOf(SmtpEmailSender.class));
+    }
+
+    @Test
+    @DisplayName("grab.mail.provider가 smtp가 아니거나 없으면 SMTP 구현체를 등록하지 않는다")
+    // 기본값으로 등록되면 다른 구현체로 전환할 때 EmailSender 빈이 둘이 되므로, 명시한 값에서만 등록되는지 확인하는 테스트
+    void skipsWhenProviderIsNotSmtp() {
+        // given & when & then
+        contextRunner()
+                .withPropertyValues("grab.mail.provider=ses")
+                .run(context -> assertThat(context).doesNotHaveBean(EmailSender.class));
+        contextRunner()
+                .run(context -> assertThat(context).doesNotHaveBean(EmailSender.class));
+    }
+
+    private static EmailMessage message() {
+        return new EmailMessage("user@example.com", "[GRAB] 이메일 인증 코드", "<p>인증 코드: 482913</p>", "인증 코드: 482913");
+    }
+
+    // 잠깐 열었다 닫은 포트라 접속하면 바로 연결이 거부된다
+    private static int closedPort() throws Exception {
+        try (ServerSocket socket = new ServerSocket(0)) {
+            return socket.getLocalPort();
+        }
+    }
+
+    private static ApplicationContextRunner contextRunner() {
+        return new ApplicationContextRunner()
+                .withBean(JavaMailSender.class, () -> mock(JavaMailSender.class))
+                .withPropertyValues("grab.mail.from=" + FROM)
+                .withUserConfiguration(SmtpEmailSender.class);
     }
 
     private static MimeMessage prepared(JavaMailSender mailSender) throws Exception {
