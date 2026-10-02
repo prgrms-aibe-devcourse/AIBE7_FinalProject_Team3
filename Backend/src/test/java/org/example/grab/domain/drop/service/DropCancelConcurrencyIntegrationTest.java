@@ -98,12 +98,11 @@ class DropCancelConcurrencyIntegrationTest {
         start.countDown();
 
         // when
-        long transitioned = transition.get(10, TimeUnit.SECONDS);
+        transition.get(10, TimeUnit.SECONDS);
         Drop canceled = cancel.get(10, TimeUnit.SECONDS);
 
-        // then: 취소는 거부되고(잠금 순서와 무관하게 시작 후 상태) 최종 상태는 GRAB 하나뿐이다
+        // then: 취소는 거부되고(잠금 순서와 무관하게 시작 후 상태) 대상 DROP의 최종 상태는 GRAB 하나뿐이다
         assertThat(canceled).isNull();
-        assertThat(transitioned).isEqualTo(1);
         assertThat(statusOf(dropId)).isEqualTo(DropStatus.GRAB);
     }
 

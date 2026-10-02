@@ -198,6 +198,93 @@ class WishServiceIntegrationTest {
         }
     }
 
+    @Test
+    @DisplayName("취소된 WISH를 동시에 재등록해도 두 응답의 wishedAt과 DB 활성화 시각이 하나로 같다")
+    void reRegister_concurrentlyAfterCancelYieldsSingleActivatedAt() throws Exception {
+        // given: 취소된 WISH 한 건
+        wishService.register(userId, wishDropId);
+        wishService.cancel(userId, wishDropId);
+        assertThat(isCanceled()).isTrue();
+
+        int requestCount = 5;
+        ExecutorService executor = Executors.newFixedThreadPool(requestCount);
+        CountDownLatch ready = new CountDownLatch(requestCount);
+        CountDownLatch start = new CountDownLatch(1);
+
+        try {
+            List<Future<WishResponse>> results = new ArrayList<>();
+            for (int i = 0; i < requestCount; i++) {
+                results.add(executor.submit(() -> {
+                    ready.countDown();
+                    start.await();
+                    return wishService.register(userId, wishDropId);
+                }));
+            }
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+
+            // when
+            start.countDown();
+            List<java.time.OffsetDateTime> wishedAtList = new ArrayList<>();
+            for (Future<WishResponse> result : results) {
+                wishedAtList.add(result.get(10, TimeUnit.SECONDS).wishedAt());
+            }
+
+            // then: 모든 응답의 wishedAt이 같고, DB 활성화 시각도 그 값 하나다
+            assertThat(wishedAtList).doesNotContainNull().containsOnly(wishedAtList.get(0));
+            assertThat(activatedAtOf()).isEqualTo(wishedAtList.get(0));
+            assertThat(countWishes()).isEqualTo(1);
+            assertThat(countActiveWishes()).isEqualTo(1);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    @DisplayName("동시 재등록과 취소가 경합하면 최종 상태는 하나이고 마지막 커밋 결과와 일치한다")
+    void reRegisterAndCancelRaceLeavesConsistentState() throws Exception {
+        // given
+        wishService.register(userId, wishDropId);
+        wishService.cancel(userId, wishDropId);
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            Future<WishResponse> register = executor.submit(() -> {
+                start.await();
+                return wishService.register(userId, wishDropId);
+            });
+            Future<?> cancel = executor.submit(() -> {
+                start.await();
+                try {
+                    wishService.cancel(userId, wishDropId);
+                } catch (BusinessException ignored) {
+                    // 시작 시각 경과 등으로 거부될 수 있다(WISH DROP은 시작 전이라 현재는 성공한다)
+                }
+                return null;
+            });
+
+            // when
+            start.countDown();
+            register.get(10, TimeUnit.SECONDS);
+            cancel.get(10, TimeUnit.SECONDS);
+
+            // then: 행은 하나이고 활성/취소 중 하나의 일관된 상태다
+            assertThat(countWishes()).isEqualTo(1);
+            boolean canceled = isCanceled();
+            assertThat(countActiveWishes()).isEqualTo(canceled ? 0 : 1);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    private java.time.OffsetDateTime activatedAtOf() {
+        return jdbcTemplate.queryForObject(
+                "SELECT activated_at FROM wishes WHERE user_id = ? AND drop_id = ?",
+                java.time.OffsetDateTime.class,
+                userId,
+                wishDropId);
+    }
+
     private boolean isCanceled() {
         return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
                 "SELECT canceled_at IS NOT NULL FROM wishes WHERE user_id = ? AND drop_id = ?",
