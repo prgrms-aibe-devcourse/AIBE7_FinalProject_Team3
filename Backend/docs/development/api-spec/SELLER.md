@@ -157,8 +157,12 @@ GET /api/v1/seller/dashboard/summary
 - **인증**: `SELLER`
 
 **쿼리 파라미터:**
-- `from`: 시작 일시 (예: `2026-09-01T00:00:00+09:00`)
-- `to`: 종료 일시 (예: `2026-09-30T23:59:59+09:00`)
+- `from`: 시작 일시 (예: `2026-09-01T00:00:00+09:00`), 생략 시 제한 없음
+- `to`: 종료 일시 (예: `2026-09-30T23:59:59+09:00`), 생략 시 제한 없음
+
+기간은 `orderCounts`와 `paymentCounts`에만 적용하며 각각 주문·결제의 생성 시각을 기준으로 양끝을 포함합니다.
+`dropCounts`, `stockSummary`, `reconciliationRequired`는 현재 시점의 값이므로 기간의 영향을 받지 않습니다.
+`from`이 `to`보다 뒤면 400을 반환합니다.
 
 **응답:**
 
@@ -178,12 +182,16 @@ GET /api/v1/seller/dashboard/summary
       "PAID": 10,
       "PREPARING": 3,
       "SHIPPED": 7,
+      "DELIVERED": 6,
+      "EXPIRED": 1,
       "CANCELED": 2
     },
     "paymentCounts": {
+      "PENDING": 1,
       "SUCCEEDED": 20,
       "FAILED": 3,
-      "UNKNOWN": 1
+      "UNKNOWN": 1,
+      "CANCELED": 2
     },
     "reconciliationRequired": 1,
     "stockSummary": {
@@ -194,6 +202,13 @@ GET /api/v1/seller/dashboard/summary
   }
 }
 ```
+
+- `orderCounts`·`paymentCounts`는 해당 상태의 모든 값을 반환하며, 건수가 없는 상태도 `0`으로 채웁니다.
+- `paymentCounts`는 주문이 아니라 결제 시도 건수이므로 재시도가 있으면 `orderCounts` 합계보다 큽니다.
+- `dropCounts`는 저장된 상태를 그대로 집계합니다. 상태 전환 배치 주기(약 10초)만큼 늦을 수 있습니다.
+- `stockSummary`는 `CANCELED`를 제외한 본인 DROP 전체의 옵션 수량 합계이며, 신규 주문을 받지 않는 옵션(`is_active = false`)도 포함합니다.
+  `available`은 `total - reserved - sold - withheld`로 계산한 미할당 수량이며, 종료된 DROP의 잔여 수량이 포함되므로 즉시 구매 가능한 수량과는 다릅니다.
+- `reconciliationRequired`는 기간과 무관하게 현재 보정이 끝나지 않은 결제 건수입니다. 0이 아니면 승인은 됐으나 주문이 확정되지 않은 결제가 있다는 뜻입니다.
 
 ### 2.2 DROP별 통계
 
@@ -230,6 +245,10 @@ GET /api/v1/seller/dashboard/drops?page=0&size=20
   }
 }
 ```
+
+`availableStock`·`reservedStock`·`soldStock`은 DROP에 속한 옵션 수량의 합계이며, 2.1 `stockSummary`와 같은 기준을 씁니다.
+신규 주문을 받지 않는 옵션(`is_active = false`)도 포함하고, `availableStock`은 `total - reserved - sold - withheld`로 계산합니다.
+이 목록은 `CANCELED` DROP도 반환하지만 2.1 `stockSummary`는 제외하므로, 취소된 DROP이 있으면 목록의 재고 합계가 요약보다 큽니다.
 
 ### 2.3 임박 DROP 조회
 
