@@ -3,6 +3,7 @@ package org.example.grab.domain.drop.service;
 import jakarta.persistence.EntityManager;
 import org.example.grab.global.config.JpaConfig;
 import org.example.grab.domain.drop.dto.request.DropDraftRequest;
+import org.example.grab.domain.drop.dto.request.DropImageRequest;
 import org.example.grab.domain.drop.dto.request.OptionGroupRequest;
 import org.example.grab.domain.drop.dto.request.OptionRequest;
 import org.example.grab.domain.drop.dto.request.OptionValueRequest;
@@ -23,6 +24,7 @@ import org.example.grab.domain.wish.service.WishQueryService;
 import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
+import org.example.grab.global.storage.supabase.SupabaseStorageConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -49,9 +51,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
-@Import({JpaConfig.class, DropService.class, CategoryService.class, WishQueryService.class})
+@Import({JpaConfig.class, DropService.class, CategoryService.class, WishQueryService.class,
+        SupabaseStorageConfig.class})
 @Testcontainers
 class DropServiceIntegrationTest {
+
+    private static final String IMAGE_URL_PREFIX =
+            "https://project.supabase.co/storage/v1/object/public/drop-images/images/";
 
     @Container
     static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18");
@@ -175,9 +181,10 @@ class DropServiceIntegrationTest {
                 List.of(new OptionValueRequest("black", "블랙", 0)));
         OptionRequest option = new OptionRequest(
                 List.of(new SelectionRequest("color", "black")), 5000L, 3, true, 0);
+        DropImageRequest c = image(UUID.randomUUID());
+        DropImageRequest d = image(UUID.randomUUID());
         DropDraftRequest update = new DropDraftRequest(null, null,
-                List.of("https://example.com/c.jpg", "https://example.com/d.jpg"),
-                null, null, null, null, List.of(color), List.of(option));
+                List.of(c, d), null, null, null, null, List.of(color), List.of(option));
 
         // when
         dropService.updateDraft(sellerId, saved.getId(), update);
@@ -187,7 +194,7 @@ class DropServiceIntegrationTest {
         // then
         Drop found = dropRepository.findById(saved.getId()).orElseThrow();
         assertThat(found.getImages()).extracting(DropImage::getImageUrl)
-                .containsExactly("https://example.com/c.jpg", "https://example.com/d.jpg");
+                .containsExactly(c.imageUrl(), d.imageUrl());
         assertThat(found.getOptionGroups()).singleElement()
                 .extracting("name").isEqualTo("색상");
         assertThat(found.getOptions()).hasSize(1);
@@ -199,7 +206,7 @@ class DropServiceIntegrationTest {
         // given: 영속성 컨텍스트를 비워 LAZY 로딩된 옵션 구조로 검증이 동작하는지 확인한다.
         OffsetDateTime start = OffsetDateTime.now().plusDays(1);
         DropDraftRequest full = fullRequest();
-        DropDraftRequest request = new DropDraftRequest(full.name(), full.description(), full.imageUrls(),
+        DropDraftRequest request = new DropDraftRequest(full.name(), full.description(), full.images(),
                 full.categoryId(), start, start.plusDays(1), new ShippingRequest(3000L, "안내"),
                 full.optionGroups(), full.options());
         Long dropId =         dropService.createDraft(sellerId, request).getId();
@@ -236,7 +243,7 @@ class DropServiceIntegrationTest {
         // given
         OffsetDateTime start = OffsetDateTime.now().plusDays(1);
         DropDraftRequest full = fullRequest();
-        DropDraftRequest request = new DropDraftRequest(full.name(), full.description(), full.imageUrls(),
+        DropDraftRequest request = new DropDraftRequest(full.name(), full.description(), full.images(),
                 categoryId, start, start.plusDays(1), new ShippingRequest(3000L, "안내"),
                 full.optionGroups(), full.options());
         Long dropId = dropService.createDraft(sellerId, request).getId();
@@ -260,7 +267,7 @@ class DropServiceIntegrationTest {
         // given
         OffsetDateTime start = OffsetDateTime.now().plusDays(1);
         DropDraftRequest full = fullRequest();
-        DropDraftRequest request = new DropDraftRequest(full.name(), full.description(), full.imageUrls(),
+        DropDraftRequest request = new DropDraftRequest(full.name(), full.description(), full.images(),
                 categoryId, start, start.plusDays(1), new ShippingRequest(3000L, "안내"),
                 full.optionGroups(), full.options());
         Long dropId = dropService.createDraft(sellerId, request).getId();
@@ -405,7 +412,8 @@ class DropServiceIntegrationTest {
     @DisplayName("상세 조회는 지연 로딩 상태에서도 그룹·값·SKU 매핑을 순서대로 반환한다")
     void findSellerDrop_returnsOrderedDetail() {
         // given
-        Long dropId = dropService.createDraft(sellerId, fullRequest()).getId();
+        DropDraftRequest request = fullRequest();
+        Long dropId = dropService.createDraft(sellerId, request).getId();
         entityManager.flush();
         entityManager.clear();
 
@@ -413,8 +421,8 @@ class DropServiceIntegrationTest {
         SellerDropDetailResponse detail = dropService.findSellerDrop(sellerId, dropId);
 
         // then
-        assertThat(detail.imageUrls())
-                .containsExactly("https://example.com/a.jpg", "https://example.com/b.jpg");
+        assertThat(detail.images()).extracting(SellerDropDetailResponse.Image::imageUrl)
+                .containsExactly(request.images().stream().map(DropImageRequest::imageUrl).toArray(String[]::new));
         assertThat(detail.optionGroups()).extracting(DropOptionGroupResponse::name)
                 .containsExactly("소재", "길이");
         assertThat(detail.optionGroups().get(0).values()).extracting(DropOptionGroupResponse.Value::value)
@@ -519,8 +527,12 @@ class DropServiceIntegrationTest {
                 139000L, 5, false, 1);
 
         return new DropDraftRequest("상품", "설명",
-                List.of("https://example.com/a.jpg", "https://example.com/b.jpg"),
+                List.of(image(UUID.randomUUID()), image(UUID.randomUUID())),
                 categoryId, null, null, null, List.of(material, length), List.of(first, second));
+    }
+
+    private static DropImageRequest image(UUID imageId) {
+        return new DropImageRequest(imageId, IMAGE_URL_PREFIX + imageId + ".jpg");
     }
 
     private DropDraftRequest emptyRequest() {

@@ -4,18 +4,18 @@ import org.example.grab.domain.drop.dto.response.common.DropOptionGroupResponse;
 import org.example.grab.domain.drop.dto.response.common.DropOptionSelectionResponse;
 import org.example.grab.domain.drop.dto.response.common.DropShippingResponse;
 import org.example.grab.domain.drop.entity.Drop;
-import org.example.grab.domain.drop.entity.DropImage;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.entity.option.DropOption;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.UUID;
 
 public record SellerDropDetailResponse(
         Long dropId,
         String name,
         String description,
-        List<String> imageUrls,
+        List<Image> images,
         Long minPrice,
         Long categoryId,
         DropStatus status,
@@ -25,6 +25,9 @@ public record SellerDropDetailResponse(
         List<DropOptionGroupResponse> optionGroups,
         List<Option> options
 ) {
+
+    public record Image(UUID imageId, String imageUrl) {
+    }
 
     public record Option(Long optionId, List<DropOptionSelectionResponse> selections, Long unitPrice,
                          int totalQuantity, int reservedQuantity, int soldQuantity, boolean active, int sortOrder) {
@@ -36,7 +39,9 @@ public record SellerDropDetailResponse(
                 drop.getId(),
                 drop.getName(),
                 drop.getDescription(),
-                drop.getImages().stream().map(DropImage::getImageUrl).toList(),
+                drop.getImages().stream()
+                        .map(image -> new Image(image.getUuid(), image.getImageUrl()))
+                        .toList(),
                 drop.getMinPrice(),
                 drop.getCategoryId(),
                 drop.getStatus(),

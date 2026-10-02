@@ -98,7 +98,8 @@ class SellerDropControllerTest {
         // when & then
         mockMvc.perform(post("/api/v1/seller/drops")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"imageUrls\":[\"" + longUrl + "\"]}"))
+                        .content("{\"images\":[{\"imageId\":\"" + java.util.UUID.randomUUID()
+                                + "\",\"imageUrl\":\"" + longUrl + "\"}]}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
@@ -389,7 +390,9 @@ class SellerDropControllerTest {
         // given
         given(currentSellerIdProvider.currentSellerId()).willReturn(1L);
         SellerDropDetailResponse detail = new SellerDropDetailResponse(
-                100L, "상품", "설명", List.of("https://example.com/a.jpg"), 10000L, 1L, DropStatus.DRAFT,
+                100L, "상품", "설명",
+                List.of(new SellerDropDetailResponse.Image(java.util.UUID.randomUUID(), "https://example.com/a.jpg")),
+                10000L, 1L, DropStatus.DRAFT,
                 OffsetDateTime.parse("2026-09-18T07:00:00Z"), OffsetDateTime.parse("2026-09-18T09:00:00Z"),
                 new DropShippingResponse(3000L, "안내"),
                 List.of(new DropOptionGroupResponse(11L, "소재", 0,

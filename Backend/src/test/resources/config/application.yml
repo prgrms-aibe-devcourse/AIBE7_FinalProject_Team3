@@ -6,3 +6,8 @@ grab:
       # 테스트 전용 JWT 서명 키. 운영·개발 환경에서 절대 사용하지 않는다.
       # 디코딩하면 "grab-test-only-jwt-secret-not-for-production"(44바이트)이다.
       secret: Z3JhYi10ZXN0LW9ubHktand0LXNlY3JldC1ub3QtZm9yLXByb2R1Y3Rpb24=
+  # DROP 이미지 imageUrl 검증(GR-51)이 공개 URL 접두사를 만들 때 쓰는 테스트 값.
+  storage:
+    supabase:
+      url: https://project.supabase.co
+      bucket: drop-images

@@ -5,6 +5,7 @@ import org.example.grab.domain.drop.dto.PublicDropListProjection;
 import org.example.grab.domain.drop.dto.PublicDropSort;
 import org.example.grab.domain.drop.dto.SellerDropListProjection;
 import org.example.grab.domain.drop.dto.request.DropDraftRequest;
+import org.example.grab.domain.drop.dto.request.DropImageRequest;
 import org.example.grab.domain.drop.dto.request.ShippingRequest;
 import org.example.grab.domain.drop.dto.response.PublicDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.PublicDropListResponse;
@@ -15,6 +16,7 @@ import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.domain.drop.entity.DropImage;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.error.DropErrorCode;
+import org.example.grab.domain.drop.repository.DropImageRepository;
 import org.example.grab.domain.drop.repository.DropRepository;
 import org.example.grab.domain.category.service.CategoryService;
 import org.example.grab.domain.wish.service.WishQueryService;
@@ -22,6 +24,7 @@ import org.example.grab.global.common.ErrorResponse;
 import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
+import org.example.grab.global.storage.supabase.SupabaseStorageClient;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -30,7 +33,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 /**
  * 판매자의 DROP 임시 저장·수정·공개·조회를 담당한다.
@@ -44,10 +50,14 @@ public class DropService {
     private static final List<String> PUBLIC_STATUSES = List.of(
             DropStatus.WISH.name(), DropStatus.GRAB.name(), DropStatus.ENDED.name());
     private static final int KEYWORD_MAX_LENGTH = 100;
+    private static final String IMAGE_OBJECT_KEY_PREFIX = "images/";
+    private static final List<String> IMAGE_EXTENSIONS = List.of("jpg", "png", "webp");
 
     private final DropRepository dropRepository;
+    private final DropImageRepository dropImageRepository;
     private final CategoryService categoryService;
     private final WishQueryService wishQueryService;
+    private final SupabaseStorageClient supabaseStorageClient;
 
     /** 새 DRAFT를 만들고 요청 값을 반영해 저장한다. */
     @Transactional
@@ -217,7 +227,7 @@ public class DropService {
         validateCategory(request.categoryId());
 
         // 그룹만 또는 옵션만 오면 기존 SKU가 조용히 삭제되므로, 옵션 구조는 둘 다 오거나 둘 다 없어야 한다.
-        boolean replaceImages = request.imageUrls() != null;
+        boolean replaceImages = request.images() != null;
         boolean hasOptionGroups = request.optionGroups() != null;
         boolean hasOptions = request.options() != null;
         if (hasOptionGroups != hasOptions) {
@@ -226,6 +236,10 @@ public class DropService {
         boolean replaceOptions = hasOptionGroups;
         if (!replaceImages && !replaceOptions) {
             return;
+        }
+        // 자식 컬렉션을 비우기 전에 imageId·imageUrl 관계와 다른 DROP 사용 여부를 먼저 검증한다.
+        if (replaceImages) {
+            validateImages(request.images(), drop.getId());
         }
         // 자식 컬렉션에는 sort_order 등 unique 제약이 있어, 삽입이 삭제보다 먼저 실행되면 충돌한다.
         // 컬렉션을 비우고 flush로 삭제를 먼저 확정한 뒤 새 자식을 추가한다(맵이 값·그룹을 참조하므로 옵션 → 그룹 순서).
@@ -241,7 +255,7 @@ public class DropService {
         }
 
         if (replaceImages) {
-            toImages(drop, request.imageUrls()).forEach(drop::addImage);
+            toImages(drop, request.images()).forEach(drop::addImage);
         }
         if (replaceOptions) {
             DropOptionAssembler.apply(drop, request.optionGroups(), request.options());
@@ -258,12 +272,50 @@ public class DropService {
     }
 
     // 이미지 정렬 순서는 요청 배열의 인덱스를 그대로 쓰고, alt_text는 정책 확정 전까지 상품명을 기본값으로 둔다.
-    private List<DropImage> toImages(Drop drop, List<String> imageUrls) {
+    private List<DropImage> toImages(Drop drop, List<DropImageRequest> images) {
         String altText = drop.getName() != null ? drop.getName() : "";
-        List<DropImage> images = new ArrayList<>();
-        for (int index = 0; index < imageUrls.size(); index++) {
-            images.add(DropImage.create(drop, imageUrls.get(index), index, altText));
+        List<DropImage> result = new ArrayList<>();
+        for (int index = 0; index < images.size(); index++) {
+            DropImageRequest image = images.get(index);
+            result.add(DropImage.create(drop, image.imageId(), image.imageUrl(), index, altText));
         }
-        return images;
+        return result;
+    }
+
+    /*
+        imageUrl을 그대로 믿지 않고 발급한 imageId와의 관계로 검증한다(GR-51 2-3).
+        다른 사이트 URL이나 다른 이미지의 URL을 붙이는 것을 막고, 같은 요청·다른 DROP의 imageId 재사용도 거부한다.
+     */
+    private void validateImages(List<DropImageRequest> images, Long dropId) {
+        List<ErrorResponse.FieldError> fieldErrors = new ArrayList<>();
+        Set<UUID> seenImageIds = new HashSet<>();
+        for (int index = 0; index < images.size(); index++) {
+            DropImageRequest image = images.get(index);
+            if (!seenImageIds.add(image.imageId())) {
+                fieldErrors.add(new ErrorResponse.FieldError(
+                        "images[" + index + "].imageId", "같은 요청에서 imageId가 중복됩니다."));
+                continue;
+            }
+            if (!isExpectedImageUrl(image.imageId(), image.imageUrl())) {
+                fieldErrors.add(new ErrorResponse.FieldError(
+                        "images[" + index + "].imageUrl", "imageId와 일치하는 공개 이미지 URL이 아닙니다."));
+            }
+            if (dropImageRepository.existsByUuidUsedByOtherDrop(image.imageId(), dropId)) {
+                fieldErrors.add(new ErrorResponse.FieldError(
+                        "images[" + index + "].imageId", "다른 DROP이 이미 사용 중인 imageId입니다."));
+            }
+        }
+        if (!fieldErrors.isEmpty()) {
+            throw new BusinessException(CommonErrorCode.VALIDATION_FAILED, fieldErrors);
+        }
+    }
+
+    private boolean isExpectedImageUrl(UUID imageId, String imageUrl) {
+        for (String extension : IMAGE_EXTENSIONS) {
+            if (supabaseStorageClient.publicUrl(IMAGE_OBJECT_KEY_PREFIX + imageId + "." + extension).equals(imageUrl)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

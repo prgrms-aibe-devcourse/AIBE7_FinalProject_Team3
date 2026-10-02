@@ -59,7 +59,8 @@ public class SupabaseStorageClient {
         }
     }
 
-    private String publicUrl(String objectKey) {
+    // DROP 저장 시 imageUrl이 이 버킷의 공개 URL인지 검증할 때도 쓴다.
+    public String publicUrl(String objectKey) {
         return baseUrl + PUBLIC_URL_PATH + bucket + "/" + objectKey;
     }
 
