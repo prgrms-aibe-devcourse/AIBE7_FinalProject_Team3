@@ -18,6 +18,7 @@ public class SupabaseStorageClient {
     private static final String STORAGE_PATH = "/storage/v1";
     private static final String SIGNED_UPLOAD_PATH = STORAGE_PATH + "/object/upload/sign/";
     private static final String PUBLIC_URL_PATH = STORAGE_PATH + "/object/public/";
+    private static final String API_KEY_HEADER = "apikey";
 
     private final RestClient restClient;
     private final String baseUrl;
@@ -32,7 +33,8 @@ public class SupabaseStorageClient {
 
         RestClient.Builder builder = restClientBuilder.clone();
         if (StringUtils.hasText(properties.serviceRoleKey())) {
-            builder.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + properties.serviceRoleKey());
+            builder.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + properties.serviceRoleKey())
+                    .defaultHeader(API_KEY_HEADER, properties.serviceRoleKey());
         }
         this.restClient = builder.build();
     }

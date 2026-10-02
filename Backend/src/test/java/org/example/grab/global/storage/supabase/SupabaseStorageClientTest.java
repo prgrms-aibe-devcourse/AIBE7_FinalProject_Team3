@@ -40,13 +40,14 @@ class SupabaseStorageClientTest {
     }
 
     @Test
-    @DisplayName("서명 요청을 올바른 경로·Bearer 인증으로 보내고 uploadUrl·imageUrl을 조립한다")
+    @DisplayName("서명 요청을 올바른 경로·인증 헤더로 보내고 uploadUrl·imageUrl을 조립한다")
     void createSignedUploadUrl() {
         // given
         SupabaseStorageClient client = new SupabaseStorageClient(builder, properties(SERVICE_ROLE_KEY));
         server.expect(requestTo(BASE_URL + "/storage/v1/object/upload/sign/" + BUCKET + "/" + OBJECT_KEY))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(header("Authorization", "Bearer " + SERVICE_ROLE_KEY))
+                .andExpect(header("apikey", SERVICE_ROLE_KEY))
                 .andRespond(withSuccess(
                         "{\"url\":\"/object/upload/sign/" + BUCKET + "/" + OBJECT_KEY + "?token=signed-token\"}",
                         MediaType.APPLICATION_JSON));
