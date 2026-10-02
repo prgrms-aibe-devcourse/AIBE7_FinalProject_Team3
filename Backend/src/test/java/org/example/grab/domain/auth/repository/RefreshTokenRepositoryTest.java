@@ -13,6 +13,10 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.dao.QueryTimeoutException;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import tools.jackson.databind.ObjectMapper;
@@ -29,11 +33,12 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 
 // GR-33 M03-01: 저장소 계약. 실제 Redis 동작(TTL·만료)은 M04 통합 테스트에서 확인한다
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class RefreshTokenRepositoryTest {
 
     private static final String RAW_TOKEN = "Xk3_vQ9aT1mZ0bR7cY2wL5nP8sD4fH6jK1gE3uA9qWo";
@@ -149,6 +154,72 @@ class RefreshTokenRepositoryTest {
 
         // when & then
         assertThat(repository.find(RAW_TOKEN)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("값을 읽지 못한 경고 로그에는 원문·해시·값이 없다")
+    void unreadableValueWarningOmitsTokenAndValue(CapturedOutput output) {
+        // given: Jackson 예외 메시지에는 잘못된 값이 그대로 들어간다
+        String marker = "VALUE-MARKER-7c1e";
+        given(valueOperations.get(KEY)).willReturn(SESSION_JSON.replace("7,", "\"" + marker + "\","));
+
+        // when
+        repository.find(RAW_TOKEN);
+
+        // then
+        assertThat(output).contains("Refresh Token 세션 값을 읽지 못해");
+        assertThat(output).doesNotContain(RAW_TOKEN, RefreshTokenHasher.hash(RAW_TOKEN), marker);
+    }
+
+    @Test
+    @DisplayName("저장·조회·삭제는 원문·해시·값을 로그에 남기지 않는다")
+    void normalOperationsLogNoTokenOrValue(CapturedOutput output) {
+        // given
+        given(ttlCalculator.calculateTtl(any())).willReturn(Duration.ofDays(14));
+        given(valueOperations.get(KEY)).willReturn(SESSION_JSON);
+
+        // when
+        repository.save(RAW_TOKEN, SESSION);
+        repository.find(RAW_TOKEN);
+        repository.delete(RAW_TOKEN);
+
+        // then
+        assertThat(output).doesNotContain(RAW_TOKEN, RefreshTokenHasher.hash(RAW_TOKEN), SESSION_JSON);
+    }
+
+    // M03-03: Redis 장애를 없는 토큰(INVALID_TOKEN)으로 바꾸면 장애 동안 재발급한 사용자가 전부 로그아웃된다
+    @Test
+    @DisplayName("Redis 오류는 save에서 감싸지 않고 그대로 전파된다")
+    void savePropagatesRedisFailure() {
+        // given
+        RedisConnectionFailureException failure = new RedisConnectionFailureException("Redis 연결 실패");
+        given(ttlCalculator.calculateTtl(any())).willReturn(Duration.ofDays(14));
+        willThrow(failure).given(valueOperations).set(anyString(), anyString(), any(Duration.class));
+
+        // when & then
+        assertThatThrownBy(() -> repository.save(RAW_TOKEN, SESSION)).isSameAs(failure);
+    }
+
+    @Test
+    @DisplayName("Redis 오류는 find에서 빈 결과로 바뀌지 않고 그대로 전파된다")
+    void findPropagatesRedisFailureInsteadOfEmpty() {
+        // given
+        QueryTimeoutException failure = new QueryTimeoutException("Redis 명령 타임아웃");
+        given(valueOperations.get(KEY)).willThrow(failure);
+
+        // when & then
+        assertThatThrownBy(() -> repository.find(RAW_TOKEN)).isSameAs(failure);
+    }
+
+    @Test
+    @DisplayName("Redis 오류는 delete에서 감싸지 않고 그대로 전파된다")
+    void deletePropagatesRedisFailure() {
+        // given
+        RedisConnectionFailureException failure = new RedisConnectionFailureException("Redis 연결 실패");
+        given(redisTemplate.delete(KEY)).willThrow(failure);
+
+        // when & then
+        assertThatThrownBy(() -> repository.delete(RAW_TOKEN)).isSameAs(failure);
     }
 
     @Test
