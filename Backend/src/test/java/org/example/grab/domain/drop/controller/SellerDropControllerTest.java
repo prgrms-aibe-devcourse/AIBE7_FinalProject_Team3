@@ -3,6 +3,7 @@ package org.example.grab.domain.drop.controller;
 import org.example.grab.domain.drop.dto.request.DropDraftRequest;
 import org.example.grab.domain.drop.dto.response.SellerDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.SellerDropListResponse;
+import org.example.grab.domain.drop.dto.response.SellerDropStockResponse;
 import org.example.grab.domain.drop.dto.response.common.DropOptionGroupResponse;
 import org.example.grab.domain.drop.dto.response.common.DropOptionSelectionResponse;
 import org.example.grab.domain.drop.dto.response.common.DropShippingResponse;
@@ -433,6 +434,56 @@ class SellerDropControllerTest {
 
         // when & then
         mockMvc.perform(get("/api/v1/seller/drops/100"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("DROP_ACCESS_DENIED"));
+    }
+
+    @Test
+    @DisplayName("판매자 재고 현황은 200과 명세 2.7 필드를 반환한다")
+    void findStocks() throws Exception {
+        // given
+        given(currentSellerIdProvider.currentSellerId()).willReturn(1L);
+        SellerDropStockResponse response = new SellerDropStockResponse(100L,
+                List.of(new SellerDropStockResponse.Option(1001L, "코튼 / 롱", 10, 4, 2, 4)));
+        given(dropService.findSellerStocks(1L, 100L)).willReturn(response);
+
+        // when & then
+        mockMvc.perform(get("/api/v1/seller/drops/100/stocks"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.dropId").value(100))
+                .andExpect(jsonPath("$.data.options[0].optionId").value(1001))
+                .andExpect(jsonPath("$.data.options[0].optionName").value("코튼 / 롱"))
+                .andExpect(jsonPath("$.data.options[0].totalStock").value(10))
+                .andExpect(jsonPath("$.data.options[0].availableStock").value(4))
+                .andExpect(jsonPath("$.data.options[0].reservedStock").value(2))
+                .andExpect(jsonPath("$.data.options[0].soldStock").value(4));
+    }
+
+    @Test
+    @DisplayName("없는 dropId 재고 조회는 404 DROP_NOT_FOUND")
+    void findStocks_notFound() throws Exception {
+        // given
+        given(currentSellerIdProvider.currentSellerId()).willReturn(1L);
+        given(dropService.findSellerStocks(1L, 999L))
+                .willThrow(new BusinessException(DropErrorCode.DROP_NOT_FOUND));
+
+        // when & then
+        mockMvc.perform(get("/api/v1/seller/drops/999/stocks"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("DROP_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("다른 판매자의 DROP 재고 조회는 403 DROP_ACCESS_DENIED")
+    void findStocks_accessDenied() throws Exception {
+        // given
+        given(currentSellerIdProvider.currentSellerId()).willReturn(1L);
+        given(dropService.findSellerStocks(1L, 100L))
+                .willThrow(new BusinessException(DropErrorCode.DROP_ACCESS_DENIED));
+
+        // when & then
+        mockMvc.perform(get("/api/v1/seller/drops/100/stocks"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code").value("DROP_ACCESS_DENIED"));
     }
