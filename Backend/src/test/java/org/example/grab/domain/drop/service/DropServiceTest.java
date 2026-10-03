@@ -9,6 +9,7 @@ import org.example.grab.domain.drop.dto.request.ShippingRequest;
 import org.example.grab.domain.category.dto.response.CategoryResponse;
 import org.example.grab.domain.category.service.CategoryService;
 import org.example.grab.domain.drop.dto.response.PublicDropDetailResponse;
+import org.example.grab.domain.drop.dto.response.SellerDropWishCountResponse;
 import org.example.grab.domain.drop.dto.response.common.DropCategoryResponse;
 import org.example.grab.domain.wish.WishNotice;
 import org.example.grab.domain.wish.service.WishQueryService;
@@ -326,6 +327,66 @@ class DropServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(DropErrorCode.DROP_ACCESS_DENIED);
+    }
+
+    @Test
+    @DisplayName("판매자 활성 WISH 수: 소유자면 건수를 반환한다")
+    void findSellerWishCount_returnsCount() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+        given(wishQueryService.countActiveByDropId(10L)).willReturn(152L);
+
+        // when
+        SellerDropWishCountResponse response = dropService.findSellerWishCount(1L, 10L);
+
+        // then
+        assertThat(response.dropId()).isEqualTo(10L);
+        assertThat(response.activeWishCount()).isEqualTo(152L);
+    }
+
+    @Test
+    @DisplayName("판매자 활성 WISH 수: 0건은 0으로 반환한다")
+    void findSellerWishCount_zero() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+        given(wishQueryService.countActiveByDropId(10L)).willReturn(0L);
+
+        // when
+        SellerDropWishCountResponse response = dropService.findSellerWishCount(1L, 10L);
+
+        // then
+        assertThat(response.activeWishCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("판매자 활성 WISH 수: 없는 DROP은 DROP_NOT_FOUND이고 건수를 조회하지 않는다")
+    void findSellerWishCount_notFound() {
+        // given
+        given(dropRepository.findById(99L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> dropService.findSellerWishCount(1L, 99L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(DropErrorCode.DROP_NOT_FOUND);
+        verifyNoInteractions(wishQueryService);
+    }
+
+    @Test
+    @DisplayName("판매자 활성 WISH 수: 다른 판매자의 DROP은 DROP_ACCESS_DENIED이고 건수를 조회하지 않는다")
+    void findSellerWishCount_accessDenied() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+
+        // when & then
+        assertThatThrownBy(() -> dropService.findSellerWishCount(2L, 10L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(DropErrorCode.DROP_ACCESS_DENIED);
+        verifyNoInteractions(wishQueryService);
     }
 
     @Test
