@@ -9,6 +9,8 @@ import org.example.grab.domain.drop.dto.request.ShippingRequest;
 import org.example.grab.domain.category.dto.response.CategoryResponse;
 import org.example.grab.domain.category.service.CategoryService;
 import org.example.grab.domain.drop.dto.response.PublicDropDetailResponse;
+import org.example.grab.domain.drop.dto.response.PublicDropStockResponse;
+import org.example.grab.domain.drop.dto.response.SellerDropStockResponse;
 import org.example.grab.domain.drop.dto.response.common.DropCategoryResponse;
 import org.example.grab.domain.wish.WishNotice;
 import org.example.grab.domain.wish.service.WishQueryService;
@@ -16,6 +18,9 @@ import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.domain.drop.entity.DropImage;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.entity.option.DropOption;
+import org.example.grab.domain.drop.entity.option.DropOptionGroup;
+import org.example.grab.domain.drop.entity.option.DropOptionValue;
+import org.example.grab.domain.drop.entity.option.DropOptionValueMap;
 import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.domain.drop.repository.DropRepository;
 import org.example.grab.global.common.ErrorResponse;
@@ -378,6 +383,221 @@ class DropServiceTest {
         assertThat(response.wishNotice()).isEqualTo(WishNotice.MESSAGE);
         assertThat(response.actions())
                 .isEqualTo(new PublicDropDetailResponse.Actions(false, false, false));
+    }
+
+    @Test
+    @DisplayName("판매자 재고 현황: 전체·확보·판매 수량을 독립적으로 반환하고 보류를 차감한다")
+    void findSellerStocks_returnsQuantities() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        ReflectionTestUtils.setField(drop, "id", 10L);
+        DropOption option = DropOption.create(drop, 10000L, 10, 0);
+        ReflectionTestUtils.setField(option, "reservedQuantity", 2);
+        ReflectionTestUtils.setField(option, "soldQuantity", 3);
+        ReflectionTestUtils.setField(option, "withheldQuantity", 1);
+        drop.addOption(option);
+        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+
+        // when
+        SellerDropStockResponse response = dropService.findSellerStocks(1L, 10L);
+
+        // then
+        assertThat(response.dropId()).isEqualTo(10L);
+        assertThat(response.options()).hasSize(1);
+        SellerDropStockResponse.Option stock = response.options().get(0);
+        assertThat(stock.totalStock()).isEqualTo(10);
+        assertThat(stock.reservedStock()).isEqualTo(2);
+        assertThat(stock.soldStock()).isEqualTo(3);
+        assertThat(stock.availableStock()).isEqualTo(4);
+    }
+
+    @Test
+    @DisplayName("판매자 재고 현황: 소유자면 DRAFT도 조회하고 비활성 SKU도 포함한다")
+    void findSellerStocks_includesDraftAndInactive() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        DropOption active = DropOption.create(drop, 10000L, 5, 0);
+        DropOption inactive = DropOption.create(drop, 20000L, 5, 1);
+        inactive.updateActive(false);
+        drop.addOption(active);
+        drop.addOption(inactive);
+        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+
+        // when
+        SellerDropStockResponse response = dropService.findSellerStocks(1L, 10L);
+
+        // then
+        assertThat(response.options()).hasSize(2);
+        assertThat(response.options()).extracting(SellerDropStockResponse.Option::optionId)
+                .containsExactly(active.getId(), inactive.getId());
+    }
+
+    @Test
+    @DisplayName("판매자 재고 현황: 옵션명은 그룹 sortOrder 순으로 값을 연결한다")
+    void findSellerStocks_buildsOptionNameByGroupOrder() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        DropOptionGroup material = DropOptionGroup.create(drop, "소재", 0);
+        DropOptionGroup length = DropOptionGroup.create(drop, "길이", 1);
+        DropOptionValue cotton = DropOptionValue.create(material, "코튼", 0);
+        DropOptionValue longValue = DropOptionValue.create(length, "롱", 0);
+        DropOption option = DropOption.create(drop, 10000L, 10, 0);
+        // 매핑 삽입 순서를 그룹 표시 순서와 반대로 둔다.
+        option.addValueMap(DropOptionValueMap.create(option, longValue));
+        option.addValueMap(DropOptionValueMap.create(option, cotton));
+        drop.addOption(option);
+        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+
+        // when
+        SellerDropStockResponse response = dropService.findSellerStocks(1L, 10L);
+
+        // then
+        assertThat(response.options().get(0).optionName()).isEqualTo("코튼 / 롱");
+    }
+
+    @Test
+    @DisplayName("판매자 재고 현황: 값 매핑 없는 기본 SKU의 이름은 '기본'이다")
+    void findSellerStocks_defaultOptionName() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        drop.addOption(DropOption.create(drop, 10000L, 10, 0));
+        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+
+        // when
+        SellerDropStockResponse response = dropService.findSellerStocks(1L, 10L);
+
+        // then
+        assertThat(response.options().get(0).optionName()).isEqualTo("기본");
+    }
+
+    @Test
+    @DisplayName("판매자 재고 현황: SKU가 없으면 빈 배열을 반환한다")
+    void findSellerStocks_emptyOptions() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+
+        // when
+        SellerDropStockResponse response = dropService.findSellerStocks(1L, 10L);
+
+        // then
+        assertThat(response.options()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("판매자 재고 현황: 없는 DROP은 DROP_NOT_FOUND")
+    void findSellerStocks_notFound() {
+        // given
+        given(dropRepository.findById(99L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> dropService.findSellerStocks(1L, 99L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(DropErrorCode.DROP_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("판매자 재고 현황: 다른 판매자의 DROP은 DROP_ACCESS_DENIED")
+    void findSellerStocks_accessDenied() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+
+        // when & then
+        assertThatThrownBy(() -> dropService.findSellerStocks(2L, 10L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(DropErrorCode.DROP_ACCESS_DENIED);
+    }
+
+    @Test
+    @DisplayName("공개 재고: 가용 0이면 soldOut true, 양수이면 false")
+    void findPublicStocks_soldOut() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        ReflectionTestUtils.setField(drop, "id", 10L);
+        ReflectionTestUtils.setField(drop, "status", DropStatus.GRAB);
+        DropOption soldOut = DropOption.create(drop, 10000L, 5, 0);
+        ReflectionTestUtils.setField(soldOut, "soldQuantity", 5);
+        DropOption available = DropOption.create(drop, 20000L, 5, 1);
+        drop.addOption(soldOut);
+        drop.addOption(available);
+        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+
+        // when
+        PublicDropStockResponse response = dropService.findPublicStocks(10L);
+
+        // then
+        assertThat(response.dropId()).isEqualTo(10L);
+        assertThat(response.serverTime()).isNotNull();
+        assertThat(response.options()).extracting(PublicDropStockResponse.Option::soldOut)
+                .containsExactly(true, false);
+    }
+
+    @Test
+    @DisplayName("공개 재고: 활성 SKU만 반환한다")
+    void findPublicStocks_onlyActiveOptions() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        ReflectionTestUtils.setField(drop, "status", DropStatus.GRAB);
+        DropOption active = DropOption.create(drop, 10000L, 5, 0);
+        DropOption inactive = DropOption.create(drop, 20000L, 5, 1);
+        inactive.updateActive(false);
+        drop.addOption(active);
+        drop.addOption(inactive);
+        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+
+        // when
+        PublicDropStockResponse response = dropService.findPublicStocks(10L);
+
+        // then
+        assertThat(response.options()).hasSize(1);
+        assertThat(response.options().get(0).optionId()).isEqualTo(active.getId());
+    }
+
+    @Test
+    @DisplayName("공개 재고: CANCELED여도 가용 재고를 0으로 바꾸지 않는다")
+    void findPublicStocks_allowsCanceledWithoutZeroing() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        ReflectionTestUtils.setField(drop, "status", DropStatus.CANCELED);
+        drop.addOption(DropOption.create(drop, 10000L, 5, 0));
+        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+
+        // when
+        PublicDropStockResponse response = dropService.findPublicStocks(10L);
+
+        // then
+        assertThat(response.options().get(0).availableStock()).isEqualTo(5);
+        assertThat(response.options().get(0).soldOut()).isFalse();
+    }
+
+    @Test
+    @DisplayName("공개 재고: DRAFT는 DROP_NOT_FOUND로 숨긴다")
+    void findPublicStocks_hidesDraft() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+
+        // when & then
+        assertThatThrownBy(() -> dropService.findPublicStocks(10L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(DropErrorCode.DROP_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("공개 재고: 없는 DROP은 DROP_NOT_FOUND")
+    void findPublicStocks_notFound() {
+        // given
+        given(dropRepository.findById(99L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> dropService.findPublicStocks(99L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(DropErrorCode.DROP_NOT_FOUND);
     }
 
     private DropDraftRequest requestWithOptions() {
