@@ -8,6 +8,8 @@ import org.example.grab.domain.drop.dto.request.DropDraftRequest;
 import org.example.grab.domain.drop.dto.request.ShippingRequest;
 import org.example.grab.domain.drop.dto.response.PublicDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.PublicDropListResponse;
+import org.example.grab.domain.drop.dto.response.PublicDropStockResponse;
+import org.example.grab.domain.drop.dto.response.SellerDropStockResponse;
 import org.example.grab.domain.drop.dto.response.common.DropCategoryResponse;
 import org.example.grab.domain.drop.dto.response.SellerDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.SellerDropListResponse;
@@ -144,6 +146,27 @@ public class DropService {
         }
         long wishCount = wishQueryService.countActiveByDropId(dropId);
         return PublicDropDetailResponse.of(drop, toCategory(drop.getCategoryId()), wishCount, now);
+    }
+
+    /**
+     * 판매자 재고 현황(2.7). 조회 → 소유권 검증 후 PostgreSQL에 커밋된 수량을 응답한다.
+     * 상태 제한이 없어 소유자면 DRAFT도 조회할 수 있고, 비활성 SKU도 포함한다(정책 합의).
+     */
+    public SellerDropStockResponse findSellerStocks(Long sellerId, Long dropId) {
+        return SellerDropStockResponse.from(findOwnedDrop(sellerId, dropId));
+    }
+
+    /**
+     * 공개 재고 재조회(1.2). 공개 상세와 같은 isPublic() 기준을 적용해 DRAFT는 DROP_NOT_FOUND로 숨긴다.
+     * CANCELED여도 가용 재고를 0으로 바꾸지 않는다. now는 응답 serverTime에 쓴다.
+     */
+    public PublicDropStockResponse findPublicStocks(Long dropId) {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        Drop drop = findDrop(dropId);
+        if (!drop.isPublic()) {
+            throw new BusinessException(DropErrorCode.DROP_NOT_FOUND);
+        }
+        return PublicDropStockResponse.of(drop, now);
     }
 
     // category_id는 NOT NULL·FK라 정상 데이터에서는 항상 존재한다. 정합성이 깨진 경우 DROP_NOT_FOUND로 숨긴다.
