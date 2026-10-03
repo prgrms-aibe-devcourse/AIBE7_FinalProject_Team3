@@ -45,6 +45,8 @@ public class SecurityConfig {
                         // 판매자 API는 URL에서 SELLER를 먼저 거르고, 승인 상태는 CurrentSellerIdProvider가 DB로 다시 확인한다.
                         // 세그먼트 단위 매칭이라 /api/v1/seller-applications(USER의 판매자 신청)에는 걸리지 않는다.
                         .requestMatchers("/api/v1/seller/**").hasRole("SELLER")
+                        // 내 WISH 목록은 정확한 경로의 GET에 USER 권한을 요구한다. 비로그인 401, USER 없는 계정 403.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/users/me/wishes").hasRole("USER")
                         .anyRequest().authenticated()
                 )
                 // 인증되지 않은 사용자가 보호된 api에 접근하면 authenticationEntryPoint가,
