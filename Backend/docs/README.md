@@ -9,6 +9,7 @@
 | [API 명세](development/api-spec/README.md) | 전체 API 목록, 공통 규칙, 도메인별 상세 명세 |
 | [TECHSTACK.md](development/TECHSTACK.md) | 기술 선정, 인프라, CI/CD, 테스트 전략 |
 | [MONITORING.md](MONITORING.md) | 로컬 메트릭 모니터링 실행·확인 방법 |
+| [MAIL.md](MAIL.md) | 메일 발송 환경변수와 로컬 Mailpit·운영 Gmail SMTP 설정 방법 |
 | [CODING_CONVENTION.md](collaboration/CODING_CONVENTION.md) | 코드 작성 규칙 |
 
 ## 협업 (`collaboration/`)
