@@ -13,6 +13,8 @@ services:
       TOSS_SECRET_KEY: ${TOSS_SECRET_KEY:-}
       # 기본값을 두지 않는다. .env에 없으면 빈 값이 전달되어 backend가 기동에 실패한다
       JWT_SECRET: ${JWT_SECRET}
+      # JWT_SECRET과 같이 기본값을 두지 않는다. .env에 없으면 이메일 인증 HMAC 키를 쓰는 시점에 기동에 실패한다
+      EMAIL_VERIFICATION_SECRET: ${EMAIL_VERIFICATION_SECRET}
       REDIS_HOST: redis
       REDIS_PASSWORD: ${REDIS_PASSWORD:-grab}
       # 기본값은 Mailpit이다. 컨테이너 안의 localhost는 mailpit이 아니므로 서비스 이름으로 접속한다(docs/MAIL.md)

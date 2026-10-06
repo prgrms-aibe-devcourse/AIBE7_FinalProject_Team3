@@ -59,6 +59,10 @@ grab:
       # 비활동 14일 + 절대 30일(GR-33 M00-01). idle-ttl이 absolute-ttl보다 길면 기동하지 않는다
       idle-ttl: 14d
       absolute-ttl: 30d
+    email-verification:
+      # 인증 코드 해시와 Redis 키의 이메일 해시에 함께 쓰는 HMAC 키(GR-61 M00-01). 형식은 JWT_SECRET과 같다
+      # 기본값이 없으므로 EMAIL_VERIFICATION_SECRET이 없으면 기동하지 않는다
+      hmac-secret: ${EMAIL_VERIFICATION_SECRET}
 
 management:
   endpoints:
