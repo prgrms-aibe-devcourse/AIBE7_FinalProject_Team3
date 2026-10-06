@@ -160,7 +160,7 @@ Set-Cookie: email_signup_token=; HttpOnly; Secure; SameSite=Lax; Path=/api/v1/au
 
 **가입 컨텍스트:**
 - 요청 본문을 검증하기 전에 가입 컨텍스트를 먼저 확인한다.
-- 쿠키가 없거나 알 수 없는·이미 사용한 토큰이면 `EMAIL_SIGNUP_CONTEXT_INVALID`, 유효시간이 지났으면 `EMAIL_SIGNUP_CONTEXT_EXPIRED`로 거부한다.
+- 쿠키가 없거나 알 수 없는·만료된·이미 사용한 토큰이면 `EMAIL_SIGNUP_CONTEXT_INVALID`로 거부한다. 만료된 컨텍스트는 Redis에서 삭제되어 없는 컨텍스트와 구분할 수 없고 쿠키도 같은 시각에 만료되므로, 만료를 별도 코드로 구분하지 않는다.
 - 가입 컨텍스트는 회원가입에 성공하면 한 번만 소비한다.
 - 요청 값 오류(`VALIDATION_FAILED`, `INVALID_PASSWORD`, `INVALID_NICKNAME`)와 `DUPLICATE_NICKNAME`은 가입 컨텍스트를 소비하지 않는다. 사용자는 컨텍스트가 만료되기 전까지 값을 바꿔 다시 요청할 수 있다.
 - 코드 확인 이후 같은 이메일로 다른 회원이 생성됐으면 가입 컨텍스트를 소비하고 `DUPLICATE_EMAIL`로 거부한다.
@@ -218,7 +218,6 @@ Set-Cookie: email_signup_token=; HttpOnly; Secure; SameSite=Lax; Path=/api/v1/au
 
 **오류 코드:**
 - `EMAIL_SIGNUP_CONTEXT_INVALID`
-- `EMAIL_SIGNUP_CONTEXT_EXPIRED`
 - `INVALID_REQUEST`
 - `VALIDATION_FAILED`
 - `DUPLICATE_EMAIL`
