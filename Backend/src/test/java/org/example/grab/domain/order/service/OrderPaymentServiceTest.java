@@ -3,6 +3,8 @@ package org.example.grab.domain.order.service;
 import jakarta.persistence.EntityManager;
 import org.example.grab.domain.order.dto.PayableOrder;
 import org.example.grab.domain.order.dto.PaymentCompletionResult;
+import org.example.grab.domain.order.dto.PaymentExpiryCandidate;
+import org.example.grab.domain.order.dto.PaymentExpiryResult;
 import org.example.grab.domain.order.entity.Order;
 import org.example.grab.domain.order.entity.OrderItem;
 import org.example.grab.domain.order.entity.OrderStatus;
@@ -252,6 +254,99 @@ class OrderPaymentServiceTest {
         assertThat(afterPaid).isFalse();
         assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.PAID);
         assertThat(quantities(firstOptionId)).containsEntry("reserved_quantity", 0).containsEntry("sold_quantity", 2);
+    }
+
+    @Test
+    @DisplayName("만료 배치는 마감이 지난 결제 대기 주문을 만료하고, 다시 실행하면 아무것도 바꾸지 않는다")
+    void expireIfDueSkippingLocked() {
+        // when
+        PaymentExpiryResult beforeDeadline = orderPaymentService.expireIfDueSkippingLocked(
+                order.getId(), expiresAt.minusSeconds(1));
+        PaymentExpiryResult first = orderPaymentService.expireIfDueSkippingLocked(order.getId(), expiresAt);
+        PaymentExpiryResult second = orderPaymentService.expireIfDueSkippingLocked(order.getId(), expiresAt.plusSeconds(10));
+        entityManager.flush();
+        entityManager.clear();
+
+        // then: 재고는 처음 만료할 때 한 번만 반환된다
+        assertThat(beforeDeadline).isEqualTo(PaymentExpiryResult.NOT_DUE);
+        assertThat(first).isEqualTo(PaymentExpiryResult.EXPIRED);
+        assertThat(second).isEqualTo(PaymentExpiryResult.NOT_DUE);
+        Order expiredOrder = orderRepository.findById(order.getId()).orElseThrow();
+        assertThat(expiredOrder.getStatus()).isEqualTo(OrderStatus.EXPIRED);
+        assertThat(expiredOrder.getExpiredAt()).isEqualTo(expiresAt);
+        assertThat(reservations()).allSatisfy(reservation -> {
+            assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.RELEASED);
+            assertThat(reservation.getReleaseReason()).isEqualTo(ReleaseReason.EXPIRED);
+        });
+        assertThat(quantities(firstOptionId)).containsEntry("reserved_quantity", 0);
+        assertThat(quantities(secondOptionId)).containsEntry("reserved_quantity", 0);
+    }
+
+    @Test
+    @DisplayName("만료 후보는 마감이 지난 결제 대기 주문만 (마감, ID) 순서로 이어서 조회한다")
+    void findPaymentExpiryCandidates() {
+        // given: 다른 테스트 데이터와 섞이지 않도록 과거 시각에 마감되는 주문을 만든다
+        OffsetDateTime base = OffsetDateTime.of(2000, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
+        Long first = insertOrderExpiringAt(base.plusMinutes(1));
+        Long second = insertOrderExpiringAt(base.plusMinutes(2));
+        Long sameDeadline = insertOrderExpiringAt(base.plusMinutes(2));
+        Long paid = insertOrderExpiringAt(base.plusMinutes(1));
+        jdbcTemplate.update("UPDATE orders SET status = 'PAID', paid_at = payment_expires_at WHERE id = ?", paid);
+        insertOrderExpiringAt(base.plusMinutes(10));
+        OffsetDateTime now = base.plusMinutes(5);
+
+        // when
+        List<PaymentExpiryCandidate> page1 = orderPaymentService.findPaymentExpiryCandidates(now, null, 2);
+        List<PaymentExpiryCandidate> page2 = orderPaymentService.findPaymentExpiryCandidates(now, page1.get(1), 2);
+        List<PaymentExpiryCandidate> page3 = orderPaymentService.findPaymentExpiryCandidates(now, page2.get(0), 2);
+
+        // then: 결제된 주문과 마감 전 주문은 빠지고, 마감이 같으면 ID 순서로 이어진다
+        assertThat(page1).extracting(PaymentExpiryCandidate::getId).containsExactly(first, second);
+        assertThat(page1.get(0).getPaymentExpiresAt()).isEqualTo(base.plusMinutes(1).toInstant());
+        assertThat(page2).extracting(PaymentExpiryCandidate::getId).containsExactly(sameDeadline);
+        assertThat(page3).isEmpty();
+    }
+
+    @Test
+    @DisplayName("만료 후보 조회는 정렬 없이 idx_orders_payment_expiry 인덱스 조건으로 키셋을 읽는다")
+    void paymentExpiryCandidateQueriesUseIndex() {
+        // given: 테스트 DB에는 행이 적어 순차 스캔을 고르므로 끈다(트랜잭션이 끝나면 되돌아간다)
+        jdbcTemplate.execute("SET LOCAL enable_seqscan = off");
+
+        // when: OrderRepository의 두 후보 조회와 같은 문장
+        String firstPage = explain("""
+                SELECT o.id, o.payment_expires_at FROM orders o
+                WHERE o.status = 'PAYMENT_PENDING' AND o.payment_expires_at <= now()
+                ORDER BY o.payment_expires_at, o.id LIMIT 500
+                """);
+        String nextPage = explain("""
+                SELECT o.id, o.payment_expires_at FROM orders o
+                WHERE o.status = 'PAYMENT_PENDING' AND o.payment_expires_at <= now()
+                  AND (o.payment_expires_at, o.id) > (now() - interval '1 minute', 1::bigint)
+                ORDER BY o.payment_expires_at, o.id LIMIT 500
+                """);
+
+        // then
+        assertThat(firstPage).contains("idx_orders_payment_expiry").doesNotContain("Sort");
+        assertThat(nextPage).contains("idx_orders_payment_expiry").doesNotContain("Sort").doesNotContain("Filter");
+        assertThat(nextPage).containsPattern("Index Cond: .*ROW\\(payment_expires_at, id\\) >");
+    }
+
+    private String explain(String sql) {
+        return String.join("\n", jdbcTemplate.queryForList("EXPLAIN " + sql, String.class));
+    }
+
+    // 결제 마감을 과거 시각으로 옮긴 결제 대기 주문. 생성 시각도 함께 옮겨 마감 > 생성 제약을 지킨다.
+    private Long insertOrderExpiringAt(OffsetDateTime paymentExpiresAt) {
+        String uniqueValue = UUID.randomUUID().toString();
+        Order saved = orderRepository.saveAndFlush(Order.create(
+                "ORD-EXP-" + uniqueValue, buyerId, dropId, "order-key-" + uniqueValue, "a".repeat(64),
+                "한정판 후드", "GRAB 판매자", 45000, 3000,
+                ShippingAddress.of("홍길동", "010-1234-5678", "06236", "서울시 강남구", "101호", null),
+                expiresAt));
+        jdbcTemplate.update("UPDATE orders SET created_at = ?, payment_expires_at = ? WHERE id = ?",
+                paymentExpiresAt.minusMinutes(10), paymentExpiresAt, saved.getId());
+        return saved.getId();
     }
 
     private Long insertOption(int reservedQuantity) {
