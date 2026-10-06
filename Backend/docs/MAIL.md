@@ -128,3 +128,68 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8025/api/v1/send `
 - `EmailSendException`의 메시지는 고정 문구다. 원인 예외(cause)의 SMTP 서버 응답에는 받는 주소가 들어갈 수 있으므로, 발송 실패 로그에는 스택 트레이스와 예외 메시지 대신 원인 예외 이름만 남긴다(예: `cause=MailSendException > SocketTimeoutException`).
 - 비동기 발송은 `AsyncEmailDispatcher.dispatch()`로 한다. 큐 거부와 발송 실패는 `WARN` 로그만 남기고 호출하는 쪽에 예외를 던지지 않는다. 사용자는 재발송 간격 뒤 다시 요청한다.
 - JavaMail 디버그 출력(`spring.mail.properties.mail.debug=true`)은 켜지 않는다. SMTP 대화 전체가 출력되어 Base64로 인코딩된 로그인 정보와 메일 본문이 그대로 남는다.
+
+## 6. 발송 코드 사용 방법
+
+인증 코드 메일처럼 서비스 코드에서 메일을 보낼 때의 규칙이다(GR-61 인계). 메일 발송 코드는 `domain/mail`에 있다.
+
+| 타입 | 위치 | 용도 |
+| --- | --- | --- |
+| `AsyncEmailDispatcher` | `domain/mail/service` | 서비스 코드의 기본 발송 진입점. 메일 전용 스레드 풀에 넘기고 바로 반환한다 |
+| `EmailSender` | `domain/mail/service` | 메일 한 통을 동기로 보낸다. 실패하면 `EmailSendException`을 던진다 |
+| `EmailMessage` | `domain/mail/dto` | 받는 사람, 제목, HTML 본문, 텍스트 본문. 네 값 모두 필수다 |
+| `EmailSendException` | `domain/mail/error` | 발송 실패. `BusinessException`이 아니므로 HTTP 오류 응답으로 바꾸지 않는다 |
+
+호출하는 쪽은 위 타입만 사용하고 `JavaMailSender`, `MimeMessage` 등 Spring Mail·Jakarta Mail 타입을 직접 쓰지 않는다. 발신 주소는 구현체가 `grab.mail.from` 설정으로 채운다.
+
+### 6.1 기본 사용
+
+요청을 처리하는 서비스 코드는 `AsyncEmailDispatcher.dispatch()`로 보낸다. 요청 스레드가 SMTP 발송을 기다리지 않는다.
+
+~~~java
+asyncEmailDispatcher.dispatch(new EmailMessage(email, subject, htmlBody, textBody));
+~~~
+
+- `EmailSender.send()`를 요청 처리 중에 직접 호출하지 않는다. SMTP가 느리면 요청 스레드가 타임아웃(최대 5초씩)만큼 붙잡힌다.
+- `EmailSender`는 발송 결과를 바로 알아야 하는 경우(관리 기능, 테스트 등)에만 쓴다.
+- 메일 전용 스레드 풀(`MailAsyncConfig.MAIL_TASK_EXECUTOR`)은 메일 발송에만 쓴다. 다른 비동기 작업은 기본 executor를 쓴다.
+
+### 6.2 발송 시점
+
+- 트랜잭션 안에서 코드를 저장하는 경우 커밋된 뒤 `dispatch()`를 호출한다. 트랜잭션 안에서 보내면 롤백됐을 때 서버에 없는 코드가 메일로 나간다. Spring에서는 이벤트를 발행하고 `@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)`에서 `dispatch()`를 호출한다.
+- 인증 코드를 Redis에만 저장하고 DB 트랜잭션이 없으면, Redis 저장이 성공한 뒤 `dispatch()`를 호출한다.
+- `dispatch()`는 작업을 넘기고 바로 반환하므로 응답이 발송을 기다리지 않는다. 다만 메일 스레드가 HTTP 응답 전송이 끝나기 전에 발송을 시작할 수는 있다. [MEMBER_AUTH.md](development/api-spec/MEMBER_AUTH.md) 1.2.1의 "응답 후 비동기로 발송"을 이 수준으로 구현할지, 문구를 고칠지는 GR-61에서 정한다.
+
+### 6.3 실패 처리
+
+| 상황 | `dispatch()` | `EmailSender.send()` |
+| --- | --- | --- |
+| 정상 발송 | 반환 후 메일 스레드에서 발송 | 발송 후 반환 |
+| 메일 풀 대기열 초과(실행 4·대기 40 초과) | 발송하지 않고 `WARN` 로그 | 해당 없음 |
+| SMTP 연결·인증·응답 실패, 타임아웃(각 5초) | 예외를 던지지 않고 `WARN` 로그 | `EmailSendException` |
+| 그 밖의 예상하지 못한 오류 | 예외를 던지지 않고 `ERROR` 로그 | 예외 그대로 |
+
+- `dispatch()`는 발송 실패를 호출하는 쪽에 알리지 않는다. 따라서 발송 실패가 코드 요청의 응답을 바꾸지 않는다. 호출하는 쪽에서 `dispatch()`를 try-catch로 감쌀 필요가 없다.
+- 실패 로그는 메일 제목과 원인 예외 이름만 남긴다(예: `메일 발송 실패: EmailMessage[subject=...], cause=MailSendException > MailConnectException > ConnectException`). 받는 주소·본문·인증 코드는 남지 않는다.
+- 발송이 실패해도 재시도하지 않는다. 사용자는 재발송 간격이 지난 뒤 다시 요청한다([MEMBER_AUTH.md](development/api-spec/MEMBER_AUTH.md) 1.2.1).
+- 재발송 간격과 이메일당·IP당 발송 한도는 호출하는 쪽(코드 요청 API)에서 구현한다. 발송 구현체와 메일 스레드 풀에는 요청 제한이 없다.
+- 발송 성공·실패 횟수 같은 메트릭이 필요하면 호출하는 쪽에서 추가한다.
+
+### 6.4 메일 내용 작성
+
+- 제목에 인증 코드를 넣지 않는다. `EmailMessage.toString()`과 실패 로그에 제목이 남는다.
+- HTML 본문과 텍스트 본문을 모두 채운다. HTML을 표시하지 못하는 메일 프로그램은 텍스트 본문을 보여 준다.
+- 본문 작성(템플릿)은 호출하는 쪽에서 한다. 발송 구현체는 완성된 메일 한 통을 보내기만 한다.
+- 받는 주소는 정규화한 이메일(앞뒤 공백 제거, 소문자)을 쓴다.
+
+### 6.5 설정과 기동
+
+- `grab.mail.provider`가 `smtp`가 아니거나 없으면 `EmailSender` 빈이 없어 `AsyncEmailDispatcher`를 만들 수 없고 기동이 실패한다. 메일 발송이 조용히 꺼지지 않게 하기 위함이다.
+- SMTP 서버에 연결할 수 없어도 애플리케이션은 기동되고 `/actuator/health`는 메일 상태를 반영하지 않는다.
+
+### 6.6 테스트
+
+- 메일 발송과 관계없는 `@SpringBootTest`는 SMTP 서버 없이 실행된다. 발송을 호출하는 코드의 테스트에서 실제 발송이 필요 없으면 `@MockitoBean`으로 `AsyncEmailDispatcher`를 대체하고 `dispatch()` 호출 여부와 `EmailMessage` 내용을 확인한다.
+- 실제 SMTP 수신까지 확인하려면 GreenMail을 쓴다(`com.icegreen:greenmail-junit5`, 테스트 의존성으로 추가됨). `GreenMailExtension(ServerSetupTest.SMTP.dynamicPort())`로 빈 포트에 서버를 띄우고 `spring.mail.host`·`spring.mail.port`를 그 주소로 지정한다. 예시는 `SmtpEmailSenderGreenMailTest`, `AsyncEmailDispatcherGreenMailTest`에 있다.
+- 비동기 발송은 `dispatch()` 직후에 바로 확인하지 않는다. `greenMail.waitForIncomingEmail(...)`처럼 도착을 기다린 뒤 확인한다.
+- 실제 Gmail 계정은 자동 테스트에 쓰지 않는다.
