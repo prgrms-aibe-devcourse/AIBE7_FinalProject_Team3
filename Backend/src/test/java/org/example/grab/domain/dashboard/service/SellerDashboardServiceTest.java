@@ -1,14 +1,20 @@
 package org.example.grab.domain.dashboard.service;
 
+import org.example.grab.domain.dashboard.dto.DropStatsProjection;
+import org.example.grab.domain.dashboard.dto.DropStatsResponse;
 import org.example.grab.domain.dashboard.dto.SellerDashboardSummaryResponse;
 import org.example.grab.domain.dashboard.dto.SellerDashboardSummaryResponse.StockSummary;
 import org.example.grab.domain.dashboard.dto.UpcomingDropEventType;
 import org.example.grab.domain.dashboard.dto.UpcomingDropProjection;
 import org.example.grab.domain.dashboard.dto.UpcomingDropResponse;
 import org.example.grab.domain.dashboard.repository.SellerDashboardRepository;
+import org.example.grab.domain.drop.entity.DropStatus;
+import org.example.grab.global.common.PageResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -31,6 +37,43 @@ class SellerDashboardServiceTest {
     void setUp() {
         sellerDashboardRepository = mock(SellerDashboardRepository.class);
         sellerDashboardService = new SellerDashboardService(sellerDashboardRepository);
+    }
+
+    @Test
+    @DisplayName("상태를 고르면 이름만 Repository에 넘기고 페이지 응답으로 변환한다")
+    void findDropStats_passesStatusNameAndMapsPage() {
+        // given
+        DropStatsProjection projection = new DropStatsProjection(
+                10L, "종료 상품", "ENDED", OffsetDateTime.parse("2026-10-01T01:00:00Z"),
+                152L, 4L, 2L, 14L, 10L, 1806000L);
+        given(sellerDashboardRepository.findDropStats(3L, "ENDED", PageRequest.of(0, 20)))
+                .willReturn(new PageImpl<>(List.of(projection), PageRequest.of(0, 20), 1));
+
+        // when
+        PageResponse<DropStatsResponse> result = sellerDashboardService.findDropStats(
+                3L, DropStatus.ENDED, 0, 20);
+
+        // then
+        assertThat(result.totalElements()).isEqualTo(1);
+        assertThat(result.hasNext()).isFalse();
+        assertThat(result.content()).containsExactly(new DropStatsResponse(
+                10L, "종료 상품", "ENDED", OffsetDateTime.parse("2026-10-01T01:00:00Z"),
+                152L, 4L, 2L, 14L, 10L, 1806000L));
+    }
+
+    @Test
+    @DisplayName("상태를 생략하면 Repository에 상태 없이 조회한다")
+    void findDropStats_withoutStatus() {
+        // given
+        given(sellerDashboardRepository.findDropStats(3L, null, PageRequest.of(1, 5)))
+                .willReturn(new PageImpl<>(List.of(), PageRequest.of(1, 5), 0));
+
+        // when
+        PageResponse<DropStatsResponse> result = sellerDashboardService.findDropStats(3L, null, 1, 5);
+
+        // then
+        assertThat(result.content()).isEmpty();
+        verify(sellerDashboardRepository).findDropStats(3L, null, PageRequest.of(1, 5));
     }
 
     @Test
