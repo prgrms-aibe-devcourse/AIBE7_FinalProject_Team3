@@ -9,6 +9,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -61,11 +62,38 @@ class DropDraftRequestTest {
     }
 
     @Test
-    @DisplayName("이미지 URL이 500자를 넘으면 검증에 실패한다")
-    void rejectsLongImageUrl() {
-        // given
+    @DisplayName("이미지 URL이 500자를 넘거나 imageId가 없으면 검증에 실패한다")
+    void rejectsInvalidImageRequest() {
+        // imageUrl 501자
         String longUrl = "x".repeat(501);
-        DropDraftRequest request = new DropDraftRequest(null, null, List.of(longUrl), null, null, null, null, null, null);
+        DropDraftRequest longUrlRequest = new DropDraftRequest(null, null,
+                List.of(new DropImageRequest(UUID.randomUUID(), longUrl)), null, null, null, null, null, null);
+        assertThat(validator.validate(longUrlRequest)).isNotEmpty();
+
+        // imageId null
+        DropDraftRequest nullIdRequest = new DropDraftRequest(null, null,
+                List.of(new DropImageRequest(null, "https://example.com/a.jpg")), null, null, null, null, null, null);
+        assertThat(validator.validate(nullIdRequest)).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("images 배열의 null 원소는 검증에 실패한다")
+    void rejectsNullImageElement() {
+        // given
+        DropDraftRequest request = new DropDraftRequest(
+                null, null, singleNullElement(), null, null, null, null, null, null);
+
+        // when & then
+        assertThat(validator.validate(request)).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("상품 이미지는 10개를 초과하면 검증에 실패한다")
+    void rejectsMoreThanTenImages() {
+        // given
+        DropImageRequest image = new DropImageRequest(UUID.randomUUID(), "https://example.com/a.jpg");
+        DropDraftRequest request = new DropDraftRequest(
+                null, null, java.util.Collections.nCopies(11, image), null, null, null, null, null, null);
 
         // when & then
         assertThat(validator.validate(request)).isNotEmpty();
@@ -111,8 +139,8 @@ class DropDraftRequestTest {
         SelectionRequest selection = new SelectionRequest("material", "cotton");
         OptionRequest option = new OptionRequest(List.of(selection), 129000L, 10, true, 0);
         DropDraftRequest request = new DropDraftRequest(
-                "상품", "설명", List.of("https://example.com/a.jpg"), 1L, null, null,
-                new ShippingRequest(3000L, "안내"), List.of(group), List.of(option));
+                "상품", "설명", List.of(new DropImageRequest(UUID.randomUUID(), "https://example.com/a.jpg")),
+                1L, null, null, new ShippingRequest(3000L, "안내"), List.of(group), List.of(option));
 
         // when & then
         assertThat(validator.validate(request)).isEmpty();

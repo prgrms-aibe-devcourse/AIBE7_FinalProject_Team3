@@ -48,7 +48,7 @@ public final class DropPublishValidator {
             missing.add(required("saleEndsAt"));
         }
         if (drop.getImages().isEmpty()) {
-            missing.add(new ErrorResponse.FieldError("imageUrls", "이미지를 1개 이상 등록해야 합니다."));
+            missing.add(new ErrorResponse.FieldError("images", "이미지를 1개 이상 등록해야 합니다."));
         }
         if (drop.getOptions().isEmpty()) {
             missing.add(new ErrorResponse.FieldError("options", "구매 옵션을 1개 이상 등록해야 합니다."));

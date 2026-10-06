@@ -10,6 +10,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -72,7 +73,7 @@ class DropTest {
         // given
         for (DropStatus status : List.of(DropStatus.GRAB, DropStatus.ENDED)) {
             Drop drop = dropWith(status, OffsetDateTime.now(), OffsetDateTime.now().plusHours(1));
-            drop.addImage(DropImage.create(drop, "https://example.com/a.jpg", 0, "상품"));
+            drop.addImage(DropImage.create(drop, UUID.randomUUID(), "https://example.com/a.jpg", 0, "상품"));
             addOption(drop, 1000L, 5, true);
 
             // when & then: 핵심 판매 조건 변경과 자식 초기화가 모두 막힌다
@@ -148,8 +149,8 @@ class DropTest {
     void clearImages() {
         // given
         Drop drop = Drop.createDraft(SELLER_ID);
-        drop.addImage(DropImage.create(drop, "a.jpg", 0, "a"));
-        drop.addImage(DropImage.create(drop, "b.jpg", 1, "b"));
+        drop.addImage(DropImage.create(drop, UUID.randomUUID(), "a.jpg", 0, "a"));
+        drop.addImage(DropImage.create(drop, UUID.randomUUID(), "b.jpg", 1, "b"));
 
         // when
         drop.clearImages();

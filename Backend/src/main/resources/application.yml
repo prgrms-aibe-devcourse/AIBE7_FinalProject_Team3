@@ -39,6 +39,15 @@ grab:
   # 토스페이먼츠 테스트 환경(TECHSTACK.md 4.4). 시크릿 키는 환경변수로만 주입한다.
   toss:
     secret-key: ${TOSS_SECRET_KEY:}
+  # Supabase Storage(GR-51). Secret Key는 RLS를 우회하므로 서버에서만 쓰고 저장소·이미지·로그·응답에 남기지 않는다.
+  # 기본값을 빈 값으로 두어 키가 없어도 기동·테스트는 되고, 발급 호출 시점에만 실패한다.
+  storage:
+    supabase:
+      url: ${SUPABASE_URL:}
+      secret-key: ${SUPABASE_SECRET_KEY:}
+      bucket: ${SUPABASE_DROP_IMAGE_BUCKET:drop-images}
+      connect-timeout: 3s
+      read-timeout: 5s
   auth:
     access-token:
       ttl: 15m

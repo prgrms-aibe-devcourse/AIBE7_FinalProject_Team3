@@ -2,6 +2,7 @@ package org.example.grab.domain.drop.controller;
 
 import org.example.grab.domain.drop.dto.response.PublicDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.PublicDropListResponse;
+import org.example.grab.domain.drop.dto.response.PublicDropStockResponse;
 import org.example.grab.domain.drop.dto.response.common.DropCategoryResponse;
 import org.example.grab.domain.drop.dto.response.common.DropOptionGroupResponse;
 import org.example.grab.domain.drop.dto.response.common.DropOptionSelectionResponse;
@@ -185,6 +186,46 @@ class DropControllerTest {
                 .andExpect(jsonPath("$.data.actions.wishCancelable").value(false))
                 .andExpect(jsonPath("$.data.actions.orderable").value(true))
                 .andExpect(jsonPath("$.data.serverTime").exists());
+    }
+
+    @Test
+    @DisplayName("공개 재고 재조회는 200과 명세 1.2 필드만 반환한다")
+    void getStocks() throws Exception {
+        // given
+        PublicDropStockResponse response = new PublicDropStockResponse(
+                100L,
+                List.of(new PublicDropStockResponse.Option(1001L, 8, false),
+                        new PublicDropStockResponse.Option(1002L, 0, true)),
+                OffsetDateTime.parse("2026-10-03T05:00:00Z"));
+        given(dropService.findPublicStocks(100L)).willReturn(response);
+
+        // when & then
+        mockMvc.perform(get("/api/v1/drops/100/stocks"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.dropId").value(100))
+                .andExpect(jsonPath("$.data.options[0].optionId").value(1001))
+                .andExpect(jsonPath("$.data.options[0].availableStock").value(8))
+                .andExpect(jsonPath("$.data.options[0].soldOut").value(false))
+                .andExpect(jsonPath("$.data.options[1].optionId").value(1002))
+                .andExpect(jsonPath("$.data.options[1].soldOut").value(true))
+                .andExpect(jsonPath("$.data.serverTime").exists())
+                // 판매자용 내부 수량 필드는 공개 응답에 없다
+                .andExpect(jsonPath("$.data.options[0].totalStock").doesNotExist())
+                .andExpect(jsonPath("$.data.options[0].reservedStock").doesNotExist())
+                .andExpect(jsonPath("$.data.options[0].soldStock").doesNotExist())
+                .andExpect(jsonPath("$.data.options[0].optionName").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("공개 재고 재조회: DRAFT면 404 DROP_NOT_FOUND")
+    void getStocks_hidesDraft() throws Exception {
+        given(dropService.findPublicStocks(99L))
+                .willThrow(new BusinessException(DropErrorCode.DROP_NOT_FOUND));
+
+        mockMvc.perform(get("/api/v1/drops/99/stocks"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("DROP_NOT_FOUND"));
     }
 
     @Test

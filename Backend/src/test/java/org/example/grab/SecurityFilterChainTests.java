@@ -212,6 +212,32 @@ class SecurityFilterChainTests {
                 .andExpect(jsonPath("$.error.code").value("AUTHENTICATION_REQUIRED"));
     }
 
+    // GR-51: 이미지 업로드 경로도 필터에서 SELLER를 먼저 거른다.
+    @Test
+    @DisplayName("쿠키 없이 /api/v1/uploads/images/presigned-url는 401 AUTHENTICATION_REQUIRED")
+    void rejectsUnauthenticatedUploadApi() throws Exception {
+        mockMvc.perform(post("/api/v1/uploads/images/presigned-url")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("AUTHENTICATION_REQUIRED"));
+    }
+
+    @Test
+    @DisplayName("USER 토큰으로 이미지 업로드 API에 접근하면 403 ACCESS_DENIED")
+    void rejectsUserTokenOnUploadApi() throws Exception {
+        // given
+        String token = jwtProvider.issue(UUID.randomUUID(), Set.of(AuthRole.USER)).value();
+
+        // when, then
+        mockMvc.perform(post("/api/v1/uploads/images/presigned-url")
+                        .cookie(new Cookie("access_token", token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("ACCESS_DENIED"));
+    }
+
     @Test
     @DisplayName("USER 토큰 + 검증에 실패하는 body로 취소 API를 호출하면 400이 아니라 403 ACCESS_DENIED")
     void rejectsUserTokenBeforeValidationOnSellerApi() throws Exception {
@@ -223,6 +249,42 @@ class SecurityFilterChainTests {
                         .cookie(new Cookie("access_token", token))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("ACCESS_DENIED"));
+    }
+
+    @Test
+    @DisplayName("공개 재고 재조회는 인증 쿠키 없이 보안을 통과한다")
+    void allowsPublicStocksWithoutAuthentication() throws Exception {
+        // 매핑된 공개 경로라 인증 없이 통과한다. 없는 DROP이면 404 DROP_NOT_FOUND(401·403이 아님)
+        mockMvc.perform(get("/api/v1/drops/1/stocks"))
+                .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotIn(401, 403));
+    }
+
+    @Test
+    @DisplayName("WISH 등 기존 보호 API는 여전히 인증을 요구한다")
+    void stillProtectsWishApi() throws Exception {
+        mockMvc.perform(get("/api/v1/drops/1/wish"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("AUTHENTICATION_REQUIRED"));
+    }
+
+    @Test
+    @DisplayName("쿠키 없이 판매자 재고 현황은 401 AUTHENTICATION_REQUIRED")
+    void rejectsUnauthenticatedSellerStocks() throws Exception {
+        mockMvc.perform(get("/api/v1/seller/drops/1/stocks"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("AUTHENTICATION_REQUIRED"));
+    }
+
+    @Test
+    @DisplayName("USER만 가진 토큰으로 판매자 재고 현황에 접근하면 403 ACCESS_DENIED")
+    void rejectsUserTokenOnSellerStocks() throws Exception {
+        // given
+        String token = jwtProvider.issue(UUID.randomUUID(), Set.of(AuthRole.USER)).value();
+
+        // when, then: ROLE_SELLER가 없어 URL 규칙에서 거부된다
+        mockMvc.perform(get("/api/v1/seller/drops/1/stocks").cookie(new Cookie("access_token", token)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code").value("ACCESS_DENIED"));
     }
