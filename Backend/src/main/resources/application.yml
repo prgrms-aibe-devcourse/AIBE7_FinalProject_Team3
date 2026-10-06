@@ -64,6 +64,11 @@ grab:
       # 기본값이 없으므로 EMAIL_VERIFICATION_SECRET이 없으면 기동하지 않는다
       hmac-secret: ${EMAIL_VERIFICATION_SECRET}
 
+server:
+  # 운영은 Nginx 뒤에서 실행한다. Tomcat이 내부 프록시(사설망 IP)에서 온 요청의 X-Forwarded-For만 믿고
+  # request.getRemoteAddr()를 실제 사용자 IP로 바꾼다. 외부에서 직접 보낸 X-Forwarded-For는 무시한다(GR-61 M00-04)
+  forward-headers-strategy: native
+
 management:
   endpoints:
     web:
