@@ -58,10 +58,11 @@ class OrderPaymentStateTest {
         Order order = createOrder();
 
         // when
-        order.expire();
+        order.expire(NOW);
 
         // then
         assertThat(order.getStatus()).isEqualTo(OrderStatus.EXPIRED);
+        assertThat(order.getExpiredAt()).isEqualTo(NOW);
         assertThat(order.getPaidAt()).isNull();
     }
 
@@ -72,10 +73,10 @@ class OrderPaymentStateTest {
         Order paid = createOrder();
         paid.markPaid(NOW);
         Order expired = createOrder();
-        expired.expire();
+        expired.expire(NOW);
 
         // when & then
-        assertThatThrownBy(() -> paid.expire())
+        assertThatThrownBy(() -> paid.expire(NOW))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(CommonErrorCode.INVALID_STATE_TRANSITION);

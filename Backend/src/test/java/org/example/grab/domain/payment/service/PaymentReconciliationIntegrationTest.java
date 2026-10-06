@@ -403,7 +403,8 @@ class PaymentReconciliationIntegrationTest {
         // when & then: 결제 대기인데 마감이 지남
         assertPayRejected(afterDeadline, PaymentErrorCode.PAYMENT_EXPIRED);
         // when & then: 만료 처리된 주문
-        jdbcTemplate.update("UPDATE orders SET status = 'EXPIRED' WHERE id = ?", order.getId());
+        jdbcTemplate.update("UPDATE orders SET status = 'EXPIRED', expired_at = CURRENT_TIMESTAMP WHERE id = ?",
+                order.getId());
         assertPayRejected(now, PaymentErrorCode.PAYMENT_EXPIRED);
         // when & then: 취소된 주문은 마감 전후와 관계없이 상태 전이 오류
         jdbcTemplate.update("UPDATE orders SET status = 'CANCELED', canceled_at = CURRENT_TIMESTAMP WHERE id = ?",
