@@ -1,10 +1,12 @@
 package org.example.grab;
 
 import org.example.grab.domain.category.service.CategoryService;
+import org.example.grab.support.TestcontainersConfiguration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import tools.jackson.databind.JsonNode;
@@ -25,6 +27,7 @@ import static org.mockito.BDDMockito.given;
     MockMvc는 error dispatch를 하지 않아 이 문제를 재현하지 못하므로 실제 서버에 HTTP로 요청한다.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@Import(TestcontainersConfiguration.class)
 class UnexpectedExceptionResponseTests {
 
     private final ObjectMapper objectMapper = JsonMapper.builder().build();
