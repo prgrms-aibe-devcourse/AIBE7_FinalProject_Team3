@@ -1,6 +1,7 @@
 package org.example.grab.domain.order.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.grab.domain.order.dto.CancelableOrder;
 import org.example.grab.domain.order.dto.PayableOrder;
 import org.example.grab.domain.order.dto.PaymentCompletionResult;
 import org.example.grab.domain.order.dto.PaymentExpiryCandidate;
@@ -17,6 +18,7 @@ import org.example.grab.domain.order.repository.OrderItemRepository;
 import org.example.grab.domain.order.repository.OrderRepository;
 import org.example.grab.domain.order.repository.StockReservationRepository;
 import org.example.grab.global.error.BusinessException;
+import org.example.grab.global.error.CommonErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,6 +54,38 @@ public class OrderPaymentService {
         Order order = orderRepository.findByUuidAndBuyerIdForUpdate(orderId, buyerId)
                 .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
         return PayableOrder.from(order);
+    }
+
+    /**
+     * 소비자 취소 요청을 검증하는 동안 주문 행을 잠근다(ERD.md 3.3). 같은 주문의 취소·결제 확정·만료·배송 처리는 기다린다.
+     * 다른 구매자의 주문은 존재 여부를 숨기고 ORDER_NOT_FOUND로 응답한다.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public CancelableOrder lockForCancel(long buyerId, UUID orderId) {
+        Order order = orderRepository.findByUuidAndBuyerIdForUpdate(orderId, buyerId)
+                .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+        return CancelableOrder.from(order);
+    }
+
+    /**
+     * 결제 전 주문을 취소하고 선점 재고를 가용 재고로 되돌린다(ERD.md 3.3). 진행 중인 결제 확인은 호출하는 결제 도메인이
+     * 같은 트랜잭션에서 먼저 한다.
+     *
+     * @param lockedOrder 같은 트랜잭션에서 lockForCancel로 잠근 주문. 다시 잠그지 않는다
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public CancelableOrder cancelUnpaid(
+            CancelableOrder lockedOrder, String idempotencyKey, String requestHash, String reason, OffsetDateTime now) {
+        Order order = orderRepository.findById(lockedOrder.id())
+                .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+        if (order.getStatus() != OrderStatus.PAYMENT_PENDING) {
+            throw new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION);
+        }
+
+        order.requestCancel(idempotencyKey, requestHash, reason);
+        order.cancel(now);
+        releaseHeld(order, ReleaseReason.ORDER_CANCELED, now);
+        return CancelableOrder.from(order);
     }
 
     /**
@@ -147,12 +181,17 @@ public class OrderPaymentService {
         }
 
         order.expire(now);
+        releaseHeld(order, ReleaseReason.EXPIRED, now);
+        return true;
+    }
+
+    // 결제 전 만료·취소: HELD 예약을 해제하고 선점 수량을 가용 재고로 되돌린다. 옵션 ID 순서로 갱신해 교착을 피한다.
+    private void releaseHeld(Order order, ReleaseReason reason, OffsetDateTime now) {
         for (StockReservation reservation : stockReservationRepository.findAllOfOrderSortedByOption(order.getId())) {
-            reservation.release(ReleaseReason.EXPIRED, ReleaseDestination.AVAILABLE, now);
+            reservation.release(reason, ReleaseDestination.AVAILABLE, now);
             requireOneRow(inventoryRepository.releaseReservedQuantity(
                     reservation.getOrderItem().getOptionId(), reservation.getOrderItem().getQuantity()));
         }
-        return true;
     }
 
     // 주문 생성은 주문 항목마다 HELD 예약을 하나씩 만든다. 수가 다르거나 이미 확정·해제된 예약이 있으면 원장이 어긋난 것이다.
