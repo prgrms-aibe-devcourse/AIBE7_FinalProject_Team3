@@ -76,8 +76,7 @@ public class OrderPaymentService {
     @Transactional(propagation = Propagation.MANDATORY)
     public CancelableOrder cancelUnpaid(
             CancelableOrder lockedOrder, String idempotencyKey, String requestHash, String reason, OffsetDateTime now) {
-        Order order = orderRepository.findById(lockedOrder.id())
-                .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+        Order order = findLocked(lockedOrder);
         if (order.getStatus() != OrderStatus.PAYMENT_PENDING) {
             throw new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION);
         }
@@ -85,6 +84,61 @@ public class OrderPaymentService {
         order.requestCancel(idempotencyKey, requestHash, reason);
         order.cancel(now);
         releaseHeld(order, ReleaseReason.ORDER_CANCELED, now);
+        return CancelableOrder.from(order);
+    }
+
+    /**
+     * 결제 후 취소 요청을 주문에 기록한다. 주문 상태는 PG 결제 취소 결과를 받은 뒤 바꾼다(ERD.md 3.3).
+     * 기록이 남아 있는 동안 다른 키의 취소 요청과 판매자 배송 처리를 막는다.
+     *
+     * @param lockedOrder 같은 트랜잭션에서 lockForCancel로 잠근 주문
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public CancelableOrder requestPaidCancel(
+            CancelableOrder lockedOrder, String idempotencyKey, String requestHash, String reason) {
+        Order order = findLocked(lockedOrder);
+        if (order.getStatus() != OrderStatus.PAID && order.getStatus() != OrderStatus.PREPARING) {
+            throw new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION);
+        }
+        order.requestCancel(idempotencyKey, requestHash, reason);
+        return CancelableOrder.from(order);
+    }
+
+    /**
+     * PG 결제 취소 결과를 반영하기 전에 주문 행을 잠근다. 취소 요청 검증과 같은 순서(주문 → 결제 → 취소 기록)로 잠근다.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public CancelableOrder lockForCancelResult(Long orderId) {
+        return CancelableOrder.from(lockOrder(orderId));
+    }
+
+    /**
+     * PG 결제 취소 성공을 주문에 반영한다. 주문 CANCELED, COMMITTED 예약을 ORDER_CANCELED·AVAILABLE로 해제하고
+     * 판매 수량을 가용 재고로 되돌린다. 결제 취소 기록과 같은 트랜잭션에서 반영한다(ERD.md 3.3).
+     *
+     * @param lockedOrder 같은 트랜잭션에서 lockForCancelResult로 잠근 주문
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public CancelableOrder cancelPaid(CancelableOrder lockedOrder, OffsetDateTime now) {
+        Order order = findLocked(lockedOrder);
+        order.cancel(now);
+        for (StockReservation reservation : stockReservationRepository.findAllOfOrderSortedByOption(order.getId())) {
+            reservation.releaseCommitted(ReleaseDestination.AVAILABLE, now);
+            requireOneRow(inventoryRepository.returnSoldQuantity(
+                    reservation.getOrderItem().getOptionId(), reservation.getOrderItem().getQuantity()));
+        }
+        return CancelableOrder.from(order);
+    }
+
+    /**
+     * PG가 결제 취소를 거절했다. 주문은 그대로 두고 취소 요청 기록을 비워 새 취소 요청을 받는다.
+     *
+     * @param lockedOrder 같은 트랜잭션에서 lockForCancelResult로 잠근 주문
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public CancelableOrder clearCancelRequest(CancelableOrder lockedOrder) {
+        Order order = findLocked(lockedOrder);
+        order.clearCancelRequest();
         return CancelableOrder.from(order);
     }
 
@@ -217,6 +271,12 @@ public class OrderPaymentService {
 
     private Order lockOrder(Long orderId) {
         return orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+    }
+
+    // 같은 트랜잭션에서 이미 잠근 주문이다. 다시 잠그지 않고 영속성 컨텍스트의 주문 엔티티를 그대로 쓴다.
+    private Order findLocked(CancelableOrder lockedOrder) {
+        return orderRepository.findById(lockedOrder.id())
                 .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
     }
 
