@@ -213,10 +213,17 @@ GET /api/v1/seller/dashboard/summary
 ### 2.2 DROP별 통계
 
 ```http
-GET /api/v1/seller/dashboard/drops?page=0&size=20
+GET /api/v1/seller/dashboard/drops?status=ENDED&page=0&size=20
 ```
 
 - **인증**: `SELLER`
+
+**쿼리 파라미터:**
+- `status`: `DRAFT`·`WISH`·`GRAB`·`ENDED`·`CANCELED` 중 하나, 생략 시 전체
+- `page`: 0부터 시작, 기본값 `0`
+- `size`: 1~100, 기본값 `20`
+
+본인 DROP만 최근 생성순(`id` 내림차순)으로 반환합니다.
 
 **응답:**
 
@@ -229,6 +236,7 @@ GET /api/v1/seller/dashboard/drops?page=0&size=20
         "dropId": 100,
         "name": "한정판 스니커즈",
         "status": "GRAB",
+        "saleEndsAt": "2026-09-18T17:00:00+09:00",
         "activeWishCount": 152,
         "availableStock": 4,
         "reservedStock": 2,
@@ -249,6 +257,11 @@ GET /api/v1/seller/dashboard/drops?page=0&size=20
 `availableStock`·`reservedStock`·`soldStock`은 DROP에 속한 옵션 수량의 합계이며, 2.1 `stockSummary`와 같은 기준을 씁니다.
 신규 주문을 받지 않는 옵션(`is_active = false`)도 포함하고, `availableStock`은 `total - reserved - sold - withheld`로 계산합니다.
 이 목록은 `CANCELED` DROP도 반환하지만 2.1 `stockSummary`는 제외하므로, 취소된 DROP이 있으면 목록의 재고 합계가 요약보다 큽니다.
+
+- `saleEndsAt`은 아직 공개하지 않은 `DRAFT`에서는 `null`일 수 있습니다.
+- `orderCount`·`salesAmount`는 결제가 확정되고(`paid_at`) 취소되지 않은(`canceled_at`이 없는) 주문만 집계합니다.
+  `salesAmount`는 배송비를 포함한 `total_amount`의 합계입니다.
+- 미결제·만료·취소 주문을 제외하고 기간 필터도 없으므로, `orderCount`의 합계는 2.1 `orderCounts`의 합계보다 작습니다.
 
 ### 2.3 임박 DROP 조회
 

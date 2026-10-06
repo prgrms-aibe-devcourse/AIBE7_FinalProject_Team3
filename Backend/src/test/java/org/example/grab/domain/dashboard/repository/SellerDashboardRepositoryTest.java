@@ -1,5 +1,6 @@
 package org.example.grab.domain.dashboard.repository;
 
+import org.example.grab.domain.dashboard.dto.DropStatsProjection;
 import org.example.grab.domain.dashboard.dto.SellerDashboardSummaryResponse.StockSummary;
 import org.example.grab.domain.dashboard.dto.UpcomingDropEventType;
 import org.example.grab.domain.dashboard.dto.UpcomingDropProjection;
@@ -12,6 +13,8 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -188,6 +191,94 @@ class SellerDashboardRepositoryTest {
         // then
         assertThat(summary).isEqualTo(new StockSummary(115L, 10L, 20L));
     }
+    @Test
+    @DisplayName("DROP별 통계는 본인 DROP만 취소 WISH를 뺀 수와 재고·매출 집계로 반환한다")
+    void findDropStats_aggregatesOwnDropsOnly() {
+        // given
+        Long dropId = insertDrop(sellerId, "ENDED", "집계 대상", now.minusDays(3), now.minusDays(1));
+        insertOption(dropId, 100, 10, 20, 5, true);
+        insertOption(dropId, 50, 0, 10, 0, false);
+        insertWish(dropId, false);
+        insertWish(dropId, false);
+        insertWish(dropId, true);
+        insertOrder(dropId, "PAID", now.minusDays(2));
+        insertOrder(dropId, "DELIVERED", now.minusDays(2));
+        insertOrder(dropId, "PAYMENT_PENDING", now.minusDays(2));
+        insertOrder(dropId, "EXPIRED", now.minusDays(2));
+        insertOrder(dropId, "CANCELED", now.minusDays(2));
+        // 결제까지 끝난 뒤 취소된 주문도 매출에서 빠져야 한다
+        Long paidThenCanceled = insertOrder(dropId, "CANCELED", now.minusDays(2));
+        jdbcTemplate.update("UPDATE orders SET paid_at = ? WHERE id = ?", now.minusDays(2), paidThenCanceled);
+
+        Long otherDropId = insertDrop(otherSellerId, "ENDED", "다른 판매자", now.minusDays(3), now.minusDays(1));
+        insertOption(otherDropId, 10, 0, 0, 0, true);
+        insertOrder(otherDropId, "PAID", now.minusDays(2));
+
+        // when
+        Page<DropStatsProjection> page = sellerDashboardRepository.findDropStats(
+                sellerId, null, PageRequest.of(0, 20));
+
+        // then
+        assertThat(page.getTotalElements()).isEqualTo(1);
+        DropStatsProjection stats = page.getContent().get(0);
+        assertThat(stats.dropId()).isEqualTo(dropId);
+        assertThat(stats.status()).isEqualTo("ENDED");
+        assertThat(stats.saleEndsAt()).isEqualTo(now.minusDays(1));
+        assertThat(stats.activeWishCount()).isEqualTo(2);
+        // 가용 재고는 is_active=false 옵션까지 더해 (100-10-20-5) + (50-0-10-0) = 105
+        assertThat(stats.availableStock()).isEqualTo(105);
+        assertThat(stats.reservedStock()).isEqualTo(10);
+        assertThat(stats.soldStock()).isEqualTo(30);
+        // 주문 단가는 1000이고 결제 확정·미취소인 PAID·DELIVERED 두 건만 센다
+        assertThat(stats.orderCount()).isEqualTo(2);
+        assertThat(stats.salesAmount()).isEqualTo(2000);
+    }
+
+    @Test
+    @DisplayName("상태를 지정하면 그 상태만, 페이지는 최근 생성순으로 끊어 반환한다")
+    void findDropStats_filtersStatusAndPaginates() {
+        // given
+        insertDrop(sellerId, "DRAFT", "임시 저장", now.plusDays(1), now.plusDays(2));
+        Long firstEnded = insertDrop(sellerId, "ENDED", "먼저 만든 종료", now.minusDays(5), now.minusDays(4));
+        Long lastEnded = insertDrop(sellerId, "ENDED", "나중 만든 종료", now.minusDays(3), now.minusDays(2));
+
+        // when
+        Page<DropStatsProjection> firstPage = sellerDashboardRepository.findDropStats(
+                sellerId, "ENDED", PageRequest.of(0, 1));
+        Page<DropStatsProjection> secondPage = sellerDashboardRepository.findDropStats(
+                sellerId, "ENDED", PageRequest.of(1, 1));
+
+        // then
+        assertThat(firstPage.getTotalElements()).isEqualTo(2);
+        assertThat(firstPage.hasNext()).isTrue();
+        assertThat(firstPage.getContent()).extracting(DropStatsProjection::dropId).containsExactly(lastEnded);
+        assertThat(secondPage.getContent()).extracting(DropStatsProjection::dropId).containsExactly(firstEnded);
+        assertThat(secondPage.hasNext()).isFalse();
+    }
+
+    @Test
+    @DisplayName("옵션과 주문이 없는 DROP도 0으로 집계해 목록에서 빠지지 않는다")
+    void findDropStats_keepsDropWithoutOptionsAndOrders() {
+        // given
+        Long dropId = insertDrop(sellerId, "DRAFT", "옵션 없는 임시 저장", now.plusDays(1), now.plusDays(2));
+        // 공개 전 DRAFT는 일정이 비어 있을 수 있다(ERD.md 1.2)
+        jdbcTemplate.update("UPDATE drops SET sale_starts_at = NULL, sale_ends_at = NULL WHERE id = ?", dropId);
+
+        // when
+        Page<DropStatsProjection> page = sellerDashboardRepository.findDropStats(
+                sellerId, null, PageRequest.of(0, 20));
+
+        // then
+        assertThat(page.getContent()).hasSize(1);
+        DropStatsProjection stats = page.getContent().get(0);
+        assertThat(stats.dropId()).isEqualTo(dropId);
+        assertThat(stats.saleEndsAt()).isNull();
+        assertThat(stats.activeWishCount()).isZero();
+        assertThat(stats.availableStock()).isZero();
+        assertThat(stats.orderCount()).isZero();
+        assertThat(stats.salesAmount()).isZero();
+    }
+
 
     private Long insertUser() {
         String suffix = UUID.randomUUID().toString();
@@ -243,18 +334,21 @@ class SellerDashboardRepositoryTest {
                 INSERT INTO orders (order_number, buyer_id, drop_id, idempotency_key, request_hash, status,
                                     product_name_snapshot, seller_name_snapshot, items_amount, shipping_amount,
                                     total_amount, recipient_name, recipient_phone, postal_code, address_line1,
-                                    payment_expires_at, paid_at, canceled_at, cancel_reason, created_at)
+                                    payment_expires_at, paid_at, canceled_at, expired_at, cancel_reason, created_at)
                 VALUES (?, ?, ?, ?, 'hash', ?, '상품', '브랜드', 1000, 0, 1000,
                         '수령인', '01000000000', '00000', '주소', ?,
                         CASE WHEN ? IN ('PAID', 'PREPARING', 'SHIPPED', 'DELIVERED') THEN ? ELSE NULL END,
                         CASE WHEN ? = 'CANCELED' THEN ? ELSE NULL END,
+                        CASE WHEN ? = 'EXPIRED' THEN ? ELSE NULL END,
                         CASE WHEN ? = 'CANCELED' THEN '테스트 취소' ELSE NULL END,
                         ?)
                 RETURNING id
                 """,
                 Long.class,
                 "ORDER-" + suffix, buyerId, dropId, suffix, status,
-                createdAt.plusHours(1), status, createdAt, status, createdAt, status, createdAt);
+                createdAt.plusHours(1), status, createdAt, status, createdAt,
+                // EXPIRED는 expired_at이, CANCELED는 cancel_reason이 있어야 한다(V12·V13 제약)
+                status, createdAt, status, createdAt);
     }
 
     private void insertPayment(Long orderId, String status, String reconciliationStatus, OffsetDateTime createdAt) {
@@ -271,5 +365,15 @@ class SellerDashboardRepositoryTest {
                 """,
                 orderId, suffix, suffix, status, reconciliationStatus,
                 reconciliationStatus, status, createdAt, createdAt);
+    }
+
+    // wishes는 UQ(user_id, drop_id)라 WISH 한 건마다 회원을 새로 만든다
+    private void insertWish(Long dropId, boolean canceled) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO wishes (user_id, drop_id, activated_at, canceled_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP, CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE NULL END)
+                """,
+                insertUser(), dropId, canceled);
     }
 }
