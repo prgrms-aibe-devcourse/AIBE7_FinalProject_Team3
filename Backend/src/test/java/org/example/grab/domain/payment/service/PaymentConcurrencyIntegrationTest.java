@@ -1,5 +1,6 @@
 package org.example.grab.domain.payment.service;
 
+import org.example.grab.domain.order.dto.PaymentExpiryResult;
 import org.example.grab.domain.order.entity.Order;
 import org.example.grab.domain.order.entity.OrderStatus;
 import org.example.grab.domain.order.repository.OrderItemRepository;
@@ -28,6 +29,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -171,6 +174,132 @@ class PaymentConcurrencyIntegrationTest {
         assertThat(fixture.quantities())
                 .containsEntry("reserved_quantity", 0)
                 .containsEntry("sold_quantity", PaymentTestFixture.QUANTITY);
+    }
+
+    @Test
+    @DisplayName("결제 승인 반영이 주문을 잠그고 있으면 만료 배치는 기다리지 않고 건너뛰고, 확정된 주문은 이후에도 만료하지 않는다")
+    void expiryBatchSkipsOrderLockedByApproval() throws Exception {
+        // given: 승인 반영 트랜잭션이 주문을 잠그고 커밋 전에 멈춘다
+        Race race = prepareRace();
+        OffsetDateTime deadline = race.order().getPaymentExpiresAt();
+        CountDownLatch applied = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        Future<?> approval = executor.submit(() -> new TransactionTemplate(transactionManager).executeWithoutResult(
+                status -> {
+                    transactionService.applyResult(race.paymentId, race.approved, null, race.beforeDeadline);
+                    applied.countDown();
+                    await(release);
+                }));
+        assertThat(applied.await(10, TimeUnit.SECONDS)).isTrue();
+
+        // when
+        PaymentExpiryResult whileLocked = executor.submit(
+                () -> orderPaymentService.expireIfDueSkippingLocked(race.order().getId(), deadline))
+                .get(5, TimeUnit.SECONDS);
+        release.countDown();
+        approval.get(10, TimeUnit.SECONDS);
+        PaymentExpiryResult afterApproval = orderPaymentService.expireIfDueSkippingLocked(race.order().getId(), deadline);
+
+        // then
+        assertThat(whileLocked).isEqualTo(PaymentExpiryResult.SKIPPED_LOCKED);
+        assertThat(afterApproval).isEqualTo(PaymentExpiryResult.NOT_DUE);
+        assertThat(fixture.orderStatus(race.order())).isEqualTo(OrderStatus.PAID);
+        assertThat(fixture.payments(race.order())).singleElement().satisfies(payment -> {
+            assertThat(payment.get("status")).isEqualTo("SUCCEEDED");
+            assertThat(payment.get("reconciliation_status")).isEqualTo("NONE");
+        });
+        assertThat(fixture.quantities())
+                .containsEntry("reserved_quantity", 0)
+                .containsEntry("sold_quantity", PaymentTestFixture.QUANTITY);
+    }
+
+    @Test
+    @DisplayName("만료 배치가 먼저 만료하면 이후 승인 반영은 주문을 확정하지 않고 보정 대상으로 남긴다")
+    void approvalAfterExpiryBatchRequiresReconciliation() {
+        // given
+        Race race = prepareRace();
+
+        // when
+        PaymentExpiryResult expiry = orderPaymentService.expireIfDueSkippingLocked(
+                race.order().getId(), race.order().getPaymentExpiresAt());
+        transactionService.applyResult(race.paymentId, race.approved, null, race.order().getPaymentExpiresAt());
+
+        // then
+        assertThat(expiry).isEqualTo(PaymentExpiryResult.EXPIRED);
+        assertThat(fixture.orderStatus(race.order())).isEqualTo(OrderStatus.EXPIRED);
+        assertThat(fixture.reservationStatus(race.order())).isEqualTo("RELEASED");
+        assertThat(fixture.payments(race.order())).singleElement().satisfies(payment -> {
+            assertThat(payment.get("status")).isEqualTo("SUCCEEDED");
+            assertThat(payment.get("reconciliation_status")).isEqualTo("REQUIRED");
+        });
+        assertThat(fixture.quantities())
+                .containsEntry("reserved_quantity", 0)
+                .containsEntry("sold_quantity", 0);
+    }
+
+    @Test
+    @DisplayName("여러 인스턴스의 만료 배치가 같은 주문을 동시에 처리해도 한 번만 만료하고 재고도 한 번만 반환한다")
+    void concurrentExpiryBatchesExpireOnce() throws Exception {
+        // given
+        Order order = fixture.createOrder();
+        OffsetDateTime deadline = order.getPaymentExpiresAt();
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<PaymentExpiryResult>> results = new ArrayList<>();
+
+        // when
+        for (int i = 0; i < 3; i++) {
+            results.add(executor.submit(() -> {
+                await(start);
+                return orderPaymentService.expireIfDueSkippingLocked(order.getId(), deadline);
+            }));
+        }
+        start.countDown();
+        List<PaymentExpiryResult> outcomes = new ArrayList<>();
+        for (Future<PaymentExpiryResult> result : results) {
+            outcomes.add(result.get(10, TimeUnit.SECONDS));
+        }
+
+        // then: 나머지는 잠긴 주문을 건너뛰거나, 이미 만료된 주문을 대상 아님으로 본다
+        assertThat(outcomes).filteredOn(PaymentExpiryResult.EXPIRED::equals).hasSize(1);
+        assertThat(outcomes).filteredOn(outcome -> outcome != PaymentExpiryResult.EXPIRED)
+                .allMatch(outcome -> outcome == PaymentExpiryResult.SKIPPED_LOCKED
+                        || outcome == PaymentExpiryResult.NOT_DUE);
+        assertThat(fixture.orderStatus(order)).isEqualTo(OrderStatus.EXPIRED);
+        assertThat(fixture.reservationStatus(order)).isEqualTo("RELEASED");
+        assertThat(fixture.quantities()).containsEntry("reserved_quantity", 0);
+    }
+
+    @Test
+    @DisplayName("다른 트랜잭션이 주문을 잠그고 있으면 만료 배치는 건너뛰고, 잠금이 풀린 뒤 다음 실행에서 만료한다")
+    void expiryBatchRetriesSkippedOrderOnNextRun() throws Exception {
+        // given
+        Order order = fixture.createOrder();
+        OffsetDateTime deadline = order.getPaymentExpiresAt();
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        Future<?> holder = executor.submit(() -> new TransactionTemplate(transactionManager).executeWithoutResult(
+                status -> {
+                    jdbcTemplate.queryForObject("SELECT id FROM orders WHERE id = ? FOR UPDATE", Long.class,
+                            order.getId());
+                    locked.countDown();
+                    await(release);
+                }));
+        assertThat(locked.await(10, TimeUnit.SECONDS)).isTrue();
+
+        // when
+        PaymentExpiryResult whileLocked = executor.submit(
+                () -> orderPaymentService.expireIfDueSkippingLocked(order.getId(), deadline))
+                .get(5, TimeUnit.SECONDS);
+        OrderStatus statusWhileLocked = fixture.orderStatus(order);
+        release.countDown();
+        holder.get(10, TimeUnit.SECONDS);
+        PaymentExpiryResult nextRun = orderPaymentService.expireIfDueSkippingLocked(order.getId(), deadline);
+
+        // then
+        assertThat(whileLocked).isEqualTo(PaymentExpiryResult.SKIPPED_LOCKED);
+        assertThat(statusWhileLocked).isEqualTo(OrderStatus.PAYMENT_PENDING);
+        assertThat(nextRun).isEqualTo(PaymentExpiryResult.EXPIRED);
+        assertThat(fixture.quantities()).containsEntry("reserved_quantity", 0);
     }
 
     // 결제 시도가 PENDING으로 저장되고 PG 승인이 끝난 직후, 결제 마감에 도달한 상황을 만든다.

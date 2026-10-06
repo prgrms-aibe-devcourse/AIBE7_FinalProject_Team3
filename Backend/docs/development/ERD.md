@@ -126,11 +126,13 @@ MVP에서는 판매자 신청과 프로필을 한 테이블에서 관리한다. 
 | 컬럼 | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |
 | `id` | BIGINT | O | PK |
-| `public_id` | UUID | O | UQ, 외부 노출 식별자 겸 이미지 객체 키 |
+| `public_id` | UUID | O | UQ, 외부 노출 식별자(객체 키 `images/{public_id}.{ext}`에 사용) |
 | `drop_id` | BIGINT | O | FK drops |
-| `image_url` | VARCHAR(500) | O | 객체 키 또는 영속 URL |
+| `image_url` | VARCHAR(500) | O | Supabase Storage 공개 URL |
 | `sort_order` | INT | O | 0 이상, UQ(drop_id, sort_order) |
 | `alt_text` | VARCHAR(300) | O | 대체 설명 |
+
+DROP 하나에는 상품 이미지를 최대 10개까지 등록한다.
 
 #### `drop_option_groups`
 
@@ -238,6 +240,7 @@ UQ(`user_id`, `drop_id`)를 둔다. 취소 후 재등록은 기존 행을 다시
 | `payment_expires_at` | TIMESTAMPTZ | O | 결제 마감 시각 |
 | `paid_at` | TIMESTAMPTZ | X | 결제 확정 시각 |
 | `canceled_at` | TIMESTAMPTZ | X | 주문 취소 시각 |
+| `expired_at` | TIMESTAMPTZ | X | 결제 대기 만료 시각. `EXPIRED`이면 필수 |
 
 배송지와 상품 정보는 주문 시점의 값을 보존한다. 로그에는 주소와 전화번호 원문을 남기지 않는다.
 
@@ -420,9 +423,19 @@ COMMITTED → RELEASED
 - 승인 요청이 PG에 닿지 않음(조회 결과가 인증만 된 `IN_PROGRESS`): 결제 `UNKNOWN`으로 두고, 이후 정리할 때 주문이 `PAYMENT_PENDING`이고 마감 전이면 최초 요청과 같은 서버 멱등 키로 승인을 다시 요청한다. 결제할 수 없는 주문에는 다시 요청하지 않는다
 - 결제 마감 후 도착한 승인 성공: 결제 `SUCCEEDED`, 보정 `REQUIRED`; 주문을 자동 완료하지 않음
 - 승인 성공이지만 주문번호·금액이 다르거나 재고 원장이 어긋남(예약이 주문 항목과 맞지 않거나 `HELD`가 아님, 선점 수량 부족): 결제 `SUCCEEDED`, 보정 `REQUIRED`; 주문·예약·재고를 바꾸지 않음. 재고 원장은 옵션 행을 잠그고 먼저 확인해, 반영 도중 예외로 승인 기록이 롤백되지 않게 한다
-- 만료: 주문 `EXPIRED`, 예약 `RELEASED`, reserved 감소
+- 만료: 주문 `EXPIRED`(`expired_at = now`), 예약 `RELEASED`, reserved 감소
 
 결제 성공과 만료 처리는 같은 주문 행을 잠가 한 경로만 재고를 변경하도록 한다.
+
+결제 대기 만료 배치(처리 규칙 GR-22, 배치 실행 GR-65):
+
+- 결제 흐름의 일부로 보고 결제 도메인의 배치가 실행한다. 대상 조회와 주문·예약·재고 변경은 주문 도메인 서비스를 거친다.
+- 대상은 `status = PAYMENT_PENDING AND payment_expires_at <= now`인 주문이다. `now`는 서버 시각이며 한 번의 실행이 같은 값을 공유한다.
+- 후보는 잠그지 않고 `idx_orders_payment_expiry (status, payment_expires_at, id)` 순서의 키셋으로 회당 최대 500건씩 조회한다.
+- 주문마다 별도 트랜잭션에서 `FOR UPDATE SKIP LOCKED`로 잠그고 상태·마감 조건을 다시 확인한 뒤 위의 만료를 반영한다. 결제 확정 등 다른 트랜잭션이 잠근 주문은 기다리지 않고 건너뛰어 다음 실행에서 다시 조회한다.
+- 이미 만료됐거나 결제된 주문은 조건 재확인에서 제외되므로 반복 실행·다중 인스턴스에서도 재고는 한 번만 반환된다.
+- 만료 처리는 결제 상태를 보지 않는다. 진행 중인 결제(`PENDING`, `UNKNOWN`)가 있어도 마감이 지나면 만료하고, 이후 승인이 확인되면 마감 후 승인과 같이 결제 `SUCCEEDED`, 보정 `REQUIRED`로 기록한다. 진행 중 결제를 조회로 정리하는 작업과 만료와의 실행 순서는 GR-65에서 정한다.
+- 주문 생성 후 결제 마감까지는 10분이다. 결제 가능 여부는 저장 상태가 아니라 `payment_expires_at`으로 판정하므로, 배치 주기(약 10초)는 재고 반환 시점에만 영향을 준다.
 
 ### 3.3 주문 취소
 
@@ -449,7 +462,7 @@ PK와 UQ에서 자동 생성되는 인덱스는 중복 생성하지 않는다.
 | `wishes` | (`user_id`, `activated_at`, `id`) | 소비자 마이페이지 |
 | `orders` | (`buyer_id`, `created_at`, `id`) | 소비자 주문 목록 |
 | `orders` | (`drop_id`, `status`, `id`) | 판매자 주문 목록 |
-| `orders` | (`status`, `payment_expires_at`, `id`) | 결제 만료 처리 |
+| `orders` | `idx_orders_payment_expiry` (`status`, `payment_expires_at`, `id`) | 결제 대기 만료 배치(`PAYMENT_PENDING AND payment_expires_at <= now`, 키셋 조회) |
 | `payments` | (`order_id`, `created_at`, `id`) | 결제 시도 이력 |
 | `payments` | (`reconciliation_status`, `updated_at`, `id`) | 결제 보정 작업 |
 | `payment_cancellations` | (`status`, `next_retry_at`, `id`) | 취소 재시도 |
@@ -461,7 +474,7 @@ PK와 UQ에서 자동 생성되는 인덱스는 중복 생성하지 않는다.
 | 항목 | 현재 초안 | 확정할 내용 |
 | --- | --- | --- |
 | 판매자 신청 정보 | 브랜드명·연락 이메일 | 사업자 정보와 증빙 필수 여부 |
-| 결제 대기 시간 | DB에 절대 만료 시각 저장 | 구체적인 만료 시간 |
+| 결제 대기 시간 | 주문 생성 후 10분, DB에 절대 만료 시각(`payment_expires_at`) 저장 (확정) | - |
 | 결제 재시도 | 결제 마감 전까지 횟수 제한 없이 허용, 진행 중인 결제(`PENDING`, `UNKNOWN`)나 승인된 결제(`SUCCEEDED`, 보정 대기 포함)가 있으면 거부 (확정) | - |
 | 판매 종료 후 결제 | 선점 주문은 결제 마감까지 허용 | 최종 허용 여부 |
 | 구매 제한 | 재고 범위만 검증 | 주문별·회원 누적 제한 |

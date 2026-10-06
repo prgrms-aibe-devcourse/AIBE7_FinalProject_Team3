@@ -1,6 +1,7 @@
 package org.example.grab.domain.drop.service;
 
 import org.example.grab.domain.drop.dto.request.DropDraftRequest;
+import org.example.grab.domain.drop.dto.request.DropImageRequest;
 import org.example.grab.domain.drop.dto.request.OptionGroupRequest;
 import org.example.grab.domain.drop.dto.request.OptionRequest;
 import org.example.grab.domain.drop.dto.request.OptionValueRequest;
@@ -22,33 +23,50 @@ import org.example.grab.domain.drop.entity.option.DropOptionGroup;
 import org.example.grab.domain.drop.entity.option.DropOptionValue;
 import org.example.grab.domain.drop.entity.option.DropOptionValueMap;
 import org.example.grab.domain.drop.error.DropErrorCode;
+import org.example.grab.domain.drop.repository.DropImageRepository;
 import org.example.grab.domain.drop.repository.DropRepository;
 import org.example.grab.global.common.ErrorResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
+import org.example.grab.global.storage.supabase.SupabaseStorageClient;
+import org.example.grab.global.storage.supabase.SupabaseStorageProperties;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.client.RestClient;
 
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class DropServiceTest {
 
+    private static final String IMAGE_URL_PREFIX =
+            "https://project.supabase.co/storage/v1/object/public/drop-images/images/";
+
     @Mock
     private DropRepository dropRepository;
+
+    @Mock
+    private DropImageRepository dropImageRepository;
 
     @Mock
     private CategoryService categoryService;
@@ -56,8 +74,19 @@ class DropServiceTest {
     @Mock
     private WishQueryService wishQueryService;
 
-    @InjectMocks
+    // imageUrl 검증은 실제 공개 URL 조립이 필요하므로 진짜 클라이언트를 쓴다(HTTP 호출은 하지 않는다).
+    private final SupabaseStorageClient supabaseStorageClient = new SupabaseStorageClient(
+            RestClient.builder(),
+            new SupabaseStorageProperties("https://project.supabase.co", "sb_secret_test", "drop-images",
+                    Duration.ofSeconds(3), Duration.ofSeconds(5)));
+
     private DropService dropService;
+
+    @BeforeEach
+    void setUp() {
+        dropService = new DropService(
+                dropRepository, dropImageRepository, categoryService, wishQueryService, supabaseStorageClient);
+    }
 
     @Test
     @DisplayName("임시 저장 시 옵션 그룹·값·SKU 매핑이 요청대로 조립된다")
@@ -292,7 +321,7 @@ class DropServiceTest {
         Drop drop = Drop.createDraft(1L);
         drop.updateDraft("상품", "설명", 1L, 3000L, "안내",
                 OffsetDateTime.now().plusDays(1), OffsetDateTime.now().plusDays(2));
-        drop.addImage(DropImage.create(drop, "https://example.com/a.jpg", 0, "상품"));
+        drop.addImage(DropImage.create(drop, UUID.randomUUID(), "https://example.com/a.jpg", 0, "상품"));
         drop.addOption(DropOption.create(drop, 1000L, 5, 0));
         given(dropRepository.findByIdForUpdate(10L)).willReturn(Optional.of(drop));
         given(categoryService.isActive(1L)).willReturn(false);
@@ -615,11 +644,124 @@ class DropServiceTest {
                 List.of(new SelectionRequest("material", "linen"), new SelectionRequest("length", "long")),
                 139000L, 5, false, 1);
 
-        return new DropDraftRequest("상품", "설명", List.of("https://example.com/a.jpg"), 1L, null, null,
+        return new DropDraftRequest("상품", "설명", List.of(image(UUID.randomUUID())), 1L, null, null,
                 new ShippingRequest(3000L, "안내"), List.of(material, length), List.of(first, second));
     }
 
     private DropDraftRequest emptyRequest() {
         return new DropDraftRequest(null, null, null, null, null, null, null, null, null);
+    }
+
+    private static DropImageRequest image(UUID imageId) {
+        return new DropImageRequest(imageId, IMAGE_URL_PREFIX + imageId + ".jpg");
+    }
+
+    @Test
+    @DisplayName("imageUrl이 imageId와 맞지 않으면 VALIDATION_FAILED(images[0].imageUrl)이고 저장하지 않는다")
+    void createDraft_rejectsMismatchedImageUrl() {
+        // given
+        UUID imageId = UUID.randomUUID();
+        DropDraftRequest request = new DropDraftRequest(
+                null, null, List.of(new DropImageRequest(imageId, "https://evil.example.com/other.jpg")),
+                null, null, null, null, null, null);
+
+        // when & then
+        assertThatThrownBy(() -> dropService.createDraft(1L, request))
+                .isInstanceOfSatisfying(BusinessException.class, e -> {
+                    assertThat(e.getErrorCode()).isEqualTo(CommonErrorCode.VALIDATION_FAILED);
+                    assertThat(e.getFieldErrors()).extracting(ErrorResponse.FieldError::field)
+                            .containsExactly("images[0].imageUrl");
+                });
+        verifyNoInteractions(categoryService);
+    }
+
+    @Test
+    @DisplayName("같은 요청 안에서 imageId가 중복되면 VALIDATION_FAILED(images[1].imageId)")
+    void createDraft_rejectsDuplicateImageId() {
+        // given
+        UUID imageId = UUID.randomUUID();
+        DropDraftRequest request = new DropDraftRequest(
+                null, null, List.of(image(imageId), image(imageId)),
+                null, null, null, null, null, null);
+
+        // when & then
+        assertThatThrownBy(() -> dropService.createDraft(1L, request))
+                .isInstanceOfSatisfying(BusinessException.class, e -> {
+                    assertThat(e.getErrorCode()).isEqualTo(CommonErrorCode.VALIDATION_FAILED);
+                    assertThat(e.getFieldErrors()).extracting(ErrorResponse.FieldError::field)
+                            .containsExactly("images[1].imageId");
+                });
+    }
+
+    @Test
+    @DisplayName("다른 DROP이 쓰는 imageId는 VALIDATION_FAILED(images[0].imageId)이고 저장하지 않는다")
+    void createDraft_rejectsImageIdUsedByOtherDrop() {
+        // given
+        UUID imageId = UUID.randomUUID();
+        DropDraftRequest request = new DropDraftRequest(
+                null, null, List.of(image(imageId)), null, null, null, null, null, null);
+        given(dropImageRepository.findUuidsUsedByOtherDrop(Set.of(imageId), null)).willReturn(Set.of(imageId));
+
+        // when & then
+        assertThatThrownBy(() -> dropService.createDraft(1L, request))
+                .isInstanceOfSatisfying(BusinessException.class, e -> {
+                    assertThat(e.getErrorCode()).isEqualTo(CommonErrorCode.VALIDATION_FAILED);
+                    assertThat(e.getFieldErrors()).extracting(ErrorResponse.FieldError::field)
+                            .containsExactly("images[0].imageId");
+                });
+        verify(dropRepository, never()).save(any(Drop.class));
+    }
+
+    @Test
+    @DisplayName("같은 DROP 수정에서 자기 imageId를 다시 보내면 다른 DROP 조회에서 제외되어 통과한다")
+    void updateDraft_allowsOwnImageId() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        ReflectionTestUtils.setField(drop, "id", 10L);
+        given(dropRepository.findByIdForUpdate(10L)).willReturn(Optional.of(drop));
+        UUID imageId = UUID.randomUUID();
+        DropDraftRequest request = new DropDraftRequest(
+                null, null, List.of(image(imageId)), null, null, null, null, null, null);
+        given(dropImageRepository.findUuidsUsedByOtherDrop(eq(Set.of(imageId)), anyLong())).willReturn(Set.of());
+
+        // when
+        dropService.updateDraft(1L, 10L, request);
+
+        // then
+        assertThat(drop.getImages()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("여러 imageId의 다른 DROP 사용 여부를 한 번에 조회한다")
+    void createDraft_checksImageIdsInSingleQuery() {
+        // given
+        UUID firstImageId = UUID.randomUUID();
+        UUID secondImageId = UUID.randomUUID();
+        DropDraftRequest request = new DropDraftRequest(
+                null, null, List.of(image(firstImageId), image(secondImageId)),
+                null, null, null, null, null, null);
+
+        // when
+        dropService.createDraft(1L, request);
+
+        // then
+        verify(dropImageRepository).findUuidsUsedByOtherDrop(Set.of(firstImageId, secondImageId), null);
+    }
+
+    @Test
+    @DisplayName("images를 생략하면 기존 이미지를 유지하고 imageId 중복 조회를 하지 않는다")
+    void updateDraft_keepsImagesWhenOmitted() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        ReflectionTestUtils.setField(drop, "id", 10L);
+        drop.addImage(DropImage.create(drop, UUID.randomUUID(), "old.jpg", 0, "상품"));
+        given(dropRepository.findByIdForUpdate(10L)).willReturn(Optional.of(drop));
+
+        // when
+        dropService.updateDraft(1L, 10L, emptyRequest());
+
+        // then
+        assertThat(drop.getImages()).hasSize(1);
+        verifyNoInteractions(dropImageRepository);
     }
 }

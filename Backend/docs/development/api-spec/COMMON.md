@@ -214,6 +214,7 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 | `EMAIL_VERIFICATION_ATTEMPTS_EXCEEDED` | 429 | 이메일 인증 코드 확인 시도 횟수 초과 |
 | `EMAIL_VERIFICATION_RESEND_TOO_SOON` | 429 | 이메일 인증 코드 재발송 간격 또는 발송 한도 초과 |
 | `INTERNAL_SERVER_ERROR` | 500 | 처리하지 못한 서버 오류 (Redis·DB 장애 등). 인증 실패가 아니므로 클라이언트는 로그아웃하지 않는다 |
+| `EXTERNAL_SERVICE_ERROR` | 502 | 외부 연동 서비스(스토리지 등) 호출 실패 |
 
 ---
 
@@ -221,7 +222,7 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 
 1. 서버 시각이 `saleStartsAt`에 도달하면 `WISH` → `GRAB`으로 전환한다.
 2. 서버 시각이 `saleEndsAt`에 도달하면 `GRAB` → `ENDED`로 전환한다.
-3. 결제 대기 시간이 만료되면 주문을 `EXPIRED`로 전환한다.
+3. 결제 대기 시간(주문 생성 후 10분)이 만료되면 주문을 `EXPIRED`로 전환한다. 처리 규칙은 [ERD.md 3.2](../ERD.md#32-결제-처리), 선정 이유는 [TECHSTACK.md 1.2](../TECHSTACK.md#12-결제-대기-만료-배치-선정-이유-gr-22-gr-65)를 따른다.
 4. 만료된 주문의 확보 재고를 한 번만 반환한다.
 5. 모든 옵션의 `availableStock`이 0이면 `soldOut=true`로 처리한다.
 6. 결제 성공 웹훅이 만료 후 도착하면 자동 완료하지 않고 보정 대상으로 기록한다.
