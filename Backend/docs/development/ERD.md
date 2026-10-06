@@ -238,6 +238,7 @@ UQ(`user_id`, `drop_id`)를 둔다. 취소 후 재등록은 기존 행을 다시
 | `payment_expires_at` | TIMESTAMPTZ | O | 결제 마감 시각 |
 | `paid_at` | TIMESTAMPTZ | X | 결제 확정 시각 |
 | `canceled_at` | TIMESTAMPTZ | X | 주문 취소 시각 |
+| `expired_at` | TIMESTAMPTZ | X | 결제 대기 만료 시각. `EXPIRED`이면 필수 |
 
 배송지와 상품 정보는 주문 시점의 값을 보존한다. 로그에는 주소와 전화번호 원문을 남기지 않는다.
 
@@ -420,7 +421,7 @@ COMMITTED → RELEASED
 - 승인 요청이 PG에 닿지 않음(조회 결과가 인증만 된 `IN_PROGRESS`): 결제 `UNKNOWN`으로 두고, 이후 정리할 때 주문이 `PAYMENT_PENDING`이고 마감 전이면 최초 요청과 같은 서버 멱등 키로 승인을 다시 요청한다. 결제할 수 없는 주문에는 다시 요청하지 않는다
 - 결제 마감 후 도착한 승인 성공: 결제 `SUCCEEDED`, 보정 `REQUIRED`; 주문을 자동 완료하지 않음
 - 승인 성공이지만 주문번호·금액이 다르거나 재고 원장이 어긋남(예약이 주문 항목과 맞지 않거나 `HELD`가 아님, 선점 수량 부족): 결제 `SUCCEEDED`, 보정 `REQUIRED`; 주문·예약·재고를 바꾸지 않음. 재고 원장은 옵션 행을 잠그고 먼저 확인해, 반영 도중 예외로 승인 기록이 롤백되지 않게 한다
-- 만료: 주문 `EXPIRED`, 예약 `RELEASED`, reserved 감소
+- 만료: 주문 `EXPIRED`(`expired_at = now`), 예약 `RELEASED`, reserved 감소
 
 결제 성공과 만료 처리는 같은 주문 행을 잠가 한 경로만 재고를 변경하도록 한다.
 

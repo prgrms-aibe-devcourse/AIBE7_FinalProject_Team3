@@ -110,7 +110,7 @@ public class OrderPaymentService {
             return false;
         }
 
-        order.expire();
+        order.expire(now);
         for (StockReservation reservation : stockReservationRepository.findAllOfOrderSortedByOption(order.getId())) {
             reservation.release(ReleaseReason.EXPIRED, ReleaseDestination.AVAILABLE, now);
             requireOneRow(inventoryRepository.releaseReservedQuantity(

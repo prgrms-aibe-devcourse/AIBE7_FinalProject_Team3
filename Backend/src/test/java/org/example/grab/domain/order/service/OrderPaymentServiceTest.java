@@ -222,7 +222,9 @@ class OrderPaymentServiceTest {
 
         // then
         assertThat(expired).isTrue();
-        assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.EXPIRED);
+        Order expiredOrder = orderRepository.findById(order.getId()).orElseThrow();
+        assertThat(expiredOrder.getStatus()).isEqualTo(OrderStatus.EXPIRED);
+        assertThat(expiredOrder.getExpiredAt()).isEqualTo(expiresAt);
         assertThat(reservations()).allSatisfy(reservation -> {
             assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.RELEASED);
             assertThat(reservation.getReleaseReason()).isEqualTo(ReleaseReason.EXPIRED);
