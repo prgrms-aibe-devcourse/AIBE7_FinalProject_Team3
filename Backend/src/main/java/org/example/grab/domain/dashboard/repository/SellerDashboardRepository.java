@@ -1,9 +1,13 @@
 package org.example.grab.domain.dashboard.repository;
 
+import org.example.grab.domain.dashboard.dto.DropStatsProjection;
 import org.example.grab.domain.dashboard.dto.SellerDashboardSummaryResponse.StockSummary;
 import org.example.grab.domain.dashboard.dto.UpcomingDropEventType;
 import org.example.grab.domain.dashboard.dto.UpcomingDropProjection;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -116,6 +120,64 @@ public class SellerDashboardRepository {
                         resultSet.getLong("available"),
                         resultSet.getLong("reserved"),
                         resultSet.getLong("sold")));
+    }
+
+    /*
+     * DROP별 운영 지표(SELLER.md 2.2). 재고는 drop_options, 매출은 orders라서 한 번에 JOIN하면
+     * 행이 곱해져 합계가 부풀므로 LATERAL로 각각 집계한 뒤 붙인다.
+     * 재고 계산식은 sumStock과 같지만 여기서는 CANCELED DROP도 목록에 포함한다.
+     * 매출은 결제가 확정되고(paid_at) 취소되지 않은 주문만 센다. 상태 이름을 나열하지 않아
+     * 주문 상태가 늘어도 집계 기준이 흔들리지 않는다.
+     */
+    public Page<DropStatsProjection> findDropStats(long sellerId, String status, Pageable pageable) {
+        String statusCondition = "AND (CAST(:status AS TEXT) IS NULL OR d.status = :status)\n";
+        String sql = """
+                SELECT d.id AS "dropId", d.name AS "name", d.status AS "status",
+                       d.sale_ends_at AS "saleEndsAt",
+                       (SELECT COUNT(*) FROM wishes w
+                         WHERE w.drop_id = d.id AND w.canceled_at IS NULL) AS "activeWishCount",
+                       st.available AS "availableStock", st.reserved AS "reservedStock",
+                       st.sold AS "soldStock",
+                       ord.order_count AS "orderCount", ord.sales_amount AS "salesAmount"
+                FROM drops d
+                LEFT JOIN LATERAL (
+                    SELECT COALESCE(SUM(op.total_quantity - op.reserved_quantity
+                                        - op.sold_quantity - op.withheld_quantity), 0) AS available,
+                           COALESCE(SUM(op.reserved_quantity), 0) AS reserved,
+                           COALESCE(SUM(op.sold_quantity), 0) AS sold
+                    FROM drop_options op WHERE op.drop_id = d.id
+                ) st ON TRUE
+                LEFT JOIN LATERAL (
+                    SELECT COUNT(*) AS order_count, COALESCE(SUM(o.total_amount), 0) AS sales_amount
+                    FROM orders o
+                    WHERE o.drop_id = d.id AND o.paid_at IS NOT NULL AND o.canceled_at IS NULL
+                ) ord ON TRUE
+                WHERE d.seller_id = :sellerId
+                """ + statusCondition + """
+                ORDER BY d.id DESC
+                LIMIT :size OFFSET :offset
+                """;
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("sellerId", sellerId)
+                .addValue("status", status, Types.VARCHAR)
+                .addValue("size", pageable.getPageSize())
+                .addValue("offset", pageable.getOffset());
+        List<DropStatsProjection> content = jdbcTemplate.query(sql, parameters,
+                (resultSet, rowNumber) -> new DropStatsProjection(
+                        resultSet.getLong("dropId"),
+                        resultSet.getString("name"),
+                        resultSet.getString("status"),
+                        resultSet.getObject("saleEndsAt", OffsetDateTime.class),
+                        resultSet.getLong("activeWishCount"),
+                        resultSet.getLong("availableStock"),
+                        resultSet.getLong("reservedStock"),
+                        resultSet.getLong("soldStock"),
+                        resultSet.getLong("orderCount"),
+                        resultSet.getLong("salesAmount")));
+        // 총 건수는 집계가 필요 없으므로 LATERAL 없이 센다.
+        String countSql = "SELECT COUNT(*) FROM drops d WHERE d.seller_id = :sellerId\n" + statusCondition;
+        Long total = jdbcTemplate.queryForObject(countSql, parameters, Long.class);
+        return new PageImpl<>(content, pageable, Objects.requireNonNullElse(total, 0L));
     }
 
     // SQL에 넘길 값 꾸러미 만들기
