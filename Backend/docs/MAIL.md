@@ -41,16 +41,26 @@
 
 ## 3. 로컬 Mailpit
 
-| 환경변수 | 값 |
-| --- | --- |
-| `MAIL_HOST` | `localhost` (기본값) |
-| `MAIL_PORT` | `1025` (기본값) |
-| `MAIL_USERNAME`, `MAIL_PASSWORD` | 비움 |
-| `MAIL_SMTP_AUTH` | `false` (기본값) |
-| `MAIL_STARTTLS` | `false` (기본값) |
-| `MAIL_FROM` | `no-reply@grab.local` (기본값) |
+Mailpit은 `compose.yaml`의 `mailpit` 서비스로 실행한다. 인증과 STARTTLS 없이 메일을 받는다.
 
-Mailpit은 인증과 STARTTLS 없이 메일을 받으므로 기본값을 그대로 사용한다.
+### 3.1 실행 방식별 SMTP 접속 주소
+
+Backend를 어디서 실행하느냐에 따라 Mailpit에 접속하는 주소가 다르다.
+
+| 실행 방식 | `MAIL_HOST` | `MAIL_PORT` | 값을 정하는 곳 |
+| --- | --- | --- | --- |
+| 호스트에서 실행 (`gradlew bootRun`, IDE) | `localhost` | `1025` | `application-mail.yml` 기본값 |
+| Compose의 `backend` 서비스 | `mailpit` | `1025` | `compose.yaml` 기본값 |
+
+- 호스트에서 실행하면 Mailpit 컨테이너가 `127.0.0.1:1025`로 공개한 포트에 접속한다. 메일 환경변수를 넣지 않으면 기본값으로 동작한다.
+- Compose의 `backend` 컨테이너 안에서 `localhost`는 backend 컨테이너 자신이다. 같은 Compose 네트워크의 서비스 이름 `mailpit`으로 접속한다.
+- 두 방식 모두 포트는 Mailpit 컨테이너의 SMTP 포트 `1025`이고, 인증과 STARTTLS는 끈다(`MAIL_SMTP_AUTH`, `MAIL_STARTTLS`는 `false`). 발신 주소는 `no-reply@grab.local`이다.
+
+### 3.2 환경변수 전달
+
+- Compose의 `backend` 서비스는 `.env`의 `MAIL_*` 값을 받는다. 값이 없거나 빈 값이면 위 Mailpit 기본값으로 대체하므로, Mailpit을 쓸 때는 `.env`의 메일 키를 비워 둔다. Gmail로 시험할 때만 4절의 값을 넣는다.
+- 호스트에서 실행할 때는 `.env`가 자동으로 읽히지 않는다. 다른 SMTP로 바꾸려면 실행하는 셸이나 IDE 실행 설정에 환경변수를 직접 넣는다.
+- 호스트 실행에서 메일 키를 빈 값으로 넣으면 기본값 대신 빈 문자열이 적용되어 발송이 실패한다. 쓰지 않는 키는 환경변수로 넣지 않는다.
 
 ## 4. 운영 Gmail SMTP
 
