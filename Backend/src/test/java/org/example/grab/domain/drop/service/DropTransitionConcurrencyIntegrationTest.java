@@ -1,12 +1,14 @@
 package org.example.grab.domain.drop.service;
 
 import org.example.grab.domain.drop.entity.DropStatus;
+import org.example.grab.support.TestcontainersConfiguration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -29,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 상태 전환 배치가 실제 PostgreSQL 행 잠금 아래에서 SKIP LOCKED·멱등으로 동작하는지 확인한다(GR-18 4-3).
  */
 @SpringBootTest
+@Import(TestcontainersConfiguration.class)
 class DropTransitionConcurrencyIntegrationTest {
 
     @Autowired
@@ -41,6 +44,7 @@ class DropTransitionConcurrencyIntegrationTest {
     private PlatformTransactionManager transactionManager;
 
     private ExecutorService executor;
+    private Long userId;
     private Long sellerId;
     private Long categoryId;
 
@@ -48,7 +52,7 @@ class DropTransitionConcurrencyIntegrationTest {
     void setUp() {
         executor = Executors.newFixedThreadPool(4);
         String unique = UUID.randomUUID().toString();
-        Long userId = jdbcTemplate.queryForObject(
+        userId = jdbcTemplate.queryForObject(
                 "INSERT INTO users (email, password_hash, nickname) VALUES (?, 'encoded-password', ?) RETURNING id",
                 Long.class, unique + "@example.com", "판매자-" + unique);
         sellerId = jdbcTemplate.queryForObject(
@@ -65,8 +69,11 @@ class DropTransitionConcurrencyIntegrationTest {
     @AfterEach
     void tearDown() {
         executor.shutdownNow();
-        // @SpringBootTest는 롤백하지 않으므로 이 테스트가 만든 DROP만 정리한다.
+        // @SpringBootTest는 롤백하지 않으므로 이 테스트가 만든 DROP과 부모 행을 FK 순서대로 정리한다.
         jdbcTemplate.update("DELETE FROM drops WHERE seller_id = ?", sellerId);
+        jdbcTemplate.update("DELETE FROM sellers WHERE id = ?", sellerId);
+        jdbcTemplate.update("DELETE FROM users WHERE id = ?", userId);
+        jdbcTemplate.update("DELETE FROM categories WHERE id = ?", categoryId);
     }
 
     @Test

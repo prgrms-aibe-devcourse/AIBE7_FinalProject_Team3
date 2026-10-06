@@ -17,6 +17,7 @@ import org.example.grab.global.error.CommonErrorCode;
 import org.example.grab.global.idempotency.IdempotencyKey;
 import org.example.grab.global.idempotency.RequestHash;
 import org.example.grab.global.idempotency.RequestHashGenerator;
+import org.example.grab.support.TestcontainersConfiguration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -24,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
@@ -44,6 +46,7 @@ import static org.mockito.Mockito.verify;
 
 // PG는 승인했지만 주문을 확정할 수 없는 경우와, 결과가 확정되지 않은 이전 결제를 정리하는 경우를 확인한다.
 @SpringBootTest
+@Import(TestcontainersConfiguration.class)
 class PaymentReconciliationIntegrationTest {
 
     @Autowired

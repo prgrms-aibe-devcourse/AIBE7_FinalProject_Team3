@@ -10,11 +10,13 @@ import org.example.grab.domain.shipment.entity.Shipment;
 import org.example.grab.domain.order.entity.ShippingAddress;
 import org.example.grab.domain.order.entity.StockReservation;
 import org.example.grab.domain.shipment.repository.ShipmentRepository;
+import org.example.grab.support.TestcontainersConfiguration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -30,6 +32,7 @@ import static org.assertj.core.api.Assertions.within;
 
 @Transactional
 @SpringBootTest
+@Import(TestcontainersConfiguration.class)
 class OrderRepositoryTest {
 
     @Autowired
