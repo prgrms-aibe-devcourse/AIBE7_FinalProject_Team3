@@ -35,10 +35,12 @@ org.example.grab
     ├── config              SecurityConfig, JpaConfig
     ├── common              ApiResponse, PageResponse
     ├── error               ErrorCode, CommonErrorCode, BusinessException, GlobalExceptionHandler
-    └── security            AuthRole, AuthenticatedUser
-        ├── jwt             JwtProvider, JwtAuthenticationFilter
-        ├── identity        CurrentUserIdProvider, UserIdResolver
-        └── handler         RestAuthenticationEntryPoint, RestAccessDeniedHandler
+    ├── security            AuthRole, AuthenticatedUser
+    │   ├── jwt             JwtProvider, JwtAuthenticationFilter
+    │   ├── identity        CurrentUserIdProvider, UserIdResolver
+    │   └── handler         RestAuthenticationEntryPoint, RestAccessDeniedHandler
+    └── storage             외부 스토리지 연동(도메인 무지)
+        └── supabase        SupabaseStorageClient, SupabaseStorageProperties, SupabaseStorageConfig
 ```
 
 - 도메인 패키지는 다른 도메인의 `repository`, `entity`를 직접 참조하지 않는다. 필요하면 상대 도메인의 `service`를 통한다.

@@ -6,6 +6,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.Objects;
 import java.util.UUID;
 
 @Getter
@@ -16,4 +17,9 @@ public abstract class UUIDEntity extends BaseEntity {
 
     @Column(name = "public_id", nullable = false, updatable = false, unique = true)
     private UUID uuid = UUID.randomUUID();
+
+    // 외부에서 발급한 UUID를 그대로 public_id로 쓰는 경우(예: DROP 이미지 발급 imageId)를 위한 생성자.
+    protected UUIDEntity(UUID uuid) {
+        this.uuid = Objects.requireNonNull(uuid);
+    }
 }

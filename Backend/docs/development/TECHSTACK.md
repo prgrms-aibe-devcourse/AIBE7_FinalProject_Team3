@@ -89,18 +89,18 @@ Actuator와 Prometheus의 로컬 메트릭 수집 연결은 완료됐다. Redis 
 
 | 구분 | 기술 | 용도 | 선정 이유 |
 | --- | --- | --- | --- |
-| Cloud | AWS | 인프라 환경 | EC2·RDS·S3 등 운영 자원을 한 환경에서 관리한다. |
+| Cloud | AWS | 인프라 환경 | EC2·RDS 등 운영 자원을 한 환경에서 관리한다. |
 | Compute | EC2 | 애플리케이션 서버 | Docker 기반 배포와 서버 운영 구성을 직접 학습하고 제어할 수 있다. |
 | Database | Amazon RDS for PostgreSQL | 운영 DB | 자동 백업, 복구 및 관리형 PostgreSQL 환경을 사용한다. |
-| Storage | Amazon S3 | DROP 이미지 저장 | 애플리케이션 서버와 이미지 파일을 분리하고 Presigned URL 업로드를 지원한다. |
+| Storage | Supabase Storage | DROP 이미지 저장 | 서명 업로드 URL을 지원하고, 공개 버킷 URL로 별도 CDN 없이 조회하며, 버킷 단위로 MIME·크기 제한을 걸 수 있다. |
 | Container | Docker | 애플리케이션 컨테이너화 | 개발·CI·운영 환경 차이를 줄인다. |
 | Container Management | Docker Compose | 컨테이너 실행 | Kubernetes 없이 애플리케이션과 운영 도구를 단순하게 관리한다. |
 | Reverse Proxy | Nginx | TLS 종료 및 트래픽 전환 | 외부 요청을 애플리케이션으로 전달하고 Blue/Green 포트 전환에 사용한다. |
 | Container Registry | GHCR | Docker 이미지 저장 | GitHub Actions와 권한 및 배포 흐름을 연계한다. |
-| Secrets | AWS Systems Manager Parameter Store | 환경변수·비밀값 관리 | DB 비밀번호, PG Secret Key, SMTP 계정 정보가 저장소 및 이미지에 포함되는 것을 방지한다. |
+| Secrets | AWS Systems Manager Parameter Store | 환경변수·비밀값 관리 | DB 비밀번호, PG Secret Key, SMTP 계정 정보, Supabase Secret Key가 저장소 및 이미지에 포함되는 것을 방지한다. |
 | DNS / TLS | Route 53 + ACM | 도메인·인증서 | 운영 서비스에 HTTPS를 적용한다. |
 
-RDS와 S3를 기본 운영안으로 사용한다. 비용이나 운영 일정 때문에 Neon 또는 Supabase를 검토할 수 있지만, 같은 역할의 서비스를 동시에 사용하지 않고 배포 전 하나로 확정한다.
+RDS를 기본 운영 DB로 사용하고, DROP 이미지 저장소는 Supabase Storage로 확정한다. 비용이나 운영 일정 때문에 Neon 등 다른 관리형 PostgreSQL을 검토할 수 있지만, 같은 역할의 서비스를 동시에 사용하지 않고 배포 전 하나로 확정한다.
 
 ### 4.3 이메일 발송
 

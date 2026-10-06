@@ -4,6 +4,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.example.grab.domain.category.service.CategoryService;
 import org.example.grab.domain.drop.dto.request.DropDraftRequest;
+import org.example.grab.domain.drop.dto.request.DropImageRequest;
 import org.example.grab.domain.drop.dto.request.OptionGroupRequest;
 import org.example.grab.domain.drop.dto.request.OptionRequest;
 import org.example.grab.domain.drop.dto.request.OptionValueRequest;
@@ -18,6 +19,7 @@ import org.example.grab.domain.wish.WishNotice;
 import org.example.grab.domain.wish.service.WishQueryService;
 import org.example.grab.global.config.JpaConfig;
 import org.example.grab.global.error.BusinessException;
+import org.example.grab.global.storage.supabase.SupabaseStorageConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -47,10 +49,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
-@Import({JpaConfig.class, DropService.class, CategoryService.class, WishQueryService.class})
+@Import({JpaConfig.class, DropService.class, CategoryService.class, WishQueryService.class,
+        SupabaseStorageConfig.class})
 @TestPropertySource(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
 @Testcontainers
 class PublicDropDetailIntegrationTest {
+
+    private static final String IMAGE_URL_PREFIX =
+            "https://project.supabase.co/storage/v1/object/public/drop-images/images/";
 
     @Container
     static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18");
@@ -266,8 +272,10 @@ class PublicDropDetailIntegrationTest {
     // 그룹·값·SKU의 sort_order를 뒤섞어 저장해도 응답은 sortOrder 순이어야 한다.
     private Long publishDrop() {
         OffsetDateTime start = OffsetDateTime.now().plusDays(1);
+        UUID imageId = UUID.randomUUID();
         DropDraftRequest request = new DropDraftRequest(
-                "상품", "설명", List.of("https://example.com/a.jpg"), categoryId, start, start.plusHours(2),
+                "상품", "설명", List.of(new DropImageRequest(imageId, IMAGE_URL_PREFIX + imageId + ".jpg")),
+                categoryId, start, start.plusHours(2),
                 new ShippingRequest(3000L, "출고 안내"),
                 List.of(
                         new OptionGroupRequest("material", "소재", 0, List.of(

@@ -1,6 +1,7 @@
 package org.example.grab.domain.drop.service;
 
 import org.example.grab.domain.drop.dto.request.DropDraftRequest;
+import org.example.grab.domain.drop.dto.request.DropImageRequest;
 import org.example.grab.domain.drop.dto.request.OptionGroupRequest;
 import org.example.grab.domain.drop.dto.request.OptionRequest;
 import org.example.grab.domain.drop.dto.request.OptionValueRequest;
@@ -37,6 +38,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 @SpringBootTest
 class DropDraftPublishConcurrencyIntegrationTest {
+
+    private static final String IMAGE_URL_PREFIX =
+            "https://project.supabase.co/storage/v1/object/public/drop-images/images/";
 
     @Autowired
     private DropService dropService;
@@ -182,7 +186,9 @@ class DropDraftPublishConcurrencyIntegrationTest {
                 List.of(new OptionValueRequest("black", "블랙", 0)));
         OptionRequest option = new OptionRequest(
                 List.of(new SelectionRequest("color", "black")), 5000L, 5, true, 0);
-        return new DropDraftRequest("상품", "설명", List.of("https://example.com/a.jpg"), categoryId,
+        UUID imageId = UUID.randomUUID();
+        return new DropDraftRequest("상품", "설명",
+                List.of(new DropImageRequest(imageId, IMAGE_URL_PREFIX + imageId + ".jpg")), categoryId,
                 java.time.OffsetDateTime.now().plusDays(1), java.time.OffsetDateTime.now().plusDays(2),
                 new ShippingRequest(3000L, "안내"), List.of(group), List.of(option));
     }

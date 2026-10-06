@@ -12,7 +12,7 @@ import java.util.List;
 public record DropDraftRequest(
         @Size(max = 200) String name,
         String description,
-        List<@NotBlank @Size(max = 500) String> imageUrls,
+        @Size(max = 10) List<@NotNull @Valid DropImageRequest> images,
         @Positive Long categoryId,
         OffsetDateTime saleStartsAt,
         OffsetDateTime saleEndsAt,
