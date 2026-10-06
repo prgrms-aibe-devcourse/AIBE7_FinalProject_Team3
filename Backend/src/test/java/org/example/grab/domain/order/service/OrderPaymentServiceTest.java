@@ -140,7 +140,7 @@ class OrderPaymentServiceTest {
                 lockedOrder(), 48000, expiresAt, expiresAt);
         PaymentCompletionResult mismatch = orderPaymentService.completePayment(
                 lockedOrder(), 47000, expiresAt.minusMinutes(1), expiresAt.minusMinutes(1));
-        jdbcTemplate.update("UPDATE orders SET status = 'CANCELED', canceled_at = CURRENT_TIMESTAMP WHERE id = ?",
+        jdbcTemplate.update("UPDATE orders SET status = 'CANCELED', canceled_at = CURRENT_TIMESTAMP, cancel_reason = '테스트 취소' WHERE id = ?",
                 order.getId());
         entityManager.clear();
         PaymentCompletionResult canceled = orderPaymentService.completePayment(

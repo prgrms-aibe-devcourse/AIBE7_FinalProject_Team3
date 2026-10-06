@@ -359,7 +359,7 @@ class PaymentReconciliationIntegrationTest {
         given(paymentGateway.lookup("payment-unknown"))
                 .willReturn(PaymentGatewayResult.awaitingConfirmation("IN_PROGRESS"));
         payAt(now, "payment-unknown", idempotencyKey);
-        jdbcTemplate.update("UPDATE orders SET status = 'CANCELED', canceled_at = CURRENT_TIMESTAMP WHERE id = ?",
+        jdbcTemplate.update("UPDATE orders SET status = 'CANCELED', canceled_at = CURRENT_TIMESTAMP, cancel_reason = '테스트 취소' WHERE id = ?",
                 order.getId());
 
         // when
@@ -407,7 +407,7 @@ class PaymentReconciliationIntegrationTest {
                 order.getId());
         assertPayRejected(now, PaymentErrorCode.PAYMENT_EXPIRED);
         // when & then: 취소된 주문은 마감 전후와 관계없이 상태 전이 오류
-        jdbcTemplate.update("UPDATE orders SET status = 'CANCELED', canceled_at = CURRENT_TIMESTAMP WHERE id = ?",
+        jdbcTemplate.update("UPDATE orders SET status = 'CANCELED', canceled_at = CURRENT_TIMESTAMP, cancel_reason = '테스트 취소' WHERE id = ?",
                 order.getId());
         assertPayRejected(now, CommonErrorCode.INVALID_STATE_TRANSITION);
         assertPayRejected(afterDeadline, CommonErrorCode.INVALID_STATE_TRANSITION);
