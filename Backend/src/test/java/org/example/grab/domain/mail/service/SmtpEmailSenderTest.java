@@ -7,11 +7,14 @@ import jakarta.mail.Multipart;
 import jakarta.mail.Part;
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
+import org.example.grab.domain.mail.config.MailAsyncConfig;
 import org.example.grab.domain.mail.dto.EmailMessage;
 import org.example.grab.domain.mail.error.EmailSendException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.NoSuchBeanDefinitionException;
+import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.mail.MailParseException;
 import org.springframework.mail.MailSendException;
@@ -169,6 +172,31 @@ class SmtpEmailSenderTest {
                 .run(context -> assertThat(context).doesNotHaveBean(EmailSender.class));
         contextRunner()
                 .run(context -> assertThat(context).doesNotHaveBean(EmailSender.class));
+    }
+
+    @Test
+    @DisplayName("설정 파일의 기본 provider(smtp)로 SMTP 구현체를 EmailSender로 등록한다")
+    // 속성을 따로 지정하지 않고 application-mail.yml을 그대로 불러와, 배포 기본 설정에서 SMTP 구현체가 선택되는지 확인한다
+    void registersWithDefaultConfigFile() {
+        // given & when & then
+        contextRunner()
+                .withInitializer(new ConfigDataApplicationContextInitializer())
+                .run(context -> assertThat(context).getBean(EmailSender.class).isInstanceOf(SmtpEmailSender.class));
+    }
+
+    @Test
+    @DisplayName("provider가 smtp가 아니면 EmailSender를 주입받는 비동기 발송 진입점이 생성되지 않아 기동이 실패한다")
+    // 메일 발송이 조용히 꺼지지 않고 잘못된 설정을 기동 시점에 드러내는지 확인하는 테스트
+    void failsToStartWhenProviderIsUnknown() {
+        // given & when & then
+        contextRunner()
+                .withInitializer(new ConfigDataApplicationContextInitializer())
+                .withUserConfiguration(MailAsyncConfig.class, AsyncEmailDispatcher.class)
+                .withPropertyValues("grab.mail.provider=ses")
+                .run(context -> assertThat(context).hasFailed()
+                        .getFailure().rootCause()
+                        .isInstanceOf(NoSuchBeanDefinitionException.class)
+                        .hasMessageContaining(EmailSender.class.getName()));
     }
 
     private static String stackTraceOf(Throwable throwable) {

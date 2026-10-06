@@ -21,6 +21,7 @@ repositories {
 ext {
     set('datasourceMicrometerVersion', "2.3.0")
     set('jjwtVersion', "0.13.0")
+    set('greenmailVersion', "2.1.14")
     // set('springAiVersion', "2.0.1")
 }
 
@@ -58,6 +59,10 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
     testImplementation 'org.testcontainers:testcontainers-postgresql'
     testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+    testImplementation("com.icegreen:greenmail-junit5:${greenmailVersion}") {
+        exclude group: 'junit', module: 'junit'
+        exclude group: 'org.eclipse.angus', module: 'jakarta.mail'
+    }
     testCompileOnly 'org.projectlombok:lombok'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testAnnotationProcessor 'org.projectlombok:lombok'
