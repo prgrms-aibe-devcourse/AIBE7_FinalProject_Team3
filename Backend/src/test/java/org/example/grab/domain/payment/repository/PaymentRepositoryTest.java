@@ -9,11 +9,13 @@ import org.example.grab.domain.payment.entity.PaymentEventType;
 import org.example.grab.domain.payment.entity.PaymentProvider;
 import org.example.grab.domain.payment.entity.PaymentStatus;
 import org.example.grab.domain.payment.entity.ReconciliationStatus;
+import org.example.grab.support.TestcontainersConfiguration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Transactional
 @SpringBootTest
+@Import(TestcontainersConfiguration.class)
 class PaymentRepositoryTest {
 
     @Autowired

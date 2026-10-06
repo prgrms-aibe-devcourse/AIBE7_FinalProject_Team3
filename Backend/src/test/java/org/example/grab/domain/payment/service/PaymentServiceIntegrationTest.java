@@ -19,6 +19,7 @@ import org.example.grab.domain.payment.gateway.PaymentGateway;
 import org.example.grab.domain.payment.gateway.PaymentGatewayResult;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
+import org.example.grab.support.TestcontainersConfiguration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
@@ -48,6 +50,7 @@ import static org.mockito.Mockito.verify;
 // 실제 PostgreSQL에서 결제 요청 → PG 결과 반영 흐름을 확인한다. PG는 결과를 지정할 수 있는 mock으로 바꾼다.
 // 서비스의 두 트랜잭션이 운영처럼 따로 커밋되도록 테스트 트랜잭션을 쓰지 않고, 만든 데이터는 테스트마다 지운다.
 @SpringBootTest
+@Import(TestcontainersConfiguration.class)
 class PaymentServiceIntegrationTest {
 
     private static final long TOTAL_AMOUNT = 33000;

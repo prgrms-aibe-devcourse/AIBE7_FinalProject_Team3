@@ -18,11 +18,13 @@ import org.example.grab.domain.order.repository.OrderItemRepository;
 import org.example.grab.domain.order.repository.OrderRepository;
 import org.example.grab.domain.order.repository.StockReservationRepository;
 import org.example.grab.global.error.BusinessException;
+import org.example.grab.support.TestcontainersConfiguration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +40,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Transactional
 @SpringBootTest
+@Import(TestcontainersConfiguration.class)
 class OrderPaymentServiceTest {
 
     @Autowired
