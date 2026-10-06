@@ -2,6 +2,10 @@ spring:
   application:
     name: GRAB
 
+  # 메일 발송 설정은 별도 파일로 분리. 프로필과 무관하게 항상 불러온다
+  config:
+    import: classpath:application-mail.yml
+
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/grab}
     username: ${DB_USERNAME:grab}

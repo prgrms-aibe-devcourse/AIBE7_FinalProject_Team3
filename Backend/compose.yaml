@@ -15,11 +15,24 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       REDIS_HOST: redis
       REDIS_PASSWORD: ${REDIS_PASSWORD:-grab}
+      # 기본값은 Mailpit이다. 컨테이너 안의 localhost는 mailpit이 아니므로 서비스 이름으로 접속한다(docs/MAIL.md)
+      # .env에 값을 넣으면 Gmail 등 다른 SMTP로 바꿔 시험할 수 있다
+      # :- 를 써서 .env에 빈 값으로 남은 키도 기본값으로 대체한다. 빈 문자열이 넘어가면 Spring 기본값이 적용되지 않는다
+      MAIL_HOST: ${MAIL_HOST:-mailpit}
+      MAIL_PORT: ${MAIL_PORT:-1025}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_SMTP_AUTH: ${MAIL_SMTP_AUTH:-false}
+      MAIL_STARTTLS: ${MAIL_STARTTLS:-false}
+      MAIL_FROM: ${MAIL_FROM:-no-reply@grab.local}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      # 메일 서버가 없어도 기동은 되지만, 로컬에서 발송 결과를 바로 확인할 수 있게 함께 띄운다
+      mailpit:
+        condition: service_started
 
   postgres:
     image: postgres:18
@@ -50,6 +63,20 @@ services:
       - redis-data:/data
     healthcheck:
       test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # 로컬 개발용 SMTP 서버. 받은 메일을 외부로 보내지 않고 보관해 웹 화면에서 확인한다(docs/MAIL.md)
+  mailpit:
+    image: axllent/mailpit:v1.31.3
+    ports:
+      # SMTP. 인증·STARTTLS 없이 받으므로 외부에서 접속하지 못하게 로컬에만 연다
+      - "127.0.0.1:1025:1025"
+      # 받은 메일 확인용 웹 화면. 인증 코드가 보이므로 로컬에만 연다
+      - "127.0.0.1:8025:8025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
       interval: 5s
       timeout: 3s
       retries: 10

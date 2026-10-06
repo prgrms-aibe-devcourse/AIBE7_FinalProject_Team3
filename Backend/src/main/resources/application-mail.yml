@@ -1,0 +1,36 @@
+# 메일 발송 설정(GR-60). application.yml의 spring.config.import로 항상 불러오므로 mail 프로필을 따로 켜지 않는다
+spring:
+  # 기본값은 로컬 compose Mailpit이다 -> 개발 과정에서 사용하는 가짜 메일 서버
+  # 운영 Gmail 계정과 앱 비밀번호는 환경변수로만 주입한다
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:false}
+          # SMTP 장애 시 발송 작업이 무한 대기하지 않도록 각 타임아웃을 5초로 제한한다
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+          # required를 함께 켜야 서버가 STARTTLS를 제공하지 않을 때 평문으로 내려가 계정 정보를 보내지 않는다
+          # 운영 단계에서 true로 전환, STARTTLS -> 평문으로 시작한 연결을 암호화 연결로 바꾸는 방식
+          starttls:
+            enable: ${MAIL_STARTTLS:false}
+            required: ${MAIL_STARTTLS:false}
+
+grab:
+  mail:
+    # 발송 구현체를 선택한다. 현재 구현은 smtp뿐이다(GRAB_MAIL_PROVIDER로 변경)
+    provider: smtp
+    # 메일에 표시되는 발신 주소. SMTP 로그인 계정(MAIL_USERNAME)과 별개다
+    # Gmail은 로그인 계정과 다른 주소를 계정 주소로 바꿔 보내므로 운영에서는 같은 주소를 넣는다
+    from: ${MAIL_FROM:no-reply@grab.local}
+
+management:
+  # SMTP 장애가 health 전체를 DOWN으로 만들어 메일과 무관한 요청까지 막지 않도록 메일 헬스 체크는 끈다(TECHSTACK 4.3)
+  health:
+    mail:
+      enabled: false
