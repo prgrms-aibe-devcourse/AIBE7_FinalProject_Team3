@@ -14,6 +14,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.grab.global.entity.UUIDEntity;
 
+import java.util.UUID;
+
 @Entity
 @Table(name = "drop_images")
 @Getter
@@ -37,14 +39,16 @@ public class DropImage extends UUIDEntity {
     @Column(name = "alt_text", nullable = false, length = 300)
     private String altText;
 
-    private DropImage(Drop drop, String imageUrl, int sortOrder, String altText) {
+    // 발급된 imageId를 public_id로 그대로 쓴다(IMAGE_UPLOAD.md 1.1).
+    private DropImage(Drop drop, UUID imageId, String imageUrl, int sortOrder, String altText) {
+        super(imageId);
         this.drop = drop;
         this.imageUrl = imageUrl;
         this.sortOrder = sortOrder;
         this.altText = altText;
     }
 
-    public static DropImage create(Drop drop, String imageUrl, int sortOrder, String altText) {
-        return new DropImage(drop, imageUrl, sortOrder, altText);
+    public static DropImage create(Drop drop, UUID imageId, String imageUrl, int sortOrder, String altText) {
+        return new DropImage(drop, imageId, imageUrl, sortOrder, altText);
     }
 }

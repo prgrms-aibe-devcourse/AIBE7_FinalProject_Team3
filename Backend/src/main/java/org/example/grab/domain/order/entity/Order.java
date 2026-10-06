@@ -86,6 +86,9 @@ public class Order extends UUIDEntity {
     @Column(name = "canceled_at")
     private OffsetDateTime canceledAt;
 
+    @Column(name = "expired_at")
+    private OffsetDateTime expiredAt;
+
     private Order(
             String orderNumber,
             Long buyerId,
@@ -163,11 +166,12 @@ public class Order extends UUIDEntity {
         this.paidAt = Objects.requireNonNull(paidAt);
     }
 
-    public void expire() {
+    public void expire(OffsetDateTime expiredAt) {
         if (status != OrderStatus.PAYMENT_PENDING) {
             throw new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION);
         }
         this.status = OrderStatus.EXPIRED;
+        this.expiredAt = Objects.requireNonNull(expiredAt);
     }
 
     public void prepareShipment() {

@@ -17,7 +17,7 @@
 | Build | Gradle Wrapper | 8.14+ 또는 9.x | 로컬과 CI에서 동일한 빌드 도구 버전을 사용한다. |
 | API Docs | SpringDoc OpenAPI / Swagger UI | 3.1.0 | Spring Boot 4 기반 API 명세를 자동 생성하고 프론트엔드와 공유한다. |
 | Monitoring Endpoint | Spring Boot Actuator | Boot 관리 | 상태 확인, 메트릭 노출 및 배포 성공 여부를 검증한다. |
-| Scheduling | Spring `@Scheduled` + PostgreSQL 인덱스 폴링 | Boot 관리 | DROP 상태(WISH→GRAB→ENDED) 자동 전환. 별도 스케줄러 인프라 없이 기존 DB·인덱스만 사용한다(1.1절). |
+| Scheduling | Spring `@Scheduled` + PostgreSQL 인덱스 폴링 | Boot 관리 | DROP 상태(WISH→GRAB→ENDED) 자동 전환과 결제 대기 만료. 별도 스케줄러 인프라 없이 기존 DB·인덱스만 사용한다(1.1절, 1.2절). |
 
 ### 1.1 DROP 상태 자동 전환 선정 이유 (GR-18)
 
@@ -50,6 +50,30 @@
   - 같은 구간에 수천 개 이상의 DROP이 반복적으로 시작·종료
   - 저장 상태나 알림 이벤트에 서브초 SLA가 요구됨
 - Redis를 추가하더라도 PostgreSQL을 원본으로 유지하고 Redis 전체 유실 후 DB에서 재구축할 수 있어야 한다.
+
+### 1.2 결제 대기 만료 배치 선정 이유 (GR-22, GR-65)
+
+결제 가능 여부는 저장 상태가 아니라 **서버 시각과 `payment_expires_at`** 기준으로 판정한다. 만료 배치는 마감이 지난 주문을 `EXPIRED`로 바꾸고 선점 재고를 가용 재고로 돌려주는 역할만 담당하므로, 배치 지연은 재고 반환 시점에만 영향을 준다. 1.1절과 같이 `@Scheduled` 10초 폴링을 쓰되, 만료는 주문·예약·재고를 함께 바꾸므로 처리 단위가 다르다.
+
+| 방식 | 장점 | 현재 제외 이유 |
+| --- | --- | --- |
+| **주문별 트랜잭션 + `SKIP LOCKED` (10초 폴링)** | 결제 확정과 같은 주문 행 잠금·만료 코드를 재사용, 실패가 주문 단위로 격리됨 | 대상이 많으면 주문 수만큼 트랜잭션이 생김 |
+| 한 문장 일괄 UPDATE (1.1절 방식) | 쿼리 수가 적음 | 주문·예약·옵션 재고 세 테이블을 함께 바꿔야 해 만료 로직이 SQL과 코드에 중복됨 |
+| 조회 시점 만료(lazy) | 배치가 필요 없음 | 아무도 조회하지 않는 주문은 재고가 반환되지 않음 |
+| Redis 키 만료 알림 | 마감 시각에 즉시 반응 | 알림 유실 시 재고가 반환되지 않고, Redis를 재고 판단 근거로 쓰게 됨 |
+
+선택 근거:
+
+1. **결제 확정과 같은 잠금 규칙을 따른다.** 결제 확정과 만료는 같은 주문 행을 잠그고 `PAYMENT_PENDING`과 마감을 다시 확인하므로 한 경로만 재고를 바꾼다.
+2. **결제를 기다리지 않는다.** 결제 확정이 잠근 주문은 `SKIP LOCKED`로 건너뛰고 다음 실행에서 다시 조회한다. 후보 조회는 `(payment_expires_at, id)` 키셋이라 건너뛴 주문을 같은 실행에서 반복 조회하지 않는다.
+3. **PostgreSQL만으로 복구된다.** 서버 중단 중 놓친 주문도 다음 실행의 `payment_expires_at <= now` 조건으로 다시 조회된다.
+4. **수평 확장이 가능하다.** 여러 인스턴스가 동시에 실행돼도 잠금과 상태 조건 재확인으로 재고는 한 번만 반환된다.
+
+운영·고도화 기준:
+
+- 재고 반환은 마감 후 최대 약 10초 늦고, 대상이 많거나 결제가 주문을 잠그고 있으면 더 늦어질 수 있다. 그동안 반환 대기 수량은 가용 재고에 잡히지 않는다.
+- 진행 중인 결제가 있어도 마감이 지나면 만료하므로, 마감 직전 승인은 결제 `SUCCEEDED`, 보정 `REQUIRED`로 남을 수 있다(PAY-004). 진행 중 결제 정리는 GR-65에서 다룬다.
+- 한 주기의 만료 처리가 10초 안에 끝나지 않거나 후보 조회 지연이 계속 늘면 배치 크기·주기를 먼저 조정한다.
 
 ## 2. Database
 
@@ -89,18 +113,18 @@ Actuator와 Prometheus의 로컬 메트릭 수집 연결은 완료됐다. Redis 
 
 | 구분 | 기술 | 용도 | 선정 이유 |
 | --- | --- | --- | --- |
-| Cloud | AWS | 인프라 환경 | EC2·RDS·S3 등 운영 자원을 한 환경에서 관리한다. |
+| Cloud | AWS | 인프라 환경 | EC2·RDS 등 운영 자원을 한 환경에서 관리한다. |
 | Compute | EC2 | 애플리케이션 서버 | Docker 기반 배포와 서버 운영 구성을 직접 학습하고 제어할 수 있다. |
 | Database | Amazon RDS for PostgreSQL | 운영 DB | 자동 백업, 복구 및 관리형 PostgreSQL 환경을 사용한다. |
-| Storage | Amazon S3 | DROP 이미지 저장 | 애플리케이션 서버와 이미지 파일을 분리하고 Presigned URL 업로드를 지원한다. |
+| Storage | Supabase Storage | DROP 이미지 저장 | 서명 업로드 URL을 지원하고, 공개 버킷 URL로 별도 CDN 없이 조회하며, 버킷 단위로 MIME·크기 제한을 걸 수 있다. |
 | Container | Docker | 애플리케이션 컨테이너화 | 개발·CI·운영 환경 차이를 줄인다. |
 | Container Management | Docker Compose | 컨테이너 실행 | Kubernetes 없이 애플리케이션과 운영 도구를 단순하게 관리한다. |
 | Reverse Proxy | Nginx | TLS 종료 및 트래픽 전환 | 외부 요청을 애플리케이션으로 전달하고 Blue/Green 포트 전환에 사용한다. |
 | Container Registry | GHCR | Docker 이미지 저장 | GitHub Actions와 권한 및 배포 흐름을 연계한다. |
-| Secrets | AWS Systems Manager Parameter Store | 환경변수·비밀값 관리 | DB 비밀번호, PG Secret Key, SMTP 계정 정보가 저장소 및 이미지에 포함되는 것을 방지한다. |
+| Secrets | AWS Systems Manager Parameter Store | 환경변수·비밀값 관리 | DB 비밀번호, PG Secret Key, SMTP 계정 정보, Supabase Secret Key가 저장소 및 이미지에 포함되는 것을 방지한다. |
 | DNS / TLS | Route 53 + ACM | 도메인·인증서 | 운영 서비스에 HTTPS를 적용한다. |
 
-RDS와 S3를 기본 운영안으로 사용한다. 비용이나 운영 일정 때문에 Neon 또는 Supabase를 검토할 수 있지만, 같은 역할의 서비스를 동시에 사용하지 않고 배포 전 하나로 확정한다.
+RDS를 기본 운영 DB로 사용하고, DROP 이미지 저장소는 Supabase Storage로 확정한다. 비용이나 운영 일정 때문에 Neon 등 다른 관리형 PostgreSQL을 검토할 수 있지만, 같은 역할의 서비스를 동시에 사용하지 않고 배포 전 하나로 확정한다.
 
 ### 4.3 이메일 발송
 

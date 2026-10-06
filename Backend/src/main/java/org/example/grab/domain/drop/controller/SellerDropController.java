@@ -9,6 +9,7 @@ import org.example.grab.domain.drop.dto.response.DropDraftResponse;
 import org.example.grab.domain.drop.dto.response.DropPublishResponse;
 import org.example.grab.domain.drop.dto.response.SellerDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.SellerDropListResponse;
+import org.example.grab.domain.drop.dto.response.SellerDropStockResponse;
 import org.example.grab.domain.drop.dto.response.SellerDropWishCountResponse;
 import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.domain.drop.entity.DropStatus;
@@ -93,5 +94,11 @@ public class SellerDropController {
     public ApiResponse<SellerDropWishCountResponse> findWishCount(@PathVariable Long dropId) {
         Long sellerId = currentSellerIdProvider.currentSellerId();
         return ApiResponse.success(dropService.findSellerWishCount(sellerId, dropId));
+    }
+
+    @GetMapping("/{dropId}/stocks")
+    public ApiResponse<SellerDropStockResponse> findStocks(@PathVariable Long dropId) {
+        Long sellerId = currentSellerIdProvider.currentSellerId();
+        return ApiResponse.success(dropService.findSellerStocks(sellerId, dropId));
     }
 }

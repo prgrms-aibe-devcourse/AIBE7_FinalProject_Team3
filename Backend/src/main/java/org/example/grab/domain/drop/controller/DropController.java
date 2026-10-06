@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.grab.domain.drop.dto.PublicDropSort;
 import org.example.grab.domain.drop.dto.response.PublicDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.PublicDropListResponse;
+import org.example.grab.domain.drop.dto.response.PublicDropStockResponse;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.service.DropService;
 import org.example.grab.global.common.ApiResponse;
@@ -51,5 +52,11 @@ public class DropController {
     @GetMapping("/{dropId}")
     public ApiResponse<PublicDropDetailResponse> getDrop(@PathVariable Long dropId) {
         return ApiResponse.success(dropService.findPublicDrop(dropId));
+    }
+
+    // 공개 재고 재조회. 비로그인 조회이며 DRAFT는 서비스가 DROP_NOT_FOUND로 숨긴다.
+    @GetMapping("/{dropId}/stocks")
+    public ApiResponse<PublicDropStockResponse> getStocks(@PathVariable Long dropId) {
+        return ApiResponse.success(dropService.findPublicStocks(dropId));
     }
 }
