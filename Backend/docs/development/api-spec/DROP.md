@@ -535,7 +535,14 @@ POST /api/v1/seller/drops/{dropId}/cancel
 GET /api/v1/seller/drops/{dropId}/stocks
 ```
 
-- **인증**: `SELLER`
+- **인증**: `SELLER` (승인된 판매자, DROP 소유권 필요)
+- 재고 값은 PostgreSQL에 커밋된 값을 조회 시점 기준으로 반환한다. 응답 이후 재고가 유지된다고 보장하지 않는다.
+
+**정책:**
+- 소유자면 DRAFT를 포함해 상태와 관계없이 조회할 수 있다.
+- 비활성 SKU도 운영 현황 확인을 위해 포함한다.
+- 옵션은 SKU `sortOrder` 순서로 반환하고, 반환할 SKU가 없으면 `options: []`다.
+- `availableStock = totalStock - reservedStock - soldStock - withheldQuantity`. 보류 수량은 별도 필드로 노출하지 않으며 판매 수량에 합치지 않는다.
 
 **응답:**
 
@@ -557,5 +564,11 @@ GET /api/v1/seller/drops/{dropId}/stocks
   }
 }
 ```
+
+- `optionName`은 값 매핑을 그룹 `sortOrder` 순으로 정렬한 뒤 선택값을 ` / `로 연결한다. 값 매핑이 없는 기본 SKU는 `기본`이다.
+
+**오류 코드:**
+- `DROP_NOT_FOUND` — 없는 DROP
+- `DROP_ACCESS_DENIED` — 다른 판매자의 DROP
 
 ---

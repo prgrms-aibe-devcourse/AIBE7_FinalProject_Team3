@@ -38,9 +38,11 @@ public class SecurityConfig {
                         // ponytail: 로컬 확인용 전 환경 개방. 운영 노출 정책은 GR-59(한재훈)에서 프로필로 제한
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**")
                         .permitAll()
-                        // 공개 카탈로그(목록·상세)만 GET으로 개방한다. 상세는 한 단계 경로(*)만 열어
+                        // 공개 카탈로그(목록·상세·재고 재조회)만 GET으로 개방한다. 상세는 한 단계 경로(*)만 열어
                         // /api/v1/drops/{id}/wish(WISH API)와 판매자 경로는 계속 인증이 필요하다.
-                        .requestMatchers(HttpMethod.GET, "/api/v1/categories", "/api/v1/drops", "/api/v1/drops/*")
+                        // 재고 재조회는 /stocks만 명시해 /api/v1/drops/** 전체를 열지 않는다.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/categories", "/api/v1/drops", "/api/v1/drops/*",
+                                "/api/v1/drops/*/stocks")
                         .permitAll()
                         // 판매자 API는 URL에서 SELLER를 먼저 거르고, 승인 상태는 CurrentSellerIdProvider가 DB로 다시 확인한다.
                         // 세그먼트 단위 매칭이라 /api/v1/seller-applications(USER의 판매자 신청)에는 걸리지 않는다.
