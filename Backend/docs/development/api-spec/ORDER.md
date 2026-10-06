@@ -187,19 +187,62 @@ POST /api/v1/orders/{orderId}/cancel
 }
 ```
 
+- `reason`: 취소 사유 (필수, 공백 불가, 최대 500자)
+
+**응답:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "orderId": "b2d4f6a8-1c3e-4a5b-8c7d-9e0f1a2b3c4d",
+    "status": "CANCELED",
+    "refundStatus": "SUCCEEDED",
+    "canceledAt": "2026-09-18T14:10:00+09:00"
+  }
+}
+```
+
+- 취소가 끝났거나 결제 취소 결과를 확인 중이면 `200 OK`로 응답하고 `status`, `refundStatus`로 구분합니다.
+
+| 상황 | `status` | `refundStatus` | `canceledAt` |
+| --- | --- | --- | --- |
+| 결제 전 주문 취소 | `CANCELED` | `NONE` | 취소 시각 |
+| 결제 후 주문 취소, 결제 취소 성공 | `CANCELED` | `SUCCEEDED` | 취소 시각 |
+| 결제 후 주문 취소, 결제 취소 결과 확인 중 | `PAID` 또는 `PREPARING` (변경 없음) | `UNKNOWN` | `null` |
+
+- `refundStatus`가 `UNKNOWN`이면 클라이언트는 같은 `Idempotency-Key`와 같은 본문으로 재전송해 결과를 확인합니다. 취소 확인 중에는 판매자가 배송 준비·발송 처리를 할 수 없습니다.
+
 **처리 규칙:**
-- 본인 주문만 취소할 수 있다.
-- `PAYMENT_PENDING` 주문은 즉시 취소하고 확보 재고를 반환한다.
-- `PAID` 주문은 PG 결제 취소 성공 후 `CANCELED`로 전환한다.
-- 배송이 시작된 주문은 취소할 수 없다.
-- 재고 반환은 한 번만 수행한다.
+- 본인 주문만 취소할 수 있다. 다른 사용자의 주문은 존재 여부를 숨기고 `ORDER_NOT_FOUND`로 응답한다(1.3과 같음).
+- 취소 가능 상태는 `PAYMENT_PENDING`, `PAID`, `PREPARING`이다. 배송이 시작된 `SHIPPED`·`DELIVERED`와 이미 끝난 `CANCELED`·`EXPIRED`는 `ORDER_NOT_CANCELABLE`로 거부한다. 시간 제한은 없다.
+- `PAYMENT_PENDING` 주문은 PG 호출 없이 즉시 취소하고 확보 재고를 반환한다.
+  - 결제 승인 응답을 기다리는 결제(`PENDING`)가 있으면 `ORDER_STATUS_CONFLICT`로 거부한다. 잠시 뒤 다시 요청한다.
+  - 결과 불명 결제(`UNKNOWN`)가 있어도 취소한다. 이후 승인이 확인되면 보정 대상으로 기록하고 환불한다.
+- `PAID`, `PREPARING` 주문은 토스페이먼츠 결제 취소(전액)에 성공한 뒤 `CANCELED`로 전환하고 판매 수량을 반환한다. 결제 취소와 재고 반환은 같은 트랜잭션에서 반영한다.
+  - 토스가 취소를 거절하면 주문은 바뀌지 않고 `PAYMENT_CANCEL_FAILED`로 응답한다. 새 `Idempotency-Key`로 다시 요청할 수 있다.
+  - 결제 취소 결과를 알 수 없으면 주문을 바꾸지 않고 `refundStatus: UNKNOWN`으로 응답한다.
+- 반환한 재고는 가용 재고로 돌린다. 재고 반환은 한 번만 수행한다.
+- 처리 순서와 트랜잭션 경계는 [ERD.md](../ERD.md) 3.3을 따른다.
+
+**멱등성:**
+- 같은 `Idempotency-Key`와 같은 본문이 다시 오면 최초 취소 결과를 반환한다. 결제 취소 결과를 확인 중(`UNKNOWN`)이면 같은 서버 멱등 키로 토스 결제 취소를 다시 요청해 확정한 뒤 응답한다.
+- 같은 `Idempotency-Key`에 다른 본문이 오면 `DUPLICATE_IDEMPOTENCY_KEY`로 거부한다.
+- 결제 취소를 진행·확인 중인 주문에 다른 `Idempotency-Key`로 요청하면 `ORDER_STATUS_CONFLICT`로 거부한다.
+- 취소 요청 키와 요청 해시는 `orders.cancel_idempotency_key`, `orders.cancel_request_hash`에 저장하며 키 범위는 주문별이다. 토스 결제 취소 요청에는 서버가 만든 UUID(`payment_cancellations.idempotency_key`)를 쓴다.
 
 **오류 코드:**
-- `ORDER_NOT_FOUND`
-- `ORDER_ACCESS_DENIED`
-- `ORDER_NOT_CANCELABLE`
-- `PAYMENT_CANCEL_FAILED`
-- `ORDER_STATUS_CONFLICT`
+
+| 오류 코드 | HTTP 상태 | 조건 |
+| --- | --- | --- |
+| `INVALID_IDEMPOTENCY_KEY` | 400 | `Idempotency-Key` 헤더가 없거나 UUID 형식이 아님 |
+| `VALIDATION_FAILED` | 400 | `reason` 누락·공백 또는 500자 초과 |
+| `RESOURCE_NOT_FOUND` | 404 | 경로의 주문 ID 형식이 올바르지 않음 |
+| `ORDER_NOT_FOUND` | 404 | 주문이 없거나 다른 사용자의 주문 |
+| `DUPLICATE_IDEMPOTENCY_KEY` | 409 | 같은 멱등 키에 다른 요청 본문 |
+| `ORDER_NOT_CANCELABLE` | 409 | 취소할 수 없는 상태(`SHIPPED`, `DELIVERED`, `CANCELED`, `EXPIRED`) |
+| `ORDER_STATUS_CONFLICT` | 409 | 결제 승인 응답 대기 중, 또는 다른 취소 요청을 처리·확인 중 |
+| `PAYMENT_CANCEL_FAILED` | 502 | 토스페이먼츠가 결제 취소를 거절함 |
 
 ---
 
@@ -247,7 +290,7 @@ POST /api/v1/seller/orders/{orderId}/prepare-shipment
 
 **처리 조건:**
 - 해당 주문의 DROP 소유자인 판매자만 요청할 수 있다.
-- 결제 취소 상태가 `UNKNOWN`인 주문은 배송 준비로 전환할 수 없다.
+- 소비자 취소로 결제 취소를 진행·확인 중인(`payment_cancellations.status`가 `REQUESTED`·`UNKNOWN`) 주문은 배송 준비로 전환할 수 없다(`PAYMENT_CANCELLATION_UNKNOWN`).
 - 주문 행 잠금으로 취소와 경합해도 하나의 상태 전이만 반영한다.
 
 **응답:**
@@ -288,6 +331,7 @@ POST /api/v1/seller/orders/{orderId}/shipment
 - 요청 키 범위는 주문별이다. 같은 주문·키·본문 재요청은 최초 성공 결과를 반환하고, 같은 키에 다른 본문이면 `409 DUPLICATE_IDEMPOTENCY_KEY`를 반환한다.
 - 주문 행을 잠근 트랜잭션에서 소유권·`PREPARING` 상태를 확인하고 배송 정보와 상태를 함께 저장한다. `shipped_at`은 이 요청을 처리한 서버 시각으로 기록한다.
 - 발송 상태는 주문의 `SHIPPED` 상태와 일치한다. 취소와 동시에 요청되면 먼저 커밋한 상태 전이만 성공한다.
+- 소비자 취소로 결제 취소를 진행·확인 중인 주문은 발송 처리할 수 없다(`PAYMENT_CANCELLATION_UNKNOWN`).
 
 ### 2.5 송장 정보 수정
 

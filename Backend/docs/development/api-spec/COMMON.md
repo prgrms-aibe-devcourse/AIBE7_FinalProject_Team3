@@ -192,7 +192,7 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 | `RESOURCE_NOT_FOUND` | 404 | 리소스 없음 |
 | `ORDER_NOT_FOUND` | 404 | 주문 없음 (구매자 주문 조회에서는 다른 사용자의 주문도 포함) |
 | `DUPLICATE_IDEMPOTENCY_KEY` | 409 | 같은 멱등 키에 다른 요청 본문 사용 |
-| `PAYMENT_CANCELLATION_UNKNOWN` | 409 | 결제 취소 결과 확인 중이라 배송 준비 불가 |
+| `PAYMENT_CANCELLATION_UNKNOWN` | 409 | 결제 취소 진행·확인 중이라 배송 준비·발송 불가 |
 | `DUPLICATE_EMAIL` | 409 | 이메일 중복 |
 | `DUPLICATE_NICKNAME` | 409 | 닉네임 중복 (대소문자 무시) |
 | `INVALID_STATE_TRANSITION` | 409 | 허용되지 않은 상태 전이 |
@@ -215,6 +215,7 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 | `EMAIL_VERIFICATION_RESEND_TOO_SOON` | 429 | 이메일 인증 코드 재발송 간격 또는 발송 한도 초과 |
 | `INTERNAL_SERVER_ERROR` | 500 | 처리하지 못한 서버 오류 (Redis·DB 장애 등). 인증 실패가 아니므로 클라이언트는 로그아웃하지 않는다 |
 | `EXTERNAL_SERVICE_ERROR` | 502 | 외부 연동 서비스(스토리지 등) 호출 실패 |
+| `PAYMENT_CANCEL_FAILED` | 502 | PG가 결제 취소를 거절함 |
 
 ---
 
@@ -246,6 +247,8 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 > 클라이언트 헤더 값을 재사용하지 않고 서버가 UUID로 새로 생성해 저장합니다. 토스페이먼츠 결제 승인 API의 `Idempotency-Key` 헤더에 이 값을 넣습니다.
 >
 > 결제 요청의 클라이언트 `Idempotency-Key`와 요청 해시는 `payments.client_idempotency_key`, `payments.request_hash`에 저장하며, 키 범위는 주문별입니다.
+>
+> 주문 취소 요청의 `Idempotency-Key`와 요청 해시는 `orders.cancel_idempotency_key`, `orders.cancel_request_hash`에 저장하며, 키 범위는 주문별입니다.
 
 ---
 
