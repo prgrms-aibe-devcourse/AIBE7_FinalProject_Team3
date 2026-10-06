@@ -62,6 +62,47 @@ Backend를 어디서 실행하느냐에 따라 Mailpit에 접속하는 주소가
 - 호스트에서 실행할 때는 `.env`가 자동으로 읽히지 않는다. 다른 SMTP로 바꾸려면 실행하는 셸이나 IDE 실행 설정에 환경변수를 직접 넣는다.
 - 호스트 실행에서 메일 키를 빈 값으로 넣으면 기본값 대신 빈 문자열이 적용되어 발송이 실패한다. 쓰지 않는 키는 환경변수로 넣지 않는다.
 
+### 3.3 실행과 수신 확인
+
+`Backend/` 디렉터리에서 실행한다. 명령은 Windows PowerShell 기준이다.
+
+~~~powershell
+# Mailpit만 실행 (호스트에서 Backend를 실행할 때)
+docker compose up -d mailpit
+docker compose ps mailpit   # STATUS가 healthy인지 확인
+
+# Compose의 backend를 실행하면 Mailpit도 함께 시작된다
+docker compose up -d --build backend
+~~~
+
+| 용도 | 주소 |
+| --- | --- |
+| 웹 화면 (받은 메일 확인) | http://127.0.0.1:8025 |
+| SMTP (Backend가 발송) | `127.0.0.1:1025`, Compose 안에서는 `mailpit:1025` |
+
+두 포트는 `127.0.0.1`에만 열려 있어 다른 PC에서 접속할 수 없다. 웹 화면에는 인증 코드가 그대로 보이므로 포트 공개 범위를 넓히지 않는다.
+
+**수신 확인**: Backend가 보낸 메일은 웹 화면 목록에 바로 나타난다. 메일을 열어 받는 사람, 제목, HTML 본문(HTML 탭)과 텍스트 본문(Text 탭)을 확인한다. Mailpit은 받은 메일을 외부로 보내지 않으므로 받는 주소는 아무 주소나 써도 된다.
+
+**Mailpit 동작만 확인할 때**: Backend 없이 Mailpit의 발송 API로 시험 메일을 넣을 수 있다. 이 메일은 SMTP를 거치지 않으므로 Backend의 발송 경로 확인에는 쓰지 않는다.
+
+~~~powershell
+$body = @{
+  From    = @{ Email = 'no-reply@grab.local' }
+  To      = @(@{ Email = 'test@grab.local' })
+  Subject = 'Mailpit 시험 메일'
+  Text    = '한글 본문 확인'
+} | ConvertTo-Json -Depth 3
+Invoke-RestMethod -Method Post http://127.0.0.1:8025/api/v1/send `
+  -ContentType 'application/json; charset=utf-8' `
+  -Body ([Text.Encoding]::UTF8.GetBytes($body))
+~~~
+
+- 받은 메일은 API로도 조회할 수 있다(`curl.exe -s http://127.0.0.1:8025/api/v1/message/latest`). Windows PowerShell 5.1의 `Invoke-RestMethod`는 이 응답의 한글을 깨뜨려 표시한다. `curl.exe`도 콘솔 인코딩이 UTF-8이 아니면 깨질 수 있으므로 한글 확인은 웹 화면에서 한다. 저장된 내용은 깨지지 않는다.
+- 받은 메일 전체 삭제: 웹 화면의 삭제 버튼 또는 `curl.exe -s -X DELETE http://127.0.0.1:8025/api/v1/messages`
+- 받은 메일은 컨테이너 안에만 보관한다. 컨테이너를 다시 만들면(`docker compose down`, `up --force-recreate` 등) 모두 사라진다.
+- 인증 코드 요청 API가 생기기 전(GR-61)에는 Backend에서 메일을 보내는 엔드포인트가 없다. Backend 발송 경로는 테스트 코드로 `EmailSender`를 호출해 확인한다.
+
 ## 4. 운영 Gmail SMTP
 
 | 환경변수 | 값 |
