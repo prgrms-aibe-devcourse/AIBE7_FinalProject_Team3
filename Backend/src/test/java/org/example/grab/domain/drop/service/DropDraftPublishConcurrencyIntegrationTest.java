@@ -11,12 +11,14 @@ import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
+import org.example.grab.support.TestcontainersConfiguration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -37,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * 공개가 먼저 끝나면 이후 수정이 거부되는지 실제 PostgreSQL 잠금 아래에서 확인한다(GR-64 R03).
  */
 @SpringBootTest
+@Import(TestcontainersConfiguration.class)
 class DropDraftPublishConcurrencyIntegrationTest {
 
     private static final String IMAGE_URL_PREFIX =
@@ -52,6 +55,7 @@ class DropDraftPublishConcurrencyIntegrationTest {
     private PlatformTransactionManager transactionManager;
 
     private ExecutorService executor;
+    private Long userId;
     private Long sellerId;
     private Long categoryId;
 
@@ -59,7 +63,7 @@ class DropDraftPublishConcurrencyIntegrationTest {
     void setUp() {
         executor = Executors.newFixedThreadPool(2);
         String unique = UUID.randomUUID().toString();
-        Long userId = jdbcTemplate.queryForObject(
+        userId = jdbcTemplate.queryForObject(
                 "INSERT INTO users (email, password_hash, nickname) VALUES (?, 'encoded-password', ?) RETURNING id",
                 Long.class, unique + "@example.com", "판매자-" + unique);
         sellerId = jdbcTemplate.queryForObject(
@@ -76,8 +80,11 @@ class DropDraftPublishConcurrencyIntegrationTest {
     @AfterEach
     void tearDown() {
         executor.shutdownNow();
-        // @SpringBootTest는 롤백하지 않으므로 이 테스트가 만든 DROP과 자식을 FK 순서대로 정리한다.
+        // @SpringBootTest는 롤백하지 않으므로 이 테스트가 만든 DROP·자식과 부모 행을 FK 순서대로 정리한다.
         deleteDropsForSeller();
+        jdbcTemplate.update("DELETE FROM sellers WHERE id = ?", sellerId);
+        jdbcTemplate.update("DELETE FROM users WHERE id = ?", userId);
+        jdbcTemplate.update("DELETE FROM categories WHERE id = ?", categoryId);
     }
 
     private void deleteDropsForSeller() {
