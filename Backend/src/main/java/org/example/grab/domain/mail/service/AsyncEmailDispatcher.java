@@ -41,7 +41,7 @@ public class AsyncEmailDispatcher {
             mailTaskExecutor.execute(() -> send(message));
         } catch (TaskRejectedException e) {
             // 큐가 찼다는 것은 SMTP가 느리거나 요청이 몰렸다는 뜻이다. 쌓아 두면 재발송 간격보다 늦게 도착하므로 버린다
-            log.warn("메일 발송 대기열이 가득 차 발송하지 않음: {}", message);
+            log.warn("[AsyncEmailDispatcher.dispatch]메일 발송 대기열이 가득 차 발송하지 않음: {}", message);
         }
     }
 
@@ -51,9 +51,9 @@ public class AsyncEmailDispatcher {
             emailSender.send(message);
         } catch (EmailSendException e) {
             // SMTP 서버 응답 문구에 받는 주소가 들어갈 수 있어 스택 트레이스·예외 메시지 대신 원인 예외 이름만 남긴다
-            log.warn("메일 발송 실패: {}, cause={}", message, causeNames(e));
+            log.warn("[AsyncEmailDispatcher.send]메일 발송 실패: {}, cause={}", message, causeNames(e));
         } catch (RuntimeException e) {
-            log.error("메일 발송 중 예상하지 못한 오류: {}", message, e);
+            log.error("[AsyncEmailDispatcher.send]메일 발송 중 예상하지 못한 오류: {}", message, e);
         }
     }
 
