@@ -3,6 +3,8 @@ package org.example.grab.domain.order.service;
 import lombok.RequiredArgsConstructor;
 import org.example.grab.domain.order.dto.PayableOrder;
 import org.example.grab.domain.order.dto.PaymentCompletionResult;
+import org.example.grab.domain.order.dto.PaymentExpiryCandidate;
+import org.example.grab.domain.order.dto.PaymentExpiryResult;
 import org.example.grab.domain.order.entity.Order;
 import org.example.grab.domain.order.entity.OrderStatus;
 import org.example.grab.domain.order.entity.ReleaseDestination;
@@ -23,6 +25,7 @@ import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeMap;
 import java.util.UUID;
 
@@ -101,11 +104,44 @@ public class OrderPaymentService {
 
     /**
      * 결제 마감이 지난 PAYMENT_PENDING 주문을 만료하고 선점 재고를 가용 재고로 되돌린다.
-     * 만료 대상이 아니면 아무것도 바꾸지 않고 false를 돌려준다. 결제 대기 만료 배치(GR-22)가 재사용한다.
+     * 만료 대상이 아니면 아무것도 바꾸지 않고 false를 돌려준다. 다른 트랜잭션이 주문을 잠그고 있으면 기다린다.
      */
     @Transactional
     public boolean expireIfDue(Long orderId, OffsetDateTime now) {
-        Order order = lockOrder(orderId);
+        return expireIfDue(lockOrder(orderId), now);
+    }
+
+    /**
+     * 결제 대기 만료 후보를 잠그지 않고 (payment_expires_at, id) 순서로 읽는다(GR-22, ERD.md 3.2).
+     *
+     * @param after 이전 조회의 마지막 후보. 첫 조회는 null
+     */
+    @Transactional(readOnly = true)
+    public List<PaymentExpiryCandidate> findPaymentExpiryCandidates(
+            OffsetDateTime now, PaymentExpiryCandidate after, int limit) {
+        if (after == null) {
+            return orderRepository.findPaymentExpiryCandidates(now, limit);
+        }
+        return orderRepository.findPaymentExpiryCandidatesAfter(now, after.getPaymentExpiresAt(), after.getId(), limit);
+    }
+
+    /**
+     * 만료 배치가 주문 한 건을 만료한다. 주문 행을 FOR UPDATE SKIP LOCKED로 잠가, 결제 확정 등 다른 트랜잭션이 잠근 주문은
+     * 기다리지 않고 건너뛴다. 잠근 뒤 상태·마감을 다시 확인하므로 반복·동시 실행에도 재고는 한 번만 반환된다.
+     * 결제 상태는 보지 않는다. 진행 중인 결제가 있어도 마감이 지났으면 만료한다(ERD.md 3.2).
+     */
+    @Transactional
+    public PaymentExpiryResult expireIfDueSkippingLocked(Long orderId, OffsetDateTime now) {
+        Optional<Order> locked = orderRepository.findByIdForUpdateSkipLocked(orderId);
+        if (locked.isEmpty()) {
+            // 잠긴 행과 없는 행을 구분하지 않는다. 후보로 읽은 주문은 지워지지 않으므로 잠긴 것으로 본다.
+            return PaymentExpiryResult.SKIPPED_LOCKED;
+        }
+        return expireIfDue(locked.get(), now) ? PaymentExpiryResult.EXPIRED : PaymentExpiryResult.NOT_DUE;
+    }
+
+    // 잠근 주문을 만료한다. 결제 확정과 같은 기준(Order.isPaymentExpired)으로 마감을 판정한다.
+    private boolean expireIfDue(Order order, OffsetDateTime now) {
         if (order.getStatus() != OrderStatus.PAYMENT_PENDING || !order.isPaymentExpired(now)) {
             return false;
         }

@@ -3,6 +3,7 @@ package org.example.grab.domain.order.repository;
 import jakarta.persistence.LockModeType;
 import org.example.grab.domain.order.entity.Order;
 import org.example.grab.domain.order.entity.OrderStatus;
+import org.example.grab.domain.order.dto.PaymentExpiryCandidate;
 import org.example.grab.domain.order.dto.SellerOrderListProjection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -10,6 +11,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.repository.query.Param;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -95,6 +99,40 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select o from Order o where o.id = :id")
     Optional<Order> findByIdForUpdate(@Param("id") Long id);
+
+    /*
+        결제 대기 만료 후보(GR-22, ERD.md 3.2). 잠그지 않고 idx_orders_payment_expiry 순서로 읽는다.
+        첫 페이지와 다음 페이지를 나눈 것은 커서 없음 조건을 OR로 섞으면 행 비교가 인덱스 조건으로 쓰이지 않기 때문이다.
+     */
+    @Query(value = """
+            SELECT o.id AS "id", o.payment_expires_at AS "paymentExpiresAt"
+            FROM orders o
+            WHERE o.status = 'PAYMENT_PENDING'
+              AND o.payment_expires_at <= :now
+            ORDER BY o.payment_expires_at, o.id
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<PaymentExpiryCandidate> findPaymentExpiryCandidates(
+            @Param("now") OffsetDateTime now, @Param("limit") int limit);
+
+    @Query(value = """
+            SELECT o.id AS "id", o.payment_expires_at AS "paymentExpiresAt"
+            FROM orders o
+            WHERE o.status = 'PAYMENT_PENDING'
+              AND o.payment_expires_at <= :now
+              AND (o.payment_expires_at, o.id) > (:afterExpiresAt, :afterId)
+            ORDER BY o.payment_expires_at, o.id
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<PaymentExpiryCandidate> findPaymentExpiryCandidatesAfter(
+            @Param("now") OffsetDateTime now,
+            @Param("afterExpiresAt") Instant afterExpiresAt,
+            @Param("afterId") long afterId,
+            @Param("limit") int limit);
+
+    // 결제 대기 만료: 결제 확정 등 다른 트랜잭션이 잠근 주문은 기다리지 않고 빈 결과로 건너뛴다(ERD.md 3.2).
+    @Query(value = "SELECT * FROM orders WHERE id = :id FOR UPDATE SKIP LOCKED", nativeQuery = true)
+    Optional<Order> findByIdForUpdateSkipLocked(@Param("id") Long id);
 
     /*
     payments_cancellations에서 해당 주문의 purpose = 'ORDER_CANCEL', status = 'UNKNOWN'인 기록이 있는지 조회
