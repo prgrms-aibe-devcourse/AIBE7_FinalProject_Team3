@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./Frontend/src/assets/images/grab-wordmark.png" alt="GRAB" width="260" />
+  <img src="./Frontend/src/assets/images/grab-wordmark-white.png" alt="GRAB" width="260" />
 </p>
 
 <h1 align="center">GRAB</h1>
