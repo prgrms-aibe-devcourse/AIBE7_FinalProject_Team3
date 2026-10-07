@@ -20,6 +20,10 @@ concurrency:
 permissions:
   contents: read
 
+# CI에서는 git 훅이 필요 없다
+env:
+  HUSKY: 0
+
 jobs:
   verify:
     name: Lint, test and build
@@ -43,6 +47,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Format
+        run: npm run format:check
 
       - name: Lint
         run: npm run lint

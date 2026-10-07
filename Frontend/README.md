@@ -18,6 +18,8 @@ npm run build
 npm run e2e      # Playwright E2E (시각 비교 제외)
 ```
 
+`npm install` 시 Git pre-commit 훅(husky)이 설치되어, 커밋할 때 스테이징한 `Frontend/` 파일에 Prettier가 자동 적용됩니다(lint-staged). CI는 `npm run format:check`로 포맷을 검사합니다.
+
 ## E2E·시각 회귀 테스트
 
 Playwright로 핵심 흐름, PC(1440×900)·모바일(390×844) 가로 넘침, 화면 기준 스크린샷을 검사합니다.
