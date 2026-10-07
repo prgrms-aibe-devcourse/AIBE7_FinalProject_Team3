@@ -1,6 +1,7 @@
 package org.example.grab.domain.user.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.grab.domain.mail.service.AsyncEmailDispatcher;
 import org.example.grab.domain.user.error.UserErrorCode;
 import org.example.grab.domain.user.repository.EmailSignupContextRepository;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Service;
     이메일 인증 코드 요청·확인(GR-61 M03). 데이터는 Redis에 있고 DB는 가입 여부 조회 한 번뿐이라 트랜잭션을 두지 않는다.
     코드·토큰·이메일 원문은 로그와 예외 메시지에 남기지 않는다(NFR-011). 예외는 오류 코드의 기본 문구만 쓴다.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class EmailVerificationService {
@@ -101,17 +103,28 @@ public class EmailVerificationService {
      */
     private void checkSendLimit(String email, String ipAddress) {
         if (sendLimitRepository.incrementIpRequests(ipAddress) > sendLimitProperties.ipMaxRequests()) {
-            throw resendTooSoon();
+            throw resendTooSoon(SendLimitReason.IP_LIMIT);
         }
         if (!sendLimitRepository.tryStartResendInterval(email)) {
-            throw resendTooSoon();
+            throw resendTooSoon(SendLimitReason.RESEND_INTERVAL);
         }
         if (sendLimitRepository.incrementEmailRequests(email) > sendLimitProperties.emailMaxRequests()) {
-            throw resendTooSoon();
+            throw resendTooSoon(SendLimitReason.EMAIL_LIMIT);
         }
     }
 
-    private static BusinessException resendTooSoon() {
+    /*
+        세 거부가 응답·오류 로그에서는 같은 코드라, 어느 한도가 자주 걸리는지 알 수 있도록 사유만 따로 남긴다.
+        이메일·IP는 남기지 않는다(NFR-011). 누가 걸렸는지가 아니라 한도 값을 조정할 근거를 보려는 로그다.
+     */
+    private static BusinessException resendTooSoon(SendLimitReason reason) {
+        log.info("[EmailVerificationService.requestCode]인증 코드 요청 거부: reason={}", reason);
         return new BusinessException(UserErrorCode.EMAIL_VERIFICATION_RESEND_TOO_SOON);
+    }
+
+    private enum SendLimitReason {
+        IP_LIMIT,
+        RESEND_INTERVAL,
+        EMAIL_LIMIT
     }
 }

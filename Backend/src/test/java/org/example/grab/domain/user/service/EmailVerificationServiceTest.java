@@ -23,6 +23,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.data.redis.RedisConnectionFailureException;
 
 import java.nio.charset.StandardCharsets;
@@ -41,7 +43,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 
 // GR-61 M03-01·M03-03: 요청·확인의 순서와 분기. 저장소·발송기·생성기는 mock, 메일 내용과 코드 해시는 실제 객체로 만든다
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class EmailVerificationServiceTest {
 
     private static final String EMAIL = "user@example.com";
@@ -90,7 +92,7 @@ class EmailVerificationServiceTest {
 
         @Test
         @DisplayName("한도 안이면 IP → 재발송 간격 → 이메일 확인 후 코드를 저장하고, 저장 뒤에 그 코드의 메일을 발송한다")
-        void savesCodeThenDispatchesMail() {
+        void savesCodeThenDispatchesMail(CapturedOutput output) {
             // given: 각 한도의 마지막 허용 값(30회째, 10회째)
             givenWithinLimits();
             given(codeGenerator.generate()).willReturn(CODE);
@@ -109,16 +111,18 @@ class EmailVerificationServiceTest {
             assertThat(message.getValue().to()).isEqualTo(EMAIL);
             assertThat(message.getValue().textBody()).contains(CODE);
             assertThat(message.getValue().subject()).doesNotContain(CODE);
+            assertThat(output).doesNotContain("인증 코드 요청 거부");
         }
 
         @Test
         @DisplayName("IP 한도를 넘으면 거부하고, 이메일의 재발송 간격·횟수를 건드리지 않으며 저장·발송하지 않는다")
-        void rejectsWhenIpLimitExceeded() {
+        void rejectsWhenIpLimitExceeded(CapturedOutput output) {
             // given
             given(sendLimitRepository.incrementIpRequests(IP)).willReturn(31L);
 
             // when & then
             assertResendTooSoon();
+            assertRejectReasonLogged(output, "IP_LIMIT");
             then(sendLimitRepository).should(never()).tryStartResendInterval(anyString());
             then(sendLimitRepository).should(never()).incrementEmailRequests(anyString());
             assertNothingSavedOrSent();
@@ -126,20 +130,21 @@ class EmailVerificationServiceTest {
 
         @Test
         @DisplayName("재발송 간격 안이면 거부하고, 이메일 횟수를 소모하지 않으며 저장·발송하지 않는다")
-        void rejectsWithinResendInterval() {
+        void rejectsWithinResendInterval(CapturedOutput output) {
             // given
             given(sendLimitRepository.incrementIpRequests(IP)).willReturn(1L);
             given(sendLimitRepository.tryStartResendInterval(EMAIL)).willReturn(false);
 
             // when & then
             assertResendTooSoon();
+            assertRejectReasonLogged(output, "RESEND_INTERVAL");
             then(sendLimitRepository).should(never()).incrementEmailRequests(anyString());
             assertNothingSavedOrSent();
         }
 
         @Test
         @DisplayName("이메일 한도를 넘으면 거부하고 저장·발송하지 않는다")
-        void rejectsWhenEmailLimitExceeded() {
+        void rejectsWhenEmailLimitExceeded(CapturedOutput output) {
             // given
             given(sendLimitRepository.incrementIpRequests(IP)).willReturn(1L);
             given(sendLimitRepository.tryStartResendInterval(EMAIL)).willReturn(true);
@@ -147,6 +152,7 @@ class EmailVerificationServiceTest {
 
             // when & then
             assertResendTooSoon();
+            assertRejectReasonLogged(output, "EMAIL_LIMIT");
             assertNothingSavedOrSent();
         }
 
@@ -171,6 +177,13 @@ class EmailVerificationServiceTest {
                     // 예외 메시지는 WARN 로그에 남으므로 이메일·IP 원문이 없어야 한다(M03-04)
                     .hasMessageNotContaining(EMAIL)
                     .hasMessageNotContaining(IP);
+        }
+
+        // 사유 한 줄만 남고 이메일·IP 원문은 로그에 없다(NFR-011)
+        private void assertRejectReasonLogged(CapturedOutput output, String reason) {
+            assertThat(output).contains("인증 코드 요청 거부: reason=" + reason)
+                    .doesNotContain(EMAIL)
+                    .doesNotContain(IP);
         }
 
         private void assertNothingSavedOrSent() {
