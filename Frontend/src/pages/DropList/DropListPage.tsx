@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import logo from '../../assets/images/grab-symbol.png'
 import heroImage from '../../assets/images/hero-background.png'
+import EmptyState from '../../components/EmptyState/EmptyState'
 import DropCard from '../../features/drop/DropCard'
 import { categories, drops } from '../../features/drop/mockDrops'
 import type { DropStatus } from '../../types/drop'
@@ -97,10 +98,11 @@ export default function DropListPage({
           ))}
         </section>
       ) : (
-        <div className="empty-state">
-          <strong>조건에 맞는 상품이 없어요.</strong>
-          <p>검색어나 카테고리를 바꿔보세요.</p>
-        </div>
+        <EmptyState
+          title="조건에 맞는 상품이 없어요."
+          description="검색어나 카테고리를 바꿔보세요."
+          variant="block"
+        />
       )}
 
       <section className="seller-banner">

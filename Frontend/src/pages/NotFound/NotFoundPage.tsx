@@ -6,7 +6,7 @@ export default function NotFoundPage() {
       title="페이지를 찾을 수 없어요."
       link="/wish"
       label="홈으로 돌아가기"
-      page
+      variant="page"
     />
   )
 }
