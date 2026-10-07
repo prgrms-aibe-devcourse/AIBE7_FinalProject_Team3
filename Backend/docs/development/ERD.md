@@ -9,7 +9,9 @@
 - 주요 업무 테이블은 `created_at`, `updated_at`을 `TIMESTAMPTZ`로 가진다.
 - 판매 가능 여부, 예약 만료 및 상태 전이는 서버 시각을 기준으로 판단한다.
 - API가 반환하는 `SELLER` 권한은 별도 회원 역할 컬럼이 아니라 `sellers.status = APPROVED`에서 파생한다.
-- 알림 기능은 MVP 범위에서 제외하며 알림 테이블을 생성하지 않는다.
+- 알림은 MVP에서 SMTP 메일로만 제공한다. 사용자에게 보여주는 인앱 알림 목록(읽음 표시 등)은 범위 밖이라 수신자별 알림 테이블을 두지 않는다.
+  메일 중복 발송을 막을 토큰이 필요한 알림만 발송 기록을 테이블로 남긴다. 판매 시작 알림(GR-69)은 `drops.status`의 `WISH → GRAB` 전환
+  자체가 한 번만 성공하므로 기록이 필요 없고, 상태가 바뀌지 않는 알림(판매 시작 n분 전 등)은 기록 없이는 스케줄러 주기마다 재발송된다.
 - PK는 모든 테이블에서 `BIGINT` 자동 증가 값을 쓰고 내부 조인·정렬·행 잠금에만 사용한다.
   외부에 노출하는 리소스는 `public_id UUID`(UQ)를 별도로 두고, API 경로·응답·외부 연동에는 `public_id`만 내보낸다.
   대상은 `users`, `sellers`, `drop_images`, `orders`, `payments`, `payment_cancellations`이다.
@@ -211,6 +213,21 @@ PK(`option_id`, `group_id`)로 옵션 조합에서 그룹별 값을 하나만 �
 | `canceled_at` | TIMESTAMPTZ | X | NULL이면 활성 |
 
 UQ(`user_id`, `drop_id`)를 둔다. 취소 후 재등록은 기존 행을 다시 활성화하며, GRAB 시작 이후에는 등록과 취소를 모두 제한한다.
+
+#### `drop_notifications`
+
+| 컬럼 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `id` | BIGINT | O | PK |
+| `drop_id` | BIGINT | O | FK drops |
+| `type` | VARCHAR(30) | O | 알림 종류. `PRESALE_10M` |
+| `sent_at` | TIMESTAMPTZ | O | 발송 시각 |
+
+UQ(`drop_id`, `type`)가 중복 발송을 막는 토큰이다. `INSERT ... ON CONFLICT DO NOTHING RETURNING`으로 선점에 성공한 인스턴스만 메일을 보낸다.
+
+**수신자별 행이 아니라 DROP 1건당 1행이다.** 활성 WISH 사용자 전원에게 한 번 발송했다는 사실만 남기며, 개인별 수신 여부·읽음은 다루지 않는다.
+
+상태 전환이 없는 알림만 이 테이블을 쓴다. 판매 시작 알림은 `drops.status`의 `WISH → GRAB` 전환 자체가 한 번만 성공하므로 기록을 남기지 않는다.
 
 ### 1.4 주문 및 재고 예약
 

@@ -111,25 +111,75 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
             Pageable pageable);
 
     /*
-     * 상태 전환 배치(GR-18). 후보 잠금·상태 조건 재검증·변경을 한 문장으로 원자 처리한다.
-     * 서브쿼리의 FOR UPDATE SKIP LOCKED가 후보 행을 잠그고, 바깥 UPDATE가 같은 트랜잭션에서 값을 바꾼다.
-     * 조건(status·sale_starts_at)이 다시 평가되므로 여러 인스턴스가 중복 실행해도 멱등하다.
-     * 엔티티 로딩·dirty checking을 거치지 않으므로 updated_at을 직접 갱신한다.
+     * 시작 배치(GR-18). 대상을 잠가 ID를 확보한 뒤 같은 트랜잭션에서 전환하고, 전환된 ID 목록을 반환한다.
+     * 한 문장 UPDATE는 건수만 알려주는데, 판매 시작 알림(GR-69)에는 실제로 전환된 DROP의 ID가 필요해 두 쿼리로 나눴다.
+     * UPDATE ... RETURNING id는 @Modifying 규약 밖이라 쓰지 않는다.
+     * 두 쿼리는 호출자의 한 트랜잭션 안에서 실행해야 한다. 잠금이 풀리면 확보한 ID가 전환 대상이라는 보장이 사라진다.
+     * 반환 건수로 호출자가 다음 배치 실행 여부를 판단하는 것은 이전과 같다.
+     */
+    default List<Long> startGrabBatch(OffsetDateTime now, int batchSize) {
+        List<Long> ids = lockStartGrabTargets(now, batchSize);
+        if (ids.isEmpty()) {
+            return ids;
+        }
+        markGrabStarted(ids, now);
+        return ids;
+    }
+
+    /*
+     * 시작 배치 1단계. 후보 행을 잠그고 ID만 확보한다.
+     * FOR UPDATE SKIP LOCKED가 다른 인스턴스가 잡은 행을 건너뛰고, 잠금을 얻은 뒤 조건(status·sale_starts_at)이
+     * 다시 평가되므로 반환된 ID는 이 트랜잭션이 전환을 확정할 대상이다. 여러 인스턴스가 중복 실행해도 멱등하다.
      * ORDER BY는 인덱스(idx_drops_sale_start) 정렬과 맞춰 잠금 순서를 안정시킨다.
-     * 변경 건수를 반환해 호출자가 다음 배치 실행 여부를 판단한다.
+     */
+    @Query(value = """
+            SELECT id FROM drops
+            WHERE status = 'WISH' AND sale_starts_at <= :now
+            ORDER BY sale_starts_at, id
+            LIMIT :batchSize
+            FOR UPDATE SKIP LOCKED
+            """, nativeQuery = true)
+    List<Long> lockStartGrabTargets(@Param("now") OffsetDateTime now, @Param("batchSize") int batchSize);
+
+    /*
+     * 시작 배치 2단계. 1단계에서 잠근 행만 바꾼다.
+     * 잠근 행은 다른 트랜잭션이 바꿀 수 없으므로 상태 조건을 다시 걸지 않는다.
+     * 엔티티 로딩·dirty checking을 거치지 않으므로 updated_at을 직접 갱신한다.
      */
     @Modifying
     @Query(value = """
             UPDATE drops SET status = 'GRAB', grab_started_at = :now, updated_at = :now
-            WHERE id IN (
-                SELECT id FROM drops
-                WHERE status = 'WISH' AND sale_starts_at <= :now
-                ORDER BY sale_starts_at, id
-                LIMIT :batchSize
-                FOR UPDATE SKIP LOCKED
-            )
+            WHERE id IN (:ids)
             """, nativeQuery = true)
-    int startGrabBatch(@Param("now") OffsetDateTime now, @Param("batchSize") int batchSize);
+    int markGrabStarted(@Param("ids") List<Long> ids, @Param("now") OffsetDateTime now);
+
+    /*
+     * 판매 시작 10분 전 알림 대상 선점(GR-69).
+     * 판매 시작 알림과 달리 DROP 상태가 바뀌지 않아 멱등 토큰이 없다. "10분 전 범위"는 스케줄러 주기마다
+     * 계속 참이므로, 기록을 남기지 않으면 같은 사람에게 주기마다 메일이 나간다.
+     * drop_notifications의 UNIQUE (drop_id, type)이 그 토큰이다. 여러 인스턴스가 같은 DROP을 동시에 집어도
+     * INSERT에 성공하는 쪽은 하나뿐이고, RETURNING이 그 행만 돌려주므로 발송도 한 번만 일어난다.
+     * 행 잠금(FOR UPDATE SKIP LOCKED)은 쓰지 않는다. 잠금은 drops 행을 직렬화할 뿐이고, 다른 트랜잭션이
+     * 이미 기록을 커밋했는지는 조회 스냅샷 시점에 따라 놓칠 수 있다. 유니크 제약만이 유일한 보증이다.
+     * 선점과 ID 확보가 한 문장이라 결과를 받는 쿼리로 선언한다(@Modifying은 결과를 돌려주지 못한다).
+     * 이미 판매가 시작된 DROP(sale_starts_at <= now)은 제외한다. 그 구간은 판매 시작 알림이 담당한다.
+     */
+    @Query(value = """
+            INSERT INTO drop_notifications (drop_id, type, sent_at)
+            SELECT id, :type, :now FROM drops
+            WHERE status = 'WISH'
+              AND sale_starts_at > :now
+              AND sale_starts_at <= :noticeUntil
+            ORDER BY sale_starts_at, id
+            LIMIT :batchSize
+            ON CONFLICT (drop_id, type) DO NOTHING
+            RETURNING drop_id
+            """, nativeQuery = true)
+    List<Long> claimNoticeBatch(
+            @Param("type") String type,
+            @Param("now") OffsetDateTime now,
+            @Param("noticeUntil") OffsetDateTime noticeUntil,
+            @Param("batchSize") int batchSize);
 
     /*
      * 판매 종료 배치(GR-18). startGrabBatch와 잠금·멱등 규칙이 같다.

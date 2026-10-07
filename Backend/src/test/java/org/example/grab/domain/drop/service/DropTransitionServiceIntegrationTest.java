@@ -191,6 +191,34 @@ class DropTransitionServiceIntegrationTest {
         assertThat(updatedAtEquals(endsExactlyNow, now)).isTrue();
     }
 
+    @Test
+    @DisplayName("판매 시작이 임박한 WISH는 전환되지 않고 알림만 한 번 선점된다")
+    // 알림 선점은 상태 전환이 아니므로 전환 건수에 들어가지 않고, 주기마다 반복 선점되지도 않아야 한다(GR-69)
+    void claimsPresaleNoticeWithoutTransition() {
+        // given: 5분 뒤 시작하는 WISH
+        Long startsSoon = insertDropAt(DropStatus.WISH,
+                OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(5), OffsetDateTime.now(ZoneOffset.UTC).plusHours(3));
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+        // when: 스케줄러가 두 번 돈다
+        long first = dropTransitionService.transition(now);
+        long second = dropTransitionService.transition(now);
+        entityManager.flush();
+        entityManager.clear();
+
+        // then
+        assertThat(first).isZero();
+        assertThat(second).isZero();
+        assertThat(dropRow(startsSoon).get("status")).isEqualTo("WISH");
+        assertThat(noticeCount(startsSoon)).isEqualTo(1);
+    }
+
+    private int noticeCount(Long dropId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM drop_notifications WHERE drop_id = ? AND type = 'PRESALE_10M'",
+                Integer.class, dropId);
+    }
+
     private boolean updatedAtEquals(Long dropId, OffsetDateTime expected) {
         return jdbcTemplate.queryForObject(
                 "SELECT updated_at = ? FROM drops WHERE id = ?", Boolean.class,
