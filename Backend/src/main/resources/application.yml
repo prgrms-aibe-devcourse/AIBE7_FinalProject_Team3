@@ -10,6 +10,12 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/grab}
     username: ${DB_USERNAME:grab}
     password: ${DB_PASSWORD:grab}
+    hikari:
+      data-source-properties:
+        # PostgreSQL 오류 상세(Detail: Failing row contains ..., Key (email)=(...))를 예외 메시지에 붙이지 않는다.
+        # 처리하지 않은 DB 오류의 ERROR 로그에 이메일·비밀번호 해시 등 행 값이 남지 않게 한다. 오류 종류와 제약 이름은 남는다(GR-29, 팀 결정)
+        # DB_URL이 URL을 통째로 바꾸므로 URL 파라미터가 아니라 여기에 둔다
+        logServerErrorDetail: false
 
   data:
     redis:
