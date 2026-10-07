@@ -92,11 +92,13 @@
 | Language | TypeScript | 5.x | API 요청·응답과 클라이언트 상태의 타입을 명확하게 관리한다. |
 | Framework | React | 19.x | 컴포넌트 기반으로 소비자·판매자·관리자 화면을 구성한다. |
 | Build Tool | Vite | 8.x | 빠른 개발 서버와 단순한 SPA 빌드 환경을 제공한다. |
-| Styling | Tailwind CSS | 4.x | 짧은 MVP 기간에 일관된 반응형 UI를 구현한다. |
+| Styling | CSS (전역 스타일시트) | - | `src/styles/global.css`의 CSS 변수와 클래스로 디자인을 일관되게 유지한다. 별도 CSS 프레임워크 없이 기존 클래스를 재사용한다. |
 | HTTP Client | Axios | 1.x | Credential·CSRF 헤더, 공통 오류 처리 및 쿠키 기반 토큰 재발급 흐름을 구성한다. |
 | Routing | React Router | 7.x | 소비자·판매자·관리자 라우팅과 권한별 화면을 분리한다. |
 | Server State | TanStack Query | 5.x | API 데이터 캐싱, 재조회, 로딩·오류 상태를 관리한다. |
 | Client State | React Context 또는 Zustand | 필요 시 확정 | 로그인 사용자 정보 등 작은 전역 상태만 관리한다. 서버 응답 데이터는 TanStack Query에서 관리한다. |
+| Unit Test | Vitest | 4.x | Vite 설정을 그대로 쓰는 단위 테스트로 옵션 조합·검증 함수 같은 순수 로직을 검사한다. |
+| E2E·Visual Test | Playwright | 1.63.x | 핵심 사용자 흐름과 PC·모바일 화면 기준 스크린샷을 검사한다. 기준 이미지는 CI와 같은 Playwright Docker 이미지에서 생성·비교한다. |
 
 ## 4. Infrastructure / Deployment
 
@@ -105,6 +107,7 @@
 - `Backend/Dockerfile`: Gradle `bootJar`를 실행하는 멀티 스테이지 빌드와 non-root 런타임 이미지
 - `Backend/compose.yaml`: 백엔드, PostgreSQL, Redis, Mailpit, Prometheus, Grafana, Loki, Alloy 컨테이너 정의. Mailpit은 로컬 개발용 SMTP 서버이며 운영 발송 대상이 아니다(4.3절).
 - `.github/workflows/backend-ci.yml`: `main` 또는 `deploy` 대상 PR과 두 브랜치의 푸시에서 PostgreSQL 기반 테스트와 Docker 이미지 빌드 검증
+- `.github/workflows/frontend-ci.yml`: `main` 또는 `deploy` 대상 PR과 두 브랜치의 푸시에서 Frontend lint·Vitest·build와 Playwright E2E·시각 비교 검증. 실패 시 리포트·trace를 산출물로 보관
 - `.github/workflows/publish-backend.yml`: Backend 이미지를 빌드해 GHCR에 `latest`, 커밋 SHA 태그로 게시. 운영 기준은 `deploy` 푸시지만 현재 트리거는 `main`이므로 변경이 필요하다.
 
 Actuator와 Prometheus의 로컬 메트릭 수집 연결은 완료됐다. Redis 연결 설정과 Refresh Token 저장소(생성·해시·TTL·저장·조회·삭제)는 구현됐으며, 로그인·재발급·로그아웃 API 연동은 구현 예정이다. Grafana·Loki·Alloy는 실행 틀만 마련된 상태다.
@@ -245,7 +248,7 @@ MVP 초기에는 Actuator와 Prometheus를 연결해 JVM·HTTP·DB Connection Po
 - PostgreSQL, Flyway, Refresh Token·이메일 인증 저장용 Redis
 - Gmail SMTP 기반 이메일 인증 코드 발송, 로컬 Mailpit·테스트 GreenMail
 - 토스페이먼츠 테스트 환경 기반 Mock 결제 (결제창, 테스트 API 키)
-- React, TypeScript, Vite, Tailwind CSS, Axios, React Router
+- React, TypeScript, Vite, CSS, Axios, React Router
 - Docker, Docker Compose, GitHub Actions
 - GHCR 이미지 게시(`latest`, 커밋 SHA 태그)
 - JUnit 기반 테스트와 핵심 API 통합 테스트
