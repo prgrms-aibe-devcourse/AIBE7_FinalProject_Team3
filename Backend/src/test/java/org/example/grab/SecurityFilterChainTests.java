@@ -6,6 +6,7 @@ import jakarta.servlet.http.Cookie;
 import org.example.grab.global.security.AuthRole;
 import org.example.grab.global.security.jwt.AccessTokenProperties;
 import org.example.grab.global.security.jwt.JwtProvider;
+import org.example.grab.support.TestcontainersConfiguration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,6 +15,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -40,6 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ExtendWith(OutputCaptureExtension.class)
+@Import(TestcontainersConfiguration.class)
 class SecurityFilterChainTests {
 
     // 인증되면 보안을 통과해 매핑 없는 경로의 404까지 간다. 막히면 401이다

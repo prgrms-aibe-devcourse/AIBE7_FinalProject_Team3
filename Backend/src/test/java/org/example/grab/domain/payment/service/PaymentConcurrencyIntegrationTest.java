@@ -16,12 +16,14 @@ import org.example.grab.domain.payment.gateway.PaymentGatewayResult;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.idempotency.IdempotencyKey;
 import org.example.grab.global.idempotency.RequestHash;
+import org.example.grab.support.TestcontainersConfiguration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -47,6 +49,7 @@ import static org.mockito.Mockito.verify;
 
 // 결제 확정과 만료, 같은 주문의 동시 결제 요청이 실제 PostgreSQL 행 잠금 아래에서 한 경로만 성공하는지 확인한다.
 @SpringBootTest
+@Import(TestcontainersConfiguration.class)
 class PaymentConcurrencyIntegrationTest {
 
     @Autowired
