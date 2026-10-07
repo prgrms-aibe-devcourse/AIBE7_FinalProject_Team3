@@ -17,6 +17,8 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.List;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -71,6 +73,30 @@ class AsyncEmailDispatcherGreenMailTest {
             String failureLog = awaitLogLine(output, "메일 발송 실패");
             assertThat(failureLog).contains("WARN", "mail-", "cause=MailSendException");
             assertThat(output).doesNotContain(RECIPIENT, CODE);
+        });
+    }
+
+    @Test
+    @DisplayName("수신자가 메일 큐 용량을 넘어도 묶음 발송은 한 통도 누락하지 않는다")
+    // 통당 작업으로 넘기면 큐 용량(40)을 넘는 분량이 거부돼 조용히 사라지므로(GR-69) 전부 도착하는지 확인하는 테스트
+    void deliversBatchLargerThanQueueCapacity() {
+        contextRunner().run(context -> {
+            // given: 큐 용량보다 많은 수신자
+            AsyncEmailDispatcher dispatcher = context.getBean(AsyncEmailDispatcher.class);
+            List<EmailMessage> messages = IntStream.range(0, 50)
+                    .mapToObj(index -> new EmailMessage(
+                            "buyer" + index + "@example.com",
+                            "[GRAB] 한정판 스니커즈 판매가 시작됐습니다",
+                            "<p>판매 시작</p>",
+                            "판매 시작"))
+                    .toList();
+
+            // when
+            dispatcher.dispatchAll(messages);
+
+            // then
+            assertThat(greenMail.waitForIncomingEmail(Duration.ofSeconds(30).toMillis(), messages.size())).isTrue();
+            assertThat(greenMail.getReceivedMessages()).hasSize(messages.size());
         });
     }
 

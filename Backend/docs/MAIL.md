@@ -135,8 +135,8 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8025/api/v1/send `
 
 | 타입 | 위치 | 용도 |
 | --- | --- | --- |
-| `AsyncEmailDispatcher` | `domain/mail/service` | 서비스 코드의 기본 발송 진입점. 메일 전용 스레드 풀에 넘기고 바로 반환한다 |
-| `EmailSender` | `domain/mail/service` | 메일 한 통을 동기로 보낸다. 실패하면 `EmailSendException`을 던진다 |
+| `AsyncEmailDispatcher` | `domain/mail/service` | 서비스 코드의 기본 발송 진입점. 메일 전용 스레드 풀에 넘기고 바로 반환한다(한 통은 `dispatch()`, 여러 통은 `dispatchAll()`) |
+| `EmailSender` | `domain/mail/service` | 메일을 동기로 보낸다(`send()` 한 통, `sendAll()` 여러 통). 실패하면 `EmailSendException`을 던진다 |
 | `EmailMessage` | `domain/mail/dto` | 받는 사람, 제목, HTML 본문, 텍스트 본문. 네 값 모두 필수다 |
 | `EmailSendException` | `domain/mail/error` | 발송 실패. `BusinessException`이 아니므로 HTTP 오류 응답으로 바꾸지 않는다 |
 
@@ -150,6 +150,16 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8025/api/v1/send `
 asyncEmailDispatcher.dispatch(new EmailMessage(email, subject, htmlBody, textBody));
 ~~~
 
+한 번의 알림으로 여러 사람에게 보낼 때는 `dispatchAll()`로 목록을 한 번에 넘긴다(GR-69 판매 시작 알림).
+
+~~~java
+asyncEmailDispatcher.dispatchAll(messages); // List<EmailMessage>
+~~~
+
+- 수신자 수만큼 `dispatch()`를 호출하면 대기열 용량(40)을 넘는 분량이 거부돼 그 수신자만 메일을 받지 못한다. `dispatchAll()`은 목록 전체를 한 작업으로 묶어 큐 슬롯을 하나만 쓴다.
+- 묶음 안의 한 통이 실패해도 나머지는 계속 발송하고, 실패가 있으면 마지막에 `EmailSendException`을 한 번 던진다(`EmailSender.sendAll()` 계약).
+- `dispatchAll()`은 `sendAll()`을 호출하므로 SMTP 연결을 한 번만 열어 목록 전체를 보낸다. 통마다 `dispatch()`를 부르면 접속·STARTTLS·인증을 수신자 수만큼 반복해, Gmail처럼 연결 비용이 큰 서버에서는 그 반복이 전체 발송 시간의 대부분을 차지한다.
+- 한 스레드·한 연결로 보내므로 수신자가 아주 많으면 뒤쪽 메일이 늦게 도착한다. 목록을 메일 풀 크기(4)만큼 청크로 나눠 제출하면 그만큼 빨라지지만 SMTP 동시 연결이 4개가 되므로, Gmail 계정 잠금 위험과 함께 판단한다.
 - `EmailSender.send()`를 요청 처리 중에 직접 호출하지 않는다. SMTP가 느리면 요청 스레드가 타임아웃(최대 5초씩)만큼 붙잡힌다.
 - `EmailSender`는 발송 결과를 바로 알아야 하는 경우(관리 기능, 테스트 등)에만 쓴다.
 - 메일 전용 스레드 풀(`MailAsyncConfig.MAIL_TASK_EXECUTOR`)은 메일 발송에만 쓴다. 다른 비동기 작업은 기본 executor를 쓴다.
@@ -165,7 +175,7 @@ asyncEmailDispatcher.dispatch(new EmailMessage(email, subject, htmlBody, textBod
 | 상황 | `dispatch()` | `EmailSender.send()` |
 | --- | --- | --- |
 | 정상 발송 | 반환 후 메일 스레드에서 발송 | 발송 후 반환 |
-| 메일 풀 대기열 초과(실행 4·대기 40 초과) | 발송하지 않고 `WARN` 로그 | 해당 없음 |
+| 메일 풀 대기열 초과(실행 4·대기 40 초과) | 발송하지 않고 `WARN` 로그 (`dispatchAll()`은 묶음 전체를 버리고 건수만 남긴다) | 해당 없음 |
 | SMTP 연결·인증·응답 실패, 타임아웃(각 5초) | 예외를 던지지 않고 `WARN` 로그 | `EmailSendException` |
 | 그 밖의 예상하지 못한 오류 | 예외를 던지지 않고 `ERROR` 로그 | 예외 그대로 |
 

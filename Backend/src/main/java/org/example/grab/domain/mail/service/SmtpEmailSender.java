@@ -9,9 +9,11 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.mail.javamail.MimeMessagePreparator;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 /*
     JavaMailSender로 메일 한 통을 SMTP 발송한다. 접속 정보·타임아웃은 application-mail.yml의 spring.mail 설정을 따른다.
@@ -37,6 +39,25 @@ public class SmtpEmailSender implements EmailSender {
         // JavaMailSender.send() 가 만든 MimeMessage에 prepare()가 내용을 채우고, send() 직접 해당 객체 전송
         try {
             mailSender.send(mimeMessage -> prepare(mimeMessage, message));
+        } catch (MailException e) {
+            throw new EmailSendException(e);
+        }
+    }
+
+    /*
+        연결 하나로 목록 전체를 보낸다. JavaMailSenderImpl은 preparator 배열을 받으면 Transport를 한 번만 열고
+        모든 메일을 그 연결로 보낸다. 통마다 send()를 부르면 접속·STARTTLS·인증을 수신자 수만큼 반복해,
+        Gmail처럼 연결 비용이 큰 서버에서는 이 반복이 전체 발송 시간의 대부분을 차지한다.
+        일부 주소가 거부되면 JavaMail이 나머지를 계속 보낸 뒤 MailSendException으로 모아 던지므로,
+        이 구현은 EmailSender 계약(일부 실패해도 계속, 마지막에 한 번 던짐)을 그대로 만족한다.
+     */
+    @Override
+    public void sendAll(List<EmailMessage> messages) {
+        MimeMessagePreparator[] preparators = messages.stream()
+                .map(message -> (MimeMessagePreparator) mimeMessage -> prepare(mimeMessage, message))
+                .toArray(MimeMessagePreparator[]::new);
+        try {
+            mailSender.send(preparators);
         } catch (MailException e) {
             throw new EmailSendException(e);
         }

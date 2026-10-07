@@ -16,7 +16,8 @@ public class MailAsyncConfig {
     public static final String MAIL_TASK_EXECUTOR = "mailTaskExecutor";
 
     // 동시에 여는 SMTP 연결 수. 크게 늘리면 Gmail이 비정상 활동으로 판단해 계정을 잠글 수 있어 적게 둔다
-    private static final int MAIL_POOL_SIZE = 4;
+    // 묶음 발송(AsyncEmailDispatcher.dispatchAll)이 이 값만큼만 작업을 나누도록 공개한다
+    public static final int MAIL_POOL_SIZE = 4;
 
     // 큐에 들어간 메일이 발송을 시작하기까지의 최대 대기. 재발송 간격(60초)을 넘기면 사용자가 재요청해 먼저 보낸 코드가 무효가 되므로 그보다 짧게 둔다
     private static final int MAIL_MAX_WAIT_SECONDS = 30;
