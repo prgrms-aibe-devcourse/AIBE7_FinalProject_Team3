@@ -15,6 +15,8 @@ public enum UserErrorCode implements ErrorCode {
     // 만료된 가입 컨텍스트도 이 코드로 응답한다. 만료와 미존재를 구분하지 않는다(GR-61 M00-03)
     EMAIL_SIGNUP_CONTEXT_INVALID(HttpStatus.UNAUTHORIZED, "이메일 인증 정보가 유효하지 않습니다."),
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "이미 가입된 이메일입니다."),
+    // 대소문자를 무시한 닉네임 중복(MEMBER_AUTH.md 1.2.3). 사전 검사와 uq_users_nickname_lower 위반 모두 이 코드로 응답한다(GR-29)
+    DUPLICATE_NICKNAME(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다."),
     EMAIL_VERIFICATION_ATTEMPTS_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "이메일 인증 코드 확인 시도 횟수를 초과했습니다."),
     EMAIL_VERIFICATION_RESEND_TOO_SOON(HttpStatus.TOO_MANY_REQUESTS, "이메일 인증 코드를 다시 요청할 수 없습니다. 잠시 후 다시 시도해 주세요.");
 

@@ -49,6 +49,15 @@ class UserErrorCodeTest {
     }
 
     @Test
+    @DisplayName("닉네임 중복 코드는 COMMON.md 3절대로 HTTP 409다")
+    void definesDuplicateNicknameErrorCode() {
+        // then
+        assertThat(UserErrorCode.DUPLICATE_NICKNAME.getCode()).isEqualTo("DUPLICATE_NICKNAME");
+        assertThat(UserErrorCode.DUPLICATE_NICKNAME.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(UserErrorCode.DUPLICATE_NICKNAME.getMessage()).isNotBlank();
+    }
+
+    @Test
     @DisplayName("공통 오류 코드와 같은 코드 이름을 다시 정의하지 않는다")
     // UserErrorCode의 코드 이름이 CommonErrorCode의 코드 이름과 하나도 겹치지 않는지 검증하는 테스트
     // 설계상 enum이 달라도 같은 이름을 다시 정의하면 안됨
