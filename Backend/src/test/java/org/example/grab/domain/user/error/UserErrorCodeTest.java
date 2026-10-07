@@ -30,6 +30,24 @@ class UserErrorCodeTest {
         assertThat(errorCode.getMessage()).isEqualTo(message);
     }
 
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "EMAIL_VERIFICATION_CODE_MISMATCH     | BAD_REQUEST",
+            "EMAIL_VERIFICATION_CODE_EXPIRED      | BAD_REQUEST",
+            "EMAIL_SIGNUP_CONTEXT_INVALID         | UNAUTHORIZED",
+            "DUPLICATE_EMAIL                      | CONFLICT",
+            "EMAIL_VERIFICATION_ATTEMPTS_EXCEEDED | TOO_MANY_REQUESTS",
+            "EMAIL_VERIFICATION_RESEND_TOO_SOON   | TOO_MANY_REQUESTS"
+    })
+    @DisplayName("이메일 인증 오류 코드는 상수 이름을 코드로, COMMON.md 3절의 HTTP 상태를 가진다")
+    // 이메일 인증·가입 컨텍스트·이메일 중복 코드가 API 명세의 상태 코드와 일치하는지 확인하는 테스트
+    void definesEmailVerificationErrorCodes(UserErrorCode errorCode, HttpStatus status) {
+        // then
+        assertThat(errorCode.getCode()).isEqualTo(errorCode.name());
+        assertThat(errorCode.getStatus()).isEqualTo(status);
+        assertThat(errorCode.getMessage()).isNotBlank();
+    }
+
     @Test
     @DisplayName("공통 오류 코드와 같은 코드 이름을 다시 정의하지 않는다")
     // UserErrorCode의 코드 이름이 CommonErrorCode의 코드 이름과 하나도 겹치지 않는지 검증하는 테스트
