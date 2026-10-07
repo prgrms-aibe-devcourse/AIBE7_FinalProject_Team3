@@ -97,6 +97,8 @@
 | Routing | React Router | 7.x | 소비자·판매자·관리자 라우팅과 권한별 화면을 분리한다. |
 | Server State | TanStack Query | 5.x | API 데이터 캐싱, 재조회, 로딩·오류 상태를 관리한다. |
 | Client State | React Context 또는 Zustand | 필요 시 확정 | 로그인 사용자 정보 등 작은 전역 상태만 관리한다. 서버 응답 데이터는 TanStack Query에서 관리한다. |
+| Unit Test | Vitest | 4.x | Vite 설정을 그대로 쓰는 단위 테스트로 옵션 조합·검증 함수 같은 순수 로직을 검사한다. |
+| E2E·Visual Test | Playwright | 1.63.x | 핵심 사용자 흐름과 PC·모바일 화면 기준 스크린샷을 검사한다. 기준 이미지는 CI와 같은 Playwright Docker 이미지에서 생성·비교한다. |
 
 ## 4. Infrastructure / Deployment
 
@@ -105,6 +107,7 @@
 - `Backend/Dockerfile`: Gradle `bootJar`를 실행하는 멀티 스테이지 빌드와 non-root 런타임 이미지
 - `Backend/compose.yaml`: 백엔드, PostgreSQL, Redis, Mailpit, Prometheus, Grafana, Loki, Alloy 컨테이너 정의. Mailpit은 로컬 개발용 SMTP 서버이며 운영 발송 대상이 아니다(4.3절).
 - `.github/workflows/backend-ci.yml`: `main` 또는 `deploy` 대상 PR과 두 브랜치의 푸시에서 PostgreSQL 기반 테스트와 Docker 이미지 빌드 검증
+- `.github/workflows/frontend-ci.yml`: `main` 또는 `deploy` 대상 PR과 두 브랜치의 푸시에서 Frontend lint·Vitest·build와 Playwright E2E·시각 비교 검증. 실패 시 리포트·trace를 산출물로 보관
 - `.github/workflows/publish-backend.yml`: Backend 이미지를 빌드해 GHCR에 `latest`, 커밋 SHA 태그로 게시. 운영 기준은 `deploy` 푸시지만 현재 트리거는 `main`이므로 변경이 필요하다.
 
 Actuator와 Prometheus의 로컬 메트릭 수집 연결은 완료됐다. Redis 연결 설정과 Refresh Token 저장소(생성·해시·TTL·저장·조회·삭제)는 구현됐으며, 로그인·재발급·로그아웃 API 연동은 구현 예정이다. Grafana·Loki·Alloy는 실행 틀만 마련된 상태다.

@@ -11,11 +11,14 @@ npm run dev      # 개발 서버
 npm run lint
 npm test         # Vitest (src/**/*.test.ts)
 npm run build    # tsc --noEmit + vite build
+npm run e2e      # Playwright E2E (시각 비교 제외)
+npm run e2e:docker -- --grep @visual   # 시각 비교 (CI와 같은 Docker 이미지)
 ```
 
-- 변경 후 `lint`·`test`·`build`를 실행하고, 실행하지 못한 항목과 이유를 결과에 적는다.
+- 변경 후 `lint`·`test`·`build`·`e2e`를 실행하고, 화면을 바꿨다면 시각 비교도 실행한다. 실행하지 못한 항목과 이유를 결과에 적는다.
+- 기준 이미지는 의도한 화면만 골라 갱신하고(`--grep <이름> --update-snapshots`), 일괄 갱신하지 않는다. 절차는 `README.md`를 따른다.
 - 포맷은 Prettier(`semi: false`, `singleQuote: true`)를 따른다.
-- CI(`.github/workflows/frontend-ci.yml`)는 `Frontend/**` 변경 시에만 동작한다. 체크가 없는 것을 통과로 읽지 않는다.
+- CI(`.github/workflows/frontend-ci.yml`)는 `main`·`deploy` 대상 PR·푸시에서 `Frontend/**` 변경 시에만 동작한다. 체크가 없는 것을 통과로 읽지 않는다.
 
 ## 구조
 
