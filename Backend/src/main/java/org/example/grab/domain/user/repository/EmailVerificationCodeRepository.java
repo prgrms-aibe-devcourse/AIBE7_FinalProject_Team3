@@ -53,10 +53,14 @@ public class EmailVerificationCodeRepository {
     public long incrementAttempts(String email) {
         String key = ATTEMPTS_KEY_PREFIX + hasher.hashEmail(email);
         Long attempts = redisTemplate.opsForValue().increment(key);
-        if (attempts != null && attempts == 1L) {
+        // null은 파이프라인·트랜잭션 안에서만 온다. 0으로 바꾸면 5회 제한 아래로 보여 코드 비교가 허용되므로 예외로 막는다
+        if (attempts == null) {
+            throw new IllegalStateException("Redis INCR 결과가 없습니다.");
+        }
+        if (attempts == 1L) {
             redisTemplate.expire(key, CODE_TTL);
         }
-        return attempts == null ? 0L : attempts;
+        return attempts;
     }
 
     /*

@@ -63,6 +63,13 @@ grab:
       # 인증 코드 해시와 Redis 키의 이메일 해시에 함께 쓰는 HMAC 키(GR-61 M00-01). 형식은 JWT_SECRET과 같다
       # 기본값이 없으므로 EMAIL_VERIFICATION_SECRET이 없으면 기동하지 않는다
       hmac-secret: ${EMAIL_VERIFICATION_SECRET}
+      # 인증 코드 발송 제한(MEMBER_AUTH 1.2). 이메일은 60초 간격·24시간 10회, IP는 1시간 30회. 구간은 첫 요청부터 세는 고정 구간이다
+      send-limit:
+        resend-interval: 60s
+        email-max-requests: 10
+        email-window: 24h
+        ip-max-requests: 30
+        ip-window: 1h
 
 server:
   # 운영은 Nginx 뒤에서 실행한다. Tomcat이 내부 프록시(사설망 IP)에서 온 요청의 X-Forwarded-For만 믿고

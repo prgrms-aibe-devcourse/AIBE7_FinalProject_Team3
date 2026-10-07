@@ -13,7 +13,7 @@ import java.util.HexFormat;
     이메일 인증의 이메일·코드를 HMAC-SHA256으로 해시한다(GR-61 M00-01).
     6자리 코드는 경우의 수가 100만 개라 SHA-256만 쓰면 Redis 값을 본 사람이 전부 대입해 원문을 알 수 있다.
     이메일도 키에 원문을 남기지 않되 사전 대입으로 되찾을 수 없도록 같은 키로 HMAC한다.
-    키 하나를 두 용도에 쓰므로 입력 앞에 용도를 붙여 이메일 해시와 코드 해시가 겹치지 않게 한다.
+    키 하나를 여러 용도(이메일·코드·IP)에 쓰므로 입력 앞에 용도를 붙여 해시가 서로 겹치지 않게 한다.
  */
 @Component
 public class EmailVerificationHasher {
@@ -21,6 +21,7 @@ public class EmailVerificationHasher {
     private static final String ALGORITHM = "HmacSHA256";
     private static final String EMAIL_PREFIX = "email:";
     private static final String CODE_PREFIX = "code:";
+    private static final String IP_PREFIX = "ip:";
 
     private final SecretKeySpec key;
 
@@ -31,6 +32,11 @@ public class EmailVerificationHasher {
     // 정규화(EmailNormalizer)한 이메일을 받는다. 정규화 전 값을 넘기면 같은 주소가 다른 키가 된다
     public String hashEmail(String email) {
         return hmac(EMAIL_PREFIX, email, "이메일");
+    }
+
+    // IP도 개인정보라 발송 제한 키(M02-02)에 원문을 남기지 않는다.
+    public String hashIpAddress(String ipAddress) {
+        return hmac(IP_PREFIX, ipAddress, "IP");
     }
 
     public String hashVerificationCode(String code) {

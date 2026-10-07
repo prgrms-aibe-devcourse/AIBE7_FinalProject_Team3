@@ -48,9 +48,23 @@ class EmailVerificationHasherTest {
     }
 
     @Test
-    @DisplayName("같은 값이어도 이메일 해시와 코드 해시는 다르다")
-    void separatesEmailAndCodeHashes() {
+    @DisplayName("IP는 용도를 붙인 입력의 HMAC-SHA256 소문자 hex 64자다")
+    void hashesIpAddressWithPurposePrefix() throws Exception {
+        // when
+        String ipHash = hasher.hashIpAddress("203.0.113.7");
+
+        // then
+        assertThat(ipHash).hasSize(64).matches("[0-9a-f]+")
+                .isEqualTo(hmacHex(SECRET_TEXT, "ip:203.0.113.7"));
+    }
+
+    @Test
+    @DisplayName("같은 값이어도 이메일·코드·IP 해시는 서로 다르다")
+    void separatesHashesByPurpose() {
         assertThat(hasher.hashEmail("123456")).isNotEqualTo(hasher.hashVerificationCode("123456"));
+        assertThat(hasher.hashIpAddress("123456"))
+                .isNotEqualTo(hasher.hashEmail("123456"))
+                .isNotEqualTo(hasher.hashVerificationCode("123456"));
     }
 
     @Test
@@ -83,5 +97,6 @@ class EmailVerificationHasherTest {
     void rejectsBlankInput(String value) {
         assertThatThrownBy(() -> hasher.hashEmail(value)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> hasher.hashVerificationCode(value)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> hasher.hashIpAddress(value)).isInstanceOf(IllegalArgumentException.class);
     }
 }
