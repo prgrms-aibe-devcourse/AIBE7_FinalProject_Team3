@@ -1,5 +1,7 @@
 import { expect, test as base, type Page } from '@playwright/test'
 
+export type { Page }
+
 // Mock 일정이 모두 Date.now() 기준이라 시각을 고정해야 D-day·날짜 표시가 매번 같다.
 export const FIXED_NOW = new Date('2026-10-01T10:00:00+09:00')
 
