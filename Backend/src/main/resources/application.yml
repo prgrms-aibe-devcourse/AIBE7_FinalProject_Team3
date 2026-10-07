@@ -31,6 +31,9 @@ spring:
       ddl-auto: validate
 
 grab:
+  # 메일 본문 등 서버가 만드는 링크가 가리키는 프런트엔드 주소. 기본값은 로컬 Vite 개발 서버다
+  web:
+    base-url: ${WEB_BASE_URL:http://localhost:5173}
   mock-delivery:
     enabled: ${GRAB_MOCK_DELIVERY_ENABLED:false}
   drop-transition:

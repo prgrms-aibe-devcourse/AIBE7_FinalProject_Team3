@@ -14,6 +14,8 @@ services:
       # 기본값을 두지 않는다. .env에 없으면 빈 값이 전달되어 backend가 기동에 실패한다
       JWT_SECRET: ${JWT_SECRET}
       REDIS_HOST: redis
+      # 메일 본문 링크가 가리키는 프런트엔드 주소. 받는 사람의 브라우저가 여는 주소라 컨테이너 안이 아니라 외부에서 닿는 값을 넣는다
+      WEB_BASE_URL: ${WEB_BASE_URL:-http://localhost:5173}
       REDIS_PASSWORD: ${REDIS_PASSWORD:-grab}
       # 기본값은 Mailpit이다. 컨테이너 안의 localhost는 mailpit이 아니므로 서비스 이름으로 접속한다(docs/MAIL.md)
       # .env에 값을 넣으면 Gmail 등 다른 SMTP로 바꿔 시험할 수 있다
