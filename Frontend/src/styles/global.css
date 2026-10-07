@@ -50,7 +50,9 @@ button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 select:focus-visible,
-textarea:focus-visible {
+textarea:focus-visible,
+/* 검색 입력은 테두리가 없어 감싸는 박스에 표시한다 */
+.search-box:focus-within {
   outline: 3px solid #7fa61f;
   outline-offset: 3px;
 }
@@ -622,7 +624,6 @@ main {
   border: 1px solid #dfe1da;
   border-radius: 8px;
   background: #fff;
-  outline: 0;
 }
 .buy-form input {
   width: 110px;

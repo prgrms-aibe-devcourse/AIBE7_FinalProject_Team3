@@ -56,6 +56,7 @@ export default function DropCard({ drop, wished, onWish }: Props) {
         </span>
         {drop.status === 'WISH' ? (
           <button
+            type="button"
             className={`wish-button ${wished ? 'selected' : ''}`}
             onClick={() => onWish(drop.id)}
           >

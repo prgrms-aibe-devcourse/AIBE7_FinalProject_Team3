@@ -65,3 +65,34 @@ test('배송 준비 후 송장을 검증하고 발송 처리한다', async ({ pa
   await expect(shipped).toContainText('CJ대한통운 · 123456789012')
   await expect(shipped.getByRole('button', { name: '송장 수정' })).toBeVisible()
 })
+
+test('발송된 주문의 송장을 수정한다', async ({ page }) => {
+  await page.getByRole('button', { name: '배송 중 1' }).click()
+  const order = row(page, 'ORD-20260916-000433')
+  await order
+    .getByRole('button', { name: 'ORD-20260916-000433 주문 상세' })
+    .click()
+
+  const edit = order.getByRole('button', { name: '송장 수정' })
+  const tracking = order.getByLabel('송장번호')
+
+  // 취소한 입력은 버리고 저장된 송장으로 다시 연다
+  await edit.click()
+  await expect(tracking).toHaveValue('482910355174')
+  await tracking.fill('999')
+  await order.getByRole('button', { name: '취소' }).click()
+  await edit.click()
+  await expect(tracking).toHaveValue('482910355174')
+
+  // 열린 폼에서 다시 눌러도 저장된 값으로 되돌린다
+  await tracking.fill('999')
+  await edit.click()
+  await expect(tracking).toHaveValue('482910355174')
+
+  await tracking.fill('482910355175')
+  await order.getByRole('button', { name: '수정 저장' }).click()
+  await expect(toast(page)).toHaveText('ORD-20260916-000433 송장을 수정했어요.')
+  await expect(order).toContainText('CJ대한통운 · 482910355175')
+  // 수정은 상태를 바꾸지 않는다
+  await expect(page.getByRole('button', { name: '배송 중 1' })).toBeVisible()
+})

@@ -60,6 +60,17 @@ test.describe('상품 탐색', () => {
 })
 
 test.describe('WISH', () => {
+  test('데모 기본 WISH는 로그인 후에만 보인다', async ({ page }) => {
+    await page.goto('/#/wish')
+    const tote = card(page, '매일을 담는 캔버스 토트')
+    await expect(tote.getByRole('button')).toHaveText('♡ WISH')
+    await expect(tote).toContainText('248 WISH')
+
+    await login(page)
+    await expect(tote.getByRole('button')).toHaveText('✓ WISHED')
+    await expect(tote).toContainText('249 WISH')
+  })
+
   test('로그인 전에는 WISH 대신 로그인 안내를 띄운다', async ({ page }) => {
     await page.goto('/#/wish')
     await card(page, '나의 작은 휴식, 데일리 머그')

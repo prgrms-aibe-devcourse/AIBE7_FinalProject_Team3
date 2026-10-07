@@ -108,7 +108,9 @@ export default function SellerDropFormPage({
           <Link className="secondary-button" to="/seller">
             취소
           </Link>
-          <button className="primary-button">임시 저장</button>
+          <button type="submit" className="primary-button">
+            임시 저장
+          </button>
         </div>
       </form>
     </section>

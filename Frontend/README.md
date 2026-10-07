@@ -58,7 +58,8 @@ npx playwright show-trace test-results/<테스트>/trace.zip
 
 1. 의도한 디자인 변경인지 실패 diff로 먼저 확인합니다. 의도하지 않은 변경이면 코드를 고칩니다.
 2. 바뀐 화면만 갱신합니다. 예: `npm run e2e:docker -- --grep login --update-snapshots`
-3. PR에 갱신 사유와 변경 전후 화면을 첨부합니다. 기준 이미지를 일괄 갱신해 의도하지 않은 변경을 통과시키지 않습니다.
+3. PR 본문에 갱신 사유를 적습니다. 변경 전후 화면은 PR의 Files changed에서 이미지 diff(2-up·Swipe·Onion skin)로 확인하므로 따로 첨부하지 않습니다.
+4. 기준 이미지를 일괄 갱신해 의도하지 않은 변경을 통과시키지 않습니다.
 
 판매자 대시보드·판매자 DROP 상세는 디자인 개선 예정이라 기준 이미지 대상이 아닙니다.
 

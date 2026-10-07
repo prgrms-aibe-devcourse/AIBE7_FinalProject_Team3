@@ -8,7 +8,8 @@ import {
   orderDetails,
   sellerOrders,
 } from '../../features/order/mockSellerOrders'
-import { validateShipment } from '../../features/order/shipment'
+import SellerOrderDetail from '../../features/order/SellerOrderDetail'
+import ShipmentForm from '../../features/order/ShipmentForm'
 import { dateLabel } from '../../utils/date'
 import { won } from '../../utils/price'
 
@@ -29,9 +30,8 @@ export default function SellerOrdersPage({
   const [tab, setTab] = useState<SellerOrderStatus>('PAID')
   const [openId, setOpenId] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
-  const [carrier, setCarrier] = useState('')
-  const [trackingNumber, setTrackingNumber] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  // 송장 버튼을 다시 누르면 입력을 저장된 값으로 되돌린다. key를 바꿔 폼을 새로 그린다.
+  const [formKey, setFormKey] = useState(0)
 
   const countOf = (status: SellerOrderStatus) =>
     orders.filter((order) => order.orderStatus === status).length
@@ -40,7 +40,6 @@ export default function SellerOrdersPage({
   const close = () => {
     setOpenId(null)
     setEditing(false)
-    setError(null)
   }
 
   // GET /seller/orders/{orderId} (GR-39) — 펼칠 때 상세를 받아온다.
@@ -48,7 +47,6 @@ export default function SellerOrdersPage({
     if (openId === orderId) return close()
     setOpenId(orderId)
     setEditing(false)
-    setError(null)
   }
 
   const setStatus = (orderId: string, orderStatus: SellerOrderStatus) =>
@@ -65,33 +63,27 @@ export default function SellerOrdersPage({
   }
 
   const openShipmentForm = (order: SellerOrder) => {
-    const shipping = details[order.orderId]?.shipping
     setOpenId(order.orderId)
     setEditing(true)
-    setCarrier(shipping?.carrier ?? '')
-    setTrackingNumber(shipping?.trackingNumber ?? '')
-    setError(null)
+    setFormKey((current) => current + 1)
   }
 
   // 등록: POST /seller/orders/{orderId}/shipment + Idempotency-Key (GR-42)
   // 수정: PATCH /seller/orders/{orderId}/shipment — 상태 전이 없이 송장만 갱신 (명세 추가 필요)
   // 수정은 SHIPPED까지만 허용한다. 오타 교정이 목적이고,
   // DELIVERED 이후에 번호를 바꾸면 끝난 배송 이력과 어긋난다.
-  const submit = (event: React.FormEvent, order: SellerOrder) => {
-    event.preventDefault()
-    const message = validateShipment(carrier, trackingNumber)
-    if (message) {
-      setError(message)
-      return
-    }
+  const saveShipment = (
+    order: SellerOrder,
+    { carrier, trackingNumber }: { carrier: string; trackingNumber: string },
+  ) => {
     const isUpdate = order.orderStatus === 'SHIPPED'
     setDetails((current) => ({
       ...current,
       [order.orderId]: {
         ...current[order.orderId],
         shipping: {
-          carrier: carrier.trim(),
-          trackingNumber: trackingNumber.trim(),
+          carrier,
+          trackingNumber,
           deliveredAt: current[order.orderId]?.shipping?.deliveredAt ?? null,
         },
       },
@@ -182,114 +174,30 @@ export default function SellerOrdersPage({
                     {open ? '▴' : '▾'}
                   </button>
                   {open && detail && (
-                    <div className="order-detail">
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>상품</th>
-                            <th>옵션</th>
-                            <th>단가</th>
-                            <th>수량</th>
-                            <th>금액</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {detail.items.map((item) => (
-                            <tr key={`${item.productName}-${item.optionName}`}>
-                              <td>{item.productName}</td>
-                              <td>{item.optionName}</td>
-                              <td>{won(item.unitPrice)}</td>
-                              <td>{item.quantity}</td>
-                              <td>{won(item.subtotal)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      <dl className="order-amounts">
-                        <div>
-                          <dt>상품 금액</dt>
-                          <dd>{won(detail.itemsAmount)}</dd>
-                        </div>
-                        <div>
-                          <dt>배송비</dt>
-                          <dd>{won(detail.shippingAmount)}</dd>
-                        </div>
-                        <div>
-                          <dt>결제 금액</dt>
-                          <dd>{won(detail.totalAmount)}</dd>
-                        </div>
-                      </dl>
-                      <div className="order-shipping">
-                        {detail.shipping ? (
-                          <>
-                            <span>
-                              {detail.shipping.carrier} ·{' '}
-                              {detail.shipping.trackingNumber}
-                              {detail.shipping.deliveredAt
-                                ? ` · ${dateLabel(detail.shipping.deliveredAt)} 배송 완료`
-                                : ''}
-                            </span>
-                            {order.orderStatus === 'SHIPPED' && (
-                              <button
-                                className="text-link"
-                                type="button"
-                                onClick={() => openShipmentForm(order)}
-                              >
-                                송장 수정
-                              </button>
-                            )}
-                          </>
-                        ) : (
-                          <span>등록된 송장이 없습니다.</span>
-                        )}
-                      </div>
-                    </div>
+                    <SellerOrderDetail
+                      detail={detail}
+                      onEditShipment={
+                        order.orderStatus === 'SHIPPED'
+                          ? () => openShipmentForm(order)
+                          : undefined
+                      }
+                    />
                   )}
                   {open && editing && (
-                    <form
-                      className="shipment-form"
-                      onSubmit={(event) => submit(event, order)}
-                    >
-                      <label>
-                        택배사
-                        <input
-                          value={carrier}
-                          maxLength={50}
-                          placeholder="CJ대한통운"
-                          onChange={(event) => setCarrier(event.target.value)}
-                        />
-                      </label>
-                      <label>
-                        송장번호
-                        <input
-                          value={trackingNumber}
-                          maxLength={100}
-                          placeholder="123456789012"
-                          onChange={(event) =>
-                            setTrackingNumber(event.target.value)
-                          }
-                        />
-                      </label>
-                      <div className="shipment-actions">
-                        <button className="primary-button" type="submit">
-                          {order.orderStatus === 'SHIPPED'
-                            ? '수정 저장'
-                            : '발송 처리'}
-                        </button>
-                        <button
-                          className="text-link"
-                          type="button"
-                          onClick={() => setEditing(false)}
-                        >
-                          취소
-                        </button>
-                      </div>
-                      {error && (
-                        <p className="shipment-error" role="alert">
-                          {error}
-                        </p>
-                      )}
-                    </form>
+                    <ShipmentForm
+                      key={formKey}
+                      initial={{
+                        carrier: detail?.shipping?.carrier ?? '',
+                        trackingNumber: detail?.shipping?.trackingNumber ?? '',
+                      }}
+                      submitLabel={
+                        order.orderStatus === 'SHIPPED'
+                          ? '수정 저장'
+                          : '발송 처리'
+                      }
+                      onSubmit={(shipment) => saveShipment(order, shipment)}
+                      onCancel={() => setEditing(false)}
+                    />
                   )}
                 </article>
               )
