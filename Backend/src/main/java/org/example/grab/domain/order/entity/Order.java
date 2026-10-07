@@ -13,6 +13,7 @@ import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.example.grab.domain.order.error.OrderErrorCode;
 import org.example.grab.global.entity.UUIDEntity;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
@@ -88,6 +89,16 @@ public class Order extends UUIDEntity {
 
     @Column(name = "expired_at")
     private OffsetDateTime expiredAt;
+
+    // 진행 중이거나 완료된 소비자 취소 요청의 Idempotency-Key. 결제 취소가 거절되면 비운다(ERD.md 3.3).
+    @Column(name = "cancel_idempotency_key", length = 100)
+    private String cancelIdempotencyKey;
+
+    @Column(name = "cancel_request_hash", length = 64)
+    private String cancelRequestHash;
+
+    @Column(name = "cancel_reason", length = 500)
+    private String cancelReason;
 
     private Order(
             String orderNumber,
@@ -172,6 +183,52 @@ public class Order extends UUIDEntity {
         }
         this.status = OrderStatus.EXPIRED;
         this.expiredAt = Objects.requireNonNull(expiredAt);
+    }
+
+    // 소비자 취소 가능 상태(ERD.md 3.3). 배송이 시작됐거나 이미 끝난 주문은 취소하지 않는다.
+    public boolean isCancelable() {
+        return status == OrderStatus.PAYMENT_PENDING
+                || status == OrderStatus.PAID
+                || status == OrderStatus.PREPARING;
+    }
+
+    public boolean hasCancelRequest() {
+        return cancelIdempotencyKey != null;
+    }
+
+    /**
+     * 소비자 취소 요청을 기록한다. 결제 후 취소는 PG 결과를 받기 전까지 이 기록으로 다른 키의 취소 요청을 막는다.
+     * 이미 다른 취소 요청이 진행 중이면 거부한다.
+     */
+    public void requestCancel(String idempotencyKey, String requestHash, String reason) {
+        if (!isCancelable()) {
+            throw new BusinessException(OrderErrorCode.ORDER_NOT_CANCELABLE);
+        }
+        if (hasCancelRequest()) {
+            throw new BusinessException(CommonErrorCode.ORDER_STATUS_CONFLICT);
+        }
+        this.cancelIdempotencyKey = Objects.requireNonNull(idempotencyKey);
+        this.cancelRequestHash = Objects.requireNonNull(requestHash);
+        this.cancelReason = Objects.requireNonNull(reason);
+    }
+
+    // 기록한 취소 요청대로 주문을 취소한다. 결제 후 취소는 PG 결제 취소 성공을 확인한 뒤에만 호출한다.
+    public void cancel(OffsetDateTime canceledAt) {
+        if (!isCancelable() || !hasCancelRequest()) {
+            throw new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION);
+        }
+        this.status = OrderStatus.CANCELED;
+        this.canceledAt = Objects.requireNonNull(canceledAt);
+    }
+
+    // PG가 결제 취소를 거절했다. 주문은 그대로 두고 새 취소 요청을 받을 수 있게 기록을 비운다.
+    public void clearCancelRequest() {
+        if (status == OrderStatus.CANCELED) {
+            throw new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION);
+        }
+        this.cancelIdempotencyKey = null;
+        this.cancelRequestHash = null;
+        this.cancelReason = null;
     }
 
     public void prepareShipment() {

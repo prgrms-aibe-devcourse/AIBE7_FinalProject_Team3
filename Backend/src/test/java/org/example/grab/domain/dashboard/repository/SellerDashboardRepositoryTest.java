@@ -334,20 +334,21 @@ class SellerDashboardRepositoryTest {
                 INSERT INTO orders (order_number, buyer_id, drop_id, idempotency_key, request_hash, status,
                                     product_name_snapshot, seller_name_snapshot, items_amount, shipping_amount,
                                     total_amount, recipient_name, recipient_phone, postal_code, address_line1,
-                                    payment_expires_at, paid_at, canceled_at, expired_at, created_at)
+                                    payment_expires_at, paid_at, canceled_at, expired_at, cancel_reason, created_at)
                 VALUES (?, ?, ?, ?, 'hash', ?, '상품', '브랜드', 1000, 0, 1000,
                         '수령인', '01000000000', '00000', '주소', ?,
                         CASE WHEN ? IN ('PAID', 'PREPARING', 'SHIPPED', 'DELIVERED') THEN ? ELSE NULL END,
                         CASE WHEN ? = 'CANCELED' THEN ? ELSE NULL END,
                         CASE WHEN ? = 'EXPIRED' THEN ? ELSE NULL END,
+                        CASE WHEN ? = 'CANCELED' THEN '테스트 취소' ELSE NULL END,
                         ?)
                 RETURNING id
                 """,
                 Long.class,
                 "ORDER-" + suffix, buyerId, dropId, suffix, status,
                 createdAt.plusHours(1), status, createdAt, status, createdAt,
-                // EXPIRED는 expired_at이 있어야 한다(V12 ck_orders_expired_at)
-                status, createdAt, createdAt);
+                // EXPIRED는 expired_at이, CANCELED는 cancel_reason이 있어야 한다(V12·V13 제약)
+                status, createdAt, status, createdAt);
     }
 
     private void insertPayment(Long orderId, String status, String reconciliationStatus, OffsetDateTime createdAt) {

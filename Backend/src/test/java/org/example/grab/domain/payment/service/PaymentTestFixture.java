@@ -83,6 +83,10 @@ class PaymentTestFixture {
 
     void cleanup() {
         jdbcTemplate.update("""
+                DELETE FROM payment_cancellations WHERE payment_id IN
+                    (SELECT p.id FROM payments p JOIN orders o ON o.id = p.order_id WHERE o.drop_id = ?)
+                """, dropId);
+        jdbcTemplate.update("""
                 DELETE FROM payment_events WHERE payment_id IN
                     (SELECT p.id FROM payments p JOIN orders o ON o.id = p.order_id WHERE o.drop_id = ?)
                 """, dropId);
@@ -100,6 +104,10 @@ class PaymentTestFixture {
 
     Long buyerId() {
         return buyerId;
+    }
+
+    Long sellerId() {
+        return sellerId;
     }
 
     Long optionId() {

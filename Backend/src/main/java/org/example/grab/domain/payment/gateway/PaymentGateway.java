@@ -11,4 +11,7 @@ public interface PaymentGateway {
 
     // 승인 결과를 알 수 없을 때 PG에 실제 상태를 다시 묻는다.
     PaymentGatewayResult lookup(String paymentKey);
+
+    // 승인된 결제를 전액 취소한다. 같은 멱등 키로 다시 부르면 PG가 최초 결과를 돌려준다.
+    PaymentCancelResult cancel(PaymentCancelCommand command);
 }
