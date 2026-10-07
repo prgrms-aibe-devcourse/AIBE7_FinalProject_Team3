@@ -56,7 +56,7 @@ export default function LoginPage({ mode, onLogin, notify }: Props) {
             placeholder="8자 이상 입력"
           />
         </label>
-        <button className="primary-button full">
+        <button type="submit" className="primary-button full">
           {signup ? 'GRAB 시작하기' : '로그인'}
         </button>
         <p>

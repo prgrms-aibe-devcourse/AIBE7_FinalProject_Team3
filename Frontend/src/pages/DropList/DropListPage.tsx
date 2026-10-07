@@ -68,6 +68,7 @@ export default function DropListPage({
           {categories.map((item) => (
             <button
               key={item}
+              type="button"
               className={category === item ? 'active' : ''}
               onClick={() => setCategory(item)}
             >
