@@ -27,7 +27,7 @@ import org.example.grab.global.common.ErrorResponse;
 import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
-import org.example.grab.global.storage.supabase.SupabaseStorageClient;
+import org.example.grab.global.storage.ImageStorage;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -60,7 +60,7 @@ public class DropService {
     private final DropImageRepository dropImageRepository;
     private final CategoryService categoryService;
     private final WishQueryService wishQueryService;
-    private final SupabaseStorageClient supabaseStorageClient;
+    private final ImageStorage imageStorage;
 
     /** 새 DRAFT를 만들고 요청 값을 반영해 저장한다. */
     @Transactional
@@ -350,7 +350,7 @@ public class DropService {
 
     private boolean isExpectedImageUrl(UUID imageId, String imageUrl) {
         for (String extension : IMAGE_EXTENSIONS) {
-            if (supabaseStorageClient.publicUrl(IMAGE_OBJECT_KEY_PREFIX + imageId + "." + extension).equals(imageUrl)) {
+            if (imageStorage.publicUrl(IMAGE_OBJECT_KEY_PREFIX + imageId + "." + extension).equals(imageUrl)) {
                 return true;
             }
         }
