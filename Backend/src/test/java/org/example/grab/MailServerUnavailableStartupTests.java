@@ -2,12 +2,14 @@ package org.example.grab;
 
 import org.example.grab.domain.mail.service.EmailSender;
 import org.example.grab.domain.mail.service.SmtpEmailSender;
+import org.example.grab.support.TestcontainersConfiguration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.mail.health.MailHealthIndicator;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
@@ -21,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
     로컬에서는 Mailpit이 기본 주소(localhost:1025)에서 실행 중일 수 있으므로, 아무도 듣지 않는 포트로 바꿔 SMTP가 없는 상황을 만든다.
  */
 @SpringBootTest
+@Import(TestcontainersConfiguration.class)
 class MailServerUnavailableStartupTests {
 
     @DynamicPropertySource

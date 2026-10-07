@@ -12,6 +12,7 @@ import org.example.grab.domain.category.service.CategoryService;
 import org.example.grab.domain.drop.dto.response.PublicDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.PublicDropStockResponse;
 import org.example.grab.domain.drop.dto.response.SellerDropStockResponse;
+import org.example.grab.domain.drop.dto.response.SellerDropWishCountResponse;
 import org.example.grab.domain.drop.dto.response.common.DropCategoryResponse;
 import org.example.grab.domain.wish.WishNotice;
 import org.example.grab.domain.wish.service.WishQueryService;
@@ -28,8 +29,8 @@ import org.example.grab.domain.drop.repository.DropRepository;
 import org.example.grab.global.common.ErrorResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
-import org.example.grab.global.storage.supabase.SupabaseStorageClient;
-import org.example.grab.global.storage.supabase.SupabaseStorageProperties;
+import org.example.grab.global.storage.ImageStorage;
+import org.example.grab.global.storage.SignedUploadUrl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,9 +38,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.client.RestClient;
 
-import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -60,7 +59,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 class DropServiceTest {
 
     private static final String IMAGE_URL_PREFIX =
-            "https://project.supabase.co/storage/v1/object/public/drop-images/images/";
+            "https://storage.example.com/";
 
     @Mock
     private DropRepository dropRepository;
@@ -74,18 +73,24 @@ class DropServiceTest {
     @Mock
     private WishQueryService wishQueryService;
 
-    // imageUrl 검증은 실제 공개 URL 조립이 필요하므로 진짜 클라이언트를 쓴다(HTTP 호출은 하지 않는다).
-    private final SupabaseStorageClient supabaseStorageClient = new SupabaseStorageClient(
-            RestClient.builder(),
-            new SupabaseStorageProperties("https://project.supabase.co", "sb_secret_test", "drop-images",
-                    Duration.ofSeconds(3), Duration.ofSeconds(5)));
+    private final ImageStorage imageStorage = new ImageStorage() {
+        @Override
+        public SignedUploadUrl createSignedUploadUrl(String objectKey) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public String publicUrl(String objectKey) {
+            return IMAGE_URL_PREFIX + objectKey;
+        }
+    };
 
     private DropService dropService;
 
     @BeforeEach
     void setUp() {
         dropService = new DropService(
-                dropRepository, dropImageRepository, categoryService, wishQueryService, supabaseStorageClient);
+                dropRepository, dropImageRepository, categoryService, wishQueryService, imageStorage);
     }
 
     @Test
@@ -360,6 +365,66 @@ class DropServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(DropErrorCode.DROP_ACCESS_DENIED);
+    }
+
+    @Test
+    @DisplayName("판매자 활성 WISH 수: 소유자면 건수를 반환한다")
+    void findSellerWishCount_returnsCount() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+        given(wishQueryService.countActiveByDropId(10L)).willReturn(152L);
+
+        // when
+        SellerDropWishCountResponse response = dropService.findSellerWishCount(1L, 10L);
+
+        // then
+        assertThat(response.dropId()).isEqualTo(10L);
+        assertThat(response.activeWishCount()).isEqualTo(152L);
+    }
+
+    @Test
+    @DisplayName("판매자 활성 WISH 수: 0건은 0으로 반환한다")
+    void findSellerWishCount_zero() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+        given(wishQueryService.countActiveByDropId(10L)).willReturn(0L);
+
+        // when
+        SellerDropWishCountResponse response = dropService.findSellerWishCount(1L, 10L);
+
+        // then
+        assertThat(response.activeWishCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("판매자 활성 WISH 수: 없는 DROP은 DROP_NOT_FOUND이고 건수를 조회하지 않는다")
+    void findSellerWishCount_notFound() {
+        // given
+        given(dropRepository.findById(99L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> dropService.findSellerWishCount(1L, 99L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(DropErrorCode.DROP_NOT_FOUND);
+        verifyNoInteractions(wishQueryService);
+    }
+
+    @Test
+    @DisplayName("판매자 활성 WISH 수: 다른 판매자의 DROP은 DROP_ACCESS_DENIED이고 건수를 조회하지 않는다")
+    void findSellerWishCount_accessDenied() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        given(dropRepository.findById(10L)).willReturn(Optional.of(drop));
+
+        // when & then
+        assertThatThrownBy(() -> dropService.findSellerWishCount(2L, 10L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(DropErrorCode.DROP_ACCESS_DENIED);
+        verifyNoInteractions(wishQueryService);
     }
 
     @Test
@@ -653,7 +718,7 @@ class DropServiceTest {
     }
 
     private static DropImageRequest image(UUID imageId) {
-        return new DropImageRequest(imageId, IMAGE_URL_PREFIX + imageId + ".jpg");
+        return new DropImageRequest(imageId, IMAGE_URL_PREFIX + "images/" + imageId + ".jpg");
     }
 
     @Test

@@ -14,6 +14,7 @@ import org.example.grab.domain.drop.dto.response.SellerDropStockResponse;
 import org.example.grab.domain.drop.dto.response.common.DropCategoryResponse;
 import org.example.grab.domain.drop.dto.response.SellerDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.SellerDropListResponse;
+import org.example.grab.domain.drop.dto.response.SellerDropWishCountResponse;
 import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.domain.drop.entity.DropImage;
 import org.example.grab.domain.drop.entity.DropStatus;
@@ -26,7 +27,7 @@ import org.example.grab.global.common.ErrorResponse;
 import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
-import org.example.grab.global.storage.supabase.SupabaseStorageClient;
+import org.example.grab.global.storage.ImageStorage;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -59,7 +60,7 @@ public class DropService {
     private final DropImageRepository dropImageRepository;
     private final CategoryService categoryService;
     private final WishQueryService wishQueryService;
-    private final SupabaseStorageClient supabaseStorageClient;
+    private final ImageStorage imageStorage;
 
     /** 새 DRAFT를 만들고 요청 값을 반영해 저장한다. */
     @Transactional
@@ -141,6 +142,15 @@ public class DropService {
 
     public SellerDropDetailResponse findSellerDrop(Long sellerId, Long dropId) {
         return SellerDropDetailResponse.from(findOwnedDrop(sellerId, dropId));
+    }
+
+    /**
+     * 판매자 DROP의 활성 WISH 수(DASH-002, WISH-006). 존재·소유권만 확인하고 건수만 반환한다.
+     * 공개 상세와 같은 기준(canceled_at IS NULL)을 위해 기존 WishQueryService를 재사용한다.
+     */
+    public SellerDropWishCountResponse findSellerWishCount(Long sellerId, Long dropId) {
+        findOwnedDrop(sellerId, dropId);
+        return new SellerDropWishCountResponse(dropId, wishQueryService.countActiveByDropId(dropId));
     }
 
     /**
@@ -340,7 +350,7 @@ public class DropService {
 
     private boolean isExpectedImageUrl(UUID imageId, String imageUrl) {
         for (String extension : IMAGE_EXTENSIONS) {
-            if (supabaseStorageClient.publicUrl(IMAGE_OBJECT_KEY_PREFIX + imageId + "." + extension).equals(imageUrl)) {
+            if (imageStorage.publicUrl(IMAGE_OBJECT_KEY_PREFIX + imageId + "." + extension).equals(imageUrl)) {
                 return true;
             }
         }

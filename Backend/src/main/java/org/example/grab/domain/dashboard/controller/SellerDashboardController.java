@@ -1,10 +1,13 @@
 package org.example.grab.domain.dashboard.controller;
 
+import org.example.grab.domain.dashboard.dto.DropStatsResponse;
 import org.example.grab.domain.dashboard.dto.SellerDashboardSummaryResponse;
 import org.example.grab.domain.dashboard.dto.UpcomingDropEventType;
 import org.example.grab.domain.dashboard.dto.UpcomingDropResponse;
 import org.example.grab.domain.dashboard.service.SellerDashboardService;
+import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.global.common.ApiResponse;
+import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
 import org.example.grab.global.security.identity.CurrentSellerIdProvider;
@@ -36,6 +39,18 @@ public class SellerDashboardController {
         }
         return ApiResponse.success(sellerDashboardService.findUpcomingDrops(
                 currentSellerIdProvider.currentSellerId(), eventType, withinMinutes));
+    }
+
+    @GetMapping("/drops")
+    public ApiResponse<PageResponse<DropStatsResponse>> findDropStats(
+            @RequestParam(required = false) DropStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        if (page < 0 || size < 1 || size > 100) {
+            throw new BusinessException(CommonErrorCode.INVALID_REQUEST);
+        }
+        return ApiResponse.success(sellerDashboardService.findDropStats(
+                currentSellerIdProvider.currentSellerId(), status, page, size));
     }
 
     @GetMapping("/summary")

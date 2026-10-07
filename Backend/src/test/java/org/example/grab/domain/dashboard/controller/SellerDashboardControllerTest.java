@@ -1,10 +1,13 @@
 package org.example.grab.domain.dashboard.controller;
 
+import org.example.grab.domain.dashboard.dto.DropStatsResponse;
 import org.example.grab.domain.dashboard.dto.SellerDashboardSummaryResponse;
 import org.example.grab.domain.dashboard.dto.SellerDashboardSummaryResponse.StockSummary;
 import org.example.grab.domain.dashboard.dto.UpcomingDropEventType;
 import org.example.grab.domain.dashboard.dto.UpcomingDropResponse;
 import org.example.grab.domain.dashboard.service.SellerDashboardService;
+import org.example.grab.domain.drop.entity.DropStatus;
+import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.GlobalExceptionHandler;
 import org.example.grab.global.error.ValidationErrorCodeResolver;
 import org.example.grab.global.security.identity.CurrentSellerIdProvider;
@@ -88,6 +91,52 @@ class SellerDashboardControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
         verifyNoInteractions(sellerDashboardService, currentSellerIdProvider);
+    }
+
+    @Test
+    @DisplayName("상태와 페이지를 넘기면 DROP별 통계를 페이지 응답으로 반환한다")
+    void findDropStats_withStatus() throws Exception {
+        // given
+        given(sellerDashboardService.findDropStats(3L, DropStatus.ENDED, 0, 20))
+                .willReturn(new PageResponse<>(List.of(new DropStatsResponse(
+                        100L, "한정판 스니커즈", "ENDED", OffsetDateTime.parse("2026-09-18T08:00:00Z"),
+                        152L, 4L, 2L, 14L, 10L, 1806000L)), 0, 20, 1, 1, false));
+
+        // when & then
+        mockMvc.perform(get("/api/v1/seller/dashboard/drops").param("status", "ENDED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content[0].dropId").value(100))
+                .andExpect(jsonPath("$.data.content[0].activeWishCount").value(152))
+                .andExpect(jsonPath("$.data.content[0].salesAmount").value(1806000))
+                .andExpect(jsonPath("$.data.hasNext").value(false));
+        verify(sellerDashboardService).findDropStats(3L, DropStatus.ENDED, 0, 20);
+    }
+
+    @Test
+    @DisplayName("상태를 생략하면 전체 DROP을 기본 페이지 크기로 조회한다")
+    void findDropStats_usesDefaults() throws Exception {
+        // given
+        given(sellerDashboardService.findDropStats(3L, null, 0, 20))
+                .willReturn(new PageResponse<>(List.of(), 0, 20, 0, 0, false));
+
+        // when & then
+        mockMvc.perform(get("/api/v1/seller/dashboard/drops"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content").isEmpty());
+        verify(sellerDashboardService).findDropStats(3L, null, 0, 20);
+    }
+
+    @Test
+    @DisplayName("허용 범위를 벗어난 페이지 값은 400 INVALID_REQUEST로 거부한다")
+    void findDropStats_rejectsInvalidPaging() throws Exception {
+        // when & then
+        mockMvc.perform(get("/api/v1/seller/dashboard/drops").param("page", "-1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        mockMvc.perform(get("/api/v1/seller/dashboard/drops").param("size", "101"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(sellerDashboardService);
     }
 
     @Test

@@ -4,6 +4,7 @@ import org.example.grab.domain.drop.dto.request.DropDraftRequest;
 import org.example.grab.domain.drop.dto.response.SellerDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.SellerDropListResponse;
 import org.example.grab.domain.drop.dto.response.SellerDropStockResponse;
+import org.example.grab.domain.drop.dto.response.SellerDropWishCountResponse;
 import org.example.grab.domain.drop.dto.response.common.DropOptionGroupResponse;
 import org.example.grab.domain.drop.dto.response.common.DropOptionSelectionResponse;
 import org.example.grab.domain.drop.dto.response.common.DropShippingResponse;
@@ -437,6 +438,50 @@ class SellerDropControllerTest {
 
         // when & then
         mockMvc.perform(get("/api/v1/seller/drops/100"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("DROP_ACCESS_DENIED"));
+    }
+
+    @Test
+    @DisplayName("판매자 활성 WISH 수는 200과 dropId·activeWishCount를 반환한다")
+    void findWishCount() throws Exception {
+        // given
+        given(currentSellerIdProvider.currentSellerId()).willReturn(1L);
+        given(dropService.findSellerWishCount(1L, 100L))
+                .willReturn(new SellerDropWishCountResponse(100L, 152L));
+
+        // when & then
+        mockMvc.perform(get("/api/v1/seller/drops/100/wish-count"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.dropId").value(100))
+                .andExpect(jsonPath("$.data.activeWishCount").value(152));
+    }
+
+    @Test
+    @DisplayName("판매자 활성 WISH 수: 없는 dropId는 404 DROP_NOT_FOUND")
+    void findWishCount_notFound() throws Exception {
+        // given
+        given(currentSellerIdProvider.currentSellerId()).willReturn(1L);
+        given(dropService.findSellerWishCount(1L, 999L))
+                .willThrow(new BusinessException(DropErrorCode.DROP_NOT_FOUND));
+
+        // when & then
+        mockMvc.perform(get("/api/v1/seller/drops/999/wish-count"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("DROP_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("판매자 활성 WISH 수: 다른 판매자의 DROP은 403 DROP_ACCESS_DENIED")
+    void findWishCount_accessDenied() throws Exception {
+        // given
+        given(currentSellerIdProvider.currentSellerId()).willReturn(1L);
+        given(dropService.findSellerWishCount(1L, 100L))
+                .willThrow(new BusinessException(DropErrorCode.DROP_ACCESS_DENIED));
+
+        // when & then
+        mockMvc.perform(get("/api/v1/seller/drops/100/wish-count"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code").value("DROP_ACCESS_DENIED"));
     }

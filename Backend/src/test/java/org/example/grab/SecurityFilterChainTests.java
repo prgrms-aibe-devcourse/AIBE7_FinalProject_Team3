@@ -6,6 +6,7 @@ import jakarta.servlet.http.Cookie;
 import org.example.grab.global.security.AuthRole;
 import org.example.grab.global.security.jwt.AccessTokenProperties;
 import org.example.grab.global.security.jwt.JwtProvider;
+import org.example.grab.support.TestcontainersConfiguration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,6 +15,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -40,6 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ExtendWith(OutputCaptureExtension.class)
+@Import(TestcontainersConfiguration.class)
 class SecurityFilterChainTests {
 
     // 인증되면 보안을 통과해 매핑 없는 경로의 404까지 간다. 막히면 401이다
@@ -249,6 +252,59 @@ class SecurityFilterChainTests {
                         .cookie(new Cookie("access_token", token))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("ACCESS_DENIED"));
+    }
+
+    // GR-54: 내 WISH 목록은 정확 경로 GET에 USER 권한을 요구한다.
+    @Test
+    @DisplayName("쿠키 없이 GET /api/v1/users/me/wishes는 401 AUTHENTICATION_REQUIRED")
+    void rejectsUnauthenticatedMyWishes() throws Exception {
+        mockMvc.perform(get("/api/v1/users/me/wishes"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("AUTHENTICATION_REQUIRED"));
+    }
+
+    @Test
+    @DisplayName("USER 토큰은 내 WISH 목록의 USER 규칙을 통과한다(403 아님)")
+    void allowsUserTokenOnMyWishes() throws Exception {
+        // given: 유효한 USER 토큰. publicId가 DB에 없어 컨트롤러에서 401이 될 수 있지만, 인가 단계(403)는 통과한다.
+        String token = jwtProvider.issue(UUID.randomUUID(), Set.of(AuthRole.USER)).value();
+
+        // when, then
+        mockMvc.perform(get("/api/v1/users/me/wishes").cookie(new Cookie("access_token", token)))
+                .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotIn(403));
+    }
+
+    @Test
+    @DisplayName("USER 없이 SELLER 토큰만으로 내 WISH 목록에 접근하면 403 ACCESS_DENIED")
+    void rejectsSellerOnlyTokenOnMyWishes() throws Exception {
+        // given: ROLE_USER가 없어 hasRole("USER") 규칙에서 거부된다
+        String token = jwtProvider.issue(UUID.randomUUID(), Set.of(AuthRole.SELLER)).value();
+
+        // when, then
+        mockMvc.perform(get("/api/v1/users/me/wishes").cookie(new Cookie("access_token", token)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("ACCESS_DENIED"));
+    }
+
+    // GR-54: 판매자 활성 WISH 수는 기존 판매자 경로 규칙(SELLER)을 그대로 따른다.
+    @Test
+    @DisplayName("쿠키 없이 판매자 활성 WISH 수는 401 AUTHENTICATION_REQUIRED")
+    void rejectsUnauthenticatedWishCount() throws Exception {
+        mockMvc.perform(get("/api/v1/seller/drops/1/wish-count"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("AUTHENTICATION_REQUIRED"));
+    }
+
+    @Test
+    @DisplayName("USER만 가진 토큰으로 판매자 활성 WISH 수에 접근하면 403 ACCESS_DENIED")
+    void rejectsUserTokenOnWishCount() throws Exception {
+        // given
+        String token = jwtProvider.issue(UUID.randomUUID(), Set.of(AuthRole.USER)).value();
+
+        // when, then
+        mockMvc.perform(get("/api/v1/seller/drops/1/wish-count").cookie(new Cookie("access_token", token)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code").value("ACCESS_DENIED"));
     }
