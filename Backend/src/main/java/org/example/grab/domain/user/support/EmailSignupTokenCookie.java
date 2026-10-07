@@ -20,12 +20,12 @@ public final class EmailSignupTokenCookie {
     }
 
     public static ResponseCookie issue(String rawToken) {
-        return ResponseCookie.from(NAME, rawToken)
-                .httpOnly(true)
-                .secure(true)
-                .sameSite("Lax")
-                .path(PATH)
-                .maxAge(EmailSignupContextRepository.CONTEXT_TTL)
+        return ResponseCookie.from(NAME, rawToken) // 쿠키 이름이 email_signup_token
+                .httpOnly(true) //Js에서 쿠키를 읽지 못하도록 설정
+                .secure(true) // HTTPS 연결에서 전송하도록 설정
+                .sameSite("Lax") // 다른 사이트에서 시작한 POST 요청에는 쿠키 전송 제한
+                .path(PATH) // /api/v1/auth/signup과 그 하위 경로에 쿠키 전송하도록 제한
+                .maxAge(EmailSignupContextRepository.CONTEXT_TTL) // 15분 설정
                 .build();
     }
 }
