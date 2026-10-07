@@ -39,6 +39,7 @@ npm run e2e:docker -- --grep @visual   # 시각 비교 (CI와 같은 Docker 이�
 
 - 새 UI를 만들기 전에 `src/components`, `src/features`의 기존 컴포넌트와 `global.css` 클래스를 먼저 찾아 재사용한다.
 - 버튼·링크는 `primary-button` / `secondary-button` / `text-link` 클래스를 그대로 쓴다. `button`과 `Link`의 의미, `type`, `disabled`, 키보드 포커스를 유지한다.
+- 페이지 이동은 `Link`, 동작은 `button`을 쓴다. `button`에는 항상 `type`을 적는다(폼 제출은 `submit`, 그 외는 `button`).
 - 빈 상태는 `EmptyState`를 사용한다.
 - 같은 역할의 UI가 두 곳 이상에서 반복되면 컴포넌트로 추출한다. 마크업만 비슷하고 바뀌는 이유가 다르면 추출하지 않는다.
 - CSS 클래스 하나로 공유되는 스타일(`primary-button` 등)은 컴포넌트로 감싸지 않는다.
