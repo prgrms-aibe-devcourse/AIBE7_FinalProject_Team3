@@ -16,12 +16,14 @@ import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
 import org.example.grab.global.idempotency.IdempotencyKey;
 import org.example.grab.global.idempotency.RequestHash;
+import org.example.grab.support.TestcontainersConfiguration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.OffsetDateTime;
@@ -41,6 +43,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 // 결제 전 주문 취소(ORDER.md 1.4, ERD.md 3.3)가 실제 PostgreSQL에서 주문·예약·재고를 한 번만 바꾸는지 확인한다.
 @SpringBootTest
+@Import(TestcontainersConfiguration.class)
 class OrderCancelServiceIntegrationTest {
 
     private static final OrderCancelRequest REQUEST = new OrderCancelRequest("단순 변심");

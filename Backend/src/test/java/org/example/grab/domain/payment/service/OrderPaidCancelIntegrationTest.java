@@ -20,6 +20,7 @@ import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
 import org.example.grab.global.idempotency.IdempotencyKey;
 import org.example.grab.global.idempotency.RequestHash;
+import org.example.grab.support.TestcontainersConfiguration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
@@ -46,6 +48,7 @@ import static org.mockito.Mockito.verify;
 
 // 결제 후 주문 취소(ORDER.md 1.4, ERD.md 3.3)가 PG 결제 취소 결과에 따라 결제·주문·예약·재고를 한 번만 바꾸는지 확인한다.
 @SpringBootTest
+@Import(TestcontainersConfiguration.class)
 class OrderPaidCancelIntegrationTest {
 
     private static final OrderCancelRequest REQUEST = new OrderCancelRequest("단순 변심");
