@@ -25,6 +25,8 @@ export const upcoming = (drop: Drop, now = Date.now()) => {
     eventType,
     label: eventType === 'START' ? '시작 임박' : '종료 임박',
     remain:
-      hours > 0 ? `${hours}시간 후` : `${Math.max(1, Math.round(left / 60_000))}분 후`,
+      hours > 0
+        ? `${hours}시간 후`
+        : `${Math.max(1, Math.round(left / 60_000))}분 후`,
   }
 }
