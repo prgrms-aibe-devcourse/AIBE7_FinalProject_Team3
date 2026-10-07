@@ -92,7 +92,7 @@
 | Language | TypeScript | 5.x | API 요청·응답과 클라이언트 상태의 타입을 명확하게 관리한다. |
 | Framework | React | 19.x | 컴포넌트 기반으로 소비자·판매자·관리자 화면을 구성한다. |
 | Build Tool | Vite | 8.x | 빠른 개발 서버와 단순한 SPA 빌드 환경을 제공한다. |
-| Styling | Tailwind CSS | 4.x | 짧은 MVP 기간에 일관된 반응형 UI를 구현한다. |
+| Styling | CSS (전역 스타일시트) | - | `src/styles/global.css`의 CSS 변수와 클래스로 디자인을 일관되게 유지한다. 별도 CSS 프레임워크 없이 기존 클래스를 재사용한다. |
 | HTTP Client | Axios | 1.x | Credential·CSRF 헤더, 공통 오류 처리 및 쿠키 기반 토큰 재발급 흐름을 구성한다. |
 | Routing | React Router | 7.x | 소비자·판매자·관리자 라우팅과 권한별 화면을 분리한다. |
 | Server State | TanStack Query | 5.x | API 데이터 캐싱, 재조회, 로딩·오류 상태를 관리한다. |
@@ -245,7 +245,7 @@ MVP 초기에는 Actuator와 Prometheus를 연결해 JVM·HTTP·DB Connection Po
 - PostgreSQL, Flyway, Refresh Token·이메일 인증 저장용 Redis
 - Gmail SMTP 기반 이메일 인증 코드 발송, 로컬 Mailpit·테스트 GreenMail
 - 토스페이먼츠 테스트 환경 기반 Mock 결제 (결제창, 테스트 API 키)
-- React, TypeScript, Vite, Tailwind CSS, Axios, React Router
+- React, TypeScript, Vite, CSS, Axios, React Router
 - Docker, Docker Compose, GitHub Actions
 - GHCR 이미지 게시(`latest`, 커밋 SHA 태그)
 - JUnit 기반 테스트와 핵심 API 통합 테스트
