@@ -1,4 +1,4 @@
-import { expect, test as base } from '@playwright/test'
+import { expect, test as base, type Page } from '@playwright/test'
 
 // Mock 일정이 모두 Date.now() 기준이라 시각을 고정해야 D-day·날짜 표시가 매번 같다.
 export const FIXED_NOW = new Date('2026-10-01T10:00:00+09:00')
@@ -24,3 +24,14 @@ export const test = base.extend({
 })
 
 export { expect }
+
+// 로그인 상태는 메모리에만 있어 page.goto로 새로 열면 사라진다. 로그인 후에는 화면 안 링크로 이동한다.
+export async function login(page: Page) {
+  await page.goto('/#/login')
+  await page.getByLabel('이메일').fill('grab@example.com')
+  await page.getByLabel('비밀번호').fill('password1234')
+  await page.getByRole('button', { name: '로그인' }).click()
+  await expect(page).toHaveURL(/#\/wish$/)
+}
+
+export const toast = (page: Page) => page.getByRole('status')
