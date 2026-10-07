@@ -102,3 +102,25 @@ test('MY: 가로 넘침 없이 핵심 버튼에 닿는다', async ({ page }) => 
   await expectReachable(page, page.getByRole('button', { name: '취소' }))
   await expectNoHorizontalOverflow(page)
 })
+
+// 입력란별 outline 재정의가 전역 :focus-visible 표시를 가리지 않는다
+test('키보드 포커스가 입력란에 보인다', async ({ page }) => {
+  const expectFocusRing = async (focus: Locator, ring: Locator = focus) => {
+    await focus.focus()
+    await expect(ring).toHaveCSS('outline-style', 'solid')
+  }
+
+  await page.goto('/#/wish')
+  await expectFocusRing(
+    page.getByPlaceholder('상품 또는 브랜드 검색'),
+    page.locator('.search-box'),
+  )
+
+  await page.goto('/#/drops/201')
+  await expectFocusRing(page.getByLabel('수량'))
+
+  await page.goto('/#/seller/drops/new')
+  await expectFocusRing(page.getByLabel('상품명'))
+  await expectFocusRing(page.getByLabel('상품 설명'))
+  await expectFocusRing(page.getByLabel('카테고리'))
+})
