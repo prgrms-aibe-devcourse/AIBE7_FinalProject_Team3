@@ -5,7 +5,7 @@ import org.example.grab.domain.drop.upload.dto.ImageUploadUrlResponse;
 import org.example.grab.global.common.ErrorResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
-import org.example.grab.global.storage.supabase.SignedUploadUrl;
+import org.example.grab.global.storage.SignedUploadUrl;
 import org.example.grab.global.storage.supabase.SupabaseStorageClient;
 import org.springframework.stereotype.Service;
 

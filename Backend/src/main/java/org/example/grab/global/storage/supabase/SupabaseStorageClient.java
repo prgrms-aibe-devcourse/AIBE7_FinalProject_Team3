@@ -3,6 +3,7 @@ package org.example.grab.global.storage.supabase;
 import lombok.extern.slf4j.Slf4j;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
+import org.example.grab.global.storage.SignedUploadUrl;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
