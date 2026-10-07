@@ -18,7 +18,9 @@ import { won } from '../../utils/price'
 const loadSummary = () => ({
   pendingShipment: sellerOrders.filter((o) => o.orderStatus === 'PAID').length,
   upcomingCount: drops.filter((drop) => upcoming(drop)).length,
-  reconciliationRequired: sellerOrders.filter((o) => o.paymentStatus === 'UNKNOWN').length,
+  reconciliationRequired: sellerOrders.filter(
+    (o) => o.paymentStatus === 'UNKNOWN',
+  ).length,
 })
 
 /*
@@ -35,7 +37,13 @@ const ORDER_STATUSES = [
   'EXPIRED',
   'CANCELED',
 ] as const
-const PAYMENT_STATUSES = ['PENDING', 'SUCCEEDED', 'FAILED', 'UNKNOWN', 'CANCELED'] as const
+const PAYMENT_STATUSES = [
+  'PENDING',
+  'SUCCEEDED',
+  'FAILED',
+  'UNKNOWN',
+  'CANCELED',
+] as const
 
 // 전체는 기간을 보내지 않는다는 뜻이다. 서버도 from·to를 생략하면 제한하지 않는다.
 const PRESETS = [
@@ -103,12 +111,18 @@ export default function SellerDashboardPage({
   const periodOrders = sellerOrders.filter((order) => inRange(order.orderedAt))
   const orderCounts = ORDER_STATUSES.map(
     (status) =>
-      [status, periodOrders.filter((order) => order.orderStatus === status).length] as const,
+      [
+        status,
+        periodOrders.filter((order) => order.orderStatus === status).length,
+      ] as const,
   )
   // 결제는 주문이 아니라 시도 건수라 재시도가 있으면 주문 합계보다 크다. 목은 시도 이력이 없어 1:1로 보인다.
   const paymentCounts = PAYMENT_STATUSES.map(
     (status) =>
-      [status, periodOrders.filter((order) => order.paymentStatus === status).length] as const,
+      [
+        status,
+        periodOrders.filter((order) => order.paymentStatus === status).length,
+      ] as const,
   )
 
   const onlyUpcoming = filter === 'UPCOMING'
@@ -173,7 +187,9 @@ export default function SellerDashboardPage({
           aria-pressed={onlyUpcoming}
           disabled={summary.upcomingCount === 0}
           onClick={() =>
-            setFilter((current) => (current === 'UPCOMING' ? 'ALL' : 'UPCOMING'))
+            setFilter((current) =>
+              current === 'UPCOMING' ? 'ALL' : 'UPCOMING',
+            )
           }
         >
           <span>임박 DROP</span>
@@ -258,7 +274,11 @@ export default function SellerDashboardPage({
                       className="secondary-button"
                       type="button"
                       onClick={() =>
-                        setStatus(drop.id, 'WISH', `${drop.name} 을(를) 공개했어요.`)
+                        setStatus(
+                          drop.id,
+                          'WISH',
+                          `${drop.name} 을(를) 공개했어요.`,
+                        )
                       }
                     >
                       공개
@@ -269,7 +289,11 @@ export default function SellerDashboardPage({
                       className="secondary-button"
                       type="button"
                       onClick={() =>
-                        setStatus(drop.id, 'CANCELED', `${drop.name} 출시를 취소했어요.`)
+                        setStatus(
+                          drop.id,
+                          'CANCELED',
+                          `${drop.name} 출시를 취소했어요.`,
+                        )
                       }
                     >
                       출시 취소
@@ -297,8 +321,8 @@ export default function SellerDashboardPage({
           <div>
             <h2>기간 실적</h2>
             <p>
-              주문·결제 건수만 기간의 영향을 받아요. 위 현황과 DROP 목록은 현재 시점
-              값입니다.
+              주문·결제 건수만 기간의 영향을 받아요. 위 현황과 DROP 목록은 현재
+              시점 값입니다.
             </p>
           </div>
         </div>
@@ -328,7 +352,9 @@ export default function SellerDashboardPage({
             aria-label="종료일"
             value={range.to}
             min={range.from || undefined}
-            onChange={(e) => editRange({ from: range.from, to: e.target.value })}
+            onChange={(e) =>
+              editRange({ from: range.from, to: e.target.value })
+            }
           />
         </div>
         <p className="count-label">주문 {periodOrders.length}건</p>
@@ -374,7 +400,9 @@ export default function SellerDashboardPage({
                   role="presentation"
                   title={`${drop.orderCount}건 · ${drop.soldStock}개 판매`}
                 >
-                  <span style={{ width: `${(drop.salesAmount / maxSales) * 100}%` }} />
+                  <span
+                    style={{ width: `${(drop.salesAmount / maxSales) * 100}%` }}
+                  />
                 </div>
                 <div className="sales-amount">
                   <b>{won(drop.salesAmount)}</b>

@@ -363,7 +363,6 @@ export const drops: Drop[] = [
     optionGroups: [],
     skus: [{ id: 4031, selections: {}, price: 42000, stock: 30 }],
   },
-
 ]
 
 export const categories = [

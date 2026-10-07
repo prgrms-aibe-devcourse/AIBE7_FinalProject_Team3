@@ -44,6 +44,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/categories", "/api/v1/drops", "/api/v1/drops/*",
                                 "/api/v1/drops/*/stocks")
                         .permitAll()
+                        // 이메일 인증 코드 요청·확인은 가입 전 단계라 로그인 없이 호출한다(MEMBER_AUTH 1.2.1, 1.2.2)
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/email-verification",
+                                "/api/v1/auth/email-verification/confirm")
+                        .permitAll()
                         // 판매자 API는 URL에서 SELLER를 먼저 거르고, 승인 상태는 CurrentSellerIdProvider가 DB로 다시 확인한다.
                         // 세그먼트 단위 매칭이라 /api/v1/seller-applications(USER의 판매자 신청)에는 걸리지 않는다.
                         .requestMatchers("/api/v1/seller/**").hasRole("SELLER")

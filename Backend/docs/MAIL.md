@@ -158,7 +158,7 @@ asyncEmailDispatcher.dispatch(new EmailMessage(email, subject, htmlBody, textBod
 
 - 트랜잭션 안에서 코드를 저장하는 경우 커밋된 뒤 `dispatch()`를 호출한다. 트랜잭션 안에서 보내면 롤백됐을 때 서버에 없는 코드가 메일로 나간다. Spring에서는 이벤트를 발행하고 `@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)`에서 `dispatch()`를 호출한다.
 - 인증 코드를 Redis에만 저장하고 DB 트랜잭션이 없으면, Redis 저장이 성공한 뒤 `dispatch()`를 호출한다.
-- `dispatch()`는 작업을 넘기고 바로 반환하므로 응답이 발송을 기다리지 않는다. 다만 메일 스레드가 HTTP 응답 전송이 끝나기 전에 발송을 시작할 수는 있다. [MEMBER_AUTH.md](development/api-spec/MEMBER_AUTH.md) 1.2.1의 "응답 후 비동기로 발송"을 이 수준으로 구현할지, 문구를 고칠지는 GR-61에서 정한다.
+- `dispatch()`는 작업을 넘기고 바로 반환하므로 응답이 발송을 기다리지 않는다. 메일 스레드가 HTTP 응답 전송이 끝나기 전에 발송을 시작할 수는 있으며, 응답 완료 뒤 발송을 따로 보장하지 않는다. [MEMBER_AUTH.md](development/api-spec/MEMBER_AUTH.md) 1.2.1도 "응답은 발송 완료를 기다리지 않는다"로 정한다(GR-61 M00-02).
 
 ### 6.3 실패 처리
 
