@@ -11,13 +11,20 @@ import { won } from '../../utils/price'
 const breakdown = (sku: Sku) => {
   const reserved = sku.reserved ?? 0
   const sold = sku.sold ?? 0
-  return { available: sku.stock, reserved, sold, total: sku.stock + reserved + sold }
+  return {
+    available: sku.stock,
+    reserved,
+    sold,
+    total: sku.stock + reserved + sold,
+  }
 }
 
 const optionLabel = (drop: Drop, sku: Sku) =>
   drop.optionGroups
-    .map((group) =>
-      group.values.find((value) => value.id === sku.selections[group.id])?.label,
+    .map(
+      (group) =>
+        group.values.find((value) => value.id === sku.selections[group.id])
+          ?.label,
     )
     .filter(Boolean)
     .join(' / ') || '기본 옵션'
