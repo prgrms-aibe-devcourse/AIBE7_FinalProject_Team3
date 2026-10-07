@@ -3,6 +3,7 @@ package org.example.grab.global.storage.supabase;
 import lombok.extern.slf4j.Slf4j;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
+import org.example.grab.global.storage.ImageStorage;
 import org.example.grab.global.storage.SignedUploadUrl;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
@@ -13,7 +14,7 @@ import org.springframework.web.client.RestClientException;
  * 객체 키는 호출자가 만든다(예: images/{imageId}.{ext}).
  */
 @Slf4j
-public class SupabaseStorageClient {
+public class SupabaseStorageClient implements ImageStorage {
 
     private static final String STORAGE_PATH = "/storage/v1";
     private static final String SIGNED_UPLOAD_PATH = STORAGE_PATH + "/object/upload/sign/";
@@ -38,6 +39,7 @@ public class SupabaseStorageClient {
         this.restClient = builder.build();
     }
 
+    @Override
     public SignedUploadUrl createSignedUploadUrl(String objectKey) {
         if (!configured) {
             log.error("Supabase Storage 설정이 없어 업로드 URL 발급을 시도하지 않음");
@@ -61,6 +63,7 @@ public class SupabaseStorageClient {
     }
 
     // DROP 저장 시 imageUrl이 이 버킷의 공개 URL인지 검증할 때도 쓴다.
+    @Override
     public String publicUrl(String objectKey) {
         return baseUrl + PUBLIC_URL_PATH + bucket + "/" + objectKey;
     }
