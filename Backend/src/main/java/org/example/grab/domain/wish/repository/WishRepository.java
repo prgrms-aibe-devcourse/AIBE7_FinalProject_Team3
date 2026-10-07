@@ -2,6 +2,7 @@ package org.example.grab.domain.wish.repository;
 
 import jakarta.persistence.LockModeType;
 import org.example.grab.domain.wish.dto.WishListProjection;
+import org.example.grab.domain.wish.dto.WishMailRecipientProjection;
 import org.example.grab.domain.wish.entity.Wish;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -10,6 +11,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface WishRepository extends JpaRepository<Wish, Long> {
@@ -54,4 +56,24 @@ public interface WishRepository extends JpaRepository<Wish, Long> {
             """,
             nativeQuery = true)
     Page<WishListProjection> findActiveWishes(@Param("userId") Long userId, Pageable pageable);
+
+    /*
+     * 판매 시작 메일 수신자(GR-69). 활성 WISH(canceled_at IS NULL)를 가진 ACTIVE 회원만 대상이다.
+     * 전환 배치가 여러 DROP을 한 번에 넘기므로 drop_id IN으로 한 번에 조회해 DROP 수만큼의 왕복을 없앤다.
+     * 메일 제목·본문에 DROP 이름이 들어가 drops를 함께 조인한다(내 WISH 목록과 같은 방식).
+     * idx_wishes_drop_active (drop_id, canceled_at, id)를 그대로 타고, 정렬은 DROP 단위로 묶기 위한 것이다.
+     * 수신 거부(opt-out) 조건은 이번 범위 밖이다. 스키마 추가가 필요해 별도 이슈로 다룬다.
+     */
+    @Query(value = """
+            SELECT w.drop_id AS "dropId", d.name AS "dropName", u.email AS "email"
+            FROM wishes w
+            JOIN users u ON u.id = w.user_id
+            JOIN drops d ON d.id = w.drop_id
+            WHERE w.drop_id IN (:dropIds)
+              AND w.canceled_at IS NULL
+              AND u.status = 'ACTIVE'
+            ORDER BY w.drop_id, w.id
+            """,
+            nativeQuery = true)
+    List<WishMailRecipientProjection> findSaleStartMailRecipients(@Param("dropIds") List<Long> dropIds);
 }

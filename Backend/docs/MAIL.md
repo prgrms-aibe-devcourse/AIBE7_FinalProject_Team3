@@ -24,6 +24,7 @@
 | `MAIL_STARTTLS` | `spring.mail.properties.mail.smtp.starttls.enable`, `.required` | `false` | STARTTLS 사용 및 강제 여부 |
 | `MAIL_FROM` | `grab.mail.from` | `no-reply@grab.local` | 메일에 표시되는 발신 주소 |
 | `GRAB_MAIL_PROVIDER` | `grab.mail.provider` | `smtp` | 발송 구현체 선택 |
+| `WEB_BASE_URL` | `grab.web.base-url` | `http://localhost:5173` | 메일 본문 링크가 가리키는 프런트엔드 주소 |
 
 - 기본값은 로컬 Mailpit 기준이다. 로컬에서는 환경변수를 설정하지 않아도 된다.
 - `MAIL_STARTTLS`는 `starttls.enable`과 `starttls.required`를 함께 바꾼다. 켜면 서버가 STARTTLS를 제공하지 않을 때 평문으로 로그인하지 않고 발송이 실패한다.
@@ -191,6 +192,8 @@ asyncEmailDispatcher.dispatchAll(messages); // List<EmailMessage>
 - HTML 본문과 텍스트 본문을 모두 채운다. HTML을 표시하지 못하는 메일 프로그램은 텍스트 본문을 보여 준다.
 - 본문 작성(템플릿)은 호출하는 쪽에서 한다. 발송 구현체는 완성된 메일 한 통을 보내기만 한다.
 - 받는 주소는 정규화한 이메일(앞뒤 공백 제거, 소문자)을 쓴다.
+- 본문에 넣는 사용자 입력값(DROP 이름 등)은 `HtmlUtils.htmlEscape`로 이스케이프한다. 텍스트 본문은 마크업으로 해석되지 않으므로 원문을 쓴다.
+- 본문 링크는 `grab.web.base-url`에 경로를 붙여 만든다. 메일 클라이언트는 외부 CSS·웹폰트를 불러오지 않고 flex·grid 지원도 고르지 않으므로, 레이아웃은 `<table>`로 짜고 스타일은 인라인으로 둔다. 예시는 `WishSaleNoticeMailListener`에 있다.
 
 ### 6.5 설정과 기동
 
