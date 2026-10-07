@@ -54,10 +54,11 @@ public class EmailVerificationHasher {
 
         try {
             // Mac은 스레드 안전하지 않아 호출마다 새로 만든다
+            // HMAC을 계산할 객체를 만들고 비밀 키를 지정
             Mac mac = Mac.getInstance(ALGORITHM);
             mac.init(key);
-            byte[] hashed = mac.doFinal((prefix + value).getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hashed);
+            byte[] hashed = mac.doFinal((prefix + value).getBytes(StandardCharsets.UTF_8)); // HMAC 계산
+            return HexFormat.of().formatHex(hashed); // 계산 결과 문자열로 변환
         } catch (GeneralSecurityException exception) {
             throw new IllegalStateException("HMAC-SHA256을 사용할 수 없습니다.", exception);
         }
