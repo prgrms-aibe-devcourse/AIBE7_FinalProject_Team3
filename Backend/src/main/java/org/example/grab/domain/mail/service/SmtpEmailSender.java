@@ -9,10 +9,10 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
-import org.springframework.mail.javamail.MimeMessagePreparator;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 
 /*
@@ -45,21 +45,43 @@ public class SmtpEmailSender implements EmailSender {
     }
 
     /*
-        연결 하나로 목록 전체를 보낸다. JavaMailSenderImpl은 preparator 배열을 받으면 Transport를 한 번만 열고
+        연결 하나로 목록 전체를 보낸다. JavaMailSenderImpl은 MimeMessage 배열을 받으면 Transport를 한 번만 열고
         모든 메일을 그 연결로 보낸다. 통마다 send()를 부르면 접속·STARTTLS·인증을 수신자 수만큼 반복해,
-        Gmail처럼 연결 비용이 큰 서버에서는 이 반복이 전체 발송 시간의 대부분을 차지한다.
-        일부 주소가 거부되면 JavaMail이 나머지를 계속 보낸 뒤 MailSendException으로 모아 던지므로,
-        이 구현은 EmailSender 계약(일부 실패해도 계속, 마지막에 한 번 던짐)을 그대로 만족한다.
+        연결 비용이 큰 서버에서는 이 반복이 전체 발송 시간의 대부분을 차지한다.
+
+        EmailSender 계약(일부 실패해도 계속, 마지막에 한 번 던짐)은 두 단계에서 모두 지킨다.
+        메시지를 만드는 단계는 아래에서 직접 건너뛰고, 보내는 단계는 일부 주소가 거부돼도 JavaMail이
+        나머지를 계속 보낸 뒤 MailSendException으로 모아 던진다.
      */
     @Override
     public void sendAll(List<EmailMessage> messages) {
-        MimeMessagePreparator[] preparators = messages.stream()
-                .map(message -> (MimeMessagePreparator) mimeMessage -> prepare(mimeMessage, message))
-                .toArray(MimeMessagePreparator[]::new);
+        /*
+         * 메시지를 하나씩 만들고 실패한 것만 건너뛴다. JavaMailSender에 MimeMessagePreparator 배열을 넘기면
+         * 전부 만든 뒤에 보내므로, 주소 형식이 깨진 수신자가 한 명만 있어도 묶음 전체가 한 통도 나가지 않는다.
+         * BCC로 묶은 뒤에는 메일 하나가 최대 100명이라 그 피해가 더 크다(GR-69).
+         */
+        List<MimeMessage> prepared = new ArrayList<>(messages.size());
+        MessagingException preparationFailure = null;
+        for (EmailMessage message : messages) {
+            try {
+                MimeMessage mimeMessage = mailSender.createMimeMessage();
+                prepare(mimeMessage, message);
+                prepared.add(mimeMessage);
+            } catch (MessagingException e) {
+                // 어떤 주소가 실패했는지는 담지 않는다(NFR-011). 마지막 원인만 남기고 나머지 준비를 계속한다
+                preparationFailure = e;
+            }
+        }
         try {
-            mailSender.send(preparators);
+            if (!prepared.isEmpty()) {
+                mailSender.send(prepared.toArray(MimeMessage[]::new));
+            }
         } catch (MailException e) {
             throw new EmailSendException(e);
+        }
+        // 발송은 됐지만 만들지 못한 메일이 있으면 호출하는 쪽이 실패를 알 수 있게 여기서 던진다
+        if (preparationFailure != null) {
+            throw new EmailSendException(preparationFailure);
         }
     }
 

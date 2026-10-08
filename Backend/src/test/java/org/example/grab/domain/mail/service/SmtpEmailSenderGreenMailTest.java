@@ -20,6 +20,7 @@ import org.springframework.mail.MailSendException;
 
 import java.net.ConnectException;
 import java.util.ArrayList;
+import java.time.Duration;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -130,6 +131,30 @@ class SmtpEmailSenderGreenMailTest {
             parts.add(part);
         }
         return parts;
+    }
+
+    @Test
+    @DisplayName("묶음 중 한 통을 만들 수 없어도 나머지는 발송하고 마지막에 한 번 던진다")
+    /*
+     * 주소 형식이 깨진 수신자가 한 명 섞이면 그 메일만 만들지 못한다. 준비 단계에서 멈추면
+     * 멀쩡한 메일까지 한 통도 나가지 않는다. BCC 도입 뒤에는 메일 하나가 최대 100명이라 피해가 더 크다(GR-69).
+     */
+    void keepsSendingRemainingMessagesWhenOneCannotBePrepared() {
+        contextRunner().run(context -> {
+            // given: 두 번째 메일의 받는 주소만 형식이 깨져 있다
+            EmailSender sender = context.getBean(EmailSender.class);
+            List<EmailMessage> messages = List.of(
+                    new EmailMessage("first@example.com", "[GRAB] 판매 시작", "<p>본문</p>", "본문"),
+                    new EmailMessage("깨진 주소", "[GRAB] 판매 시작", "<p>본문</p>", "본문"),
+                    new EmailMessage("third@example.com", "[GRAB] 판매 시작", "<p>본문</p>", "본문"));
+
+            // when & then: 실패는 한 번 알리되, 만들 수 있었던 두 통은 도착한다
+            assertThatThrownBy(() -> sender.sendAll(messages)).isInstanceOf(EmailSendException.class);
+            assertThat(greenMail.waitForIncomingEmail(Duration.ofSeconds(10).toMillis(), 2)).isTrue();
+            assertThat(greenMail.getReceivedMessages())
+                    .extracting(received -> received.getAllRecipients()[0].toString())
+                    .containsExactlyInAnyOrder("first@example.com", "third@example.com");
+        });
     }
 
     private static ApplicationContextRunner contextRunner() {
