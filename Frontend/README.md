@@ -82,9 +82,20 @@ npx playwright show-trace test-results/<테스트>/trace.zip
 - `src/utils`: 날짜와 가격 표시 함수
 - `src/styles`: 전역 스타일
 
+## Mock 화면과 API 연동 경계
+
+페이지별 화면 작업은 `docs/pages/<PageName>.md`와 `docs/wireframes/<PageName>.html`을 기준으로 합니다. 이 단계에서는 새 API 요청을 붙이지 않고, 화면에 필요한 예시 데이터와 데모 동작을 `src/features/<도메인>`의 Mock 파일에 모읍니다. 페이지와 재사용 UI에 긴 예시 객체를 흩어 놓지 않습니다. 현재 사용 중인 공개 카테고리 API는 그대로 유지합니다.
+
+- 화면은 도메인 타입과 props를 사용해 표시합니다. 기존 컴포넌트를 재사용하고, 나중의 API 호출을 위해 쓰이지 않는 요청 계층이나 추상 인터페이스를 미리 만들지 않습니다.
+- 로딩·빈 결과·오류·권한 부족·상태별 버튼의 화면 상태를 준비합니다. Mock 버튼은 로컬 데모 동작이며 실제 주문·결제·판매자 승인·배송 처리로 안내하지 않습니다.
+- 실제 연동 이슈에서는 Mock 공급 부분을 `src/api/client.ts` 요청과 TanStack Query로 교체하고, API 응답을 화면용 데이터로 바꾸는 코드는 해당 `src/features`에 둡니다. 쓰이지 않게 된 Mock만 제거하고 화면 배치와 컴포넌트는 유지합니다.
+- 인증 쿠키·CSRF·401 재시도, 저장 결과·서버 오류·중복 요청 검증은 실제 API 연동 단계에서 확인합니다. 화면 초안의 Mock 성공 상태를 서버 처리 성공의 증거로 취급하지 않습니다.
+
+화면별 PR 범위와 검증 항목은 해당 Linear 이슈에, 로컬 작업 순서는 `todo/page-renewal.md`에 적습니다. `todo/`는 git에서 제외되는 개인 작업 메모입니다.
+
 ## API 계약 및 로컬 확인
 
-백엔드를 먼저 실행한 뒤 `npm run dev`로 프론트엔드를 띄웁니다. 프론트엔드는 `/api/v1` 상대 경로로 요청하고 Vite가 로컬 백엔드 `http://localhost:8080`에 프록시합니다. 공개 카테고리 조회(`GET /api/v1/categories`)는 `src/api/category/categories.ts`에서 생성 타입을 사용합니다. 화면의 Mock 상품·카테고리 표시는 GR-55에서 교체합니다.
+백엔드를 먼저 실행한 뒤 `npm run dev`로 프론트엔드를 띄웁니다. 프론트엔드는 `/api/v1` 상대 경로로 요청하고 Vite가 로컬 백엔드 `http://localhost:8080`에 프록시합니다. 공개 카테고리 조회(`GET /api/v1/categories`)는 `src/api/category/categories.ts`에서 생성 타입을 사용합니다. 화면에 남은 Mock 상품 데이터의 실제 API 전환은 화면 작업과 분리한 후속 이슈에서 진행합니다.
 
 ```bash
 npm run api:snapshot
