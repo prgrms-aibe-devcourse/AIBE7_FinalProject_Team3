@@ -456,8 +456,22 @@ COMMITTED → RELEASED
 - 후보는 잠그지 않고 `idx_orders_payment_expiry (status, payment_expires_at, id)` 순서의 키셋으로 회당 최대 500건씩 조회한다.
 - 주문마다 별도 트랜잭션에서 `FOR UPDATE SKIP LOCKED`로 잠그고 상태·마감 조건을 다시 확인한 뒤 위의 만료를 반영한다. 결제 확정 등 다른 트랜잭션이 잠근 주문은 기다리지 않고 건너뛰어 다음 실행에서 다시 조회한다.
 - 이미 만료됐거나 결제된 주문은 조건 재확인에서 제외되므로 반복 실행·다중 인스턴스에서도 재고는 한 번만 반환된다.
-- 만료 처리는 결제 상태를 보지 않는다. 진행 중인 결제(`PENDING`, `UNKNOWN`)가 있어도 마감이 지나면 만료하고, 이후 승인이 확인되면 마감 후 승인과 같이 결제 `SUCCEEDED`, 보정 `REQUIRED`로 기록한다. 진행 중 결제를 조회로 정리하는 작업과 만료와의 실행 순서는 GR-65에서 정한다.
+- 만료 처리는 결제 상태를 보지 않는다. 진행 중인 결제(`PENDING`, `UNKNOWN`)가 있어도 마감이 지나면 만료하고, 이후 승인이 확인되면 마감 후 승인과 같이 결제 `SUCCEEDED`, 보정 `REQUIRED`로 기록한다. 진행 중 결제 정리와의 실행 순서는 아래 진행 중 결제 정리 배치를 따른다.
 - 주문 생성 후 결제 마감까지는 10분이다. 결제 가능 여부는 저장 상태가 아니라 `payment_expires_at`으로 판정하므로, 배치 주기(약 10초)는 재고 반환 시점에만 영향을 준다.
+
+진행 중 결제 정리 배치(GR-65):
+
+- 사용자가 결제를 다시 요청하지 않아도 진행 중인 결제(`PENDING`, `UNKNOWN`)를 PG 결제 조회로 확정한다.
+- 한 주기에서 정리를 먼저 실행하고 만료를 실행한다. 마감 전에 승인된 결제를 먼저 주문 `PAID`로 반영해, 만료된 뒤 보정 `REQUIRED`로 남는 경우를 줄인다.
+- 대상은 `PENDING`·`UNKNOWN` 결제 중 `updated_at`이 60초 이상 지난 것이다. `PENDING`은 아직 승인 응답을 기다리는 요청과 겹치지 않게 하고(사용자 요청의 `PENDING` 정리 기준과 같은 값), `UNKNOWN`은 조회 실패가 반복될 때 PG를 매 주기 호출하지 않게 한다.
+- 대상은 한 문장으로 선점한다. `FOR UPDATE SKIP LOCKED`로 `updated_at`이 오래된 순서로 최대 50건을 잠그고 `updated_at = now`로 바꾼다. 다른 인스턴스와 다음 주기는 60초 동안 같은 결제를 다시 고르지 않으며, 조회 실패로 `UNKNOWN`이 유지되면 60초 뒤 다시 조회된다.
+- 주기당 50건으로 제한해 PG 호출 시간이 만료 실행을 늦추지 않게 한다. 남은 대상은 다음 주기에 처리한다.
+- PG 호출은 트랜잭션 밖에서 하고, 결과는 사용자 결제 요청과 같은 반영(주문·결제 행 잠금, 결제가 아직 진행 중인지 재확인)을 쓴다. 승인 확인 시 마감 전이면 주문 `PAID`, 마감 후면 결제 `SUCCEEDED`·보정 `REQUIRED`(PAY-004), 미승인 확인 시 `FAILED`, 조회 실패 시 `UNKNOWN`·보정 `REQUIRED`를 유지한다.
+- 조회 결과가 인증만 된 `IN_PROGRESS`이면 위 규칙대로 주문이 `PAYMENT_PENDING`이고 마감 전일 때만 같은 서버 멱등 키로 승인을 다시 요청한다. 결제할 수 없는 주문은 조회만 하고, PG가 인증을 만료시키면 미승인으로 확인돼 `FAILED`가 된다.
+- 재조회 횟수에는 상한을 두지 않는다. 승인 여부를 확인하기 전에는 실패로 단정하지 않는다. 생성 후 10분이 지나도 `UNKNOWN`인 결제는 정리할 때마다 경고 로그를 남긴다.
+- 사용자 결제 요청이나 다른 인스턴스가 같은 결제를 함께 조회·승인 재요청해도, 결과 반영은 잠금과 재확인으로 한 번만 일어나고 승인 재요청은 같은 서버 멱등 키라 PG에서 중복 승인되지 않는다.
+- 배치가 남기는 결제 이벤트의 `source`는 `RECONCILIATION`이다.
+- 실행 주기는 10초(`fixedDelay`)이고 `grab.payment-pending-batch.enabled`로 끌 수 있다.
 
 ### 3.3 주문 취소
 
@@ -509,6 +523,7 @@ PK와 UQ에서 자동 생성되는 인덱스는 중복 생성하지 않는다.
 | `orders` | `idx_orders_payment_expiry` (`status`, `payment_expires_at`, `id`) | 결제 대기 만료 배치(`PAYMENT_PENDING AND payment_expires_at <= now`, 키셋 조회) |
 | `payments` | (`order_id`, `created_at`, `id`) | 결제 시도 이력 |
 | `payments` | (`reconciliation_status`, `updated_at`, `id`) | 결제 보정 작업 |
+| `payments` | `idx_payments_in_progress` (`updated_at`, `id`) `WHERE status IN ('PENDING', 'UNKNOWN')` | 진행 중 결제 정리 배치(`updated_at`이 60초 지난 진행 중 결제 선점) |
 | `payment_cancellations` | (`status`, `next_retry_at`, `id`) | 취소 재시도 |
 
 인덱스는 실제 조회 쿼리와 실행 계획을 확인한 후 조정한다.
