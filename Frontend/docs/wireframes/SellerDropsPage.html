@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>판매자 DROP 관리 와이어프레임</title>
+    <link rel="stylesheet" href="wireframe.css" />
+  </head>
+  <body>
+    <header>
+      <span class="route">/seller/drops</span>
+      <h1>판매자 DROP 관리 와이어프레임</h1>
+      <p class="muted">배치와 동선을 검토하는 화면 초안 · 실제 API 동작 없음</p>
+      <nav aria-label="와이어프레임 이동">
+        <a href="HomePage.html">메인</a><a href="WishPage.html">WISH</a
+        ><a href="GrabPage.html">GRAB</a
+        ><a href="DropDetailPage.html">상품 상세</a
+        ><a href="SellerDashboardPage.html">판매자 종합</a
+        ><a href="SellerDropsPage.html">DROP 관리</a
+        ><a href="SellerOrdersPage.html">주문</a
+        ><a href="SellerInventoryPage.html">재고</a
+        ><a href="SellerSalesPage.html">실적</a>
+      </nav>
+    </header>
+    <main>
+      <section class="section-head">
+        <div>
+          <p class="eyebrow">DROP STUDIO</p>
+          <h1>DROP 관리</h1>
+          <p>상태별로 상품을 살펴보고 공개를 관리합니다.</p>
+        </div>
+        <span class="control primary">＋ 새 DROP</span>
+      </section>
+      <section class="section panel">
+        <div class="controls">
+          <span class="chip">전체</span><span class="chip">DRAFT</span
+          ><span class="chip">WISH</span><span class="chip">GRAB</span
+          ><span class="chip">ENDED</span><span class="chip">CANCELED</span>
+        </div>
+        <div class="list-row">
+          <strong>DROP A · 대표 이미지</strong
+          ><span class="secondary">상태 · 수량</span
+          ><span class="secondary">일정 · 금액</span
+          ><span class="secondary">상세 정보</span
+          ><span class="control">보기 ↗</span>
+        </div>
+        <div class="list-row">
+          <strong>DROP B · 대표 이미지</strong
+          ><span class="secondary">상태 · 수량</span
+          ><span class="secondary">일정 · 금액</span
+          ><span class="secondary">상세 정보</span
+          ><span class="control">보기 ↗</span>
+        </div>
+        <div class="list-row">
+          <strong>DROP C · 대표 이미지</strong
+          ><span class="secondary">상태 · 수량</span
+          ><span class="secondary">일정 · 금액</span
+          ><span class="secondary">상세 정보</span
+          ><span class="control">보기 ↗</span>
+        </div>
+        <div class="list-row">
+          <strong>DROP D · 대표 이미지</strong
+          ><span class="secondary">상태 · 수량</span
+          ><span class="secondary">일정 · 금액</span
+          ><span class="secondary">상세 정보</span
+          ><span class="control">보기 ↗</span>
+        </div>
+        <div class="section-head">
+          <span>총 건수</span><span>〈 1 / 전체 페이지 〉</span>
+        </div>
+      </section>
+    </main>
+    <footer>
+      화면별 동작·예외·조회 조건은
+      <a href="../pages/SellerDropsPage.md">SellerDropsPage.md</a>를 확인하세요.
+    </footer>
+  </body>
+</html>
