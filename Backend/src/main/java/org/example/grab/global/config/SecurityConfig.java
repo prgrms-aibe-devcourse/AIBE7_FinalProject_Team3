@@ -50,6 +50,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/email-verification",
                                 "/api/v1/auth/email-verification/confirm")
                         .permitAll()
+                        // 회원가입 완료 요청도 로그인 없이 호출한다. 가입 자격은 email_signup_token 쿠키의 가입 컨텍스트로 확인한다(MEMBER_AUTH 1.2.3)
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/signup")
+                        .permitAll()
                         // 판매자 API는 URL에서 SELLER를 먼저 거르고, 승인 상태는 CurrentSellerIdProvider가 DB로 다시 확인한다.
                         // 세그먼트 단위 매칭이라 /api/v1/seller-applications(USER의 판매자 신청)에는 걸리지 않는다.
                         .requestMatchers("/api/v1/seller/**").hasRole("SELLER")

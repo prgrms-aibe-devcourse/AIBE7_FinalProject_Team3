@@ -35,6 +35,17 @@ public class SignupService {
     private final PasswordEncoder passwordEncoder;
 
     /*
+        요청 본문 검증보다 가입 컨텍스트 확인이 먼저 진행되어야 한다.
+        Controller가 본문 검증 결과를 보기 전에 호출한다.
+        컨텍스트를 소비하지 않는다. signup()이 다시 확인하므로 그 사이에 만료되거나 소비돼도 결과는 같다.
+     */
+    public void requireSignupContext(String signupToken) {
+        if (signupContextRepository.findEmail(signupToken).isEmpty()) {
+            throw new BusinessException(UserErrorCode.EMAIL_SIGNUP_CONTEXT_INVALID);
+        }
+    }
+
+    /*
         signupToken은 email_signup_token 쿠키 값이고, request는 Controller에서 검증을 마친 값이다(GR-30).
         - 이메일 중복을 닉네임보다 먼저 본다(GR-29 M00-03). 이메일이 중복이면 닉네임을 바꿔도 가입할 수 없다
         - 이메일 중복은 컨텍스트를 소비하고, 닉네임 중복은 소비하지 않아 같은 컨텍스트로 다시 요청할 수 있다
