@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>판매자 판매 실적 와이어프레임</title>
+    <link rel="stylesheet" href="wireframe.css" />
+  </head>
+  <body>
+    <header>
+      <span class="route">/seller/sales</span>
+      <h1>판매자 판매 실적 와이어프레임</h1>
+      <p class="muted">배치와 동선을 검토하는 화면 초안 · 실제 API 동작 없음</p>
+      <nav aria-label="와이어프레임 이동">
+        <a href="HomePage.html">메인</a><a href="WishPage.html">WISH</a
+        ><a href="GrabPage.html">GRAB</a
+        ><a href="DropDetailPage.html">상품 상세</a
+        ><a href="SellerDashboardPage.html">판매자 종합</a
+        ><a href="SellerDropsPage.html">DROP 관리</a
+        ><a href="SellerOrdersPage.html">주문</a
+        ><a href="SellerInventoryPage.html">재고</a
+        ><a href="SellerSalesPage.html">실적</a>
+      </nav>
+    </header>
+    <main>
+      <section>
+        <p class="eyebrow">SALES VIEW</p>
+        <h1>판매 실적</h1>
+        <p>상품별 누적 결과를 확인합니다.</p>
+      </section>
+      <p class="note">결제 확정·미취소 주문 기준 · 배송비 포함 누적 매출</p>
+      <section class="section panel">
+        <div class="controls">
+          <span class="chip">전체</span><span class="chip">GRAB</span
+          ><span class="chip">ENDED</span>
+        </div>
+        <div class="list-row">
+          <strong>DROP A · 주문 10건 · 판매 14개 · ₩1,806,000</strong
+          ><span class="secondary">상태 · 수량</span
+          ><span class="secondary">일정 · 금액</span
+          ><span class="secondary">상세 정보</span
+          ><span class="control">보기 ↗</span>
+        </div>
+        <div class="list-row">
+          <strong>DROP B · 주문 3건 · 판매 5개 · ₩520,000</strong
+          ><span class="secondary">상태 · 수량</span
+          ><span class="secondary">일정 · 금액</span
+          ><span class="secondary">상세 정보</span
+          ><span class="control">보기 ↗</span>
+        </div>
+        <div class="list-row">
+          <strong>DROP C · 주문 0건 · 판매 0개 · ₩0</strong
+          ><span class="secondary">상태 · 수량</span
+          ><span class="secondary">일정 · 금액</span
+          ><span class="secondary">상세 정보</span
+          ><span class="control">보기 ↗</span>
+        </div>
+        <p>〈 1 / 전체 페이지 〉</p>
+      </section>
+      <p class="muted">
+        기간별 매출·추이 그래프·전체 매출 합계는 이번 화면에 없습니다.
+      </p>
+    </main>
+    <footer>
+      화면별 동작·예외·조회 조건은
+      <a href="../pages/SellerSalesPage.md">SellerSalesPage.md</a>를 확인하세요.
+    </footer>
+  </body>
+</html>
