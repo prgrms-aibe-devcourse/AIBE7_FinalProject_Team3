@@ -16,6 +16,7 @@ import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 
 @Configuration
 @EnableConfigurationProperties(AccessTokenProperties.class)
@@ -32,8 +33,13 @@ public class SecurityConfig {
                 )
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
-                // TODO(GR-44): CookieCsrfTokenRepository로 재활성화. 임시 해제
-                .csrf(AbstractHttpConfigurer::disable)
+                // 모든 상태 변경 요청(POST·PUT·PATCH·DELETE)에 예외 없이 CSRF를 적용한다
+                // spa()는 XSRF-TOKEN 쿠키를 JavaScript가 읽을 수 있게 하고, 쿠키 값을 그대로 담은 X-XSRF-TOKEN 헤더를 받는다.
+                // spa()의 저장소에는 Secure·SameSite가 없어 명세 속성을 붙인 저장소로 바꾼다. spa()가 저장소를 덮어쓰므로 순서를 지킨다(M00-01)
+                .csrf(csrf -> csrf
+                        .spa()
+                        .csrfTokenRepository(csrfTokenRepository())
+                )
                 .authorizeHttpRequests(requests -> requests
                         .requestMatchers("/actuator/health", "/actuator/prometheus")
                         .permitAll()
@@ -72,6 +78,20 @@ public class SecurityConfig {
                 .addFilterBefore(new JwtAuthenticationFilter(jwtProvider, authenticationEntryPoint),
                         UsernamePasswordAuthenticationFilter.class)
                 .build();
+    }
+
+    /*
+        XSRF-TOKEN 쿠키(MEMBER_AUTH 1.1). 인증 토큰이 아니라 헤더에 같은 값을 넣기 위해 JavaScript가 읽어야 하므로 HttpOnly를 붙이지 않는다.
+        Secure는 항상 붙인다. 브라우저는 http://localhost도 안전한 출처로 보므로 로컬 개발에서도 동작한다.
+     */
+    private static CookieCsrfTokenRepository csrfTokenRepository() {
+        // js에서 요청 헤더에 X-XSRF-TOKEN을 입력하기 위해 쿠키 값을 읽어야 함
+        CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        repository.setCookieCustomizer(cookie -> cookie
+                .secure(true)
+                .sameSite("Lax")
+                .path("/"));
+        return repository;
     }
 
     /*
