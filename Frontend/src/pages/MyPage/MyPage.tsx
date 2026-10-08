@@ -36,6 +36,7 @@ export default function MyPage({
                   <small>{dateLabel(drop.saleStartsAt)} 오픈</small>
                 </div>
                 <button
+                  type="button"
                   onClick={() => {
                     if (toggleWish(drop.id)) notify('WISH를 취소했어요.')
                   }}

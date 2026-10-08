@@ -116,6 +116,7 @@ export default function DropDetailPage({
                 WISH는 구매, 재고 예약 또는 구매 우선권을 보장하지 않습니다.
               </p>
               <button
+                type="button"
                 className="primary-button full"
                 onClick={() => {
                   if (toggleWish(drop.id))
@@ -189,7 +190,11 @@ export default function DropDetailPage({
                   {won((selectedSku?.price ?? minPrice(drop)) * quantity)}
                 </strong>
               </div>
-              <button className="primary-button full" disabled={!orderable}>
+              <button
+                type="submit"
+                className="primary-button full"
+                disabled={!orderable}
+              >
                 {orderable
                   ? authenticated
                     ? '지금 GRAB 하기 ↗'

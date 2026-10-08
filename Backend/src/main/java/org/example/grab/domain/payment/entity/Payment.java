@@ -158,6 +158,15 @@ public class Payment extends UUIDEntity {
         requireReconciliation(reason);
     }
 
+    // 승인된 결제를 PG가 전액 취소했다(ERD.md 3.3).
+    public void cancel(OffsetDateTime canceledAt) {
+        if (status != PaymentStatus.SUCCEEDED) {
+            throw new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION);
+        }
+        this.status = PaymentStatus.CANCELED;
+        this.canceledAt = Objects.requireNonNull(canceledAt);
+    }
+
     // UNKNOWN을 PG 조회로 확정하면 보정이 끝난 것이므로 RESOLVED로 바꾼다.
     private void resolve(PaymentStatus resolvedStatus) {
         requireInProgress();

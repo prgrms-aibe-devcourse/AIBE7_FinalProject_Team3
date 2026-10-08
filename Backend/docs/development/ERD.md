@@ -241,6 +241,9 @@ UQ(`user_id`, `drop_id`)를 둔다. 취소 후 재등록은 기존 행을 다시
 | `paid_at` | TIMESTAMPTZ | X | 결제 확정 시각 |
 | `canceled_at` | TIMESTAMPTZ | X | 주문 취소 시각 |
 | `expired_at` | TIMESTAMPTZ | X | 결제 대기 만료 시각. `EXPIRED`이면 필수 |
+| `cancel_idempotency_key` | VARCHAR(100) | X | 진행 중이거나 완료된 소비자 취소 요청의 `Idempotency-Key` |
+| `cancel_request_hash` | VARCHAR(64) | X | 같은 취소 키의 다른 요청 탐지 |
+| `cancel_reason` | VARCHAR(500) | X | 소비자 취소 사유. `CANCELED`이면 필수 |
 
 배송지와 상품 정보는 주문 시점의 값을 보존한다. 로그에는 주소와 전화번호 원문을 남기지 않는다.
 
@@ -368,6 +371,7 @@ PAYMENT_PENDING → PAID → PREPARING → SHIPPED → DELIVERED
        └────────→ CANCELED
 
 PAID → CANCELED
+PREPARING → CANCELED
 ```
 
 배송 상태는 다음 순서로 전이한다.
@@ -439,12 +443,34 @@ COMMITTED → RELEASED
 
 ### 3.3 주문 취소
 
-- `PAYMENT_PENDING`: PG 호출 없이 예약을 해제하고 주문을 취소한다.
-- `PAID`, `PREPARING`: PG 취소 성공을 확인한 후 주문과 결제를 취소하고 sold를 감소시킨다.
-- Shipment 행이 생성된 이후(`SHIPPED`, `DELIVERED`): 배송이 시작됐으므로 소비자 취소를 거부한다.
-- 취소 응답이 불명확하면 `UNKNOWN`으로 두고 배송 준비 전환을 막는다.
+소비자 취소(GR-24)는 주문 행을 잠그고 상태를 확인한 뒤 처리한다. 취소 가능 상태는 `PAYMENT_PENDING`, `PAID`, `PREPARING`이고, 배송이 시작된 `SHIPPED`·`DELIVERED`와 이미 끝난 `CANCELED`·`EXPIRED`는 거부한다. 시간 제한은 두지 않는다. 반환한 재고는 모두 가용 재고(`AVAILABLE`)로 돌린다.
 
-PG 취소 성공과 재고 반환은 같은 DB 트랜잭션에서 반영한다. 이미 반환된 예약에는 다시 수량을 더하지 않는다.
+결제 전 취소(`PAYMENT_PENDING`)는 PG를 호출하지 않고 한 트랜잭션에서 끝낸다.
+
+- 주문 `CANCELED`(`canceled_at`), 예약 `HELD → RELEASED`(`ORDER_CANCELED`, `AVAILABLE`), reserved 감소
+- 결제 마감이 지났지만 아직 만료 처리 전인 주문도 취소로 처리한다. 결과(재고 반환)는 만료와 같다.
+- 승인 응답을 기다리는 결제(`PENDING`)가 있으면 거부한다. 곧 결과가 나오므로 잠시 뒤 다시 요청한다.
+- 결과 불명 결제(`UNKNOWN`)는 취소를 막지 않는다. 이후 승인이 확인되면 결제 대기가 아닌 주문의 승인으로 보고 결제 `SUCCEEDED`, 보정 `REQUIRED`로 기록하며, 환불은 보정 작업(GR-65)이 한다.
+
+결제 후 취소(`PAID`, `PREPARING`)는 3.2와 같이 PG 호출 중에 DB 트랜잭션과 잠금을 유지하지 않는다.
+
+```text
+[트랜잭션 1]
+주문 잠금 → 검증 → payment_cancellations REQUESTED 생성(서버 멱등 키), 주문에 취소 요청 키 기록
+        ↓
+[트랜잭션 없음]
+PG 결제 취소 API 호출 (취소 기록의 서버 멱등 키)
+        ↓
+[트랜잭션 2]
+주문 → 결제 → 취소 기록 순으로 잠그고 결과 반영
+```
+
+- 취소 성공: 결제 `CANCELED`(`canceled_at`), 취소 기록 `SUCCEEDED`(`completed_at`, `provider_cancel_id`), 주문 `CANCELED`(`canceled_at`), 예약 `COMMITTED → RELEASED`(`ORDER_CANCELED`, `AVAILABLE`), sold 감소. 모두 같은 트랜잭션에서 반영한다.
+- 취소 거절(PG가 취소하지 않았음이 확실): 취소 기록 `FAILED`(`completed_at`, `failure_code`). 주문·결제·재고는 바꾸지 않고, 주문의 취소 요청 키를 비워 새 취소 요청을 허용한다.
+- 결과 불명(타임아웃·응답 유실·PG 5xx·처리 중 응답): 취소 기록 `UNKNOWN`(`attempt_count`, `next_retry_at`). 주문은 바꾸지 않는다. PG는 같은 멱등 키의 재요청에 최초 결과를 돌려주므로, 같은 취소 키의 재전송이나 정리 작업(GR-65)이 같은 서버 멱등 키로 취소를 다시 요청해 확정한다.
+- 취소 기록이 `REQUESTED`·`UNKNOWN`인 동안에는 배송 준비와 발송 처리를 거부한다. 주문 행 잠금으로 직렬화되므로, 취소를 시작한 주문이 배송되거나 배송을 시작한 주문이 취소되지 않는다.
+
+이미 반환된 예약에는 다시 수량을 더하지 않는다. 주문 상태를 잠근 뒤 다시 확인하므로 같은 주문의 취소·만료·결제 확정 중 한 경로만 재고를 바꾼다.
 
 ## 4. 우선 인덱스
 
@@ -478,8 +504,8 @@ PK와 UQ에서 자동 생성되는 인덱스는 중복 생성하지 않는다.
 | 결제 재시도 | 결제 마감 전까지 횟수 제한 없이 허용, 진행 중인 결제(`PENDING`, `UNKNOWN`)나 승인된 결제(`SUCCEEDED`, 보정 대기 포함)가 있으면 거부 (확정) | - |
 | 판매 종료 후 결제 | 선점 주문은 결제 마감까지 허용 | 최종 허용 여부 |
 | 구매 제한 | 재고 범위만 검증 | 주문별·회원 누적 제한 |
-| 주문 취소 | PAID까지 허용 | 시간 제한과 PREPARING 취소 여부 |
-| 취소 재고 | AVAILABLE 또는 WITHHELD | 기본 반환 목적지 |
+| 주문 취소 | `PAYMENT_PENDING`·`PAID`·`PREPARING` 허용, 시간 제한 없음. 승인 응답 대기 결제(`PENDING`)가 있으면 거부 (확정) | - |
+| 취소 재고 | `AVAILABLE`로 반환 (확정) | - |
 | 배송비 | DROP별 고정 배송비 | 무료배송·지역 추가금 정책 |
 | GRAB 중 수정 | 가격·옵션·재고 구조 변경 금지 | 설명·이미지·배송 안내 수정 범위 |
 | 개인정보 | 주문 배송지 스냅샷 저장 | 보존 기간·암호화·익명화 정책 |
