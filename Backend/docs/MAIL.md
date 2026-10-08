@@ -179,7 +179,8 @@ asyncEmailDispatcher.dispatchAll(messages); // List<EmailMessage>
 - 수신자 수만큼 `dispatch()`를 호출하면 대기열 용량(40)을 넘는 분량이 거부돼 그 수신자만 메일을 받지 못한다. `dispatchAll()`은 목록 전체를 한 작업으로 묶어 큐 슬롯을 하나만 쓴다.
 - 묶음 안의 한 통이 실패해도 나머지는 계속 발송하고, 실패가 있으면 마지막에 `EmailSendException`을 한 번 던진다(`EmailSender.sendAll()` 계약).
 - `dispatchAll()`은 `sendAll()`을 호출하므로 SMTP 연결을 한 번만 열어 목록 전체를 보낸다. 통마다 `dispatch()`를 부르면 접속·STARTTLS·인증을 수신자 수만큼 반복해, 연결 비용이 큰 서버에서는 그 반복이 전체 발송 시간의 대부분을 차지한다.
-- 본문이 같은 수신자가 여럿이면 `EmailMessage.toBcc()`로 한 통에 묶는다. 받는 사람 칸은 구현체가 발신 주소로 채우고 수신자는 BCC에 담겨, 서로의 주소를 보지 못한다.
+- 본문이 같은 수신자가 여럿이면 `EmailMessage.toBcc()`로 한 통에 묶는다. 수신자는 BCC에 담겨 서로의 주소를 보지 못한다.
+- **받는 사람 칸에 실제 주소를 넣지 않는다.** SMTP는 To와 BCC를 모두 수신자로 쓰므로, 표시를 채우려고 발신 주소를 넣으면 그 주소도 수신자가 된다. 사본이 한 통 더 가고, 발송처의 일일 한도를 메일마다 1통씩 더 쓰며, BCC 100명 묶음이 실제로는 101명이 돼 메시지당 수신자 상한을 넘긴다. 구현체가 `undisclosed-recipients:;`(실제 주소가 없는 그룹 구문)로 표시만 채운다.
 
 ~~~java
 asyncEmailDispatcher.dispatchAll(List.of(EmailMessage.toBcc(recipients, subject, htmlBody, textBody)));
