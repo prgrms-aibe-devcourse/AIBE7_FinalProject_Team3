@@ -24,6 +24,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.times;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -76,6 +77,7 @@ class EmailVerificationIpLimitIntegrationTest {
     // 이메일마다 재발송 간격·이메일 한도가 따로라, 이메일을 바꿔 보내면 IP 한도만 쌓인다
     private ResultActions requestCode(int emailIndex, String remoteAddr, String forwardedFor) throws Exception {
         return mockMvc.perform(post(REQUEST_PATH)
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"user" + emailIndex + "@example.com\"}")
                 .header("X-Forwarded-For", forwardedFor)
