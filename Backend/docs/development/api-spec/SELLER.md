@@ -223,10 +223,12 @@ GET /api/v1/seller/dashboard/drops?status=ENDED&page=0&size=20
 
 **쿼리 파라미터:**
 - `status`: `DRAFT`·`WISH`·`GRAB`·`ENDED`·`CANCELED` 중 하나, 생략 시 전체
+- `dropId`: 본인 DROP ID, 생략 시 전체. 지정하면 해당 상품 한 건만 필터링합니다.
 - `page`: 0부터 시작, 기본값 `0`
 - `size`: 1~100, 기본값 `20`
 
 본인 DROP만 최근 생성순(`id` 내림차순)으로 반환합니다.
+`status`와 `dropId`를 함께 지정하면 두 조건을 모두 만족해야 합니다. 판매 실적 화면은 DROP 상세에서 받은 `dropId`를 URL에 보존해 해당 상품으로 직접 진입할 수 있습니다.
 
 **응답:**
 

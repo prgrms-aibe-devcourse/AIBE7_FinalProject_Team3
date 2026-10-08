@@ -130,7 +130,12 @@
 | DASH-006 | 판매자 종합과 DROP·주문배송·재고·판매 실적 페이지를 분리해야 한다. | 종합은 현재 상태·재고·임박 일정 중심이며 각 카드가 정확한 필터의 분야별 화면으로 이동한다. 주문·재고 필터는 URL에 남고 직접 진입·뒤로 가기에서 복원된다. 결제 보정 건수에는 전용 조회 계약 전까지 잘못된 상세 링크를 만들지 않는다. |
 | DASH-007 | 판매자는 상품별 누적 실적을 확인할 수 있어야 한다. | 주문 건수·판매 수량·배송비 포함 누적 매출을 분리해 표시한다. 매출은 결제 확정·미취소 주문의 `total_amount` 합계다. 기간별 매출·추이와 페이지 합계의 전체 매출 표시는 제공하지 않는다. |
 
-화면 경로·부분 실패·권한·접근성·반응형 인수 조건은 [Frontend 페이지 개편 명세](../../../Frontend/docs/GR-75-page-renewal.md)를 따른다. 이미지 계약의 상세 필드는 [DROP API](api-spec/DROP.md)와 [ERD](ERD.md)를 따른다.
+화면 경로·부분 실패·권한·접근성·반응형 인수 조건은 Frontend의 페이지별 명세를 따른다.
+
+- 소비자: [메인](../../../Frontend/docs/pages/HomePage.md), [WISH](../../../Frontend/docs/pages/WishPage.md), [GRAB](../../../Frontend/docs/pages/GrabPage.md), [상품 상세](../../../Frontend/docs/pages/DropDetailPage.md)
+- 판매자: [종합](../../../Frontend/docs/pages/SellerDashboardPage.md), [DROP 관리](../../../Frontend/docs/pages/SellerDropsPage.md), [DROP 상세](../../../Frontend/docs/pages/SellerDropDetailPage.md), [DROP 등록·편집](../../../Frontend/docs/pages/SellerDropFormPage.md), [주문](../../../Frontend/docs/pages/SellerOrdersPage.md), [재고](../../../Frontend/docs/pages/SellerInventoryPage.md), [실적](../../../Frontend/docs/pages/SellerSalesPage.md)
+
+이미지 계약의 상세 필드는 [DROP API](api-spec/DROP.md)와 [ERD](ERD.md)를 따른다.
 
 ### 1.12 재고 현황
 
