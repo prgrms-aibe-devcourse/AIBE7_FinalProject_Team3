@@ -20,12 +20,26 @@ public final class EmailSignupTokenCookie {
     }
 
     public static ResponseCookie issue(String rawToken) {
-        return ResponseCookie.from(NAME, rawToken) // 쿠키 이름이 email_signup_token
+        return baseCookie(rawToken)
+                .maxAge(EmailSignupContextRepository.CONTEXT_TTL) // 15분 설정
+                .build();
+    }
+
+    /*
+        회원가입 성공 시 브라우저의 쿠키를 지운다(MEMBER_AUTH 1.2.3). 서버는 쿠키를 직접 지울 수 없어 Max-Age=0인 같은 쿠키를 보낸다.
+        브라우저는 이름·Path가 같아야 같은 쿠키로 보므로 발급과 같은 속성을 쓴다. Redis의 가입 컨텍스트는 SignupService가 지운다.
+     */
+    public static ResponseCookie expire() {
+        return baseCookie("")
+                .maxAge(0)
+                .build();
+    }
+
+    private static ResponseCookie.ResponseCookieBuilder baseCookie(String value) {
+        return ResponseCookie.from(NAME, value) // 쿠키 이름이 email_signup_token
                 .httpOnly(true) //Js에서 쿠키를 읽지 못하도록 설정
                 .secure(true) // HTTPS 연결에서 전송하도록 설정
                 .sameSite("Lax") // 다른 사이트에서 시작한 POST 요청에는 쿠키 전송 제한
-                .path(PATH) // /api/v1/auth/signup과 그 하위 경로에 쿠키 전송하도록 제한
-                .maxAge(EmailSignupContextRepository.CONTEXT_TTL) // 15분 설정
-                .build();
+                .path(PATH); // /api/v1/auth/signup과 그 하위 경로에 쿠키 전송하도록 제한
     }
 }
