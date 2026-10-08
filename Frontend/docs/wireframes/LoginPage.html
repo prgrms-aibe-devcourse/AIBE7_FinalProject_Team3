@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>로그인 와이어프레임</title>
+    <link rel="stylesheet" href="wireframe.css" />
+  </head>
+  <body>
+    <header>
+      <span class="route">/login</span>
+      <h1>로그인 와이어프레임</h1>
+      <p class="muted">배치와 동선을 검토하는 화면 초안 · 실제 API 동작 없음</p>
+      <nav aria-label="와이어프레임 이동">
+        <a href="LoginPage.html">로그인</a><a href="SignupPage.html">회원가입</a
+        ><a href="MyPage.html">마이페이지</a>
+      </nav>
+    </header>
+    <main>
+      <div class="split">
+        <section class="hero">
+          <p class="eyebrow">WELCOME TO GRAB</p>
+          <h2>다시 만나 반가워요.</h2>
+          <p>좋아하는 상품을 WISH하고, 한정된 순간에 GRAB하세요.</p>
+        </section>
+        <section class="panel stack">
+          <h2>로그인</h2>
+          <span class="field">이메일</span><span class="field">비밀번호</span
+          ><span class="control primary">로그인</span>
+          <p class="muted">또는 소셜 계정으로 계속</p>
+          <div class="controls">
+            <span class="control">KAKAO</span
+            ><span class="control">GOOGLE</span>
+          </div>
+          <p>계정이 없나요? <a href="SignupPage.html">회원가입</a></p>
+        </section>
+      </div>
+      <section class="section note">
+        소셜 신규 회원 → 닉네임 입력 · 기존 회원 → 원래 화면 복귀 · 오류 → 계정
+        연결 안내
+      </section>
+    </main>
+    <footer>
+      화면별 동작·예외·조회 조건은
+      <a href="../pages/LoginPage.md">LoginPage.md</a>를 확인하세요.
+    </footer>
+  </body>
+</html>
