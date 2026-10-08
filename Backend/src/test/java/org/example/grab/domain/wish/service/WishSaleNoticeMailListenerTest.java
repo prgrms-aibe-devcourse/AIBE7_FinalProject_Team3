@@ -144,6 +144,25 @@ class WishSaleNoticeMailListenerTest {
     }
 
     @Test
+    @DisplayName("HTML과 텍스트 본문 모두에 알림을 멈추는 방법을 안내한다")
+    // 받는 사람이 메일 안에서 수신 중단 방법을 찾을 수 있어야 한다. 텍스트 본문만 보는 클라이언트도 있어 양쪽을 확인한다
+    void tellsHowToStopReceivingNotices() {
+        // given
+        when(wishRepository.findSaleStartMailRecipients(List.of(1L)))
+                .thenReturn(List.of(recipient(1L, "한정판 스니커즈", RECIPIENT)));
+
+        // when
+        listener.onDropGrabStarted(new DropGrabStartedEvent(List.of(1L)));
+
+        // then
+        ArgumentCaptor<List<EmailMessage>> captor = ArgumentCaptor.captor();
+        verify(emailDispatcher).dispatchAll(captor.capture());
+        EmailMessage message = captor.getValue().get(0);
+        assertThat(message.htmlBody()).contains("WISH를 취소하세요");
+        assertThat(message.textBody()).contains("WISH를 취소하세요");
+    }
+
+    @Test
     @DisplayName("같은 DROP의 수신자는 한 통에 BCC로 묶고 DROP이 다르면 나눈다")
     // 본문이 같은 수신자를 묶어야 SMTP 트랜잭션이 수신자 수만큼 반복되지 않는다(GR-69)
     void groupsRecipientsOfSameDropIntoOneMail() {

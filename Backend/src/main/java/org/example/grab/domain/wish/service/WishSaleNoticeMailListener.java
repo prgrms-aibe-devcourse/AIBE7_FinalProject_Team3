@@ -32,7 +32,12 @@ public class WishSaleNoticeMailListener {
     // 메시지당 BCC 수신자 상한. Gmail SMTP 기준 100명이고 Brevo 상한은 공개되지 않아 보수적으로 맞춘다
     private static final int MAX_BCC_PER_MAIL = 100;
 
-    private static final String FOOTER = "이 메일은 WISH한 DROP의 판매 소식을 알리기 위해 발송됐습니다.";
+    /*
+     * 받는 사람이 알림을 멈출 방법을 메일 안에서 찾을 수 있어야 한다. 지금 수신 중단 수단은 WISH 취소뿐이므로 그것을 안내한다.
+     * 개인별 수신 거부 링크는 수신자마다 다른 토큰이 필요해 BCC 묶음과 함께 쓸 수 없다. opt-out 이슈에서 발송 방식과 같이 정한다.
+     */
+    private static final String FOOTER = "이 메일은 WISH한 DROP의 판매 소식을 알리기 위해 발송됐습니다."
+            + " 알림을 받지 않으려면 해당 DROP의 WISH를 취소하세요.";
 
     /*
      * 메일 클라이언트는 외부 CSS·웹폰트를 불러오지 않고 flex·grid도 지원이 고르지 않아,
@@ -61,11 +66,14 @@ public class WishSaleNoticeMailListener {
             </table>
             """;
 
+    /** 서식 인자는 순서대로 제목, 안내 문구, 버튼 문구, 링크, WISH 안내, 푸터다. */
     private static final String TEXT_TEMPLATE = """
             %s
 
             %s
             %s: %s
+
+            %s
 
             %s
             """;
@@ -181,7 +189,7 @@ public class WishSaleNoticeMailListener {
                 WishNotice.MESSAGE, FOOTER);
         // 텍스트 본문은 마크업으로 해석되지 않으므로 이름을 그대로 쓴다
         String textBody = TEXT_TEMPLATE.formatted(
-                notice.subjectFormat.formatted(dropName), notice.lead, notice.cta, link, WishNotice.MESSAGE);
+                notice.subjectFormat.formatted(dropName), notice.lead, notice.cta, link, WishNotice.MESSAGE, FOOTER);
         return EmailMessage.toBcc(bcc, notice.subjectFormat.formatted(dropName), htmlBody, textBody);
     }
 }
