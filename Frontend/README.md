@@ -1,6 +1,6 @@
 # GRAB Frontend
 
-React와 TypeScript로 만든 GRAB MVP 화면 초안입니다. 현재는 Mock 데이터를 사용하며 백엔드 API 연동은 포함하지 않습니다.
+React와 TypeScript로 만든 GRAB MVP 화면 초안입니다. 주요 화면은 Mock 데이터를 사용하며 공개 카테고리 API만 최소 연동했습니다.
 
 ## 실행
 
@@ -81,4 +81,16 @@ npx playwright show-trace test-results/<테스트>/trace.zip
 - `src/utils`: 날짜와 가격 표시 함수
 - `src/styles`: 전역 스타일
 
-`api` 폴더는 실제 백엔드 연동과 OpenAPI 코드 생성을 도입할 때 추가합니다.
+## API 계약 및 로컬 확인
+
+백엔드를 먼저 실행한 뒤 `npm run dev`로 프론트엔드를 띄웁니다. 프론트엔드는 `/api/v1` 상대 경로로 요청하고 Vite가 로컬 백엔드 `http://localhost:8080`에 프록시합니다. 공개 카테고리 조회(`GET /api/v1/categories`)는 `src/api/categories.ts`에서 생성 타입을 사용합니다. 화면의 Mock 상품·카테고리 표시는 GR-55에서 교체합니다.
+
+```bash
+curl -fsS http://localhost:8080/v3/api-docs -o openapi/openapi.json
+npx prettier --write openapi/openapi.json
+npm run api:generate
+```
+
+`openapi/openapi.json`은 백엔드 OpenAPI 스냅샷이고 `src/api/schema.ts`는 생성 산출물입니다. 두 파일을 함께 커밋합니다. 생성 타입은 요청·응답 계약에만 사용하고 직접 수정하지 않습니다. `src/api/client.ts`는 공통 요청 주소를 지정하며 Axios가 HTTP 오류를 거부합니다. 각 요청 함수는 성공 응답의 `data`를 확인하고 반환합니다. 화면용 모델 변환은 요청 함수가 아닌 해당 `src/features`에서 합니다. 서버 응답 캐시는 TanStack Query를 사용합니다. 인증 쿠키·CSRF·401 재시도는 GR-45에서 구현합니다.
+
+명세가 바뀌면 위 명령으로 다시 생성한 후 `git diff -- openapi/openapi.json src/api/schema.ts`를 확인합니다. 대상 경로와 응답 형태를 `Backend/docs/development/api-spec/`의 Markdown 명세와 비교하고, 불일치하면 구현 전에 사양 방향을 확인합니다. 로컬 실행 확인은 프론트엔드 개발 서버가 켜진 상태에서 `curl -fsS http://localhost:5173/api/v1/categories`로 합니다. 응답의 `success`가 `true`이고 `data`가 카테고리 배열인지 확인합니다.
