@@ -69,6 +69,8 @@
 - 정렬: `sort`
 - 페이지: `page`, `size`
 
+`sort=wishCount,desc`는 WISH, `sort=soldQuantity,desc`는 GRAB 인기 조회에 사용합니다. 메인은 각 영역 최대 8개, 상품 목록은 24개/페이지로 요청합니다. 상세 조건은 [DROP.md](DROP.md) 1.2를 따릅니다.
+
 ### 2.4 판매자 DROP 관리
 
 | Method | Endpoint | 인증 | 용도 |
@@ -149,7 +151,7 @@
 | --- | --- | --- | --- |
 | POST | `/api/v1/uploads/images/presigned-url` | SELLER | 상품 이미지 업로드용 Supabase 서명 업로드 URL 발급 |
 
-> 발급된 `uploadUrl`로 클라이언트가 Supabase Storage에 이미지를 직접 업로드하고, 응답의 `{ imageId, imageUrl }`을 DROP 생성·수정 요청의 `images`에 그대로 사용합니다.
+> 발급된 `uploadUrl`로 클라이언트가 Supabase Storage에 이미지를 직접 업로드하고, 응답의 `{ imageId, imageUrl }`을 DROP 생성·수정 요청의 GALLERY `images` 또는 DETAIL `detailImages`에 사용합니다. 두 용도의 합계는 최대 10개입니다.
 
 ---
 
@@ -170,4 +172,3 @@
 | **합계** | **49** | |
 
 ---
-
