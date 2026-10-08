@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>판매자 DROP 상세 와이어프레임</title>
+    <link rel="stylesheet" href="wireframe.css" />
+  </head>
+  <body>
+    <header>
+      <span class="route">/seller/drops/:dropId</span>
+      <h1>판매자 DROP 상세 와이어프레임</h1>
+      <p class="muted">배치와 동선을 검토하는 화면 초안 · 실제 API 동작 없음</p>
+      <nav aria-label="와이어프레임 이동">
+        <a href="HomePage.html">메인</a><a href="WishPage.html">WISH</a
+        ><a href="GrabPage.html">GRAB</a
+        ><a href="DropDetailPage.html">상품 상세</a
+        ><a href="SellerDashboardPage.html">판매자 종합</a
+        ><a href="SellerDropsPage.html">DROP 관리</a
+        ><a href="SellerOrdersPage.html">주문</a
+        ><a href="SellerInventoryPage.html">재고</a
+        ><a href="SellerSalesPage.html">실적</a>
+      </nav>
+    </header>
+    <main>
+      <section class="section-head">
+        <div>
+          <p class="eyebrow">DROP DETAIL</p>
+          <h1>내 DROP 상품명</h1>
+          <p>판매 일정 · 카테고리 · 상태</p>
+        </div>
+        <div class="controls">
+          <span class="tag">WISH</span
+          ><span class="control">편집 / 공개 / 취소</span>
+        </div>
+      </section>
+      <section class="grid cols-3">
+        <div class="metric">활성 WISH<br /><strong>152</strong></div>
+        <div class="metric">
+          가용 · 확보 · 판매<br /><strong>4 · 2 · 14</strong>
+        </div>
+        <div class="metric">
+          주문 · 실적<br /><strong>분야별 상세 ↗</strong>
+        </div>
+      </section>
+      <section class="section split">
+        <div class="panel">
+          <h2>상품 정보</h2>
+          <div class="picture wide">GALLERY 대표 이미지</div>
+          <p>설명 · 일정 · 배송</p>
+        </div>
+        <div class="panel">
+          <h2>옵션 운영</h2>
+          <div class="list-row">
+            <strong>기본 옵션</strong><span class="secondary">상태 · 수량</span
+            ><span class="secondary">일정 · 금액</span
+            ><span class="secondary">상세 정보</span
+            ><span class="control">보기 ↗</span>
+          </div>
+          <div class="list-row">
+            <strong>옵션 A</strong><span class="secondary">상태 · 수량</span
+            ><span class="secondary">일정 · 금액</span
+            ><span class="secondary">상세 정보</span
+            ><span class="control">보기 ↗</span>
+          </div>
+          <div class="list-row">
+            <strong>옵션 B</strong><span class="secondary">상태 · 수량</span
+            ><span class="secondary">일정 · 금액</span
+            ><span class="secondary">상세 정보</span
+            ><span class="control">보기 ↗</span>
+          </div>
+        </div>
+      </section>
+      <section class="section panel">
+        <h2>관련 작업</h2>
+        <div class="controls">
+          <span class="control">이 DROP의 주문 ↗</span
+          ><span class="control">옵션별 재고 ↗</span
+          ><span class="control">판매 실적 ↗</span
+          ><span class="control">소비자 화면 ↗</span>
+        </div>
+      </section>
+    </main>
+    <footer>
+      화면별 동작·예외·조회 조건은
+      <a href="../pages/SellerDropDetailPage.md">SellerDropDetailPage.md</a>를
+      확인하세요.
+    </footer>
+  </body>
+</html>
