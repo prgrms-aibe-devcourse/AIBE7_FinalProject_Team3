@@ -157,6 +157,32 @@ class SmtpEmailSenderGreenMailTest {
         });
     }
 
+    @Test
+    @DisplayName("BCC 메일은 BCC 수신자에게만 가고 발신 주소로는 가지 않는다")
+    /*
+     * SMTP는 To와 BCC를 모두 수신자로 쓴다. 받는 사람 칸을 채우려고 발신 주소를 To에 넣으면
+     * 발신 주소도 수신자가 돼 사본이 한 통 더 가고, 발송처의 일일 한도를 메일마다 1통씩 더 쓴다.
+     * BCC 100명 묶음이 실제로는 101명이 돼 메시지당 수신자 상한도 넘긴다(GR-69).
+     */
+    void deliversOnlyToBccRecipients() {
+        contextRunner().run(context -> {
+            // given
+            EmailSender sender = context.getBean(EmailSender.class);
+            List<String> bcc = List.of("first@example.com", "second@example.com");
+
+            // when
+            sender.sendAll(List.of(EmailMessage.toBcc(bcc, SUBJECT, HTML_BODY, TEXT_BODY)));
+
+            // then: GreenMail은 수신자마다 한 건씩 돌려주므로 발신 주소가 섞이면 3건이 된다
+            assertThat(greenMail.waitForIncomingEmail(Duration.ofSeconds(10).toMillis(), 2)).isTrue();
+            assertThat(greenMail.getReceivedMessages())
+                    .hasSize(2)
+                    .allSatisfy(received -> assertThat(received.getAllRecipients())
+                            .extracting(Object::toString)
+                            .doesNotContain(FROM));
+        });
+    }
+
     private static ApplicationContextRunner contextRunner() {
         return new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(MailSenderAutoConfiguration.class))

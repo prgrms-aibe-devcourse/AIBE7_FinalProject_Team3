@@ -90,10 +90,17 @@ public class SmtpEmailSender implements EmailSender {
         // 한글 제목·본문이 깨지지 않도록 헤더와 본문 인코딩을 UTF-8로 고정한다
         MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, StandardCharsets.UTF_8.name());
         helper.setFrom(from);
-        // BCC 전용 메일은 받는 사람 칸이 비면 클라이언트가 수신자를 표시하지 못하므로 발신 주소를 넣는다
-        helper.setTo(message.to() != null ? message.to() : from);
+        if (message.to() != null) {
+            helper.setTo(message.to());
+        }
         if (!message.bcc().isEmpty()) {
             helper.setBcc(message.bcc().toArray(String[]::new));
+            /*
+             * SMTP는 To와 BCC를 모두 수신자로 쓴다. 받는 사람 칸을 채우려고 발신 주소를 To에 넣으면
+             * 발신 주소도 수신자가 돼 사본이 한 통 더 가고 발송처의 일일 한도를 메일마다 1통씩 더 쓴다.
+             * 실제 주소가 없는 그룹 구문으로 표시만 채운다. 수신자가 0명이라 발송 대상에는 들어가지 않는다.
+             */
+            mimeMessage.setHeader("To", "undisclosed-recipients:;");
         }
         helper.setSubject(message.subject());
         helper.setText(message.textBody(), message.htmlBody()); // 수신 메일 프로그램이 HTML을 지원하면 HTML을, 지원하지 않으면 텍스트
