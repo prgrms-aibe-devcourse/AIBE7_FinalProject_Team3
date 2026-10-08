@@ -89,12 +89,16 @@ class EmailVerificationSecurityTests {
     }
 
     @Test
-    @DisplayName("다른 /api/v1/auth 경로는 열리지 않아 비로그인은 401")
+    @DisplayName("열어 둔 경로 밖의 /api/v1/auth 경로는 비로그인 401")
     void keepsOtherAuthPathsProtected() throws Exception {
         mockMvc.perform(post("/api/v1/auth/email-verification/other"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("AUTHENTICATION_REQUIRED"));
-        mockMvc.perform(post("/api/v1/auth/signup"))
+        // 회원가입은 POST /api/v1/auth/signup만 연다(GR-30). 다른 메서드와 하위 경로는 계속 막힌다
+        mockMvc.perform(get("/api/v1/auth/signup"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("AUTHENTICATION_REQUIRED"));
+        mockMvc.perform(post("/api/v1/auth/signup/other"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("AUTHENTICATION_REQUIRED"));
     }
