@@ -7,7 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.validation.BindException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -60,15 +60,21 @@ public class GlobalExceptionHandler {
                         List.of()));
     }
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleMethodArgumentNotValid(MethodArgumentNotValidException e) {
+    /*
+        @Valid 검증 실패(MethodArgumentNotValidException)와, Controller가 BindingResult로 받아 직접 던진 BindException을 함께 처리한다.
+        회원가입은 본문 검증보다 가입 컨텍스트 확인이 먼저라 검증 결과를 미뤘다가 던진다(MEMBER_AUTH.md 1.2.3, GR-30 M00-01).
+     */
+    @ExceptionHandler(BindException.class)
+    public ResponseEntity<ErrorResponse> handleBindException(BindException e) {
         ValidationFailure failure = validationErrorCodeResolver.resolve(e.getBindingResult());
         ErrorCode errorCode = failure.errorCode();
+
         List<ErrorResponse.FieldError> fieldErrors = failure.fieldErrors().stream()
                 .map(error -> new ErrorResponse.FieldError(error.getField(),
                         error.isBindingFailure() ? BINDING_FAILURE_REASON : error.getDefaultMessage()))
                 .toList();
         log.warn("요청 값 검증 실패: {} - {}", errorCode.getCode(), fieldErrors);
+
         return ResponseEntity.status(errorCode.getStatus())
                 .body(ErrorResponse.of(errorCode.getCode(), errorCode.getMessage(), fieldErrors));
     }
