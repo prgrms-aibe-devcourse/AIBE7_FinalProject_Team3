@@ -2,6 +2,8 @@
 
 > 상세 규칙과 요청·응답 예시는 아래 문서에서 확인합니다.
 
+실행 중인 백엔드의 OpenAPI 문서는 `/v3/api-docs`에서 전체를, `/v3/api-docs/{group}`에서 도메인별로 확인할 수 있습니다. 그룹은 `category`, `dashboard`, `drop`, `order`, `payment`, `user`, `wish`이며 컨트롤러 패키지를 기준으로 자동 구성됩니다. Swagger UI(`/swagger-ui/index.html`)에서도 그룹을 선택할 수 있습니다. 새 도메인을 만들면 `application.yml`의 `springdoc.group-configs`에 등록합니다. Mock 배송 API를 활성화하면 `order` 그룹에 포함됩니다.
+
 ## 1. 문서 구성
 
 | 문서 | 내용 |
