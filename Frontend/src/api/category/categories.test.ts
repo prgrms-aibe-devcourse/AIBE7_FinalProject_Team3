@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest'
-import { api } from './client'
+import { api } from '../client'
 import { getCategories } from './categories'
 
 afterEach(() => vi.restoreAllMocks())

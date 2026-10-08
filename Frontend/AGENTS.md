@@ -25,7 +25,8 @@ npm run e2e:docker -- --grep @visual   # 시각 비교 (CI와 같은 Docker 이�
 - `src/components` — 도메인에 의존하지 않는 범용 UI (`Header`, `Footer`, `EmptyState`)
 - `src/features/<도메인>` — 도메인 UI·로직·Mock·테스트 (`drop`, `order`, `wish`, `auth`, `seller`)
 - `src/pages/<Page>` — 라우트 단위 화면. 라우트는 `src/App.tsx`에서 관리한다.
-- `src/types` — API 계약 타입, `src/utils` — 날짜·가격 표시 함수
+- `src/types` — 화면·Mock 타입, `src/utils` — 날짜·가격 표시 함수
+- `src/api/schema` — OpenAPI 생성 타입, `src/api/<도메인>` — 도메인별 요청·테스트, `src/api/client.ts` — 공통 클라이언트
 - 라우터는 `HashRouter`다. URL은 `/#/wish` 형태다.
 - 로그인·WISH·주문 상태는 `App.tsx`의 `useState`에만 있다. 새 전역 상태 관리 도입은 별도 합의 후 진행한다.
 

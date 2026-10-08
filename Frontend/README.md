@@ -77,13 +77,14 @@ npx playwright show-trace test-results/<테스트>/trace.zip
 - `src/components`: 도메인에 의존하지 않는 공통 UI
 - `src/pages`: 라우트 단위 화면
 - `src/features`: 인증, DROP, WISH, 주문, 판매자 기능
-- `src/types`: API 계약에 사용할 타입
+- `src/api`: 공통 요청 클라이언트, 도메인별 API 요청, 생성 스키마
+- `src/types`: 화면·Mock 데이터용 타입
 - `src/utils`: 날짜와 가격 표시 함수
 - `src/styles`: 전역 스타일
 
 ## API 계약 및 로컬 확인
 
-백엔드를 먼저 실행한 뒤 `npm run dev`로 프론트엔드를 띄웁니다. 프론트엔드는 `/api/v1` 상대 경로로 요청하고 Vite가 로컬 백엔드 `http://localhost:8080`에 프록시합니다. 공개 카테고리 조회(`GET /api/v1/categories`)는 `src/api/categories.ts`에서 생성 타입을 사용합니다. 화면의 Mock 상품·카테고리 표시는 GR-55에서 교체합니다.
+백엔드를 먼저 실행한 뒤 `npm run dev`로 프론트엔드를 띄웁니다. 프론트엔드는 `/api/v1` 상대 경로로 요청하고 Vite가 로컬 백엔드 `http://localhost:8080`에 프록시합니다. 공개 카테고리 조회(`GET /api/v1/categories`)는 `src/api/category/categories.ts`에서 생성 타입을 사용합니다. 화면의 Mock 상품·카테고리 표시는 GR-55에서 교체합니다.
 
 ```bash
 npm run api:snapshot
