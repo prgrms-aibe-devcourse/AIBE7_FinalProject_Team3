@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>판매자 재고 현황 와이어프레임</title>
+    <link rel="stylesheet" href="wireframe.css" />
+  </head>
+  <body>
+    <header>
+      <span class="route">/seller/inventory</span>
+      <h1>판매자 재고 현황 와이어프레임</h1>
+      <p class="muted">배치와 동선을 검토하는 화면 초안 · 실제 API 동작 없음</p>
+      <nav aria-label="와이어프레임 이동">
+        <a href="HomePage.html">메인</a><a href="WishPage.html">WISH</a
+        ><a href="GrabPage.html">GRAB</a
+        ><a href="DropDetailPage.html">상품 상세</a
+        ><a href="SellerDashboardPage.html">판매자 종합</a
+        ><a href="SellerDropsPage.html">DROP 관리</a
+        ><a href="SellerOrdersPage.html">주문</a
+        ><a href="SellerInventoryPage.html">재고</a
+        ><a href="SellerSalesPage.html">실적</a>
+      </nav>
+    </header>
+    <main>
+      <section>
+        <p class="eyebrow">STOCK VIEW</p>
+        <h1>재고 현황</h1>
+        <p>가용 · 확보 · 판매 수량을 따로 확인합니다.</p>
+      </section>
+      <p class="note">
+        가용은 종료 상품 잔여와 비활성 옵션을 포함할 수 있어 즉시 구매 가능
+        수량과 다릅니다.
+      </p>
+      <section class="section side">
+        <div class="panel">
+          <h2>상품별 현황</h2>
+          <div class="controls">
+            <span class="chip">전체</span><span class="chip">WISH</span
+            ><span class="chip">GRAB</span><span class="chip">ENDED</span>
+          </div>
+          <div class="list-row">
+            <strong>DROP A · 가용 4</strong
+            ><span class="secondary">상태 · 수량</span
+            ><span class="secondary">일정 · 금액</span
+            ><span class="secondary">상세 정보</span
+            ><span class="control">보기 ↗</span>
+          </div>
+          <div class="list-row">
+            <strong>DROP B · 가용 0</strong
+            ><span class="secondary">상태 · 수량</span
+            ><span class="secondary">일정 · 금액</span
+            ><span class="secondary">상세 정보</span
+            ><span class="control">보기 ↗</span>
+          </div>
+          <div class="list-row">
+            <strong>DROP C · 가용 12</strong
+            ><span class="secondary">상태 · 수량</span
+            ><span class="secondary">일정 · 금액</span
+            ><span class="secondary">상세 정보</span
+            ><span class="control">보기 ↗</span>
+          </div>
+          <p>〈 1 / 전체 페이지 〉</p>
+        </div>
+        <div class="panel">
+          <h2>선택 상품 옵션별 재고</h2>
+          <div class="list-row"><strong>옵션 A</strong><span>가용 4</span></div>
+          <div class="list-row"><strong>옵션 B</strong><span>가용 0</span></div>
+          <p>확보 · 판매 수량 별도 표시</p>
+        </div>
+      </section>
+    </main>
+    <footer>
+      화면별 동작·예외·조회 조건은
+      <a href="../pages/SellerInventoryPage.md">SellerInventoryPage.md</a>를
+      확인하세요.
+    </footer>
+  </body>
+</html>
