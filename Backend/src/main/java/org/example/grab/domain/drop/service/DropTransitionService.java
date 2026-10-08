@@ -41,9 +41,11 @@ public class DropTransitionService {
      * 남은 대상 확인용 COUNT 쿼리는 쓰지 않는다. 다른 트랜잭션이 잠근 행은 조회에서 빠지므로
      * COUNT 기준 반복은 무한 루프를 만들 수 있다.
      */
+    // IntUnaryOperator : int를 받아 int를 반환하는 함수 타입
     private long drain(IntUnaryOperator batch) {
         long total = 0;
         while (true) {
+            // applyAsInt : IntUnaryOperator에 담긴 함수를 실행하는 메서드
             int processed = batch.applyAsInt(BATCH_SIZE);
             total += processed;
             if (processed < BATCH_SIZE) {
