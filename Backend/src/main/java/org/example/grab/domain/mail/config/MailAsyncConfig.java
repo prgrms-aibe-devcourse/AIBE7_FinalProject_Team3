@@ -15,9 +15,12 @@ public class MailAsyncConfig {
 
     public static final String MAIL_TASK_EXECUTOR = "mailTaskExecutor";
 
-    // 동시에 여는 SMTP 연결 수. 크게 늘리면 Gmail이 비정상 활동으로 판단해 계정을 잠글 수 있어 적게 둔다
-    // 묶음 발송(AsyncEmailDispatcher.dispatchAll)이 이 값만큼만 작업을 나누도록 공개한다
-    public static final int MAIL_POOL_SIZE = 4;
+    /*
+       동시에 여는 SMTP 연결 수. 크게 늘리면 Gmail이 비정상 활동으로 판단해 계정을 잠글 수 있어 적게 둔다.
+       알림은 발송처(NoticeMailConfig) 수만큼만 작업을 만들고 그 수가 이 값보다 작으므로,
+       알림이 아무리 많아도 인증 코드 메일이 쓸 스레드가 남는다. 발송처를 늘리면 이 값도 함께 올려야 한다.
+     */
+    private static final int MAIL_POOL_SIZE = 4;
 
     // 큐에 들어간 메일이 발송을 시작하기까지의 최대 대기. 재발송 간격(60초)을 넘기면 사용자가 재요청해 먼저 보낸 코드가 무효가 되므로 그보다 짧게 둔다
     private static final int MAIL_MAX_WAIT_SECONDS = 30;
@@ -25,7 +28,11 @@ public class MailAsyncConfig {
     // 메일 한 통 발송 시간의 가정값. 실제 Gmail 발송 시간을 측정하면 이 값을 바꾼다
     private static final int MAIL_SEND_SECONDS = 3;
 
-    // 최대 대기 안에 처리할 수 있는 만큼만 받는다(4 × 30 ÷ 3 = 40). 넘치면 TaskRejectedException으로 거부하고, 사용자는 재발송 간격 뒤 다시 요청한다
+    /*
+       최대 대기 안에 처리할 수 있는 만큼만 받는다(4 × 30 ÷ 3 = 40). 넘치면 TaskRejectedException으로 거부하고,
+       사용자는 재발송 간격 뒤 다시 요청한다. 이 계산은 작업 하나가 메일 한 통인 인증 코드 발송을 기준으로 한다.
+       알림은 작업 하나가 수백 통이라 여기에 들어맞지 않지만, 발송처 수만큼만 작업을 만들어 큐를 거의 쓰지 않는다.
+     */
     private static final int MAIL_QUEUE_CAPACITY = MAIL_POOL_SIZE * MAIL_MAX_WAIT_SECONDS / MAIL_SEND_SECONDS;
 
     // 서버 종료 시 메일 작업이 끝날 기회를 주도록 최대 10초간 기다린다. 모든 메일의 발송 완료를 보장하지는 않는다

@@ -3,6 +3,7 @@ package org.example.grab.domain.mail.service;
 import com.icegreen.greenmail.junit5.GreenMailExtension;
 import com.icegreen.greenmail.util.ServerSetupTest;
 import org.example.grab.domain.mail.config.MailAsyncConfig;
+import org.example.grab.domain.mail.config.NoticeMailConfig;
 import org.example.grab.domain.mail.dto.EmailMessage;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,6 +23,7 @@ import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.Mockito.mock;
 
 /*
     실제 메일 전용 스레드 풀(MailAsyncConfig)과 SMTP 구현체로 비동기 발송을 확인한다.
@@ -126,7 +128,9 @@ class AsyncEmailDispatcherGreenMailTest {
     private static ApplicationContextRunner contextRunner() {
         return new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(MailSenderAutoConfiguration.class))
-                .withUserConfiguration(MailAsyncConfig.class, SmtpEmailSender.class, AsyncEmailDispatcher.class)
+                // 알림 발송처(grab.mail.notice.providers)를 설정하지 않아 라우터는 비고, 발송은 기본 SMTP 발송기로 나간다
+                .withUserConfiguration(MailAsyncConfig.class, NoticeMailConfig.class,
+                        SmtpEmailSender.class, AsyncEmailDispatcher.class)
                 .withPropertyValues(
                         "spring.mail.host=127.0.0.1",
                         "spring.mail.port=" + greenMail.getSmtp().getPort(),

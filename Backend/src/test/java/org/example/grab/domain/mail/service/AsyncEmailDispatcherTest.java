@@ -1,12 +1,10 @@
 package org.example.grab.domain.mail.service;
 
-import org.example.grab.domain.mail.config.MailAsyncConfig;
 import org.example.grab.domain.mail.dto.EmailMessage;
 import org.example.grab.domain.mail.error.EmailSendException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.core.task.SyncTaskExecutor;
@@ -23,9 +21,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -51,7 +47,7 @@ class AsyncEmailDispatcherTest {
         EmailSender emailSender = mock(EmailSender.class);
         List<Runnable> submitted = new ArrayList<>();
         TaskExecutor executor = submitted::add;
-        AsyncEmailDispatcher dispatcher = new AsyncEmailDispatcher(emailSender, executor);
+        AsyncEmailDispatcher dispatcher = dispatcher(emailSender, executor);
 
         // when
         dispatcher.dispatch(MESSAGE);
@@ -70,7 +66,7 @@ class AsyncEmailDispatcherTest {
         EmailSender emailSender = mock(EmailSender.class);
         TaskExecutor executor = mock(TaskExecutor.class);
         doThrow(new TaskRejectedException("메일 풀 대기열 초과")).when(executor).execute(any(Runnable.class));
-        AsyncEmailDispatcher dispatcher = new AsyncEmailDispatcher(emailSender, executor);
+        AsyncEmailDispatcher dispatcher = dispatcher(emailSender, executor);
 
         // when & then
         assertThatCode(() -> dispatcher.dispatch(MESSAGE)).doesNotThrowAnyException();
@@ -87,7 +83,7 @@ class AsyncEmailDispatcherTest {
         EmailSender emailSender = mock(EmailSender.class);
         doThrow(new EmailSendException(new MailSendException("550 <" + RECIPIENT + ">: Recipient address rejected")))
                 .when(emailSender).send(MESSAGE);
-        AsyncEmailDispatcher dispatcher = new AsyncEmailDispatcher(emailSender, new SyncTaskExecutor());
+        AsyncEmailDispatcher dispatcher = dispatcher(emailSender, new SyncTaskExecutor());
 
         // when & then
         assertThatCode(() -> dispatcher.dispatch(MESSAGE)).doesNotThrowAnyException();
@@ -102,7 +98,7 @@ class AsyncEmailDispatcherTest {
         // given
         EmailSender emailSender = mock(EmailSender.class);
         doThrow(new IllegalStateException("예상하지 못한 오류")).when(emailSender).send(MESSAGE);
-        AsyncEmailDispatcher dispatcher = new AsyncEmailDispatcher(emailSender, new SyncTaskExecutor());
+        AsyncEmailDispatcher dispatcher = dispatcher(emailSender, new SyncTaskExecutor());
 
         // when & then
         assertThatCode(() -> dispatcher.dispatch(MESSAGE)).doesNotThrowAnyException();
@@ -119,7 +115,7 @@ class AsyncEmailDispatcherTest {
         EmailSender emailSender = mock(EmailSender.class);
         List<Runnable> submitted = new ArrayList<>();
         TaskExecutor executor = submitted::add;
-        AsyncEmailDispatcher dispatcher = new AsyncEmailDispatcher(emailSender, executor);
+        AsyncEmailDispatcher dispatcher = dispatcher(emailSender, executor);
         List<EmailMessage> messages = List.of(MESSAGE, OTHER_MESSAGE);
 
         // when
@@ -141,7 +137,7 @@ class AsyncEmailDispatcherTest {
         EmailSender emailSender = mock(EmailSender.class);
         doThrow(new EmailSendException(new MailSendException("550 <" + RECIPIENT + ">: Recipient address rejected")))
                 .when(emailSender).sendAll(anyList());
-        AsyncEmailDispatcher dispatcher = new AsyncEmailDispatcher(emailSender, new SyncTaskExecutor());
+        AsyncEmailDispatcher dispatcher = dispatcher(emailSender, new SyncTaskExecutor());
 
         // when & then
         assertThatCode(() -> dispatcher.dispatchAll(List.of(MESSAGE, OTHER_MESSAGE))).doesNotThrowAnyException();
@@ -156,7 +152,7 @@ class AsyncEmailDispatcherTest {
         EmailSender emailSender = mock(EmailSender.class);
         TaskExecutor executor = mock(TaskExecutor.class);
         doThrow(new TaskRejectedException("메일 풀 대기열 초과")).when(executor).execute(any(Runnable.class));
-        AsyncEmailDispatcher dispatcher = new AsyncEmailDispatcher(emailSender, executor);
+        AsyncEmailDispatcher dispatcher = dispatcher(emailSender, executor);
 
         // when & then
         assertThatCode(() -> dispatcher.dispatchAll(List.of(MESSAGE, OTHER_MESSAGE))).doesNotThrowAnyException();
@@ -166,70 +162,53 @@ class AsyncEmailDispatcherTest {
     }
 
     @Test
-    @DisplayName("수신자가 많으면 메일 풀 크기만큼 작업으로 나눠 동시에 보내고 한 통도 빠뜨리지 않는다")
-    // 한 작업으로만 보내면 마지막 수신자가 '수신자 수 × 통당 전송 시간'만큼 늦으므로(GR-69) 나눠 제출하는지 확인하는 테스트
-    void splitsLargeBatchAcrossMailPool() {
+    @DisplayName("알림 발송처를 설정하지 않으면 기본 발송기로 한 작업에 보낸다")
+    // 환경변수를 주입하지 않는 로컬(Mailpit)에서 알림이 그대로 나가는지 확인하는 테스트
+    void sendsWithDefaultSenderWhenNoProviderConfigured() {
         // given
         EmailSender emailSender = mock(EmailSender.class);
         List<Runnable> submitted = new ArrayList<>();
-        TaskExecutor executor = submitted::add;
-        AsyncEmailDispatcher dispatcher = new AsyncEmailDispatcher(emailSender, executor);
+        AsyncEmailDispatcher dispatcher = dispatcher(emailSender, submitted::add);
         List<EmailMessage> messages = messages(100);
 
         // when
         dispatcher.dispatchAll(messages);
-
-        // then: 작업 수는 풀 크기까지만 늘고, 모든 통이 정확히 한 번씩 들어간다
-        assertThat(submitted).hasSize(MailAsyncConfig.MAIL_POOL_SIZE);
-        submitted.forEach(Runnable::run);
-        ArgumentCaptor<List<EmailMessage>> captor = ArgumentCaptor.captor();
-        verify(emailSender, times(MailAsyncConfig.MAIL_POOL_SIZE)).sendAll(captor.capture());
-        assertThat(captor.getAllValues()).flatExtracting(batch -> batch)
-                .containsExactlyInAnyOrderElementsOf(messages);
-    }
-
-    @Test
-    @DisplayName("수신자가 적으면 나누지 않고 연결 하나로 보낸다")
-    // 잘게 쪼개면 SMTP 연결만 늘고 전체 시간은 줄지 않으므로 확인하는 테스트
-    void keepsSmallBatchAsSingleTask() {
-        // given
-        EmailSender emailSender = mock(EmailSender.class);
-        List<Runnable> submitted = new ArrayList<>();
-        AsyncEmailDispatcher dispatcher = new AsyncEmailDispatcher(emailSender, submitted::add);
-
-        // when
-        dispatcher.dispatchAll(messages(20));
 
         // then
         assertThat(submitted).hasSize(1);
+        submitted.forEach(Runnable::run);
+        verify(emailSender).sendAll(messages);
     }
 
     @Test
-    @DisplayName("청크가 큐에 거부되면 버리지 않고 마지막 작업에 합쳐 보낸다")
-    // 나눠 제출하면 일부만 거부되는 부분 실패가 생길 수 있다. 그 몫이 사라지지 않는지 확인하는 테스트
-    void mergesRejectedChunksIntoLastTask() {
-        // given: 처음 두 번의 제출만 거부하는 executor
-        EmailSender emailSender = mock(EmailSender.class);
+    @DisplayName("알림은 인증 코드와 다른 발송처로 보낸다")
+    // 알림이 아무리 많아도 인증 코드 계정의 일일 한도를 먹지 않아야 하므로 경로가 갈리는지 확인하는 테스트(GR-69)
+    void sendsNoticeThroughSeparateSender() {
+        // given
+        EmailSender authSender = mock(EmailSender.class);
+        EmailSender noticeSender = mock(EmailSender.class);
         List<Runnable> submitted = new ArrayList<>();
-        TaskExecutor executor = task -> {
-            if (submitted.size() < 2) {
-                submitted.add(null); // 거부된 횟수만 센다
-                throw new TaskRejectedException("메일 풀 대기열 초과");
-            }
-            submitted.add(task);
-        };
-        AsyncEmailDispatcher dispatcher = new AsyncEmailDispatcher(emailSender, executor);
+        AsyncEmailDispatcher dispatcher = new AsyncEmailDispatcher(authSender, noticeSender, submitted::add);
         List<EmailMessage> messages = messages(100);
 
         // when
         dispatcher.dispatchAll(messages);
+        dispatcher.dispatch(MESSAGE);
 
-        // then: 거부된 두 청크가 마지막 작업에 합쳐져 100통이 모두 발송된다
-        submitted.stream().filter(java.util.Objects::nonNull).forEach(Runnable::run);
-        ArgumentCaptor<List<EmailMessage>> captor = ArgumentCaptor.captor();
-        verify(emailSender, atLeastOnce()).sendAll(captor.capture());
-        assertThat(captor.getAllValues()).flatExtracting(batch -> batch)
-                .containsExactlyInAnyOrderElementsOf(messages);
+        // then: 묶음 알림은 알림 발송처로, 인증 코드는 기본 발송기로 간다
+        submitted.forEach(Runnable::run);
+        verify(noticeSender).sendAll(messages);
+        verify(noticeSender, never()).send(any(EmailMessage.class));
+        verify(authSender).send(MESSAGE);
+        verify(authSender, never()).sendAll(anyList());
+    }
+
+    /*
+     * 알림 발송처를 설정하지 않은 상태(로컬 Mailpit)의 디스패처. 두 경로가 같은 발송기를 쓰므로,
+     * 발송처 분리와 무관한 기존 동작(비동기 제출·예외 삼킴·큐 거부)을 그대로 확인할 수 있다.
+     */
+    private static AsyncEmailDispatcher dispatcher(EmailSender emailSender, TaskExecutor executor) {
+        return new AsyncEmailDispatcher(emailSender, emailSender, executor);
     }
 
     private static List<EmailMessage> messages(int count) {
@@ -245,7 +224,7 @@ class AsyncEmailDispatcherTest {
         // given
         EmailSender emailSender = mock(EmailSender.class);
         TaskExecutor executor = mock(TaskExecutor.class);
-        AsyncEmailDispatcher dispatcher = new AsyncEmailDispatcher(emailSender, executor);
+        AsyncEmailDispatcher dispatcher = dispatcher(emailSender, executor);
 
         // when
         dispatcher.dispatchAll(List.of());

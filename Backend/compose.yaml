@@ -27,6 +27,14 @@ services:
       MAIL_SMTP_AUTH: ${MAIL_SMTP_AUTH:-false}
       MAIL_STARTTLS: ${MAIL_STARTTLS:-false}
       MAIL_FROM: ${MAIL_FROM:-no-reply@grab.local}
+      # WISH 판매 알림(GR-69) 전용 발송처. 위 MAIL_* (인증 코드용)과 계정을 나눠 일일 한도를 공유하지 않는다
+      # HOST를 비워 두면 발송처가 등록되지 않고, 알림도 위 MAIL_* 설정(기본값 Mailpit)으로 나간다
+      # PORT는 비면 기동에 실패하므로(숫자 바인딩) 기본값을 둔다
+      BREVO_SMTP_HOST: ${BREVO_SMTP_HOST:-}
+      BREVO_SMTP_PORT: ${BREVO_SMTP_PORT:-587}
+      BREVO_SMTP_USERNAME: ${BREVO_SMTP_USERNAME:-}
+      BREVO_SMTP_PASSWORD: ${BREVO_SMTP_PASSWORD:-}
+      BREVO_MAIL_FROM: ${BREVO_MAIL_FROM:-}
     depends_on:
       postgres:
         condition: service_healthy

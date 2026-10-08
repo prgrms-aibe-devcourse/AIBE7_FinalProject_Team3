@@ -29,6 +29,17 @@ grab:
     # Gmail은 로그인 계정과 다른 주소를 계정 주소로 바꿔 보내므로 운영에서는 같은 주소를 넣는다
     from: ${MAIL_FROM:no-reply@grab.local}
 
+    # WISH 알림(GR-69) 전용 발송처. 위 spring.mail(인증 코드용 Gmail)과 분리해, 알림이 인증 코드의 일일 한도를 먹지 않게 한다
+    # 목록 순서가 우선순위다. 앞에서부터 daily-limit만큼 채운 뒤 다음 발송처로 넘어간다(MailQuotaRouter)
+    # host가 비면 그 발송처는 등록되지 않는다. 환경변수를 주입하지 않는 로컬에서는 목록이 비어 기본 발송기(Mailpit)로 나간다
+    # 현재 Brevo(무료 300통/일)를 쓴다. host가 비면 기본 발송기(위 spring.mail)로 나간다
+    notice:
+      host: ${BREVO_SMTP_HOST:}
+      port: ${BREVO_SMTP_PORT:587}
+      username: ${BREVO_SMTP_USERNAME:}
+      password: ${BREVO_SMTP_PASSWORD:}
+      from: ${BREVO_MAIL_FROM:}
+
 management:
   # SMTP 장애가 health 전체를 DOWN으로 만들어 메일과 무관한 요청까지 막지 않도록 메일 헬스 체크는 끈다(TECHSTACK 4.3)
   health:
