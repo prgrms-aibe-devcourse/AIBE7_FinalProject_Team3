@@ -458,7 +458,7 @@ PATCH /api/v1/seller/drops/{dropId}
 - `DROP_ACCESS_DENIED`
 - `DROP_NOT_EDITABLE`
 - `INVALID_SCHEDULE`
-- `VALIDATION_FAILED` — 존재하지 않거나 비활성인 카테고리(`fieldErrors`의 `field`는 `categoryId`), 이미지 10개 초과·원소 누락(null), `imageUrl` 형식 불일치(`images[i].imageUrl`), `imageId` 중복·타 DROP 사용(`images[i].imageId`)
+- `VALIDATION_FAILED` — 존재하지 않거나 비활성인 카테고리(`fieldErrors`의 `field`는 `categoryId`), 두 용도 합계 이미지 10개 초과·원소 누락(null), URL 형식 불일치·`altText` 300자 초과, 두 용도 사이 중복 또는 다른 DROP이 사용 중인 `imageId` (이미지 오류의 `field`는 `images[i]` 또는 `detailImages[i]`로 시작)
 
 ### 2.5 DROP 공개
 
