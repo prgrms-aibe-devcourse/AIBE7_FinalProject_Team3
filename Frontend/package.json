@@ -11,11 +11,14 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "api:generate": "openapi-typescript openapi/openapi.json -o src/api/schema.ts && prettier --write src/api/schema.ts",
     "e2e": "playwright test --grep-invert @visual",
     "e2e:docker": "docker run --rm --ipc=host -v \"$PWD\":/work -v /work/node_modules -w /work mcr.microsoft.com/playwright:v1.63.0-noble sh -c 'npm ci && npx playwright test \"$@\"' sh",
     "prepare": "cd .. && husky Frontend/.husky"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.104.1",
+    "axios": "^1.20.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.0.0"
@@ -33,6 +36,7 @@
     "globals": "^17.12.0",
     "husky": "^9.1.7",
     "lint-staged": "^17.6.0",
+    "openapi-typescript": "^7.13.0",
     "prettier": "^3.9.8",
     "typescript": "^5.9.0",
     "typescript-eslint": "^8.70.0",
