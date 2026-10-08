@@ -481,6 +481,27 @@ class DropRepositoryTest {
         assertThat(claimed).containsExactlyInAnyOrder(first, second);
     }
 
+    @Test
+    @DisplayName("이미 선점된 DROP이 batchSize를 채워도 아직 선점되지 않은 DROP을 집는다")
+    /*
+     * LIMIT이 ON CONFLICT보다 먼저 적용되므로, 후보를 거르지 않으면 batchSize만큼의 기선점 DROP이
+     * 매 주기 앞자리를 차지해 그 뒤 DROP은 영영 선점되지 않는다. 배치 반복도 0건을 받고 멈춘다(GR-69).
+     */
+    void claimNoticeBatchSkipsAlreadyClaimedDrops() {
+        // given: 먼저 선점된 DROP 2건과, 그보다 늦게 시작하는 아직 선점되지 않은 DROP 1건
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        insertDropStartingInMinutes(1);
+        insertDropStartingInMinutes(2);
+        dropRepository.claimNoticeBatch(PRESALE, now, now.plusMinutes(10), 2);
+        Long notClaimed = insertDropStartingInMinutes(3);
+
+        // when: 앞의 2건이 batchSize를 채우는 크기로 다시 실행한다
+        List<Long> claimed = dropRepository.claimNoticeBatch(PRESALE, now, now.plusMinutes(10), 2);
+
+        // then: 기선점 DROP은 후보에서 빠지고 남은 DROP이 집힌다
+        assertThat(claimed).containsExactly(notClaimed);
+    }
+
     private int noticeCount(Long dropId) {
         return jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM drop_notifications WHERE drop_id = ? AND type = ?",

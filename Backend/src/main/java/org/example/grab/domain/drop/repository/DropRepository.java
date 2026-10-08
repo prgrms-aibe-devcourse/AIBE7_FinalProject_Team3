@@ -163,14 +163,23 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
      * 이미 기록을 커밋했는지는 조회 스냅샷 시점에 따라 놓칠 수 있다. 유니크 제약만이 유일한 보증이다.
      * 선점과 ID 확보가 한 문장이라 결과를 받는 쿼리로 선언한다(@Modifying은 결과를 돌려주지 못한다).
      * 이미 판매가 시작된 DROP(sale_starts_at <= now)은 제외한다. 그 구간은 판매 시작 알림이 담당한다.
+     *
+     * 이미 기록이 있는 DROP은 NOT EXISTS로 후보에서 먼저 뺀다. LIMIT이 ON CONFLICT보다 먼저 적용되므로,
+     * 거르지 않으면 batchSize만큼의 기선점 DROP이 매 주기 앞자리를 차지해 그 뒤 DROP은 영영 선점되지 않고
+     * 배치 반복(DropTransitionService.drain)도 0건을 받아 멈춘다. uq_drop_notifications를 그대로 탄다.
+     * NOT EXISTS는 조회 스냅샷 기준이라 동시 실행을 막지 못하므로, 중복 방지는 ON CONFLICT가 계속 맡는다.
      */
     @Query(value = """
             INSERT INTO drop_notifications (drop_id, type, sent_at)
-            SELECT id, :type, :now FROM drops
-            WHERE status = 'WISH'
-              AND sale_starts_at > :now
-              AND sale_starts_at <= :noticeUntil
-            ORDER BY sale_starts_at, id
+            SELECT d.id, :type, :now FROM drops d
+            WHERE d.status = 'WISH'
+              AND d.sale_starts_at > :now
+              AND d.sale_starts_at <= :noticeUntil
+              AND NOT EXISTS (
+                  SELECT 1 FROM drop_notifications n
+                  WHERE n.drop_id = d.id AND n.type = :type
+              )
+            ORDER BY d.sale_starts_at, d.id
             LIMIT :batchSize
             ON CONFLICT (drop_id, type) DO NOTHING
             RETURNING drop_id
