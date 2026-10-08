@@ -1,0 +1,1318 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "OpenAPI definition",
+    "version": "v0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Generated server url"
+    }
+  ],
+  "paths": {
+    "/api/v1/uploads/images/presigned-url": {
+      "post": {
+        "tags": ["image-upload-url-controller"],
+        "operationId": "issuePresignedUrl",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImageUploadUrlRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseImageUploadUrlResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/seller/drops": {
+      "get": {
+        "tags": ["seller-drop-controller"],
+        "operationId": "listDrops",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["DRAFT", "WISH", "GRAB", "ENDED", "CANCELED"]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseSellerDropListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["seller-drop-controller"],
+        "operationId": "createDraft",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DropDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDropDraftResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/seller/drops/{dropId}/publish": {
+      "post": {
+        "tags": ["seller-drop-controller"],
+        "operationId": "publish",
+        "parameters": [
+          {
+            "name": "dropId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDropPublishResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/seller/drops/{dropId}/cancel": {
+      "post": {
+        "tags": ["seller-drop-controller"],
+        "operationId": "cancel",
+        "parameters": [
+          {
+            "name": "dropId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DropCancelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDropCancelResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/seller/drops/{dropId}": {
+      "get": {
+        "tags": ["seller-drop-controller"],
+        "operationId": "findDrop",
+        "parameters": [
+          {
+            "name": "dropId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSellerDropDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": ["seller-drop-controller"],
+        "operationId": "updateDraft",
+        "parameters": [
+          {
+            "name": "dropId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DropDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDropDraftResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/seller/drops/{dropId}/wish-count": {
+      "get": {
+        "tags": ["seller-drop-controller"],
+        "operationId": "findWishCount",
+        "parameters": [
+          {
+            "name": "dropId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSellerDropWishCountResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/seller/drops/{dropId}/stocks": {
+      "get": {
+        "tags": ["seller-drop-controller"],
+        "operationId": "findStocks",
+        "parameters": [
+          {
+            "name": "dropId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSellerDropStockResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/drops": {
+      "get": {
+        "tags": ["drop-controller"],
+        "operationId": "listDrops_1",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["DRAFT", "WISH", "GRAB", "ENDED", "CANCELED"]
+            }
+          },
+          {
+            "name": "categoryId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "soldOut",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponsePublicDropListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/drops/{dropId}": {
+      "get": {
+        "tags": ["drop-controller"],
+        "operationId": "getDrop",
+        "parameters": [
+          {
+            "name": "dropId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePublicDropDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/drops/{dropId}/stocks": {
+      "get": {
+        "tags": ["drop-controller"],
+        "operationId": "getStocks",
+        "parameters": [
+          {
+            "name": "dropId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePublicDropStockResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ImageUploadUrlRequest": {
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 0
+          },
+          "contentType": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fileSize": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "required": ["contentType", "fileName", "fileSize"]
+      },
+      "ApiResponseImageUploadUrlResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ImageUploadUrlResponse"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ImageUploadUrlResponse": {
+        "type": "object",
+        "properties": {
+          "imageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "uploadUrl": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DropDraftRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 0
+          },
+          "description": {
+            "type": "string"
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DropImageRequest"
+            },
+            "maxItems": 10,
+            "minItems": 0
+          },
+          "categoryId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "saleStartsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "saleEndsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "shipping": {
+            "$ref": "#/components/schemas/ShippingRequest"
+          },
+          "optionGroups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OptionGroupRequest"
+            }
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OptionRequest"
+            }
+          }
+        }
+      },
+      "DropImageRequest": {
+        "type": "object",
+        "properties": {
+          "imageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "imageUrl": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0
+          }
+        },
+        "required": ["imageId", "imageUrl"]
+      },
+      "OptionGroupRequest": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 0
+          },
+          "sortOrder": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OptionValueRequest"
+            }
+          }
+        },
+        "required": ["key", "name"]
+      },
+      "OptionRequest": {
+        "type": "object",
+        "properties": {
+          "selections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SelectionRequest"
+            }
+          },
+          "unitPrice": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "totalQuantity": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "required": ["totalQuantity", "unitPrice"]
+      },
+      "OptionValueRequest": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 0
+          },
+          "sortOrder": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "required": ["key", "value"]
+      },
+      "SelectionRequest": {
+        "type": "object",
+        "properties": {
+          "groupKey": {
+            "type": "string",
+            "minLength": 1
+          },
+          "valueKey": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["groupKey", "valueKey"]
+      },
+      "ShippingRequest": {
+        "type": "object",
+        "properties": {
+          "shippingFee": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "shippingNotice": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponseDropDraftResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DropDraftResponse"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "DropDraftResponse": {
+        "type": "object",
+        "properties": {
+          "dropId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["DRAFT", "WISH", "GRAB", "ENDED", "CANCELED"]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseDropPublishResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DropPublishResponse"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "DropPublishResponse": {
+        "type": "object",
+        "properties": {
+          "dropId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["DRAFT", "WISH", "GRAB", "ENDED", "CANCELED"]
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DropCancelRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0
+          }
+        },
+        "required": ["reason"]
+      },
+      "ApiResponseDropCancelResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DropCancelResponse"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "DropCancelResponse": {
+        "type": "object",
+        "properties": {
+          "dropId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["DRAFT", "WISH", "GRAB", "ENDED", "CANCELED"]
+          },
+          "canceledAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponsePageResponseSellerDropListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PageResponseSellerDropListResponse"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "PageResponseSellerDropListResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SellerDropListResponse"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hasNext": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SellerDropListResponse": {
+        "type": "object",
+        "properties": {
+          "dropId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "thumbnailUrl": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["DRAFT", "WISH", "GRAB", "ENDED", "CANCELED"]
+          },
+          "minPrice": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseSellerDropDetailResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SellerDropDetailResponse"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "DropOptionGroupResponse": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Value"
+            }
+          }
+        }
+      },
+      "DropOptionSelectionResponse": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "valueId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "DropShippingResponse": {
+        "type": "object",
+        "properties": {
+          "shippingFee": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "shippingNotice": {
+            "type": "string"
+          }
+        }
+      },
+      "Image": {
+        "type": "object",
+        "properties": {
+          "imageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "imageUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "Option": {
+        "type": "object",
+        "properties": {
+          "optionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "selections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DropOptionSelectionResponse"
+            }
+          },
+          "unitPrice": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalQuantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reservedQuantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "soldQuantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "SellerDropDetailResponse": {
+        "type": "object",
+        "properties": {
+          "dropId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Image"
+            }
+          },
+          "minPrice": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "categoryId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["DRAFT", "WISH", "GRAB", "ENDED", "CANCELED"]
+          },
+          "saleStartsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "saleEndsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "shipping": {
+            "$ref": "#/components/schemas/DropShippingResponse"
+          },
+          "optionGroups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DropOptionGroupResponse"
+            }
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Option"
+            }
+          }
+        }
+      },
+      "Value": {
+        "type": "object",
+        "properties": {
+          "valueId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "value": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ApiResponseSellerDropWishCountResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SellerDropWishCountResponse"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "SellerDropWishCountResponse": {
+        "type": "object",
+        "properties": {
+          "dropId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "activeWishCount": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ApiResponseSellerDropStockResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SellerDropStockResponse"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "SellerDropStockResponse": {
+        "type": "object",
+        "properties": {
+          "dropId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Option"
+            }
+          }
+        }
+      },
+      "ApiResponsePageResponsePublicDropListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PageResponsePublicDropListResponse"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "DropCategoryResponse": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "PageResponsePublicDropListResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicDropListResponse"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hasNext": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PublicDropListResponse": {
+        "type": "object",
+        "properties": {
+          "dropId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "thumbnailUrl": {
+            "type": "string"
+          },
+          "minPrice": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "category": {
+            "$ref": "#/components/schemas/DropCategoryResponse"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["DRAFT", "WISH", "GRAB", "ENDED", "CANCELED"]
+          },
+          "soldOut": {
+            "type": "boolean"
+          },
+          "wishCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "saleStartsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "saleEndsAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Actions": {
+        "type": "object",
+        "properties": {
+          "wishable": {
+            "type": "boolean"
+          },
+          "wishCancelable": {
+            "type": "boolean"
+          },
+          "orderable": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponsePublicDropDetailResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PublicDropDetailResponse"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "PublicDropDetailResponse": {
+        "type": "object",
+        "properties": {
+          "dropId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "imageUrls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "minPrice": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "category": {
+            "$ref": "#/components/schemas/DropCategoryResponse"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["DRAFT", "WISH", "GRAB", "ENDED", "CANCELED"]
+          },
+          "soldOut": {
+            "type": "boolean"
+          },
+          "wishCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "wishNotice": {
+            "type": "string"
+          },
+          "saleStartsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "saleEndsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "shipping": {
+            "$ref": "#/components/schemas/DropShippingResponse"
+          },
+          "optionGroups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DropOptionGroupResponse"
+            }
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Option"
+            }
+          },
+          "actions": {
+            "$ref": "#/components/schemas/Actions"
+          },
+          "serverTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponsePublicDropStockResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PublicDropStockResponse"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "PublicDropStockResponse": {
+        "type": "object",
+        "properties": {
+          "dropId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Option"
+            }
+          },
+          "serverTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    }
+  }
+}

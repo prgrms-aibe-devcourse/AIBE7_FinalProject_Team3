@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { paths } from './schema'
+import type { paths } from './schema/category'
 
 type CategoryResponse =
   paths['/api/v1/categories']['get']['responses'][200]['content']['*/*']

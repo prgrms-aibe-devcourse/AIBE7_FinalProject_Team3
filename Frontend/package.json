@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "api:generate": "openapi-typescript openapi/openapi.json -o src/api/schema.ts && prettier --write src/api/schema.ts",
+    "api:snapshot": "node scripts/update-openapi.mjs && prettier --write openapi/*.json",
+    "api:generate": "openapi-typescript && prettier --write src/api/schema/*.ts",
     "e2e": "playwright test --grep-invert @visual",
     "e2e:docker": "docker run --rm --ipc=host -v \"$PWD\":/work -v /work/node_modules -w /work mcr.microsoft.com/playwright:v1.63.0-noble sh -c 'npm ci && npx playwright test \"$@\"' sh",
     "prepare": "cd .. && husky Frontend/.husky"
