@@ -208,6 +208,25 @@ class  UserRepositoryTest {
                 .hasMessageContaining("uq_users_nickname_lower");
     }
 
+    // 가입 서비스의 닉네임 사전 검사(GR-29 M02-02)
+    @Test
+    @DisplayName("닉네임 존재 여부는 대소문자를 무시하고 판단하며, 다른 닉네임은 찾지 않는다")
+    void checksNicknameIgnoringCase() {
+        // given
+        userRepository.save(User.createLocal("first@example.com", PASSWORD_HASH, "Grab_01"));
+        userRepository.save(User.createLocal("second@example.com", PASSWORD_HASH, "드롭헌터"));
+        entityManager.flush();
+        entityManager.clear();
+
+        // when & then
+        assertThat(userRepository.existsByNicknameIgnoreCase("Grab_01")).isTrue();
+        assertThat(userRepository.existsByNicknameIgnoreCase("grab_01")).isTrue();
+        assertThat(userRepository.existsByNicknameIgnoreCase("GRAB_01")).isTrue();
+        assertThat(userRepository.existsByNicknameIgnoreCase("드롭헌터")).isTrue();
+        assertThat(userRepository.existsByNicknameIgnoreCase("Grab_02")).isFalse();
+        assertThat(userRepository.existsByNicknameIgnoreCase("Grab")).isFalse();
+    }
+
     // createLocal은 null 해시를 먼저 거부하고 소셜 팩토리는 GR-46 범위라, DB 제약은 SQL로 직접 검증한다.
     @Test
     @DisplayName("LOCAL 회원은 비밀번호 해시 없이 DB에 저장할 수 없다")

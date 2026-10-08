@@ -12,6 +12,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -67,5 +69,16 @@ public class SecurityConfig {
                 .addFilterBefore(new JwtAuthenticationFilter(jwtProvider, authenticationEntryPoint),
                         UsernamePasswordAuthenticationFilter.class)
                 .build();
+    }
+
+    /*
+        비밀번호는 Argon2id로 해시한다(NFR-001). 회원가입(GR-29)과 로그인(GR-34)이 함께 쓴다.
+        값은 OWASP Password Storage Cheat Sheet의 최소 권장값(메모리 19 MiB, 반복 2, 병렬도 1)이다.
+        Spring 기본값(defaultsForSpringSecurity_v5_8)은 메모리가 16 MiB라 쓰지 않는다.
+        검증은 저장된 해시에 적힌 파라미터로 하므로, 값을 올려도 기존 해시는 그대로 검증된다.
+     */
+    @Bean
+    PasswordEncoder passwordEncoder() {
+        return new Argon2PasswordEncoder(16, 32, 1, 19 * 1024, 2);
     }
 }
