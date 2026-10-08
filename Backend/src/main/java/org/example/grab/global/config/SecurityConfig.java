@@ -52,6 +52,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/categories", "/api/v1/drops", "/api/v1/drops/*",
                                 "/api/v1/drops/*/stocks")
                         .permitAll()
+                        // CSRF 토큰 발급은 로그인 전에도 필요하다(MEMBER_AUTH 1.1)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/auth/csrf")
+                        .permitAll()
                         // 이메일 인증 코드 요청·확인은 가입 전 단계라 로그인 없이 호출한다(MEMBER_AUTH 1.2.1, 1.2.2)
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/email-verification",
                                 "/api/v1/auth/email-verification/confirm")
