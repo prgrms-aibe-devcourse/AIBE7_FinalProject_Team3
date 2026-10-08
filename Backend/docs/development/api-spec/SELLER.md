@@ -164,6 +164,8 @@ GET /api/v1/seller/dashboard/summary
 `dropCounts`, `stockSummary`, `reconciliationRequired`는 현재 시점의 값이므로 기간의 영향을 받지 않습니다.
 `from`이 `to`보다 뒤면 400을 반환합니다.
 
+판매자 종합(`/seller`)은 기간 파라미터를 생략한 현재 요약을 기본으로 사용합니다. 기간을 지정하더라도 재고·DROP 상태·보정 건수에는 적용하지 않으며, 기간별 매출이나 추이 그래프를 이 응답에서 계산하지 않습니다.
+
 **응답:**
 
 ```json
@@ -209,6 +211,7 @@ GET /api/v1/seller/dashboard/summary
 - `stockSummary`는 `CANCELED`를 제외한 본인 DROP 전체의 옵션 수량 합계이며, 신규 주문을 받지 않는 옵션(`is_active = false`)도 포함합니다.
   `available`은 `total - reserved - sold - withheld`로 계산한 미할당 수량이며, 종료된 DROP의 잔여 수량이 포함되므로 즉시 구매 가능한 수량과는 다릅니다.
 - `reconciliationRequired`는 기간과 무관하게 현재 보정이 끝나지 않은 결제 건수입니다. 0이 아니면 승인은 됐으나 주문이 확정되지 않은 결제가 있다는 뜻입니다.
+- `reconciliationRequired`는 일반 `paymentStatus` 주문 필터와 대상이 다릅니다. 전용 목록 조회 계약이 생기기 전까지 건수에서 주문 목록으로 연결하지 않습니다.
 
 ### 2.2 DROP별 통계
 
@@ -242,6 +245,7 @@ GET /api/v1/seller/dashboard/drops?status=ENDED&page=0&size=20
         "reservedStock": 2,
         "soldStock": 14,
         "orderCount": 10,
+        "soldQuantity": 14,
         "salesAmount": 1806000
       }
     ],
@@ -260,7 +264,8 @@ GET /api/v1/seller/dashboard/drops?status=ENDED&page=0&size=20
 
 - `saleEndsAt`은 아직 공개하지 않은 `DRAFT`에서는 `null`일 수 있습니다.
 - `orderCount`·`salesAmount`는 결제가 확정되고(`paid_at`) 취소되지 않은(`canceled_at`이 없는) 주문만 집계합니다.
-  `salesAmount`는 배송비를 포함한 `total_amount`의 합계입니다.
+- `soldQuantity`는 같은 주문들의 `order_items.quantity` 합계입니다. 재고의 `soldStock`과는 다른 실적 지표이며 주문 건수와도 구분합니다.
+- `salesAmount`는 배송비를 포함한 `total_amount`의 누적 합계입니다. 기간 필터와 전체 합계 필드는 제공하지 않으므로 현재 페이지의 합계를 전체 매출로 표시하지 않습니다.
 - 미결제·만료·취소 주문을 제외하고 기간 필터도 없으므로, `orderCount`의 합계는 2.1 `orderCounts`의 합계보다 작습니다.
 
 ### 2.3 임박 DROP 조회
@@ -297,4 +302,3 @@ GET /api/v1/seller/dashboard/upcoming-drops?eventType=START&withinMinutes=60
 `dropId`로 기존 판매자 DROP 상세 조회 API를 호출할 수 있습니다.
 
 ---
-
