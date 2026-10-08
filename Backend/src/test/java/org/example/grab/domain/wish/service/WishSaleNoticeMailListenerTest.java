@@ -15,6 +15,7 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.dao.QueryTimeoutException;
 
 import java.util.List;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -51,7 +52,7 @@ class WishSaleNoticeMailListenerTest {
         ArgumentCaptor<List<EmailMessage>> captor = ArgumentCaptor.captor();
         verify(emailDispatcher).dispatchAll(captor.capture());
         EmailMessage message = captor.getValue().get(0);
-        assertThat(message.to()).isEqualTo(RECIPIENT);
+        assertThat(message.bcc()).containsExactly(RECIPIENT);
         assertThat(message.htmlBody()).contains("&lt;b&gt;한정판&lt;/b&gt; &amp; 스니커즈");
         assertThat(message.htmlBody()).doesNotContain("<b>한정판</b>");
         // 텍스트 본문은 마크업으로 해석되지 않으므로 원문을 그대로 쓴다
@@ -140,6 +141,51 @@ class WishSaleNoticeMailListenerTest {
         // then
         assertThat(output).contains("판매 시작 메일 발송 요청", "수신자 1명");
         assertThat(output).doesNotContain(RECIPIENT);
+    }
+
+    @Test
+    @DisplayName("같은 DROP의 수신자는 한 통에 BCC로 묶고 DROP이 다르면 나눈다")
+    // 본문이 같은 수신자를 묶어야 SMTP 트랜잭션이 수신자 수만큼 반복되지 않는다(GR-69)
+    void groupsRecipientsOfSameDropIntoOneMail() {
+        // given: DROP 1에 2명, DROP 2에 1명
+        when(wishRepository.findSaleStartMailRecipients(List.of(1L, 2L))).thenReturn(List.of(
+                recipient(1L, "스니커즈", "a@example.com"),
+                recipient(1L, "스니커즈", "b@example.com"),
+                recipient(2L, "후디", "c@example.com")));
+
+        // when
+        listener.onDropGrabStarted(new DropGrabStartedEvent(List.of(1L, 2L)));
+
+        // then: DROP별로 한 통씩, 제목은 각 DROP 이름을 쓴다
+        ArgumentCaptor<List<EmailMessage>> captor = ArgumentCaptor.captor();
+        verify(emailDispatcher).dispatchAll(captor.capture());
+        assertThat(captor.getValue()).hasSize(2);
+        assertThat(captor.getValue().get(0).bcc()).containsExactly("a@example.com", "b@example.com");
+        assertThat(captor.getValue().get(0).subject()).contains("스니커즈");
+        assertThat(captor.getValue().get(1).bcc()).containsExactly("c@example.com");
+        assertThat(captor.getValue().get(1).subject()).contains("후디");
+    }
+
+    @Test
+    @DisplayName("한 DROP의 수신자가 많으면 메일당 상한만큼 나누고 한 명도 빠뜨리지 않는다")
+    // 메시지당 BCC 수신자 상한(Gmail 기준 100명)을 넘기면 서버가 거부하므로 확인하는 테스트
+    void splitsRecipientsBeyondBccLimit() {
+        // given: 한 DROP에 250명
+        List<WishMailRecipientProjection> recipients = IntStream.range(0, 250)
+                .mapToObj(index -> recipient(1L, "스니커즈", "buyer" + index + "@example.com"))
+                .toList();
+        when(wishRepository.findSaleStartMailRecipients(List.of(1L))).thenReturn(recipients);
+
+        // when
+        listener.onDropGrabStarted(new DropGrabStartedEvent(List.of(1L)));
+
+        // then: 100 + 100 + 50으로 나뉘고 전원이 정확히 한 번씩 들어간다
+        ArgumentCaptor<List<EmailMessage>> captor = ArgumentCaptor.captor();
+        verify(emailDispatcher).dispatchAll(captor.capture());
+        assertThat(captor.getValue()).extracting(message -> message.bcc().size())
+                .containsExactly(100, 100, 50);
+        assertThat(captor.getValue()).flatExtracting(EmailMessage::bcc)
+                .containsExactlyElementsOf(recipients.stream().map(WishMailRecipientProjection::getEmail).toList());
     }
 
     private static WishMailRecipientProjection recipient(Long dropId, String dropName, String email) {

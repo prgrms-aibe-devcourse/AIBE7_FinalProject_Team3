@@ -74,6 +74,8 @@ public class NoticeMailConfig {
         mailProperties.put("mail.smtp.connectiontimeout", TIMEOUT_MILLIS);
         mailProperties.put("mail.smtp.timeout", TIMEOUT_MILLIS);
         mailProperties.put("mail.smtp.writetimeout", TIMEOUT_MILLIS);
+        // 알림은 수신자를 BCC로 묶어 보낸다. 기본값(false)이면 주소 하나가 거부될 때 그 묶음 전원에게 발송되지 않는다
+        mailProperties.put("mail.smtp.sendpartial", "true");
         return sender;
     }
 }

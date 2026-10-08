@@ -15,6 +15,9 @@ spring:
           connectiontimeout: 5000
           timeout: 5000
           writetimeout: 5000
+          # 수신자 여럿(BCC)인 메일에서 일부 주소가 거부돼도 나머지에게는 보낸다.
+          # 기본값(false)이면 주소 하나가 거부될 때 그 메일의 수신자 전원에게 발송되지 않는다
+          sendpartial: true
           # required를 함께 켜야 서버가 STARTTLS를 제공하지 않을 때 평문으로 내려가 계정 정보를 보내지 않는다
           # 운영 단계에서 true로 전환, STARTTLS -> 평문으로 시작한 연결을 암호화 연결로 바꾸는 방식
           starttls:

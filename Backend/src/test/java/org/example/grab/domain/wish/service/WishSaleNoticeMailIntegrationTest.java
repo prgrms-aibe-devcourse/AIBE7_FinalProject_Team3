@@ -150,7 +150,7 @@ class WishSaleNoticeMailIntegrationTest {
         ArgumentCaptor<List<EmailMessage>> captor = ArgumentCaptor.captor();
         verify(emailDispatcher).dispatchAll(captor.capture());
         assertThat(captor.getValue()).singleElement().satisfies(message -> {
-            assertThat(message.to()).isEqualTo(emailOf(userId));
+            assertThat(message.bcc()).containsExactly(emailOf(userId));
             assertThat(message.subject()).contains("한정판 스니커즈");
             assertThat(message.htmlBody()).contains("한정판 스니커즈", "/drops/" + dropId);
             assertThat(message.textBody()).contains("한정판 스니커즈", "/drops/" + dropId);
@@ -205,7 +205,7 @@ class WishSaleNoticeMailIntegrationTest {
         ArgumentCaptor<List<EmailMessage>> captor = ArgumentCaptor.captor();
         verify(emailDispatcher).dispatchAll(captor.capture());
         assertThat(captor.getValue()).singleElement().satisfies(message -> {
-            assertThat(message.to()).isEqualTo(emailOf(userId));
+            assertThat(message.bcc()).containsExactly(emailOf(userId));
             assertThat(message.subject()).isEqualTo("[GRAB] 한정판 스니커즈 판매가 곧 시작됩니다");
         });
     }

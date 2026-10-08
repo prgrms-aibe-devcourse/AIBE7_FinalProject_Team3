@@ -14,6 +14,7 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.web.util.HtmlUtils;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -27,6 +28,9 @@ import java.util.List;
 public class WishSaleNoticeMailListener {
 
     private static final String DETAIL_PATH_FORMAT = "/drops/%d";
+
+    // 메시지당 BCC 수신자 상한. Gmail SMTP 기준 100명이고 Brevo 상한은 공개되지 않아 보수적으로 맞춘다
+    private static final int MAX_BCC_PER_MAIL = 100;
 
     private static final String FOOTER = "이 메일은 WISH한 DROP의 판매 소식을 알리기 위해 발송됐습니다.";
 
@@ -128,23 +132,49 @@ public class WishSaleNoticeMailListener {
      */
     private void dispatch(List<Long> dropIds, Notice notice) {
         try {
-            List<EmailMessage> messages = wishRepository.findSaleStartMailRecipients(dropIds).stream()
-                    .map(recipient -> toMessage(recipient, notice))
-                    .toList();
-            if (messages.isEmpty()) {
+            List<WishMailRecipientProjection> recipients = wishRepository.findSaleStartMailRecipients(dropIds);
+            if (recipients.isEmpty()) {
                 return;
             }
+            List<EmailMessage> messages = toBccMessages(recipients, notice);
             // 받는 주소·본문은 남기지 않고 건수만 남긴다(NFR-011과 같은 방침)
-            log.info("{} 메일 발송 요청: DROP {}건, 수신자 {}명", notice.badge, dropIds.size(), messages.size());
+            log.info("{} 메일 발송 요청: DROP {}건, 수신자 {}명, 메일 {}통",
+                    notice.badge, dropIds.size(), recipients.size(), messages.size());
             emailDispatcher.dispatchAll(messages);
         } catch (RuntimeException e) {
             log.warn("{} 메일 준비 실패: DROP {}건", notice.badge, dropIds.size(), e);
         }
     }
 
-    private EmailMessage toMessage(WishMailRecipientProjection recipient, Notice notice) {
-        String dropName = recipient.getDropName();
-        String link = webBaseUrl + DETAIL_PATH_FORMAT.formatted(recipient.getDropId());
+    /*
+     * 같은 DROP의 수신자는 제목·본문이 완전히 같으므로 한 통에 BCC로 묶는다(GR-69).
+     * 통마다 메일을 만들면 수신자당 MAIL FROM·RCPT·DATA·본문을 모두 반복하지만, 묶으면 수신자당 RCPT 한 번으로 끝난다.
+     * Brevo 실측으로 통당 0.643초가 수신자당 0.134초가 됐다. 판매 시작 알림은 전원 도착까지의 시간이 요구사항이다.
+     * 조회가 ORDER BY drop_id, id로 정렬돼 오므로 앞에서부터 끊어 담으면 DROP 경계가 자연히 맞는다.
+     */
+    private List<EmailMessage> toBccMessages(List<WishMailRecipientProjection> recipients, Notice notice) {
+        List<EmailMessage> messages = new ArrayList<>();
+        int start = 0;
+        while (start < recipients.size()) {
+            WishMailRecipientProjection head = recipients.get(start);
+            int end = start + 1;
+            while (end < recipients.size()
+                    && end - start < MAX_BCC_PER_MAIL
+                    && head.getDropId().equals(recipients.get(end).getDropId())) {
+                end++;
+            }
+            List<String> bcc = recipients.subList(start, end).stream()
+                    .map(WishMailRecipientProjection::getEmail)
+                    .toList();
+            messages.add(toMessage(head, bcc, notice));
+            start = end;
+        }
+        return messages;
+    }
+
+    private EmailMessage toMessage(WishMailRecipientProjection drop, List<String> bcc, Notice notice) {
+        String dropName = drop.getDropName();
+        String link = webBaseUrl + DETAIL_PATH_FORMAT.formatted(drop.getDropId());
         // DROP 이름은 판매자가 입력한 값이라 HTML 본문에 넣기 전에 이스케이프한다
         String htmlBody = HTML_TEMPLATE.formatted(
                 notice.badge, HtmlUtils.htmlEscape(dropName), notice.lead, link, notice.cta,
@@ -152,7 +182,6 @@ public class WishSaleNoticeMailListener {
         // 텍스트 본문은 마크업으로 해석되지 않으므로 이름을 그대로 쓴다
         String textBody = TEXT_TEMPLATE.formatted(
                 notice.subjectFormat.formatted(dropName), notice.lead, notice.cta, link, WishNotice.MESSAGE);
-        return new EmailMessage(
-                recipient.getEmail(), notice.subjectFormat.formatted(dropName), htmlBody, textBody);
+        return EmailMessage.toBcc(bcc, notice.subjectFormat.formatted(dropName), htmlBody, textBody);
     }
 }
