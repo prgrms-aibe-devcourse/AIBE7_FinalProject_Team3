@@ -1,11 +1,15 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import logo from '../../assets/images/grab-symbol.png'
 import heroImage from '../../assets/images/hero-background.png'
 import EmptyState from '../../components/EmptyState/EmptyState'
 import DropCard from '../../features/drop/DropCard'
-import { categories, drops } from '../../features/drop/mock/mockDrops'
-import type { DropStatus } from '../../types/drop'
+import { queryCatalog } from '../../features/drop/catalog'
+import {
+  changeCatalogParams,
+  readCatalogQuery,
+} from '../../features/drop/catalogSearchParams'
+import { catalogDrops } from '../../features/drop/mock/mockCatalog'
+import { categories } from '../../features/drop/mock/mockDrops'
 import type { SharedProps } from '../../types/store'
 
 export default function DropListPage({
@@ -13,17 +17,16 @@ export default function DropListPage({
   wishes,
   toggleWish,
   notify,
-}: SharedProps & { status: DropStatus }) {
-  const [category, setCategory] = useState('전체')
-  const [query, setQuery] = useState('')
-  const items = drops.filter(
-    (drop) =>
-      drop.status === status &&
-      (category === '전체' || drop.category === category) &&
-      `${drop.name} ${drop.brand}`
-        .toLowerCase()
-        .includes(query.trim().toLowerCase()),
-  )
+}: SharedProps & { status: 'WISH' | 'GRAB' }) {
+  const [params, setParams] = useSearchParams()
+  const category = params.get('category') || '전체'
+  const keyword = params.get('keyword') ?? ''
+  let result
+  try {
+    result = queryCatalog(catalogDrops, readCatalogQuery(params, status))
+  } catch (error) {
+    if (!(error instanceof RangeError)) throw error
+  }
 
   const onWish = (id: number) => {
     const selected = wishes.has(id)
@@ -70,7 +73,15 @@ export default function DropListPage({
               key={item}
               type="button"
               className={category === item ? 'active' : ''}
-              onClick={() => setCategory(item)}
+              onClick={() =>
+                setParams(
+                  changeCatalogParams(
+                    params,
+                    'category',
+                    item === '전체' ? '' : item,
+                  ),
+                )
+              }
             >
               {item}
             </button>
@@ -79,17 +90,31 @@ export default function DropListPage({
         <label className="search-box">
           <span className="sr-only">상품 검색</span>
           <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="상품 또는 브랜드 검색"
+            value={keyword}
+            onChange={(event) =>
+              setParams(
+                changeCatalogParams(params, 'keyword', event.target.value),
+                { replace: true },
+              )
+            }
+            maxLength={100}
+            placeholder="상품명 검색"
           />
           <span aria-hidden="true">⌕</span>
         </label>
       </section>
 
-      {items.length ? (
+      {!result ? (
+        <EmptyState
+          title="조회 조건이 올바르지 않아요."
+          description="검색어·정렬·품절·페이지 조건을 확인해주세요."
+          link={status === 'WISH' ? '/wish' : '/grab'}
+          label="조회 조건 초기화"
+          variant="block"
+        />
+      ) : result.content.length ? (
         <section className="product-grid" aria-label={`${status} 상품 목록`}>
-          {items.map((drop) => (
+          {result.content.map((drop) => (
             <DropCard
               key={drop.id}
               drop={drop}

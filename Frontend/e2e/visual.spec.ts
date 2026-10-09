@@ -25,9 +25,7 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
 
   test('wish-list-empty', async ({ page }) => {
     await page.goto('/#/wish')
-    await page
-      .getByPlaceholder('상품 또는 브랜드 검색')
-      .fill('존재하지 않는 상품')
+    await page.getByPlaceholder('상품명 검색').fill('존재하지 않는 상품')
     await expect(page.getByText('조건에 맞는 상품이 없어요.')).toBeVisible()
     await shot(page, 'wish-list-empty')
   })
