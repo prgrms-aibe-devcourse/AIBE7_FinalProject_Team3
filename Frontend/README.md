@@ -95,7 +95,9 @@ npx playwright show-trace test-results/<테스트>/trace.zip
 
 ## API 계약 및 로컬 확인
 
-백엔드를 먼저 실행한 뒤 `npm run dev`로 프론트엔드를 띄웁니다. 프론트엔드는 `/api/v1` 상대 경로로 요청하고 Vite가 로컬 백엔드 `http://localhost:8080`에 프록시합니다. 공개 카테고리 조회(`GET /api/v1/categories`)는 `src/api/category/categories.ts`에서 생성 타입을 사용합니다. 화면에 남은 Mock 상품 데이터의 실제 API 전환은 화면 작업과 분리한 후속 이슈에서 진행합니다.
+백엔드를 먼저 실행한 뒤 `npm run dev`로 프론트엔드를 띄웁니다. 프론트엔드는 `/api/v1` 상대 경로로 요청하고 Vite가 백엔드에 프록시합니다. 기본 주소는 `http://localhost:8080`입니다. 다른 백엔드를 사용하려면 `.env.example`을 `.env.local`로 복사하고 `VITE_API_PROXY_TARGET`에 백엔드 원점 주소(예: `https://api.example.com`, `/api/v1` 제외)를 설정합니다. 값이 없거나 공백이면 기본 주소를 사용합니다. `.env`·`.env.local`·`.env.[mode]` 설정은 [Vite의 `loadEnv`](https://vite.dev/config/#using-environment-variables-in-config)로 읽으며 변경 후 개발 서버를 재시작해야 합니다. 실제 환경 파일은 git에서 제외하고 `.env.example`만 공유합니다. 이 설정은 개발 서버 프록시용이며, 배포 서버에서는 `/api`를 백엔드로 전달하도록 별도로 설정합니다.
+
+공개 카테고리 조회(`GET /api/v1/categories`)는 `src/api/category/categories.ts`에서 생성 타입을 사용합니다. 화면에 남은 Mock 상품 데이터의 실제 API 전환은 화면 작업과 분리한 후속 이슈에서 진행합니다.
 
 ```bash
 npm run api:snapshot
