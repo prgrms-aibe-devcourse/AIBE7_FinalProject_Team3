@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
-import DropCard from '../../features/drop/DropCard'
+import EmptyState from '../../components/EmptyState/EmptyState'
+import PopularRail from '../../features/drop/PopularRail'
 import { catalogDrops } from '../../features/drop/mock/mockCatalog'
 import type { SharedProps } from '../../types/store'
 
@@ -58,20 +59,22 @@ export default function HomePage({ wishes, toggleWish, notify }: SharedProps) {
               </Link>
             </div>
           </div>
-          <section
-            className="product-grid catalog-grid"
-            aria-label={section.title}
-          >
-            {section.drops.map((drop) => (
-              <DropCard
-                key={drop.id}
-                drop={drop}
-                mode={section.status}
-                wished={wishes.has(drop.id)}
-                onWish={onWish}
-              />
-            ))}
-          </section>
+          {section.drops.length === 0 ? (
+            <EmptyState
+              title="아직 준비된 상품이 없어요."
+              link={section.to}
+              label="전체 보기"
+              variant="block"
+            />
+          ) : (
+            <PopularRail
+              drops={section.drops}
+              mode={section.status}
+              wishes={wishes}
+              onWish={onWish}
+              label={section.title}
+            />
+          )}
         </section>
       ))}
     </>
