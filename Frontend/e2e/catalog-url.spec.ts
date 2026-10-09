@@ -67,3 +67,80 @@ test('잘못된 URL 조건을 안내하고 초기화할 수 있다', async ({ pa
     page.getByRole('region', { name: 'WISH 상품 목록' }).getByRole('article'),
   ).toHaveCount(3)
 })
+
+test('정렬·품절 제외 UI를 URL에 반영하고 페이지 이동에서 조건을 유지한다', async ({
+  page,
+}) => {
+  await page.goto('/#/grab?category=패션&page=1')
+  await page
+    .getByLabel('정렬', { exact: true })
+    .selectOption('soldQuantity,desc')
+  await expect(
+    page.getByRole('region', { name: 'GRAB 상품 목록' }).getByRole('article'),
+  ).toHaveCount(2)
+  await page.getByLabel('품절 제외').click()
+  await expect(page.getByLabel('품절 제외')).toBeChecked()
+  await expect(page).toHaveURL(/soldOut=false/)
+  await expect(
+    page.getByRole('button', { name: '이전', exact: true }),
+  ).toBeDisabled()
+  await expect(
+    page.getByRole('button', { name: '다음', exact: true }),
+  ).toBeDisabled()
+  const url = page.url()
+  await page.goto(`${url}&page=1`)
+  await page.getByRole('link', { name: '이전', exact: true }).click()
+  await expect(page.getByLabel('정렬', { exact: true })).toHaveValue(
+    'soldQuantity,desc',
+  )
+  await expect(page.getByLabel('품절 제외')).toBeChecked()
+  await expect(
+    page.getByRole('button', { name: '패션', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true')
+  await expect(
+    page.getByRole('navigation', { name: '상품 목록 페이지' }),
+  ).toContainText('1 / 1 페이지')
+})
+
+test('상품 이미지 실패 시 대체 표시를 제공하고 링크와 WISH 버튼을 분리한다', async ({
+  page,
+}) => {
+  await page.route('**/*', (route) =>
+    route.request().resourceType() === 'image'
+      ? route.abort()
+      : route.fallback(),
+  )
+  await page.goto('/#/wish')
+  const cards = page
+    .getByRole('region', { name: 'WISH 상품 목록' })
+    .getByRole('article')
+  await expect(cards.first().getByText('상품 이미지 준비 중')).toBeVisible()
+  await expect(
+    cards.first().getByRole('button', { name: '♡ WISH' }),
+  ).toHaveAttribute('aria-pressed', 'false')
+  expect(await cards.first().locator('a button, button a').count()).toBe(0)
+  await cards.first().getByRole('heading').getByRole('link').click()
+  await expect(page).toHaveURL(/#\/drops\/103$/)
+})
+
+test('PC·태블릿·모바일에서 목록은 4·3·2열이며 넘치지 않는다', async ({
+  page,
+}) => {
+  for (const [width, columns] of [
+    [1440, 4],
+    [768, 3],
+    [390, 2],
+  ]) {
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto('/#/wish')
+    const list = page.getByRole('region', { name: 'WISH 상품 목록' })
+    await expect(list).toBeVisible()
+    const layout = await list.evaluate((element) => ({
+      columns: getComputedStyle(element).gridTemplateColumns.split(' ').length,
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }))
+    expect(layout.columns).toBe(columns)
+    expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth)
+  }
+})

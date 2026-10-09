@@ -1,6 +1,4 @@
 import { Link, useSearchParams } from 'react-router-dom'
-import logo from '../../assets/images/grab-symbol.png'
-import heroImage from '../../assets/images/hero-background.png'
 import EmptyState from '../../components/EmptyState/EmptyState'
 import DropCard from '../../features/drop/DropCard'
 import { queryCatalog } from '../../features/drop/catalog'
@@ -36,43 +34,40 @@ export default function DropListPage({
 
   return (
     <>
-      {status === 'WISH' ? (
-        <>
-          <section className="hero">
-            <img src={heroImage} alt="GRAB, Grab what you want" />
-            <span>SELLER DROPS. CONSUMER GRABS.</span>
-          </section>
-          <section className="intro">
-            <div>
-              <p className="eyebrow">BE READY FOR THE DROP</p>
-              <h1>
-                발견한 취향, <em>놓치지 않도록.</em>
-              </h1>
-              <p>마음에 드는 DROP을 WISH하고 판매 시작을 기다려보세요.</p>
-            </div>
-            <Link className="text-link" to="/my">
-              나의 WISH ↗
-            </Link>
-          </section>
-        </>
-      ) : (
-        <section className="grab-hero">
-          <div>
-            <p className="eyebrow">LIMITED TIME. LIMITED QUANTITY.</p>
-            <h1>원하던 순간, 지금 GRAB.</h1>
-            <p>작은 브랜드가 준비한 특별한 상품을 한정 수량으로 만나보세요.</p>
-          </div>
-          <img src={logo} alt="" />
-        </section>
-      )}
+      <section className="catalog-title">
+        <div>
+          <p className="eyebrow">
+            {status === 'WISH'
+              ? 'BE READY FOR THE DROP'
+              : 'LIMITED TIME. LIMITED QUANTITY.'}
+          </p>
+          <h1>
+            {status === 'WISH' ? '다가올 DROP을 WISH' : '지금 GRAB 할 상품'}
+          </h1>
+          <p>
+            {status === 'WISH'
+              ? '판매 시작을 기다리는 상품을 살펴보세요.'
+              : '작은 브랜드의 한정 판매를 만나보세요.'}
+          </p>
+        </div>
+        {status === 'WISH' && (
+          <Link className="text-link" to="/my">
+            나의 WISH ↗
+          </Link>
+        )}
+      </section>
 
-      <section className="catalog-controls" aria-label="상품 필터">
+      <section
+        className="catalog-controls catalog-filters panel"
+        aria-label="상품 필터"
+      >
         <div className="chips">
           {categories.map((item) => (
             <button
               key={item}
               type="button"
               className={category === item ? 'active' : ''}
+              aria-pressed={category === item}
               onClick={() =>
                 setParams(
                   changeCatalogParams(
@@ -87,22 +82,75 @@ export default function DropListPage({
             </button>
           ))}
         </div>
-        <label className="search-box">
-          <span className="sr-only">상품 검색</span>
-          <input
-            value={keyword}
-            onChange={(event) =>
-              setParams(
-                changeCatalogParams(params, 'keyword', event.target.value),
-                { replace: true },
-              )
-            }
-            maxLength={100}
-            placeholder="상품명 검색"
-          />
-          <span aria-hidden="true">⌕</span>
-        </label>
+        <div className="catalog-query-controls">
+          <label className="search-box">
+            <span className="sr-only">상품 검색</span>
+            <input
+              value={keyword}
+              onChange={(event) =>
+                setParams(
+                  changeCatalogParams(params, 'keyword', event.target.value),
+                  { replace: true },
+                )
+              }
+              maxLength={100}
+              placeholder="상품명 검색"
+            />
+            <span aria-hidden="true">⌕</span>
+          </label>
+          <div className="catalog-sort">
+            <label htmlFor="catalog-sort">정렬</label>
+            <select
+              id="catalog-sort"
+              value={params.get('sort') ?? 'publishedAt,desc'}
+              onChange={(event) =>
+                setParams(
+                  changeCatalogParams(params, 'sort', event.target.value),
+                )
+              }
+            >
+              <option value="publishedAt,desc">최신 공개순</option>
+              <option value="publishedAt,asc">오래된 공개순</option>
+              <option value="saleStartsAt,asc">판매 시작 빠른순</option>
+              <option value="saleStartsAt,desc">판매 시작 늦은순</option>
+              <option value="createdAt,desc">최신 등록순</option>
+              <option value="createdAt,asc">오래된 등록순</option>
+              <option
+                value={
+                  status === 'WISH' ? 'wishCount,desc' : 'soldQuantity,desc'
+                }
+              >
+                {status === 'WISH' ? '인기 WISH순' : '인기 GRAB순'}
+              </option>
+            </select>
+          </div>
+          {status === 'GRAB' && (
+            <label className="catalog-sold-out">
+              <input
+                type="checkbox"
+                checked={params.get('soldOut') === 'false'}
+                onChange={(event) =>
+                  setParams(
+                    changeCatalogParams(
+                      params,
+                      'soldOut',
+                      event.target.checked ? 'false' : '',
+                    ),
+                  )
+                }
+              />
+              품절 제외
+            </label>
+          )}
+        </div>
       </section>
+
+      <div className="section-head catalog-heading">
+        <h2>
+          {status} 상품{result && <small> {result.totalElements}개</small>}
+        </h2>
+        <span>예시 상품 · 24개/페이지</span>
+      </div>
 
       {!result ? (
         <EmptyState
@@ -113,11 +161,15 @@ export default function DropListPage({
           variant="block"
         />
       ) : result.content.length ? (
-        <section className="product-grid" aria-label={`${status} 상품 목록`}>
+        <section
+          className="product-grid catalog-grid"
+          aria-label={`${status} 상품 목록`}
+        >
           {result.content.map((drop) => (
             <DropCard
               key={drop.id}
               drop={drop}
+              mode={status}
               wished={wishes.has(drop.id)}
               onWish={onWish}
             />
@@ -131,16 +183,43 @@ export default function DropListPage({
         />
       )}
 
-      <section className="seller-banner">
-        <img src={logo} alt="" />
-        <div>
-          <strong>하나의 상품, 하나의 DROP.</strong>
-          <p>관심을 모으고 한정판매로 연결하세요.</p>
-        </div>
-        <Link className="secondary-button" to="/seller">
-          셀러로 시작하기 ↗
-        </Link>
-      </section>
+      {result && result.totalPages > 0 && (
+        <nav className="catalog-pagination" aria-label="상품 목록 페이지">
+          {result.page > 0 ? (
+            <Link
+              className="secondary-button"
+              to={{
+                search: `?${changeCatalogParams(params, 'page', String(Math.min(result.page - 1, result.totalPages - 1)))}`,
+              }}
+            >
+              이전
+            </Link>
+          ) : (
+            <button type="button" className="secondary-button" disabled>
+              이전
+            </button>
+          )}
+          <span aria-live="polite">
+            {result.page < result.totalPages
+              ? `${result.page + 1} / ${result.totalPages} 페이지`
+              : `전체 ${result.totalPages}페이지 · 범위 밖`}
+          </span>
+          {result.hasNext ? (
+            <Link
+              className="secondary-button"
+              to={{
+                search: `?${changeCatalogParams(params, 'page', String(result.page + 1))}`,
+              }}
+            >
+              다음
+            </Link>
+          ) : (
+            <button type="button" className="secondary-button" disabled>
+              다음
+            </button>
+          )}
+        </nav>
+      )}
     </>
   )
 }
