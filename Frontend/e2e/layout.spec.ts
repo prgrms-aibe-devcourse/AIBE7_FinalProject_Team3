@@ -25,6 +25,15 @@ const pages: {
   actions: (page: Page) => Locator[]
 }[] = [
   {
+    name: '소비자 메인',
+    path: '/',
+    actions: (page) => [
+      page.getByRole('group', { name: '지금 인기 GRAB' }),
+      page.getByRole('group', { name: '곧 만날 인기 WISH' }),
+      page.getByRole('link', { name: '전체 보기 ↗' }).first(),
+    ],
+  },
+  {
     name: 'WISH 목록',
     path: '/#/wish',
     actions: (page) => [

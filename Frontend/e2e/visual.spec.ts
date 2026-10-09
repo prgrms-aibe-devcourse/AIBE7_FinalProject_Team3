@@ -1,5 +1,6 @@
 import { expect, test, type Page } from './fixtures'
 import { installCatalogScenario } from './mock/catalog'
+import { installHomeScenario } from './mock/home'
 
 // 기준 이미지는 CI와 같은 Playwright Docker 이미지에서만 만든다(npm run e2e:docker).
 // 판매자 대시보드·판매자 DROP 상세는 디자인 개선 예정이라 기준에서 제외한다.
@@ -23,6 +24,27 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
       await shot(page, name)
     })
   }
+
+  test('home', async ({ page }) => {
+    await page.goto('/')
+    await expect(
+      page.getByRole('group', { name: '지금 인기 GRAB' }),
+    ).toBeVisible()
+    await expect(
+      page.getByRole('group', { name: '곧 만날 인기 WISH' }),
+    ).toBeVisible()
+    await shot(page, 'home')
+  })
+
+  test('home-states', async ({ page }) => {
+    await installHomeScenario(page, 'failure')
+    await page.goto('/')
+    await expect(page.getByText('인기 상품을 표시하지 못했어요.')).toBeVisible()
+    await expect(
+      page.getByRole('group', { name: '곧 만날 인기 WISH' }),
+    ).toBeVisible()
+    await shot(page, 'home-states')
+  })
 
   test('wish-list-empty', async ({ page }) => {
     await page.goto('/#/wish')

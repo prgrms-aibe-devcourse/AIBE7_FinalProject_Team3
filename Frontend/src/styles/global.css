@@ -51,6 +51,7 @@ a:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
+.popular-rail:focus-visible,
 /* 검색 입력은 테두리가 없어 감싸는 박스에 표시한다 */
 .search-box:focus-within {
   outline: 3px solid #7fa61f;
