@@ -1,4 +1,4 @@
-import type { Drop } from '../../types/drop'
+import type { Drop } from '../../../types/drop'
 
 const day = 86_400_000
 const dateFromNow = (days: number) =>

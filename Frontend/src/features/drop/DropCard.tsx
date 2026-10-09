@@ -1,25 +1,64 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { Drop } from '../../types/drop'
 import { daysUntil, dateLabel } from '../../utils/date'
 import { won } from '../../utils/price'
-import { minPrice, stock } from './selectors'
 
 type Props = {
   drop: Drop
   wished: boolean
   onWish: (id: number) => void
+  mode?: 'WISH' | 'GRAB'
 }
 
-export default function DropCard({ drop, wished, onWish }: Props) {
-  const available = stock(drop)
+export default function DropCard({
+  drop,
+  wished,
+  onWish,
+  mode = drop.status === 'WISH' ? 'WISH' : 'GRAB',
+}: Props) {
+  const [failedImage, setFailedImage] = useState<string | null>(null)
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const remaining = new Date(drop.saleStartsAt).getTime() - now
+    if (remaining <= 0) return
+    const timeout = window.setTimeout(
+      () => setNow(Date.now()),
+      Math.min(remaining, 2_147_483_647),
+    )
+    return () => window.clearTimeout(timeout)
+  }, [drop.saleStartsAt, now])
+  const activeSkus = drop.skus.filter((sku) => sku.active !== false)
+  const available = activeSkus.reduce((sum, sku) => sum + sku.stock, 0)
+  const price = activeSkus.length
+    ? Math.min(...activeSkus.map((sku) => sku.price))
+    : null
+  const wishMode = mode === 'WISH'
+  const wishable = wishMode && now < new Date(drop.saleStartsAt).getTime()
 
   return (
     <article className="product-card">
       <Link className="product-visual" to={`/drops/${drop.id}`}>
-        <img src={drop.image} alt={drop.name} />
-        <span className={`badge ${drop.status === 'WISH' ? 'lime' : ''}`}>
-          {drop.status === 'WISH'
-            ? `OPEN D−${daysUntil(drop.saleStartsAt)}`
+        {drop.image && failedImage !== drop.image ? (
+          <img
+            src={drop.image}
+            alt={drop.name}
+            onError={() => setFailedImage(drop.image)}
+          />
+        ) : (
+          <span
+            className="product-image-placeholder"
+            role="img"
+            aria-label={`${drop.name} 이미지 없음`}
+          >
+            상품 이미지 준비 중
+          </span>
+        )}
+        <span className={`badge ${wishMode ? 'lime' : ''}`}>
+          {wishMode
+            ? wishable
+              ? `OPEN D−${daysUntil(drop.saleStartsAt)}`
+              : '판매 시작'
             : available
               ? 'LIMITED DROP'
               : 'SOLD OUT'}
@@ -33,18 +72,22 @@ export default function DropCard({ drop, wished, onWish }: Props) {
         <Link to={`/drops/${drop.id}`}>{drop.name}</Link>
       </h2>
       <p className="price">
-        {won(minPrice(drop))}
-        <small>부터</small>
+        {price === null ? (
+          '판매 옵션 없음'
+        ) : (
+          <>
+            {won(price)}
+            <small>부터</small>
+          </>
+        )}
       </p>
       <p className="schedule">
-        {dateLabel(
-          drop.status === 'WISH' ? drop.saleStartsAt : drop.saleEndsAt,
-        )}{' '}
-        {drop.status === 'WISH' ? '오픈' : '종료'}
+        {dateLabel(wishMode ? drop.saleStartsAt : drop.saleEndsAt)}{' '}
+        {wishMode ? '오픈' : '종료'}
       </p>
       <div className="card-bottom">
         <span>
-          {drop.status === 'WISH' ? (
+          {wishMode ? (
             <>
               <b>{drop.wishCount + (wished ? 1 : 0)}</b> WISH
             </>
@@ -54,17 +97,22 @@ export default function DropCard({ drop, wished, onWish }: Props) {
             </>
           )}
         </span>
-        {drop.status === 'WISH' ? (
+        {wishMode ? (
           <button
             type="button"
-            className={`wish-button ${wished ? 'selected' : ''}`}
+            className={`secondary-button wish-button ${wished ? 'selected' : ''}`}
+            aria-pressed={wished}
+            disabled={!wishable}
             onClick={() => onWish(drop.id)}
           >
-            {wished ? '✓ WISHED' : '♡ WISH'}
+            {!wishable ? 'WISH 마감' : wished ? '✓ WISHED' : '♡ WISH'}
           </button>
         ) : (
-          <Link className="wish-button" to={`/drops/${drop.id}`}>
-            GRAB ↗
+          <Link
+            className="secondary-button wish-button"
+            to={`/drops/${drop.id}`}
+          >
+            {available ? 'GRAB ↗' : '품절 · 상세 보기 ↗'}
           </Link>
         )}
       </div>

@@ -1,6 +1,6 @@
 import { Link, Navigate } from 'react-router-dom'
 import EmptyState from '../../components/EmptyState/EmptyState'
-import { drops } from '../../features/drop/mockDrops'
+import { drops } from '../../features/drop/mock/mockDrops'
 import type { SharedProps } from '../../types/store'
 import { dateLabel } from '../../utils/date'
 import { won } from '../../utils/price'

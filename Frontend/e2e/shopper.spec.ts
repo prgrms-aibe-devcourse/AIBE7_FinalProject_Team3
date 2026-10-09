@@ -46,14 +46,16 @@ test.describe('상품 탐색', () => {
     await expect(list).toContainText('나의 작은 휴식, 데일리 머그')
 
     await page.getByRole('button', { name: '전체', exact: true }).click()
-    // 브랜드명도 대소문자 없이 찾는다
-    await page.getByPlaceholder('상품 또는 브랜드 검색').fill('slow object')
+    await expect(
+      page.getByRole('button', { name: '전체', exact: true }),
+    ).toHaveClass('active')
+    await expect(list.getByRole('article')).toHaveCount(3)
+    // 상품명은 부분 일치로 찾는다
+    await page.getByPlaceholder('상품명 검색').fill('캔버스 토트')
     await expect(list.getByRole('article')).toHaveCount(1)
     await expect(list).toContainText('매일을 담는 캔버스 토트')
 
-    await page
-      .getByPlaceholder('상품 또는 브랜드 검색')
-      .fill('존재하지 않는 상품')
+    await page.getByPlaceholder('상품명 검색').fill('존재하지 않는 상품')
     await expect(list).toBeHidden()
     await expect(page.getByText('조건에 맞는 상품이 없어요.')).toBeVisible()
   })
