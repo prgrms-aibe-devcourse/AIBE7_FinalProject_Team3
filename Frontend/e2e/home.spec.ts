@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures'
+import { installCatalogScenario } from './mock/catalog'
 import { installHomeScenario } from './mock/home'
 
 test.describe('소비자 메인', () => {
@@ -71,6 +72,16 @@ test.describe('소비자 메인', () => {
     await page.keyboard.press('ArrowLeft')
     await expect(position).toHaveText('1 / 3')
     await expect(rail.getByRole('button', { name: /이전/ })).toBeDisabled()
+  })
+
+  test('품절·비활성 GRAB은 인기 후보에서 제외된다', async ({ page }) => {
+    await installCatalogScenario(page, 'states')
+    await page.goto('/')
+
+    const rail = page.getByRole('group', { name: '지금 인기 GRAB' })
+    // states 시나리오는 201(품절)과 203(전체 비활성)을 무효화한다.
+    await expect(rail.getByRole('article')).toHaveCount(1)
+    await expect(rail).toContainText('슬로우 모닝 머그')
   })
 
   test('화면 크기가 바뀌어도 이동이 어긋나지 않는다', async ({ page }) => {

@@ -1,4 +1,5 @@
 import type { Drop } from '../../../types/drop'
+import { queryCatalog } from '../catalog'
 import { catalogDrops, type MockCatalogDrop } from './mockCatalog'
 
 export const HOME_LIMIT = 8
@@ -13,15 +14,15 @@ export type HomeSectionConfig = {
   to: string
 }
 
+// 인기 조회도 목록과 같은 조건을 쓴다. GRAB은 서버 시각상 구매 가능한 상품,
+// WISH는 판매 시작 전 상품만 후보가 되고, 동률은 공개 시각·ID로 갈린다.
 const byPopularity = (status: HomeSectionKey) =>
-  catalogDrops
-    .filter((drop) => drop.status === status)
-    .sort((a, b) =>
-      status === 'GRAB'
-        ? b.soldQuantity - a.soldQuantity
-        : b.wishCount - a.wishCount,
-    )
-    .slice(0, HOME_LIMIT)
+  queryCatalog(
+    catalogDrops,
+    status === 'GRAB'
+      ? { status, sort: 'soldQuantity,desc' }
+      : { status, sort: 'wishCount,desc' },
+  ).content.slice(0, HOME_LIMIT)
 
 // 두 영역은 각자의 인기 정렬 기준으로 분리된 목록을 사용한다.
 export const homeSections: HomeSectionConfig[] = [
@@ -37,9 +38,18 @@ export const homeSections: HomeSectionConfig[] = [
   },
 ]
 
-export const homeDrops: Record<HomeSectionKey, MockCatalogDrop[]> = {
-  GRAB: byPopularity('GRAB'),
-  WISH: byPopularity('WISH'),
+// 홈을 열 때 처음 계산한다. 목록 Mock만 실패한 경우 홈 Mock 임포트가 영향을 받지 않는다.
+let cached: Record<HomeSectionKey, MockCatalogDrop[]> | null = null
+const ensureHomeDrops = () =>
+  (cached ??= { GRAB: byPopularity('GRAB'), WISH: byPopularity('WISH') })
+
+export const homeDrops = {
+  get GRAB() {
+    return ensureHomeDrops().GRAB
+  },
+  get WISH() {
+    return ensureHomeDrops().WISH
+  },
 }
 
 // 실제 연동 시 GET /api/v1/drops?status=...&sort=... 요청으로 교체한다.
