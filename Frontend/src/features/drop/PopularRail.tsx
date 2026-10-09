@@ -48,7 +48,7 @@ export default function PopularRail({
   const safeIndex = Math.min(index, maxIndex)
 
   const move = (delta: number) =>
-    setIndex((current) => Math.min(Math.max(current + delta, 0), maxIndex))
+    setIndex(Math.min(Math.max(safeIndex + delta, 0), maxIndex))
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'ArrowLeft') {

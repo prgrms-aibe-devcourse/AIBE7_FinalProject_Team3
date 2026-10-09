@@ -72,4 +72,27 @@ test.describe('소비자 메인', () => {
     await expect(position).toHaveText('1 / 3')
     await expect(rail.getByRole('button', { name: /이전/ })).toBeDisabled()
   })
+
+  test('화면 크기가 바뀌어도 이동이 어긋나지 않는다', async ({ page }) => {
+    await installHomeScenario(page, 'many')
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/')
+
+    const rail = page.getByRole('group', { name: '곧 만날 인기 WISH' })
+    const position = rail.locator('.popular-position')
+
+    // 모바일(2장 노출)에서 끝까지 이동한다.
+    for (let n = 2; n <= 7; n += 1) {
+      await rail.getByRole('button', { name: /다음/ }).click()
+      await expect(position).toHaveText(`${n} / 8`)
+    }
+
+    // PC(4장 노출)로 전환하면 표시 위치가 보정된다.
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await expect(position).toHaveText('5 / 8')
+
+    // 보정된 위치에서 이전 이동이 실제로 동작한다.
+    await rail.getByRole('button', { name: /이전/ }).click()
+    await expect(position).toHaveText('4 / 8')
+  })
 })
