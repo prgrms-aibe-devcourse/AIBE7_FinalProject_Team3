@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures'
+import { installCatalogScenario, LONG_PRODUCT_NAME } from './mock/catalog'
 
 test('목록 조건을 직접 진입·새로고침·상세에서 뒤로 가기로 복원한다', async ({
   page,
@@ -143,4 +144,83 @@ test('PC·태블릿·모바일에서 목록은 4·3·2열이며 넘치지 않는
     expect(layout.columns).toBe(columns)
     expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth)
   }
+})
+
+test('24개 페이지에서 다음·이전과 뒤로 가기로 인기순·검색 조건을 복원한다', async ({
+  page,
+}) => {
+  await installCatalogScenario(page, 'many')
+  await page.goto('/#/wish?keyword=페이지&sort=wishCount,desc')
+  const list = page.getByRole('region', { name: 'WISH 상품 목록' })
+  await expect(list.getByRole('article')).toHaveCount(24)
+  await expect(list.getByRole('article').first()).toContainText(
+    '페이지 테스트 상품 30',
+  )
+  await page.getByRole('link', { name: '다음', exact: true }).click()
+  await expect(list.getByRole('article')).toHaveCount(6)
+  await expect(
+    page.getByRole('navigation', { name: '상품 목록 페이지' }),
+  ).toContainText('2 / 2 페이지')
+  await expect(page.getByLabel('정렬', { exact: true })).toHaveValue(
+    'wishCount,desc',
+  )
+  await expect(page.getByPlaceholder('상품명 검색')).toHaveValue('페이지')
+  await page.goBack()
+  await expect(list.getByRole('article')).toHaveCount(24)
+  await page.getByRole('link', { name: '다음', exact: true }).click()
+  await expect(list.getByRole('article')).toHaveCount(6)
+  await page.getByRole('link', { name: '이전', exact: true }).click()
+  await expect(list.getByRole('article')).toHaveCount(24)
+})
+
+test('긴 상품명·이미지 없음·품절·비활성 옵션을 실제 카드에서 처리한다', async ({
+  page,
+}) => {
+  await installCatalogScenario(page, 'states')
+  await page.goto('/#/wish')
+  const wishCard = page
+    .getByRole('article')
+    .filter({ has: page.getByRole('heading', { name: LONG_PRODUCT_NAME }) })
+  await expect(
+    wishCard.getByRole('img', { name: `${LONG_PRODUCT_NAME} 이미지 없음` }),
+  ).toBeVisible()
+  const heading = wishCard.getByRole('heading')
+  await expect(heading).toHaveCSS('-webkit-line-clamp', '2')
+  const size = await heading.evaluate((element) => ({
+    height: element.getBoundingClientRect().height,
+    lineHeight: parseFloat(getComputedStyle(element).lineHeight),
+  }))
+  expect(size.height).toBeLessThanOrEqual(size.lineHeight * 2 + 1)
+  await page.goto('/#/grab')
+  const soldOut = page
+    .getByRole('article')
+    .filter({ has: page.getByRole('heading', { name: LONG_PRODUCT_NAME }) })
+  await expect(
+    soldOut.getByRole('link', { name: '품절 · 상세 보기 ↗' }),
+  ).toBeVisible()
+  await expect(page.getByText('판매 옵션 없음')).toBeVisible()
+  await page.getByLabel('품절 제외').click()
+  await expect(page.getByLabel('품절 제외')).toBeChecked()
+  await expect(
+    page.getByRole('region', { name: 'GRAB 상품 목록' }).getByRole('article'),
+  ).toHaveCount(1)
+})
+
+test('목록 표시 실패를 안내하고 복구 후 다시 시도할 수 있다', async ({
+  page,
+}) => {
+  await installCatalogScenario(page, 'failure')
+  await page.goto('/#/wish')
+  await expect(page.getByRole('alert')).toContainText(
+    '상품 목록을 표시하지 못했어요.',
+  )
+  await page.evaluate(() => {
+    const restore = (window as unknown as { restoreCatalogMock: () => void })
+      .restoreCatalogMock
+    restore()
+  })
+  await page.getByRole('button', { name: '다시 시도' }).click()
+  await expect(
+    page.getByRole('region', { name: 'WISH 상품 목록' }).getByRole('article'),
+  ).toHaveCount(3)
 })

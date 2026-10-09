@@ -393,6 +393,12 @@ main {
   margin-top: 32px;
   font-size: 13px;
 }
+.catalog-error {
+  text-align: center;
+}
+.catalog-error .secondary-button {
+  margin-top: 16px;
+}
 .catalog-pagination button:disabled,
 .product-card button:disabled {
   opacity: 0.5;

@@ -1,3 +1,4 @@
+import { useState, useTransition } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import EmptyState from '../../components/EmptyState/EmptyState'
 import DropCard from '../../features/drop/DropCard'
@@ -17,13 +18,19 @@ export default function DropListPage({
   notify,
 }: SharedProps & { status: 'WISH' | 'GRAB' }) {
   const [params, setParams] = useSearchParams()
+  const [pending, startTransition] = useTransition()
+  const [, setRetry] = useState(0)
+  const updateParams: typeof setParams = (next, options) => {
+    startTransition(() => setParams(next, options))
+  }
   const category = params.get('category') || '전체'
   const keyword = params.get('keyword') ?? ''
   let result
+  let invalidQuery = false
   try {
     result = queryCatalog(catalogDrops, readCatalogQuery(params, status))
   } catch (error) {
-    if (!(error instanceof RangeError)) throw error
+    invalidQuery = error instanceof RangeError
   }
 
   const onWish = (id: number) => {
@@ -69,7 +76,7 @@ export default function DropListPage({
               className={category === item ? 'active' : ''}
               aria-pressed={category === item}
               onClick={() =>
-                setParams(
+                updateParams(
                   changeCatalogParams(
                     params,
                     'category',
@@ -88,7 +95,7 @@ export default function DropListPage({
             <input
               value={keyword}
               onChange={(event) =>
-                setParams(
+                updateParams(
                   changeCatalogParams(params, 'keyword', event.target.value),
                   { replace: true },
                 )
@@ -104,7 +111,7 @@ export default function DropListPage({
               id="catalog-sort"
               value={params.get('sort') ?? 'publishedAt,desc'}
               onChange={(event) =>
-                setParams(
+                updateParams(
                   changeCatalogParams(params, 'sort', event.target.value),
                 )
               }
@@ -130,7 +137,7 @@ export default function DropListPage({
                 type="checkbox"
                 checked={params.get('soldOut') === 'false'}
                 onChange={(event) =>
-                  setParams(
+                  updateParams(
                     changeCatalogParams(
                       params,
                       'soldOut',
@@ -152,7 +159,11 @@ export default function DropListPage({
         <span>예시 상품 · 24개/페이지</span>
       </div>
 
-      {!result ? (
+      {pending ? (
+        <div role="status" aria-live="polite">
+          <EmptyState title="상품 목록을 불러오는 중이에요." variant="block" />
+        </div>
+      ) : !result && invalidQuery ? (
         <EmptyState
           title="조회 조건이 올바르지 않아요."
           description="검색어·정렬·품절·페이지 조건을 확인해주세요."
@@ -160,6 +171,21 @@ export default function DropListPage({
           label="조회 조건 초기화"
           variant="block"
         />
+      ) : !result ? (
+        <div className="catalog-error" role="alert">
+          <EmptyState
+            title="상품 목록을 표시하지 못했어요."
+            description="잠시 후 다시 시도해주세요."
+            variant="block"
+          />
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => setRetry((retry) => retry + 1)}
+          >
+            다시 시도
+          </button>
+        </div>
       ) : result.content.length ? (
         <section
           className="product-grid catalog-grid"
