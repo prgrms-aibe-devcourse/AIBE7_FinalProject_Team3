@@ -42,7 +42,7 @@ export default function App() {
       <Header authenticated={authenticated} />
       <main>
         <Routes>
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<HomePage {...shared} />} />
           <Route
             path="/wish"
             element={<DropListPage status="WISH" {...shared} />}

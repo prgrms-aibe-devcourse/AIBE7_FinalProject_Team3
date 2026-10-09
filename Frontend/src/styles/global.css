@@ -297,6 +297,19 @@ main {
   transform: rotate(-7deg);
 }
 
+.home-section {
+  margin-top: 58px;
+}
+.home-section-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.home-note {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .catalog-controls {
   display: flex;
   align-items: center;
@@ -449,6 +462,9 @@ main {
     align-items: flex-start;
     flex-wrap: wrap;
     gap: 8px;
+  }
+  .home-section {
+    margin-top: 40px;
   }
   .product-grid.catalog-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
