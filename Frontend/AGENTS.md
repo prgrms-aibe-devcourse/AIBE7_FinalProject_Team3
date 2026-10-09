@@ -27,6 +27,7 @@ npm run e2e:docker -- --grep @visual   # 시각 비교 (CI와 같은 Docker 이�
 - `src/pages/<Page>` — 라우트 단위 화면. 라우트는 `src/App.tsx`에서 관리한다.
 - `src/types` — 화면·Mock 타입, `src/utils` — 날짜·가격 표시 함수
 - `src/api/schema` — OpenAPI 생성 타입, `src/api/<도메인>` — 도메인별 요청·테스트, `src/api/client.ts` — 공통 클라이언트
+- 단위 테스트는 해당 기능의 `__tests__/`에 모은다(`src/features/<도메인>/__tests__/`, `src/api/<도메인>/__tests__/`). Mock 관련 테스트도 도메인의 `__tests__/`에 둔다. 공통 UI·유틸리티 테스트는 해당 소스 디렉터리의 `__tests__/`에 둔다. E2E·시각 비교와 전용 fixture는 `e2e/`에서 관리한다.
 - 라우터는 `HashRouter`다. URL은 `/#/wish` 형태다.
 - 로그인·WISH·주문 상태는 `App.tsx`의 `useState`에만 있다. 새 전역 상태 관리 도입은 별도 합의 후 진행한다.
 
@@ -38,6 +39,9 @@ npm run e2e:docker -- --grep @visual   # 시각 비교 (CI와 같은 Docker 이�
 
 ## UI 작성 규칙
 
+- 화면을 구현하거나 수정하기 전에 대상 화면의 `docs/pages/<PageName>.md`와 `docs/wireframes/<PageName>.html`을 함께 확인한다. 페이지 스펙의 라우트·데이터·행동·예외 상태·인수 조건과 와이어프레임의 배치·반응형 구성을 작업 기준으로 삼는다.
+- 와이어프레임의 공통 스타일은 `docs/wireframes/wireframe.css`도 확인한다. 구현은 기존 컴포넌트와 `src/styles/global.css`를 재사용하며, 완료 후 대상 스펙·와이어프레임과 PC·모바일 화면을 대조한다.
+- 페이지 스펙·와이어프레임·백엔드 요구사항/API 명세가 서로 어긋나거나 필요한 사양이 없으면 임의로 결정하지 않고 사용자에게 확인한다. Mock UI와 실제 API 연동 범위는 해당 이슈와 `README.md`의 기준을 따른다.
 - 새 UI를 만들기 전에 `src/components`, `src/features`의 기존 컴포넌트와 `global.css` 클래스를 먼저 찾아 재사용한다.
 - 버튼·링크는 `primary-button` / `secondary-button` / `text-link` 클래스를 그대로 쓴다. `button`과 `Link`의 의미, `type`, `disabled`, 키보드 포커스를 유지한다.
 - 페이지 이동은 `Link`, 동작은 `button`을 쓴다. `button`에는 항상 `type`을 적는다(폼 제출은 `submit`, 그 외는 `button`).

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validateShipment } from './shipment'
+import { validateShipment } from '../shipment'
 
 describe('validateShipment', () => {
   it('정상 입력은 통과한다', () => {

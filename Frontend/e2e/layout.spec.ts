@@ -25,6 +25,15 @@ const pages: {
   actions: (page: Page) => Locator[]
 }[] = [
   {
+    name: '소비자 메인',
+    path: '/',
+    actions: (page) => [
+      page.getByRole('group', { name: '지금 인기 GRAB' }),
+      page.getByRole('group', { name: '곧 만날 인기 WISH' }),
+      page.getByRole('link', { name: '전체 보기 ↗' }).first(),
+    ],
+  },
+  {
     name: 'WISH 목록',
     path: '/#/wish',
     actions: (page) => [
@@ -112,9 +121,12 @@ test('키보드 포커스가 입력란에 보인다', async ({ page }) => {
 
   await page.goto('/#/wish')
   await expectFocusRing(
-    page.getByPlaceholder('상품 또는 브랜드 검색'),
+    page.getByPlaceholder('상품명 검색'),
     page.locator('.search-box'),
   )
+  await expectFocusRing(page.getByLabel('정렬', { exact: true }))
+  await page.goto('/#/grab')
+  await expectFocusRing(page.getByLabel('품절 제외'))
 
   await page.goto('/#/drops/201')
   await expectFocusRing(page.getByLabel('수량'))

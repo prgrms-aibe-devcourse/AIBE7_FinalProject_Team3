@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Route, Routes } from 'react-router-dom'
 import Footer from './components/Footer/Footer'
 import Header from './components/Header/Header'
 import useAuth from './features/auth/useAuth'
@@ -7,6 +7,7 @@ import useOrders from './features/order/useOrders'
 import useWish from './features/wish/useWish'
 import DropDetailPage from './pages/DropDetail/DropDetailPage'
 import DropListPage from './pages/DropList/DropListPage'
+import HomePage from './pages/Home/HomePage'
 import LoginPage from './pages/Login/LoginPage'
 import MyPage from './pages/MyPage/MyPage'
 import NotFoundPage from './pages/NotFound/NotFoundPage'
@@ -41,7 +42,7 @@ export default function App() {
       <Header authenticated={authenticated} />
       <main>
         <Routes>
-          <Route path="/" element={<Navigate to="/wish" replace />} />
+          <Route path="/" element={<HomePage {...shared} />} />
           <Route
             path="/wish"
             element={<DropListPage status="WISH" {...shared} />}

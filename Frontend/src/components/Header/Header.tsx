@@ -7,11 +7,7 @@ export default function Header({ authenticated }: { authenticated: boolean }) {
 
   return (
     <header className="site-header">
-      <Link
-        className="header-brand"
-        to={sellerMode ? '/seller' : '/wish'}
-        aria-label="GRAB 홈"
-      >
+      <Link className="header-brand" to="/" aria-label="GRAB 홈">
         <img className="header-wordmark" src={wordmark} alt="GRAB" />
       </Link>
       <nav aria-label="주요 메뉴">

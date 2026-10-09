@@ -1,14 +1,10 @@
 import { expect, test } from './fixtures'
 
-test('첫 화면은 WISH 목록으로 이동한다', async ({ page }) => {
+test('첫 화면은 메인 화면을 보여준다', async ({ page }) => {
   await page.goto('/')
 
-  await expect(page).toHaveURL(/#\/wish$/)
+  await expect(page).toHaveURL(/\/$/)
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
-    '발견한 취향',
+    '발견한 취향을 놓치지 않도록.',
   )
-  // 고정 시각 기준으로 3일 뒤 오픈하는 DROP(101)
-  await expect(
-    page.getByRole('article').filter({ hasText: '매일을 담는 캔버스 토트' }),
-  ).toContainText('OPEN D−3')
 })
