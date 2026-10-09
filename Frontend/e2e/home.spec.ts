@@ -14,6 +14,12 @@ test.describe('소비자 메인', () => {
     await expect(
       page.getByRole('group', { name: '곧 만날 인기 WISH' }),
     ).toBeVisible()
+    await expect(
+      page.getByRole('link', { name: '전체 보기 ↗' }).first(),
+    ).toHaveAttribute('href', /sort=soldQuantity,desc/)
+    await expect(
+      page.getByRole('link', { name: '전체 보기 ↗' }).last(),
+    ).toHaveAttribute('href', /sort=wishCount,desc/)
   })
 
   test('한 영역이 실패해도 다른 영역은 보인다', async ({ page }) => {

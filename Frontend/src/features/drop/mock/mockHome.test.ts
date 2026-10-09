@@ -27,8 +27,8 @@ describe('홈 인기 Mock', () => {
       'WISH',
     ])
     expect(homeSections.map((section) => section.to)).toEqual([
-      '/grab',
-      '/wish',
+      '/grab?sort=soldQuantity,desc',
+      '/wish?sort=wishCount,desc',
     ])
     expect(homeDrops.GRAB).not.toEqual(homeDrops.WISH)
   })
