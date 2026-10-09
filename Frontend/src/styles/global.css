@@ -341,30 +341,26 @@ main {
 }
 .popular-info {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 20px;
+  gap: 12px 20px;
   margin-top: 20px;
   font-size: 13px;
 }
-.popular-info button {
-  min-height: 36px;
-  padding: 0 14px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
-  font-size: 13px;
-  font-weight: 700;
-}
-.popular-info button:disabled {
-  opacity: 0.4;
+.popular-info .secondary-button:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
 }
-.popular-info span {
+.popular-position {
   min-width: 52px;
   color: var(--muted);
   text-align: center;
   font-variant-numeric: tabular-nums;
+}
+.popular-hint {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .catalog-controls {
@@ -478,7 +474,8 @@ main {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 28px 18px;
 }
-.catalog-grid .product-card h2 {
+.catalog-grid .product-card h2,
+.popular-rail .product-card h2 {
   display: -webkit-box;
   min-height: 2.8em;
   font-size: 16px;
@@ -487,7 +484,8 @@ main {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
-.catalog-grid .card-bottom {
+.catalog-grid .card-bottom,
+.popular-rail .card-bottom {
   flex-wrap: wrap;
   gap: 8px;
 }
@@ -523,29 +521,37 @@ main {
   .home-section {
     margin-top: 40px;
   }
+  .popular-rail {
+    --rail-gap: 12px;
+  }
   .product-grid.catalog-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 24px 12px;
   }
-  .catalog-grid .product-card h2 {
+  .catalog-grid .product-card h2,
+  .popular-rail .product-card h2 {
     font-size: 14px;
   }
-  .catalog-grid .card-bottom {
+  .catalog-grid .card-bottom,
+  .popular-rail .card-bottom {
     flex-direction: column;
     align-items: stretch;
     gap: 10px;
   }
-  .catalog-grid .wish-button {
+  .catalog-grid .wish-button,
+  .popular-rail .wish-button {
     width: 100%;
     padding: 0 6px;
   }
-  .catalog-grid .badge {
+  .catalog-grid .badge,
+  .popular-rail .badge {
     top: 8px;
     left: 8px;
     padding: 5px 6px;
     font-size: 9px;
   }
-  .catalog-grid .schedule {
+  .catalog-grid .schedule,
+  .popular-rail .schedule {
     min-height: 2.8em;
     font-size: 11px;
     line-height: 1.4;

@@ -109,21 +109,24 @@ export default function PopularRail({
         <div className="popular-info">
           <button
             type="button"
+            className="secondary-button"
             onClick={() => move(-1)}
             disabled={safeIndex === 0}
           >
             〈 이전
           </button>
-          <span aria-live="polite">
+          <span className="popular-position" aria-live="polite">
             {safeIndex + 1} / {drops.length}
           </span>
           <button
             type="button"
+            className="secondary-button"
             onClick={() => move(1)}
             disabled={safeIndex >= maxIndex}
           >
             다음 〉
           </button>
+          <span className="popular-hint">터치·키보드로 이동</span>
         </div>
       )}
     </div>
