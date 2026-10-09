@@ -4,7 +4,7 @@ import logo from '../../assets/images/grab-symbol.png'
 import heroImage from '../../assets/images/hero-background.png'
 import EmptyState from '../../components/EmptyState/EmptyState'
 import DropCard from '../../features/drop/DropCard'
-import { categories, drops } from '../../features/drop/mockDrops'
+import { categories, drops } from '../../features/drop/mock/mockDrops'
 import type { DropStatus } from '../../types/drop'
 import type { SharedProps } from '../../types/store'
 

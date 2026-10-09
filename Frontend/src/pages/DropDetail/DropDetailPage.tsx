@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import logo from '../../assets/images/grab-symbol.png'
-import { drops } from '../../features/drop/mockDrops'
+import { drops } from '../../features/drop/mock/mockDrops'
 import { findMatchingSku, selectionLabel } from '../../features/drop/option'
 import { minPrice, stock } from '../../features/drop/selectors'
 import type { SharedProps } from '../../types/store'

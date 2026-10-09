@@ -1,5 +1,5 @@
 import { Link, Navigate, useParams } from 'react-router-dom'
-import { drops } from '../../features/drop/mockDrops'
+import { drops } from '../../features/drop/mock/mockDrops'
 import { sellerOrders } from '../../features/order/mockSellerOrders'
 import { upcoming } from '../../features/drop/selectors'
 import type { Drop, Sku } from '../../types/drop'

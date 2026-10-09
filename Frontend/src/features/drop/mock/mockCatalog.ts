@@ -1,4 +1,4 @@
-import type { Drop } from '../../types/drop'
+import type { Drop } from '../../../types/drop'
 import { drops } from './mockDrops'
 
 // 목록 정렬용 예시 데이터다. 기존 상세·판매자 Mock과 API 계약은 변경하지 않는다.
