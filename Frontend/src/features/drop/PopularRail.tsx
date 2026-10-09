@@ -93,16 +93,20 @@ export default function PopularRail({
         onTouchEnd={onTouchEnd}
       >
         <div className="popular-track" style={railStyle}>
-          {drops.map((drop) => (
-            <div className="popular-item" key={drop.id}>
-              <DropCard
-                drop={drop}
-                mode={mode}
-                wished={wishes.has(drop.id)}
-                onWish={onWish}
-              />
-            </div>
-          ))}
+          {drops.map((drop, itemIndex) => {
+            const inView =
+              itemIndex >= safeIndex && itemIndex < safeIndex + visible
+            return (
+              <div className="popular-item" key={drop.id} inert={!inView}>
+                <DropCard
+                  drop={drop}
+                  mode={mode}
+                  wished={wishes.has(drop.id)}
+                  onWish={onWish}
+                />
+              </div>
+            )
+          })}
         </div>
       </div>
       {maxIndex > 0 && (

@@ -53,6 +53,12 @@ test.describe('소비자 메인', () => {
 
     const rail = page.getByRole('group', { name: '곧 만날 인기 WISH' })
     const position = rail.locator('.popular-position')
+    const items = rail.locator('.popular-item')
+
+    // 화면 밖 카드는 Tab 포커스를 받지 않는다.
+    await expect(items.nth(0)).not.toHaveAttribute('inert', '')
+    await expect(items.nth(1)).not.toHaveAttribute('inert', '')
+    await expect(items.nth(2)).toHaveAttribute('inert', '')
 
     await expect(position).toHaveText('1 / 3')
     await expect(rail.getByRole('button', { name: /이전/ })).toBeDisabled()
