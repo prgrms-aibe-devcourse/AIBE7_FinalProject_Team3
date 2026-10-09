@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { queryCatalog } from './catalog'
-import { catalogDrops, type MockCatalogDrop } from './mock/mockCatalog'
+import { queryCatalog } from '../catalog'
+import { catalogDrops, type MockCatalogDrop } from '../mock/mockCatalog'
 
 const now = Date.UTC(2026, 9, 9)
 const at = (hours: number) => new Date(now + hours * 3_600_000).toISOString()

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { OptionGroup } from '../../types/drop'
-import { findMatchingSku, optionCombinations } from './option'
+import type { OptionGroup } from '../../../types/drop'
+import { findMatchingSku, optionCombinations } from '../option'
 
 const groups: OptionGroup[] = [
   {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { changeCatalogParams, readCatalogQuery } from './catalogSearchParams'
+import { changeCatalogParams, readCatalogQuery } from '../catalogSearchParams'
 
 describe('상품 목록 URL 조건', () => {
   it('조건이 없으면 최신 공개순 첫 페이지로 조회한다', () => {

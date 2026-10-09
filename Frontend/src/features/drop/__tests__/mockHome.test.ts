@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import type { MockCatalogDrop } from './mockCatalog'
-import { HOME_LIMIT, fetchHomeDrops, homeDrops, homeSections } from './mockHome'
+import type { MockCatalogDrop } from '../mock/mockCatalog'
+import {
+  HOME_LIMIT,
+  fetchHomeDrops,
+  homeDrops,
+  homeSections,
+} from '../mock/mockHome'
 
 const availableStock = (drop: MockCatalogDrop) =>
   drop.skus.reduce(

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { Drop, DropStatus } from '../../types/drop'
-import { upcoming } from './selectors'
+import type { Drop, DropStatus } from '../../../types/drop'
+import { upcoming } from '../selectors'
 
 const now = Date.UTC(2026, 0, 10, 12, 0, 0)
 const at = (hours: number) => new Date(now + hours * 3_600_000).toISOString()
