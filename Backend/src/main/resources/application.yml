@@ -87,6 +87,11 @@ server:
   forward-headers-strategy: native
 
 springdoc:
+  swagger-ui:
+    csrf:
+      # Swagger UI의 Try it out이 XSRF-TOKEN 쿠키 값을 X-XSRF-TOKEN 헤더로 보낸다(GR-44 M00-06).
+      # 쿠키·헤더 이름은 springdoc 기본값이 명세와 같다. 상태 변경 요청 전에 GET /api/v1/auth/csrf를 먼저 실행한다
+      enabled: true
   group-configs:
     - group: category
       packages-to-scan: org.example.grab.domain.category
@@ -110,10 +115,3 @@ management:
     web:
       exposure:
         include: health,prometheus
-
-springdoc:
-  swagger-ui:
-    csrf:
-      # Swagger UI의 Try it out이 XSRF-TOKEN 쿠키 값을 X-XSRF-TOKEN 헤더로 보낸다(GR-44 M00-06).
-      # 쿠키·헤더 이름은 springdoc 기본값이 명세와 같다. 상태 변경 요청 전에 GET /api/v1/auth/csrf를 먼저 실행한다
-      enabled: true
