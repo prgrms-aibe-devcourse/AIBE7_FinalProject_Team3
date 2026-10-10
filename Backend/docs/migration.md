@@ -123,6 +123,15 @@ curl.exe -s http://localhost:8080/actuator/health
 - 파이프로 넘기는 문자열은 ASCII로 바뀌므로 닉네임은 영문으로 시험한다. 한글 닉네임은 화면(GR-31)이나 테스트 코드로 확인한다.
 - 가입 토큰 쿠키는 `Secure`지만 `curl.exe`는 `localhost`에서 쿠키 파일(`-c`·`-b`)로 저장·전송한다.
 
+CSRF 쿠키를 먼저 받고, 쿠키 파일에서 토큰을 읽어 모든 POST의 `X-XSRF-TOKEN` 헤더에 넣는다. 쿠키만 보내거나 헤더 값이 다르면 403 `ACCESS_DENIED`다.
+
+```powershell
+curl.exe -s -i -c signup-cookie.txt http://localhost:8080/api/v1/auth/csrf
+$csrfToken = (Get-Content signup-cookie.txt | Where-Object { $_ -match "`tXSRF-TOKEN`t" } | Select-Object -Last 1).Split("`t")[-1]
+```
+
+응답은 204이며 `XSRF-TOKEN` 쿠키는 `Secure; SameSite=Lax; Path=/`이고 `HttpOnly`가 없다. Swagger UI에서도 먼저 이 GET을 실행하면 `Try it out`이 쿠키 값을 헤더에 넣는다. CSRF 쿠키 파일에는 가입 토큰도 저장되므로 공유하거나 커밋하지 않는다.
+
 ### 6.2 인증 코드 요청과 확인
 
 ```powershell
@@ -130,14 +139,14 @@ $email = 'signup-test@example.com'
 
 # 인증 코드 요청: 204
 "{`"email`":`"$email`"}" | curl.exe -s -w "%{http_code}`n" http://localhost:8080/api/v1/auth/email-verification `
-  -H "Content-Type: application/json" --data-binary '@-'
+  -b signup-cookie.txt -H "X-XSRF-TOKEN: $csrfToken" -H "Content-Type: application/json" --data-binary '@-'
 
-# Mailpit에서 코드 확인 (웹 화면 http://127.0.0.1:8025 에서 봐도 된다)
+# 비동기 메일이 Mailpit에 도착한 뒤 코드 확인 (웹 화면 http://127.0.0.1:8025 에서 받는 주소를 확인한다)
 $code = [regex]::Match((Invoke-RestMethod http://127.0.0.1:8025/api/v1/message/latest).Text, '\b\d{6}\b').Value
 
 # 코드 확인: 204, Set-Cookie의 email_signup_token(15분)을 signup-cookie.txt에 저장
-"{`"email`":`"$email`",`"code`":`"$code`"}" | curl.exe -s -i -c signup-cookie.txt `
-  http://localhost:8080/api/v1/auth/email-verification/confirm -H "Content-Type: application/json" --data-binary '@-'
+"{`"email`":`"$email`",`"code`":`"$code`"}" | curl.exe -s -i -b signup-cookie.txt -c signup-cookie.txt `
+  http://localhost:8080/api/v1/auth/email-verification/confirm -H "X-XSRF-TOKEN: $csrfToken" -H "Content-Type: application/json" --data-binary '@-'
 ```
 
 ### 6.3 회원가입
@@ -147,15 +156,15 @@ $signup = 'http://localhost:8080/api/v1/auth/signup'
 
 # 400 INVALID_PASSWORD: 요청 값 오류는 가입 컨텍스트를 소비하지 않아 같은 쿠키로 다시 요청할 수 있다
 '{"password":"abc","nickname":"signuptest"}' | curl.exe -s -w "`n%{http_code}`n" -b signup-cookie.txt $signup `
-  -H "Content-Type: application/json" --data-binary '@-'
+  -H "X-XSRF-TOKEN: $csrfToken" -H "Content-Type: application/json" --data-binary '@-'
 
 # 201: 응답 data에 userId·email·nickname·roles·createdAt, Set-Cookie로 가입 토큰 만료(Max-Age=0)
 '{"password":"Password123!","nickname":"signuptest"}' | curl.exe -s -i -b signup-cookie.txt -c signup-cookie.txt $signup `
-  -H "Content-Type: application/json" --data-binary '@-'
+  -H "X-XSRF-TOKEN: $csrfToken" -H "Content-Type: application/json" --data-binary '@-'
 
 # 401 EMAIL_SIGNUP_CONTEXT_INVALID: 쿠키가 지워져(가입 컨텍스트도 소비됨) 다시 가입할 수 없다
 '{"password":"Password123!","nickname":"signuptest2"}' | curl.exe -s -w "`n%{http_code}`n" -b signup-cookie.txt $signup `
-  -H "Content-Type: application/json" --data-binary '@-'
+  -H "X-XSRF-TOKEN: $csrfToken" -H "Content-Type: application/json" --data-binary '@-'
 ```
 
 409는 다른 이메일로 6.2를 다시 진행한 뒤 확인한다.
@@ -178,6 +187,20 @@ docker compose exec -T postgres psql -U grab -d grab -c "SELECT email, nickname,
 docker compose exec -T postgres psql -U grab -d grab -c "DELETE FROM users WHERE email LIKE 'signup-test%';"
 Remove-Item signup-cookie.txt
 ```
+
+### 6.5 프론트엔드 CORS 설정
+
+`.env`의 `CORS_ALLOWED_ORIGINS`에 쿠키 포함 API 요청을 허용할 프론트엔드 Origin을 적는다. 주소는 프로토콜·호스트·포트를 포함하고 끝에 `/`를 붙이지 않는다. 여러 주소는 쉼표로 구분하며 `*`는 사용할 수 없다.
+
+```dotenv
+CORS_ALLOWED_ORIGINS=http://localhost:5173
+```
+
+Compose는 값이 없거나 비어 있으면 `http://localhost:5173`을 사용한다. 변경 후 `docker compose up -d backend`로 컨테이너를 재생성한다. 호스트의 `bootRun`·IDE는 `.env`를 자동으로 읽지 않으므로 실행 환경에 변수를 직접 지정한다. 호스트 실행에서도 변수가 없으면 `application.yml`의 기본값을 사용하지만, 빈 문자열을 지정하면 기본값 대신 빈 허용 목록이 된다.
+
+프론트엔드는 요청에 `credentials: 'include'`를 지정하고 상태 변경 요청에 `X-XSRF-TOKEN` 헤더를 넣는다. CORS 허용만으로 쿠키가 자동 전송되거나 CSRF 검사가 생략되지는 않는다.
+
+운영에서 프론트와 `/api`를 같은 출처로 서비스하면 CORS 허용 목록을 통한 교차 출처 접근이 필요 없다. 서브도메인 또는 다른 사이트로 분리하면 CSRF 쿠키 접근 범위와 `SameSite` 정책도 함께 검토해야 하므로 Origin 추가만으로 연동이 완료되지는 않는다.
 
 ## 7. 종료 및 초기화
 

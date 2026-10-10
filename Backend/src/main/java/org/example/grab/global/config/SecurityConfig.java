@@ -9,6 +9,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -16,15 +17,19 @@ import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 @Configuration
-@EnableConfigurationProperties(AccessTokenProperties.class)
+@EnableConfigurationProperties({AccessTokenProperties.class, CorsProperties.class})
 public class SecurityConfig {
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http, JwtProvider jwtProvider,
-                                            RestAuthenticationEntryPoint authenticationEntryPoint,
-                                            RestAccessDeniedHandler accessDeniedHandler) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http, JwtProvider jwtProvider, RestAuthenticationEntryPoint authenticationEntryPoint, RestAccessDeniedHandler accessDeniedHandler) throws Exception {
         return http
                 // 인증 근거는 access_token 쿠키의 JWT 하나다. 세션에 SecurityContext를 저장하지 않는다(M00-10)
                 .sessionManagement(session ->
@@ -32,8 +37,15 @@ public class SecurityConfig {
                 )
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
-                // TODO(GR-44): CookieCsrfTokenRepository로 재활성화. 임시 해제
-                .csrf(AbstractHttpConfigurer::disable)
+                // 아래 corsConfigurationSource 빈을 쓴다. 허용하지 않은 Origin의 요청은 인증·CSRF보다 먼저 403으로 거부된다
+                .cors(Customizer.withDefaults())
+                // 모든 상태 변경 요청(POST·PUT·PATCH·DELETE)에 예외 없이 CSRF를 적용한다
+                // spa()는 XSRF-TOKEN 쿠키를 JavaScript가 읽을 수 있게 하고, 쿠키 값을 그대로 담은 X-XSRF-TOKEN 헤더를 받는다.
+                // spa()의 저장소에는 Secure·SameSite가 없어 명세 속성을 붙인 저장소로 바꾼다. spa()가 저장소를 덮어쓰므로 순서를 지킨다(M00-01)
+                .csrf(csrf -> csrf
+                        .spa()
+                        .csrfTokenRepository(csrfTokenRepository())
+                )
                 .authorizeHttpRequests(requests -> requests
                         .requestMatchers("/actuator/health", "/actuator/prometheus")
                         .permitAll()
@@ -45,6 +57,9 @@ public class SecurityConfig {
                         // 재고 재조회는 /stocks만 명시해 /api/v1/drops/** 전체를 열지 않는다.
                         .requestMatchers(HttpMethod.GET, "/api/v1/categories", "/api/v1/drops", "/api/v1/drops/*",
                                 "/api/v1/drops/*/stocks")
+                        .permitAll()
+                        // CSRF 토큰 발급은 로그인 전에도 필요하다(MEMBER_AUTH 1.1)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/auth/csrf")
                         .permitAll()
                         // 이메일 인증 코드 요청·확인은 가입 전 단계라 로그인 없이 호출한다(MEMBER_AUTH 1.2.1, 1.2.2)
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/email-verification",
@@ -72,6 +87,38 @@ public class SecurityConfig {
                 .addFilterBefore(new JwtAuthenticationFilter(jwtProvider, authenticationEntryPoint),
                         UsernamePasswordAuthenticationFilter.class)
                 .build();
+    }
+
+    /*
+        허용한 프론트엔드 Origin에서만 쿠키를 포함한 API 요청을 받는다(COMMON 1.3, GR-44 M00-04).
+        - 헤더는 JSON 본문, CSRF 토큰, 주문 멱등성 키만 허용한다
+        - Swagger·Actuator는 같은 출처에서만 쓰므로 /api/**에만 적용한다
+     */
+    @Bean
+    CorsConfigurationSource corsConfigurationSource(CorsProperties corsProperties) {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(corsProperties.allowedOrigins()); // 설정에 명시된 프론트 출처만 허용
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE")); // 명시된 메서드만 허용
+        configuration.setAllowedHeaders(List.of("Content-Type", "X-XSRF-TOKEN", "Idempotency-Key")); // 허용 헤더
+        configuration.setAllowCredentials(true); // 쿠키를 포함한 다른 출처 요청 허용
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/api/**", configuration);
+        return source;
+    }
+
+    /*
+        XSRF-TOKEN 쿠키(MEMBER_AUTH 1.1). 인증 토큰이 아니라 헤더에 같은 값을 넣기 위해 JavaScript가 읽어야 하므로 HttpOnly를 붙이지 않는다.
+        Secure는 항상 붙인다. 브라우저는 http://localhost도 안전한 출처로 보므로 로컬 개발에서도 동작한다.
+     */
+    private static CookieCsrfTokenRepository csrfTokenRepository() {
+        // js에서 요청 헤더에 X-XSRF-TOKEN을 입력하기 위해 쿠키 값을 읽어야 함
+        CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        repository.setCookieCustomizer(cookie -> cookie
+                .secure(true)
+                .sameSite("Lax")
+                .path("/"));
+        return repository;
     }
 
     /*

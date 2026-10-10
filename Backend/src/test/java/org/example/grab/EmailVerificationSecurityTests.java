@@ -17,6 +17,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
@@ -46,7 +47,7 @@ class EmailVerificationSecurityTests {
     @Test
     @DisplayName("비로그인 POST 코드 요청은 인증 없이 Controller까지 도달해 204")
     void exposesCodeRequestWithoutAuthentication() throws Exception {
-        mockMvc.perform(post(REQUEST_PATH).contentType(MediaType.APPLICATION_JSON).content(REQUEST_BODY))
+        mockMvc.perform(post(REQUEST_PATH).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(REQUEST_BODY))
                 .andExpect(status().isNoContent());
         then(emailVerificationService).should().requestCode(anyString(), anyString());
     }
@@ -59,7 +60,7 @@ class EmailVerificationSecurityTests {
                 .willReturn("Xk3_vQ9aT1mZ0bR7cY2wL5nP8sD4fH6jK1gE3uA9qWo");
 
         // when & then
-        mockMvc.perform(post(CONFIRM_PATH).contentType(MediaType.APPLICATION_JSON).content(CONFIRM_BODY))
+        mockMvc.perform(post(CONFIRM_PATH).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(CONFIRM_BODY))
                 .andExpect(status().isNoContent())
                 .andExpect(cookie().exists("email_signup_token"));
     }
@@ -73,9 +74,9 @@ class EmailVerificationSecurityTests {
         Cookie invalid = new Cookie("access_token", "not-a-jwt");
 
         // when & then: 로그아웃하지 않은 채 쿠키가 만료된 사용자도 가입 절차를 진행할 수 있다
-        mockMvc.perform(post(REQUEST_PATH).cookie(invalid).contentType(MediaType.APPLICATION_JSON).content(REQUEST_BODY))
+        mockMvc.perform(post(REQUEST_PATH).with(csrf()).cookie(invalid).contentType(MediaType.APPLICATION_JSON).content(REQUEST_BODY))
                 .andExpect(status().isNoContent());
-        mockMvc.perform(post(CONFIRM_PATH).cookie(invalid).contentType(MediaType.APPLICATION_JSON).content(CONFIRM_BODY))
+        mockMvc.perform(post(CONFIRM_PATH).with(csrf()).cookie(invalid).contentType(MediaType.APPLICATION_JSON).content(CONFIRM_BODY))
                 .andExpect(status().isNoContent());
     }
 
@@ -91,14 +92,14 @@ class EmailVerificationSecurityTests {
     @Test
     @DisplayName("열어 둔 경로 밖의 /api/v1/auth 경로는 비로그인 401")
     void keepsOtherAuthPathsProtected() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/email-verification/other"))
+        mockMvc.perform(post("/api/v1/auth/email-verification/other").with(csrf()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("AUTHENTICATION_REQUIRED"));
         // 회원가입은 POST /api/v1/auth/signup만 연다(GR-30). 다른 메서드와 하위 경로는 계속 막힌다
         mockMvc.perform(get("/api/v1/auth/signup"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("AUTHENTICATION_REQUIRED"));
-        mockMvc.perform(post("/api/v1/auth/signup/other"))
+        mockMvc.perform(post("/api/v1/auth/signup/other").with(csrf()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("AUTHENTICATION_REQUIRED"));
     }

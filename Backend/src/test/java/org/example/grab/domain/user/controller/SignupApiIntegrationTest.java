@@ -35,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -113,7 +114,8 @@ class SignupApiIntegrationTest {
     }
 
     private static MockHttpServletRequestBuilder signupRequest(String body) {
-        return post(SIGNUP_PATH).contentType(MediaType.APPLICATION_JSON).content(body);
+        // 실제 필터 체인이라 CSRF 토큰이 필요하다(GR-44). CSRF 동작 자체는 CsrfProtectionTests가 확인한다
+        return post(SIGNUP_PATH).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body);
     }
 
     private ResultActions signup(String token, String body) throws Exception {

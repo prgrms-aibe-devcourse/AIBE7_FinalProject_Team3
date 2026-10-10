@@ -76,6 +76,10 @@ grab:
         email-window: 24h
         ip-max-requests: 30
         ip-window: 1h
+  cors:
+    # Credential(쿠키) 요청을 허용할 프론트엔드 Origin(GR-44 M00-04). 기본값은 로컬 Vite 개발 서버다.
+    # 여러 개는 쉼표로 구분하고 끝에 /를 붙이지 않는다. 운영을 같은 출처로 서비스하면 쓰이지 않는다
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
 
 server:
   # 운영은 Nginx 뒤에서 실행한다. Tomcat이 내부 프록시(사설망 IP)에서 온 요청의 X-Forwarded-For만 믿고
@@ -83,6 +87,11 @@ server:
   forward-headers-strategy: native
 
 springdoc:
+  swagger-ui:
+    csrf:
+      # Swagger UI의 Try it out이 XSRF-TOKEN 쿠키 값을 X-XSRF-TOKEN 헤더로 보낸다(GR-44 M00-06).
+      # 쿠키·헤더 이름은 springdoc 기본값이 명세와 같다. 상태 변경 요청 전에 GET /api/v1/auth/csrf를 먼저 실행한다
+      enabled: true
   group-configs:
     - group: category
       packages-to-scan: org.example.grab.domain.category

@@ -30,10 +30,12 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -140,12 +142,16 @@ class SecurityFilterChainTests {
                 .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
     }
 
+    // 응답에는 CSRF 토큰 쿠키(XSRF-TOKEN)가 실릴 수 있으므로(GR-44) Set-Cookie 전체가 아니라 세션 쿠키만 본다.
+    // MockMvc 요청 객체의 세션은 같은 컨텍스트의 다른 테스트 실행 순서에 따라 달라져 단언하지 않는다(GR-44 M02-01)
     @Test
     @DisplayName("인증 실패 응답에 세션 쿠키를 만들지 않는다")
     void doesNotCreateSession() throws Exception {
         mockMvc.perform(get(UNMAPPED_PROTECTED_PATH))
                 .andExpect(status().isUnauthorized())
-                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+                .andExpect(cookie().doesNotExist("JSESSIONID"))
+                .andExpect(result -> assertThat(result.getResponse().getHeaders(HttpHeaders.SET_COOKIE))
+                        .noneMatch(setCookie -> setCookie.startsWith("JSESSIONID")));
     }
 
     @Test
@@ -158,12 +164,14 @@ class SecurityFilterChainTests {
                 .andExpect(header().doesNotExist(HttpHeaders.WWW_AUTHENTICATE));
     }
 
-    // TODO(GR-44): CSRF를 다시 켜면 이 테스트는 403을 기대하도록 바꾼다
+    // GR-44: CSRF 필터가 인가보다 먼저 실행되므로 비로그인 사용자도 토큰이 없으면 401이 아니라 403이다
     @Test
-    @DisplayName("CSRF 임시 해제: 토큰 없는 비로그인 PUT은 403이 아니라 401")
-    void csrfTemporarilyDisabled() throws Exception {
+    @DisplayName("CSRF 토큰 없는 비로그인 PUT은 401이 아니라 공통 오류 형식의 403 ACCESS_DENIED")
+    void rejectsStateChangeWithoutCsrfToken() throws Exception {
         mockMvc.perform(put("/api/v1/drops/1/wish"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("ACCESS_DENIED"));
     }
 
     // S4: /api/v1/auth/**는 필터를 건너뛰어, 무효 쿠키를 가진 사용자도 재발급·로그인을 호출할 수 있다(M00-08)
@@ -177,9 +185,9 @@ class SecurityFilterChainTests {
         mockMvc.perform(get(UNMAPPED_PROTECTED_PATH).cookie(new Cookie("access_token", expired)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
-        // auth 경로는 아직 permitAll이 아니라(GR-30·34에서 연다) 익명 요청으로 인가 단계에서 막힌다.
+        // 재발급 경로는 아직 permitAll이 아니라(GR-34 등에서 연다) 익명 요청으로 인가 단계에서 막힌다.
         // 토큰 검증 실패(INVALID_TOKEN)가 아니라 인증 없음(AUTHENTICATION_REQUIRED)이면 필터를 건너뛴 것이다
-        mockMvc.perform(post("/api/v1/auth/refresh").cookie(new Cookie("access_token", expired)))
+        mockMvc.perform(post("/api/v1/auth/refresh").with(csrf()).cookie(new Cookie("access_token", expired)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("AUTHENTICATION_REQUIRED"));
     }
@@ -220,6 +228,7 @@ class SecurityFilterChainTests {
     @DisplayName("쿠키 없이 /api/v1/uploads/images/presigned-url는 401 AUTHENTICATION_REQUIRED")
     void rejectsUnauthenticatedUploadApi() throws Exception {
         mockMvc.perform(post("/api/v1/uploads/images/presigned-url")
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isUnauthorized())
@@ -234,6 +243,7 @@ class SecurityFilterChainTests {
 
         // when, then
         mockMvc.perform(post("/api/v1/uploads/images/presigned-url")
+                        .with(csrf())
                         .cookie(new Cookie("access_token", token))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
@@ -249,6 +259,7 @@ class SecurityFilterChainTests {
 
         // when, then: @Valid보다 인가가 먼저 실행되어 body 검증 결과가 노출되지 않는다
         mockMvc.perform(post("/api/v1/seller/drops/1/cancel")
+                        .with(csrf())
                         .cookie(new Cookie("access_token", token))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))

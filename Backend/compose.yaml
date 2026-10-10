@@ -15,6 +15,8 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       # JWT_SECRET과 같이 기본값을 두지 않는다. .env에 없으면 이메일 인증 HMAC 키를 쓰는 시점에 기동에 실패한다
       EMAIL_VERIFICATION_SECRET: ${EMAIL_VERIFICATION_SECRET}
+      # 쿠키를 포함한 요청을 허용할 프론트엔드 Origin. 기본값은 로컬 Vite 개발 서버다
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
       REDIS_HOST: redis
       REDIS_PASSWORD: ${REDIS_PASSWORD:-grab}
       # 기본값은 Mailpit이다. 컨테이너 안의 localhost는 mailpit이 아니므로 서비스 이름으로 접속한다(docs/MAIL.md)
