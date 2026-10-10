@@ -95,6 +95,8 @@ GET /api/v1/users/me/wishes?page=0&size=20
 }
 ```
 
+`thumbnailUrl`은 GALLERY의 첫 이미지이며 DETAIL 이미지는 사용하지 않습니다.
+
 ### 1.4 DROP 활성 WISH 수 조회
 
 ```http
@@ -116,4 +118,3 @@ GET /api/v1/seller/drops/{dropId}/wish-count
 ```
 
 ---
-

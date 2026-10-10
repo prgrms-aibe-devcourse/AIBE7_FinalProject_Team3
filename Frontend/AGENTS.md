@@ -1,6 +1,6 @@
 # GRAB Frontend
 
-React 19 + TypeScript + Vite 8 SPA. 현재는 Mock 데이터 기반 초안이며 백엔드 API 연동 전이다.
+React 19 + TypeScript + Vite 8 SPA. 주요 화면은 Mock 데이터 기반 초안이며 공개 카테고리 API만 최소 연동했다.
 저장소 공통 규칙은 루트 `AGENTS.md`를 따르고, 이 문서는 `Frontend/` 작업에만 적용한다.
 
 ## 실행 및 검증
@@ -25,7 +25,8 @@ npm run e2e:docker -- --grep @visual   # 시각 비교 (CI와 같은 Docker 이�
 - `src/components` — 도메인에 의존하지 않는 범용 UI (`Header`, `Footer`, `EmptyState`)
 - `src/features/<도메인>` — 도메인 UI·로직·Mock·테스트 (`drop`, `order`, `wish`, `auth`, `seller`)
 - `src/pages/<Page>` — 라우트 단위 화면. 라우트는 `src/App.tsx`에서 관리한다.
-- `src/types` — API 계약 타입, `src/utils` — 날짜·가격 표시 함수
+- `src/types` — 화면·Mock 타입, `src/utils` — 날짜·가격 표시 함수
+- `src/api/schema` — OpenAPI 생성 타입, `src/api/<도메인>` — 도메인별 요청·테스트, `src/api/client.ts` — 공통 클라이언트
 - 라우터는 `HashRouter`다. URL은 `/#/wish` 형태다.
 - 로그인·WISH·주문 상태는 `App.tsx`의 `useState`에만 있다. 새 전역 상태 관리 도입은 별도 합의 후 진행한다.
 
@@ -75,6 +76,10 @@ npm run e2e:docker -- --grep @visual   # 시각 비교 (CI와 같은 Docker 이�
 ## 사양 연동
 
 - 요구사항·API 명세는 `Backend/docs/development/`(REQUIREMENTS.md, api-spec/)를 확인한다.
+- API 요청은 `src/api/client.ts`를 사용하고 `/api/v1` 상대 경로로 보낸다. 서버 응답은 TanStack Query로 관리한다.
+- 백엔드 API가 바뀌면 백엔드 컨테이너를 재빌드·기동한 뒤 `Frontend/`에서 `npm run api:snapshot` → `npm run api:generate` 순서로 실행한다. 앞 명령은 `openapi/*.json`, 뒤 명령은 `src/api/schema/*.ts`를 갱신한다. `npm run build`는 두 파일을 갱신하지 않는다.
+- 생성 파일을 직접 수정하지 않고 명세 변경 시 `README.md`의 불일치 확인 절차를 따른다. 브라우저 런타임에서는 `/v3/api-docs`를 호출하지 않는다.
+- 생성 타입은 API 계약, `src/api`는 요청·오류 처리, 화면용 변환은 해당 `src/features`가 맡는다. 인증 쿠키·CSRF·401 재시도는 GR-45 범위다.
 - Mock 타입과 주석에 적힌 API 경로·이슈 번호(GR-xx)는 연동 시 기준이 된다. 함부로 바꾸지 않는다.
 - 코드와 사양이 어긋나면 코드를 먼저 고치지 말고 문서를 수정할지 먼저 묻는다.
 

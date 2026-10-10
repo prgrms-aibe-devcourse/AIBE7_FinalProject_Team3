@@ -117,7 +117,7 @@ MVP에서는 판매자 신청과 프로필을 한 테이블에서 관리한다. 
 공개 시 다음 조건을 검증한다.
 
 - 상품명, 설명, 카테고리, 일정, 배송 정보 입력
-- 이미지와 구매 옵션 각각 한 개 이상 존재
+- GALLERY 이미지와 구매 옵션 각각 한 개 이상 존재한다. DETAIL 이미지는 없어도 된다.
 - 전체 판매 수량이 1개 이상
 - `sale_starts_at < sale_ends_at`
 
@@ -129,10 +129,11 @@ MVP에서는 판매자 신청과 프로필을 한 테이블에서 관리한다. 
 | `public_id` | UUID | O | UQ, 외부 노출 식별자(객체 키 `images/{public_id}.{ext}`에 사용) |
 | `drop_id` | BIGINT | O | FK drops |
 | `image_url` | VARCHAR(500) | O | Supabase Storage 공개 URL |
-| `sort_order` | INT | O | 0 이상, UQ(drop_id, sort_order) |
+| `image_type` | VARCHAR(10) | O | `GALLERY` 또는 `DETAIL`, 기존 행은 `GALLERY`로 이관 |
+| `sort_order` | INT | O | 용도 안에서 0부터 연속, UQ(drop_id, image_type, sort_order) |
 | `alt_text` | VARCHAR(300) | O | 대체 설명 |
 
-DROP 하나에는 상품 이미지를 최대 10개까지 등록한다.
+DROP 하나에는 두 용도를 합쳐 이미지를 최대 10개까지 등록한다. GALLERY의 첫 이미지(`sort_order = 0`)만 목록 썸네일로 사용하고 DETAIL 이미지는 상세 설명에만 사용한다. 기존 이미지의 URL·`public_id`·순서를 보존한 채 `image_type = GALLERY`로 이관한다. 대체 설명은 빈 문자열을 허용하지만 `NULL`은 허용하지 않는다. 기존 행의 대체 설명도 보존한다.
 
 #### `drop_option_groups`
 

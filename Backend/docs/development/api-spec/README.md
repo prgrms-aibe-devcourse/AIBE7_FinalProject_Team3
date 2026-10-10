@@ -2,6 +2,8 @@
 
 > 상세 규칙과 요청·응답 예시는 아래 문서에서 확인합니다.
 
+실행 중인 백엔드의 OpenAPI 문서는 `/v3/api-docs`에서 전체를, `/v3/api-docs/{group}`에서 도메인별로 확인할 수 있습니다. 그룹은 `category`, `dashboard`, `drop`, `order`, `payment`, `user`, `wish`이며 컨트롤러 패키지를 기준으로 자동 구성됩니다. Swagger UI(`/swagger-ui/index.html`)에서도 그룹을 선택할 수 있습니다. 새 도메인을 만들면 `application.yml`의 `springdoc.group-configs`에 등록합니다. Mock 배송 API를 활성화하면 `order` 그룹에 포함됩니다.
+
 ## 1. 문서 구성
 
 | 문서 | 내용 |
@@ -66,6 +68,8 @@
 - 품절 필터: `soldOut`
 - 정렬: `sort`
 - 페이지: `page`, `size`
+
+`sort=wishCount,desc`는 WISH, `sort=soldQuantity,desc`는 GRAB 인기 조회에 사용합니다. 메인은 각 영역 최대 8개, 상품 목록은 24개/페이지로 요청합니다. 상세 조건은 [DROP.md](DROP.md) 1.2를 따릅니다.
 
 ### 2.4 판매자 DROP 관리
 
@@ -147,7 +151,7 @@
 | --- | --- | --- | --- |
 | POST | `/api/v1/uploads/images/presigned-url` | SELLER | 상품 이미지 업로드용 Supabase 서명 업로드 URL 발급 |
 
-> 발급된 `uploadUrl`로 클라이언트가 Supabase Storage에 이미지를 직접 업로드하고, 응답의 `{ imageId, imageUrl }`을 DROP 생성·수정 요청의 `images`에 그대로 사용합니다.
+> 발급된 `uploadUrl`로 클라이언트가 Supabase Storage에 이미지를 직접 업로드하고, 응답의 `{ imageId, imageUrl }`을 DROP 생성·수정 요청의 GALLERY `images` 또는 DETAIL `detailImages`에 사용합니다. 두 용도의 합계는 최대 10개입니다.
 
 ---
 
@@ -168,4 +172,3 @@
 | **합계** | **49** | |
 
 ---
-

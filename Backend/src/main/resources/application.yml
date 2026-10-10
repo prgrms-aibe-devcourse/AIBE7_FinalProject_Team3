@@ -86,6 +86,25 @@ server:
   # request.getRemoteAddr()를 실제 사용자 IP로 바꾼다. 외부에서 직접 보낸 X-Forwarded-For는 무시한다(GR-61 M00-04)
   forward-headers-strategy: native
 
+springdoc:
+  group-configs:
+    - group: category
+      packages-to-scan: org.example.grab.domain.category
+    - group: dashboard
+      packages-to-scan: org.example.grab.domain.dashboard
+    - group: drop
+      packages-to-scan: org.example.grab.domain.drop
+    - group: order
+      packages-to-scan:
+        - org.example.grab.domain.order
+        - org.example.grab.domain.shipment
+    - group: payment
+      packages-to-scan: org.example.grab.domain.payment
+    - group: user
+      packages-to-scan: org.example.grab.domain.user
+    - group: wish
+      packages-to-scan: org.example.grab.domain.wish
+
 management:
   endpoints:
     web:
