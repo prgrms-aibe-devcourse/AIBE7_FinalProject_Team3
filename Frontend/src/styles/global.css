@@ -1411,6 +1411,91 @@ main {
   margin: 0 0 18px;
   line-height: 1.6;
 }
+.buyer-status {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--lime);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+}
+.buyer-order-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(290px, 1fr);
+  grid-template-areas:
+    'product payment'
+    'shipping cancel';
+  gap: 24px;
+  align-items: start;
+}
+.buyer-order-product {
+  grid-area: product;
+}
+.buyer-order-payment {
+  grid-area: payment;
+}
+.buyer-order-shipping {
+  grid-area: shipping;
+}
+.buyer-order-cancel {
+  grid-area: cancel;
+}
+.buyer-order-payment > p,
+.buyer-order-shipping > p {
+  line-height: 1.6;
+}
+.buyer-order-payment .buyer-amounts {
+  margin-top: 20px;
+}
+.buyer-shipping-info {
+  display: grid;
+  gap: 10px;
+}
+.buyer-shipping-info div {
+  display: flex;
+  gap: 16px;
+}
+.buyer-shipping-info dt {
+  min-width: 76px;
+  color: var(--muted);
+}
+.buyer-shipping-info dd {
+  margin: 0;
+}
+.buyer-cancel-form {
+  display: grid;
+  gap: 16px;
+}
+.buyer-cancel-form label:first-child {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.buyer-cancel-form textarea {
+  min-height: 96px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  resize: vertical;
+}
+.buyer-cancel-form .buyer-result-choice {
+  margin: 0;
+}
+.buyer-cancel-form .secondary-button {
+  justify-self: start;
+}
+.buyer-alert {
+  padding: 12px;
+  border-left: 3px solid var(--lime);
+  background: var(--soft);
+  line-height: 1.6;
+}
+.buyer-back {
+  display: inline-block;
+  margin-top: 28px;
+}
 .auth-form h2 {
   margin: 0 0 12px;
   font-size: 30px;
@@ -2210,6 +2295,14 @@ footer small {
   }
   .buyer-layout {
     grid-template-columns: 1fr;
+  }
+  .buyer-order-layout {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      'product'
+      'payment'
+      'shipping'
+      'cancel';
   }
   .order-panel {
     grid-row: 1;

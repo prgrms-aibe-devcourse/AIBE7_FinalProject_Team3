@@ -3,6 +3,7 @@ import {
   canCancel,
   canPay,
   demoBuyerOrders,
+  withCancelExample,
   withPaymentExample,
 } from '../mockBuyerOrders'
 
@@ -50,5 +51,21 @@ describe('구매자 주문 Mock 상태', () => {
     expect(unknown.status).toBe('PAYMENT_PENDING')
     expect(unknown.reconciliationStatus).toBe('REQUIRED')
     expect(canPay(unknown)).toBe(false)
+  })
+
+  it('취소 실패·결과 불명은 주문을 취소 완료로 바꾸지 않는다', () => {
+    const paid = scenario('demo-paid')
+    expect(withCancelExample(paid, 'FAILED', '단순 변심').status).toBe('PAID')
+    const unknown = withCancelExample(paid, 'UNKNOWN', '단순 변심')
+    expect(unknown.status).toBe('PAID')
+    expect(unknown.refundStatus).toBe('UNKNOWN')
+    expect(canCancel(unknown)).toBe(false)
+    const canceled = withCancelExample(paid, 'SUCCEEDED', '단순 변심')
+    expect(canceled.status).toBe('CANCELED')
+    expect(canceled.refundStatus).toBe('SUCCEEDED')
+    expect(
+      withCancelExample(scenario('demo-shipped'), 'SUCCEEDED', '단순 변심')
+        .status,
+    ).toBe('SHIPPED')
   })
 })

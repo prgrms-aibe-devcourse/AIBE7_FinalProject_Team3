@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation, useParams } from 'react-router-dom'
 import EmptyState from '../../components/EmptyState/EmptyState'
+import BuyerOrderAmounts from '../../features/order/BuyerOrderAmounts'
+import BuyerOrderItem from '../../features/order/BuyerOrderItem'
 import {
   canPay,
   withPaymentExample,
@@ -8,7 +10,6 @@ import {
   type PaymentDemoResult,
 } from '../../features/order/mockBuyerOrders'
 import { dateLabel } from '../../utils/date'
-import { won } from '../../utils/price'
 
 type Props = {
   authenticated: boolean
@@ -126,36 +127,12 @@ function CheckoutContent({
           </section>
           <section className="panel buyer-panel">
             <h2>주문 상품</h2>
-            <div className="buyer-item">
-              <img src={order.image} alt="" />
-              <div>
-                <Link className="text-link" to={`/drops/${order.dropId}`}>
-                  {order.productName}
-                </Link>
-                <p>
-                  {order.optionLabel} · {order.quantity}개
-                </p>
-              </div>
-              <strong>{won(order.itemsAmount)}</strong>
-            </div>
+            <BuyerOrderItem order={order} />
           </section>
         </div>
         <section className="panel buyer-panel buyer-summary">
           <h2>결제 금액</h2>
-          <dl className="buyer-amounts">
-            <div>
-              <dt>상품 금액</dt>
-              <dd>{won(order.itemsAmount)}</dd>
-            </div>
-            <div>
-              <dt>배송비</dt>
-              <dd>{won(order.shippingAmount)}</dd>
-            </div>
-            <div className="buyer-total">
-              <dt>총 결제 금액</dt>
-              <dd>{won(order.totalAmount)}</dd>
-            </div>
-          </dl>
+          <BuyerOrderAmounts order={order} />
           <p className="buyer-deadline">
             {order.paymentExpiresAt
               ? `결제 마감: ${dateLabel(order.paymentExpiresAt)}`
