@@ -47,7 +47,7 @@ class AsyncEmailDispatcherGreenMailTest {
             // given
             AsyncEmailDispatcher dispatcher = context.getBean(AsyncEmailDispatcher.class);
             ThreadPoolTaskExecutor mailExecutor =
-                    context.getBean(MailAsyncConfig.MAIL_TASK_EXECUTOR, ThreadPoolTaskExecutor.class);
+                    context.getBean(MailAsyncConfig.AUTH_MAIL_TASK_EXECUTOR, ThreadPoolTaskExecutor.class);
 
             // when
             dispatcher.dispatch(MESSAGE);

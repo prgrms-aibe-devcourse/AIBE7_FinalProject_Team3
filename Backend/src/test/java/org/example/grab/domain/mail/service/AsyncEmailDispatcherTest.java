@@ -181,22 +181,27 @@ class AsyncEmailDispatcherTest {
     }
 
     @Test
-    @DisplayName("알림은 인증 코드와 다른 발송처로 보낸다")
-    // 알림이 아무리 많아도 인증 코드 계정의 일일 한도를 먹지 않아야 하므로 경로가 갈리는지 확인하는 테스트(GR-69)
-    void sendsNoticeThroughSeparateSender() {
+    @DisplayName("알림은 인증 코드와 다른 발송처·다른 풀로 보낸다")
+    // 알림이 아무리 많아도 인증 코드 계정의 일일 한도를 먹지 않아야 하고, 풀도 나눠 서로의 큐를 뺏지 않는지 확인하는 테스트(GR-69)
+    void sendsNoticeThroughSeparateSenderAndExecutor() {
         // given
         EmailSender authSender = mock(EmailSender.class);
         EmailSender noticeSender = mock(EmailSender.class);
-        List<Runnable> submitted = new ArrayList<>();
-        AsyncEmailDispatcher dispatcher = new AsyncEmailDispatcher(authSender, noticeSender, submitted::add);
+        List<Runnable> submittedToAuth = new ArrayList<>();
+        List<Runnable> submittedToNotice = new ArrayList<>();
+        AsyncEmailDispatcher dispatcher =
+                new AsyncEmailDispatcher(authSender, noticeSender, submittedToAuth::add, submittedToNotice::add);
         List<EmailMessage> messages = messages(100);
 
         // when
         dispatcher.dispatchAll(messages);
         dispatcher.dispatch(MESSAGE);
 
-        // then: 묶음 알림은 알림 발송처로, 인증 코드는 기본 발송기로 간다
-        submitted.forEach(Runnable::run);
+        // then: 묶음 알림은 알림 발송처·알림 풀로, 인증 코드는 기본 발송기·인증 풀로 간다
+        assertThat(submittedToNotice).hasSize(1);
+        assertThat(submittedToAuth).hasSize(1);
+        submittedToNotice.forEach(Runnable::run);
+        submittedToAuth.forEach(Runnable::run);
         verify(noticeSender).sendAll(messages);
         verify(noticeSender, never()).send(any(EmailMessage.class));
         verify(authSender).send(MESSAGE);
@@ -204,11 +209,11 @@ class AsyncEmailDispatcherTest {
     }
 
     /*
-     * 알림 발송처를 설정하지 않은 상태(로컬 Mailpit)의 디스패처. 두 경로가 같은 발송기를 쓰므로,
-     * 발송처 분리와 무관한 기존 동작(비동기 제출·예외 삼킴·큐 거부)을 그대로 확인할 수 있다.
+     * 알림 발송처를 설정하지 않은 상태(로컬 Mailpit)의 디스패처. 두 경로가 같은 발송기·같은 executor를 쓰므로,
+     * 발송처·풀 분리와 무관한 기존 동작(비동기 제출·예외 삼킴·큐 거부)을 그대로 확인할 수 있다.
      */
     private static AsyncEmailDispatcher dispatcher(EmailSender emailSender, TaskExecutor executor) {
-        return new AsyncEmailDispatcher(emailSender, emailSender, executor);
+        return new AsyncEmailDispatcher(emailSender, emailSender, executor, executor);
     }
 
     private static List<EmailMessage> messages(int count) {

@@ -27,22 +27,25 @@ public class AsyncEmailDispatcher {
 
     private final EmailSender emailSender;
     private final EmailSender noticeEmailSender;
-    private final TaskExecutor mailTaskExecutor;
+    private final TaskExecutor authMailTaskExecutor;
+    private final TaskExecutor noticeMailTaskExecutor;
 
     // 메일 풀과 알림 발송기는 defaultCandidate = false로 등록되어 타입만으로는 주입되지 않으므로 이름으로 지정한다
     public AsyncEmailDispatcher(
             EmailSender emailSender,
             @Qualifier(NoticeMailConfig.NOTICE_EMAIL_SENDER) EmailSender noticeEmailSender,
-            @Qualifier(MailAsyncConfig.MAIL_TASK_EXECUTOR) TaskExecutor mailTaskExecutor
+            @Qualifier(MailAsyncConfig.AUTH_MAIL_TASK_EXECUTOR) TaskExecutor authMailTaskExecutor,
+            @Qualifier(MailAsyncConfig.NOTICE_MAIL_TASK_EXECUTOR) TaskExecutor noticeMailTaskExecutor
     ) {
         this.emailSender = emailSender;
         this.noticeEmailSender = noticeEmailSender;
-        this.mailTaskExecutor = mailTaskExecutor;
+        this.authMailTaskExecutor = authMailTaskExecutor;
+        this.noticeMailTaskExecutor = noticeMailTaskExecutor;
     }
 
     public void dispatch(EmailMessage message) {
         try {
-            mailTaskExecutor.execute(() -> send(message));
+            authMailTaskExecutor.execute(() -> send(message));
         } catch (TaskRejectedException e) {
             // 큐가 찼다는 것은 SMTP가 느리거나 요청이 몰렸다는 뜻이다. 쌓아 두면 재발송 간격보다 늦게 도착하므로 버린다
             log.warn("[AsyncEmailDispatcher.dispatch]메일 발송 대기열이 가득 차 발송하지 않음: {}", message);
@@ -67,7 +70,7 @@ public class AsyncEmailDispatcher {
 
     private void submit(EmailSender sender, List<EmailMessage> batch) {
         try {
-            mailTaskExecutor.execute(() -> sendAll(sender, batch));
+            noticeMailTaskExecutor.execute(() -> sendAll(sender, batch));
         } catch (TaskRejectedException e) {
             // 받는 주소·본문은 남기지 않는다(NFR-011과 같은 방침)
             log.warn("[AsyncEmailDispatcher.submit]메일 발송 대기열이 가득 차 발송하지 않음: {}통", batch.size());
