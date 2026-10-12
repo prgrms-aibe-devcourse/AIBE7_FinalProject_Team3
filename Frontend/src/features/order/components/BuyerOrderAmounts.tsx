@@ -1,5 +1,5 @@
-import type { BuyerOrder } from './mockBuyerOrders'
-import { won } from '../../utils/price'
+import type { BuyerOrder } from '../mock/mockBuyerOrders'
+import { won } from '../../../utils/price'
 
 export default function BuyerOrderAmounts({ order }: { order: BuyerOrder }) {
   return (

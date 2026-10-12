@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation, useParams } from 'react-router-dom'
 import EmptyState from '../../components/EmptyState/EmptyState'
-import BuyerOrderAmounts from '../../features/order/BuyerOrderAmounts'
-import BuyerOrderItem from '../../features/order/BuyerOrderItem'
+import BuyerOrderAmounts from '../../features/order/components/BuyerOrderAmounts'
+import BuyerOrderItem from '../../features/order/components/BuyerOrderItem'
 import {
   buyerOrderStatusText,
   canCancel,
@@ -10,7 +10,7 @@ import {
   withCancelExample,
   type BuyerOrder,
   type CancelDemoResult,
-} from '../../features/order/mockBuyerOrders'
+} from '../../features/order/mock/mockBuyerOrders'
 import { dateLabel } from '../../utils/date'
 
 type Props = {

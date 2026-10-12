@@ -5,7 +5,7 @@ import {
   demoBuyerOrders,
   withCancelExample,
   withPaymentExample,
-} from '../mockBuyerOrders'
+} from '../mock/mockBuyerOrders'
 
 const scenario = (id: string) =>
   demoBuyerOrders.find((order) => order.id === id)!

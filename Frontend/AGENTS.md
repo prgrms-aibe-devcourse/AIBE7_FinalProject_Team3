@@ -23,7 +23,7 @@ npm run e2e:docker -- --grep @visual   # 시각 비교 (CI와 같은 Docker 이�
 ## 구조
 
 - `src/components` — 도메인에 의존하지 않는 범용 UI (`Header`, `Footer`, `EmptyState`)
-- `src/features/<도메인>` — 도메인 UI·로직·Mock·테스트 (`drop`, `order`, `wish`, `auth`, `seller`)
+- `src/features/<도메인>` — 도메인별 UI는 `components/`, 훅·계산·검증 코드는 `logic/`, 예시 데이터는 `mock/`, 테스트는 `__tests__/`에 둔다(`drop`, `order`, `wish`, `auth`, `seller`). 파일이 하나뿐인 역할에는 폴더를 강제하지 않는다.
 - `src/pages/<Page>` — 라우트 단위 화면. 라우트는 `src/App.tsx`에서 관리한다.
 - `src/types` — 화면·Mock 타입, `src/utils` — 날짜·가격 표시 함수
 - `src/api/schema` — OpenAPI 생성 타입, `src/api/<도메인>` — 도메인별 요청·테스트, `src/api/client.ts` — 공통 클라이언트
@@ -68,7 +68,7 @@ npm run e2e:docker -- --grep @visual   # 시각 비교 (CI와 같은 Docker 이�
 ```
 
 - `variant`: `block`은 목록 자리의 단독 영역, `compact`는 `.panel` 안, `page`는 페이지 전체를 채운다. 링크는 `link`와 `label`을 함께 줄 때만 표시된다.
-- 도메인 컴포넌트 예: `features/drop/DropCard`, `features/order/SellerOrderDetail`·`ShipmentForm`, `features/seller/OptionGroupBuilder`. 같은 도메인 화면을 만들 때 먼저 확인한다.
+- 도메인 컴포넌트 예: `features/drop/components/DropCard`, `features/order/components/SellerOrderDetail`·`ShipmentForm`, `features/seller/OptionGroupBuilder`. 같은 도메인 화면을 만들 때 먼저 확인한다.
 - 페이지 제목(`eyebrow` + `h1`)은 화면마다 감싸는 레이아웃(`hero`, `auth-copy`, `seller-title` 등)이 달라 컴포넌트로 묶지 않고 마크업을 그대로 쓴다.
 
 ## 판매자 대시보드 계열 (디자인 개선 예정)

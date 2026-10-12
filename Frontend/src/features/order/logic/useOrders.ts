@@ -3,8 +3,8 @@ import {
   demoBuyerOrders,
   fromDemoOrder,
   type BuyerOrder,
-} from './mockBuyerOrders'
-import type { Order } from '../../types/order'
+} from '../mock/mockBuyerOrders'
+import type { Order } from '../../../types/order'
 
 export default function useOrders() {
   const [orders, setOrders] = useState<Order[]>([])

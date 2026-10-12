@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { Drop } from '../../types/drop'
-import { fetchHomeDrops, type HomeSectionKey } from './mock/mockHome'
+import type { Drop } from '../../../types/drop'
+import { fetchHomeDrops, type HomeSectionKey } from '../mock/mockHome'
 
 export type HomeDropsState =
   | { status: 'loading' }

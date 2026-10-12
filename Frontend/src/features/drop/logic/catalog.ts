@@ -1,4 +1,4 @@
-import type { MockCatalogDrop } from './mock/mockCatalog'
+import type { MockCatalogDrop } from '../mock/mockCatalog'
 
 export const CATALOG_PAGE_SIZE = 24
 

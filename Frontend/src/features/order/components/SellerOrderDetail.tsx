@@ -1,6 +1,6 @@
-import { dateLabel } from '../../utils/date'
-import { won } from '../../utils/price'
-import type { SellerOrderDetail as Detail } from './mockSellerOrders'
+import { dateLabel } from '../../../utils/date'
+import { won } from '../../../utils/price'
+import type { SellerOrderDetail as Detail } from '../mock/mockSellerOrders'
 
 type Props = {
   detail: Detail

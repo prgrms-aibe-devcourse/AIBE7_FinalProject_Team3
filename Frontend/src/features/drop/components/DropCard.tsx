@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import type { Drop } from '../../types/drop'
-import { daysUntil, dateLabel } from '../../utils/date'
-import { won } from '../../utils/price'
+import type { Drop } from '../../../types/drop'
+import { daysUntil, dateLabel } from '../../../utils/date'
+import { won } from '../../../utils/price'
 
 type Props = {
   drop: Drop

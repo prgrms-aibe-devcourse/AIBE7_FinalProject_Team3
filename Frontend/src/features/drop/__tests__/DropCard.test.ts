@@ -2,7 +2,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
-import DropCard from '../DropCard'
+import DropCard from '../components/DropCard'
 import { catalogDrops } from '../mock/mockCatalog'
 import type { Drop } from '../../../types/drop'
 

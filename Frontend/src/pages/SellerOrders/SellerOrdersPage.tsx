@@ -3,13 +3,13 @@ import EmptyState from '../../components/EmptyState/EmptyState'
 import type {
   SellerOrder,
   SellerOrderStatus,
-} from '../../features/order/mockSellerOrders'
+} from '../../features/order/mock/mockSellerOrders'
 import {
   orderDetails,
   sellerOrders,
-} from '../../features/order/mockSellerOrders'
-import SellerOrderDetail from '../../features/order/SellerOrderDetail'
-import ShipmentForm from '../../features/order/ShipmentForm'
+} from '../../features/order/mock/mockSellerOrders'
+import SellerOrderDetail from '../../features/order/components/SellerOrderDetail'
+import ShipmentForm from '../../features/order/components/ShipmentForm'
 import { dateLabel } from '../../utils/date'
 import { won } from '../../utils/price'
 

@@ -6,7 +6,7 @@ import {
   mockLoginErrors,
   socialAccount,
   type MockAccount,
-} from '../../features/auth/mockAuth'
+} from '../../features/auth/mock/mockAuth'
 
 type Props = {
   onLogin: (account: MockAccount) => void

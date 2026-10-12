@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { queryCatalog } from '../catalog'
+import { queryCatalog } from '../logic/catalog'
 import { catalogDrops, type MockCatalogDrop } from '../mock/mockCatalog'
 
 const now = Date.UTC(2026, 9, 9)

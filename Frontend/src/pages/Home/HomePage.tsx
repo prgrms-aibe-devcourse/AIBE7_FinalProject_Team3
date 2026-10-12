@@ -1,11 +1,11 @@
 import { Link } from 'react-router-dom'
 import EmptyState from '../../components/EmptyState/EmptyState'
-import PopularRail from '../../features/drop/PopularRail'
+import PopularRail from '../../features/drop/components/PopularRail'
 import {
   homeSections,
   type HomeSectionConfig,
 } from '../../features/drop/mock/mockHome'
-import useHomeDrops from '../../features/drop/useHomeDrops'
+import useHomeDrops from '../../features/drop/logic/useHomeDrops'
 import type { SharedProps } from '../../types/store'
 
 function HomeSection({

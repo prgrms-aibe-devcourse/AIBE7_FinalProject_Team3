@@ -1,12 +1,12 @@
 import { useState, useTransition } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import EmptyState from '../../components/EmptyState/EmptyState'
-import DropCard from '../../features/drop/DropCard'
-import { queryCatalog } from '../../features/drop/catalog'
+import DropCard from '../../features/drop/components/DropCard'
+import { queryCatalog } from '../../features/drop/logic/catalog'
 import {
   changeCatalogParams,
   readCatalogQuery,
-} from '../../features/drop/catalogSearchParams'
+} from '../../features/drop/logic/catalogSearchParams'
 import { catalogDrops } from '../../features/drop/mock/mockCatalog'
 import { categories } from '../../features/drop/mock/mockDrops'
 import type { SharedProps } from '../../types/store'

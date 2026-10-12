@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { optionCombinations, selectionLabel } from '../drop/option'
+import { optionCombinations, selectionLabel } from '../drop/logic/option'
 import type { OptionGroup } from '../../types/drop'
 
 type DraftGroup = OptionGroup & { rawValues: string }

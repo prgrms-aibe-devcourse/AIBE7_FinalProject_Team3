@@ -1,11 +1,14 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import DropDetailImages from '../../features/drop/DropDetailImages'
-import DropGallery from '../../features/drop/DropGallery'
+import DropDetailImages from '../../features/drop/components/DropDetailImages'
+import DropGallery from '../../features/drop/components/DropGallery'
 import { findMockDetailDrop } from '../../features/drop/mock/mockDetailDrops'
 import { detailImages } from '../../features/drop/mock/mockDetailImages'
-import { findMatchingSku, selectionLabel } from '../../features/drop/option'
-import { minPrice, stock } from '../../features/drop/selectors'
+import {
+  findMatchingSku,
+  selectionLabel,
+} from '../../features/drop/logic/option'
+import { minPrice, stock } from '../../features/drop/logic/selectors'
 import type { SharedProps } from '../../types/store'
 import { dateLabel, daysUntil } from '../../utils/date'
 import { won } from '../../utils/price'

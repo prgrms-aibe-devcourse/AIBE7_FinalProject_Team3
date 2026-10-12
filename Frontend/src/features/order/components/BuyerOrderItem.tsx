@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
-import type { BuyerOrder } from './mockBuyerOrders'
-import { won } from '../../utils/price'
+import type { BuyerOrder } from '../mock/mockBuyerOrders'
+import { won } from '../../../utils/price'
 
 export default function BuyerOrderItem({ order }: { order: BuyerOrder }) {
   return (

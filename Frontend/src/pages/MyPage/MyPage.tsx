@@ -5,12 +5,12 @@ import {
   mockSignupErrors,
   nicknameError,
   type MockAccount,
-} from '../../features/auth/mockAuth'
+} from '../../features/auth/mock/mockAuth'
 import { drops } from '../../features/drop/mock/mockDrops'
 import {
   buyerOrderStatusText,
   type BuyerOrder,
-} from '../../features/order/mockBuyerOrders'
+} from '../../features/order/mock/mockBuyerOrders'
 import type { SharedProps } from '../../types/store'
 import { dateLabel } from '../../utils/date'
 import { won } from '../../utils/price'
