@@ -8,6 +8,7 @@ import useWish from './features/wish/logic/useWish'
 import {
   demoSellerApplications,
   newSellerApplication,
+  reviewSellerApplication,
 } from './features/seller/mock/mockSellerApplications'
 import CheckoutPage from './pages/Checkout/CheckoutPage'
 import DropDetailPage from './pages/DropDetail/DropDetailPage'
@@ -23,6 +24,7 @@ import SellerDropDetailPage from './pages/SellerDropDetail/SellerDropDetailPage'
 import SellerDropFormPage from './pages/SellerDropForm/SellerDropFormPage'
 import SellerOrdersPage from './pages/SellerOrders/SellerOrdersPage'
 import SellerApplyPage from './pages/SellerApply/SellerApplyPage'
+import AdminSellerApplicationsPage from './pages/AdminSellerApplications/AdminSellerApplicationsPage'
 import type { SharedProps } from './types/store'
 
 export default function App() {
@@ -127,6 +129,21 @@ export default function App() {
                     ...current,
                   ])
                 }}
+                notify={notify}
+              />
+            }
+          />
+          <Route
+            path="/admin/seller-applications"
+            element={
+              <AdminSellerApplicationsPage
+                account={account}
+                applications={sellerApplications}
+                onReview={(id, status, reason) =>
+                  setSellerApplications((current) =>
+                    reviewSellerApplication(current, id, status, reason),
+                  )
+                }
                 notify={notify}
               />
             }

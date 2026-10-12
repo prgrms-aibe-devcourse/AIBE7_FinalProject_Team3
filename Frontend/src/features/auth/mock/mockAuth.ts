@@ -2,7 +2,7 @@ export type MockAccount = {
   email: string
   nickname: string
   provider: 'LOCAL' | 'KAKAO' | 'GOOGLE'
-  role: 'MEMBER' | 'SELLER'
+  role: 'MEMBER' | 'SELLER' | 'ADMIN'
 }
 
 export const localAccount: MockAccount = {
@@ -10,6 +10,13 @@ export const localAccount: MockAccount = {
   nickname: '드롭헌터',
   provider: 'LOCAL',
   role: 'MEMBER',
+}
+
+export const adminAccount: MockAccount = {
+  email: 'admin@example.com',
+  nickname: '운영자',
+  provider: 'LOCAL',
+  role: 'ADMIN',
 }
 
 export function socialAccount(provider: 'KAKAO' | 'GOOGLE'): MockAccount {

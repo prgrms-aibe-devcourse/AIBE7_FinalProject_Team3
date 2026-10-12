@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation } from 'react-router-dom'
+import EmptyState from '../../components/EmptyState/EmptyState'
 import type { MockAccount } from '../../features/auth/mock/mockAuth'
 import type {
   SellerApplication,
@@ -33,6 +34,15 @@ export default function SellerApplyPage({
 
   if (!account)
     return <Navigate to="/login" state={{ from: location.pathname }} replace />
+  if (account.role === 'ADMIN')
+    return (
+      <EmptyState
+        title="접근 권한이 없어요."
+        link="/my"
+        label="내 계정으로 돌아가기"
+        variant="page"
+      />
+    )
 
   const current =
     example === 'CURRENT'

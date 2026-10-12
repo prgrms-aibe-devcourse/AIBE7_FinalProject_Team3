@@ -39,6 +39,16 @@ export const demoSellerApplications: SellerApplication[] = [
   },
   {
     id: 'application-3',
+    applicantEmail: 'third@example.com',
+    brandName: '세 번째 브랜드',
+    contactEmail: 'third@example.com',
+    description: '계절 한정 상품',
+    status: 'PENDING',
+    appliedAt: '2026-09-16T15:00:00+09:00',
+    rejectedReason: null,
+  },
+  {
+    id: 'application-4',
     applicantEmail: 'approved@example.com',
     brandName: '오늘의 공방',
     contactEmail: 'hello@example.com',
@@ -48,7 +58,7 @@ export const demoSellerApplications: SellerApplication[] = [
     rejectedReason: null,
   },
   {
-    id: 'application-4',
+    id: 'application-5',
     applicantEmail: 'rejected@example.com',
     brandName: '메이드 스튜디오',
     contactEmail: 'made@example.com',
@@ -73,4 +83,22 @@ export function newSellerApplication(
     appliedAt: new Date().toISOString(),
     rejectedReason: null,
   }
+}
+
+export function reviewSellerApplication(
+  applications: SellerApplication[],
+  id: string,
+  status: 'APPROVED' | 'REJECTED',
+  reason = '',
+): SellerApplication[] {
+  if (status === 'REJECTED' && !reason.trim()) return applications
+  return applications.map((application) =>
+    application.id === id && application.status === 'PENDING'
+      ? {
+          ...application,
+          status,
+          rejectedReason: status === 'REJECTED' ? reason.trim() : null,
+        }
+      : application,
+  )
 }

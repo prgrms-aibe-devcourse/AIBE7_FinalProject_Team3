@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import logo from '../../assets/images/grab-symbol.png'
 import {
+  adminAccount,
   localAccount,
   mockLoginErrors,
   socialAccount,
@@ -13,7 +14,7 @@ type Props = {
   notify: (message: string) => void
 }
 
-type LoginResult = 'success' | 'credentials' | 'inactive' | 'network'
+type LoginResult = 'success' | 'admin' | 'credentials' | 'inactive' | 'network'
 type SocialResult = 'existing' | 'new' | 'linked' | 'social'
 
 export default function LoginPage({ onLogin, notify }: Props) {
@@ -37,6 +38,10 @@ export default function LoginPage({ onLogin, notify }: Props) {
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (loginResult === 'admin') {
+      completeLogin(adminAccount)
+      return
+    }
     if (loginResult !== 'success') {
       setError(mockLoginErrors[loginResult])
       return
@@ -93,6 +98,7 @@ export default function LoginPage({ onLogin, notify }: Props) {
               }}
             >
               <option value="success">로그인 성공</option>
+              <option value="admin">운영자 계정 예시</option>
               <option value="credentials">자격 증명 오류</option>
               <option value="inactive">비활성 계정</option>
               <option value="network">네트워크 오류</option>
