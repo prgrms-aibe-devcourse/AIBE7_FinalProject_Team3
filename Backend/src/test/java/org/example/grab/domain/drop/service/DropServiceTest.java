@@ -133,6 +133,24 @@ class DropServiceTest {
     }
 
     @Test
+    @DisplayName("인기 GRAB 정렬은 정렬 없는 페이지로 인기 GRAB 쿼리를 호출한다")
+    void findPublicDrops_routesSoldQuantitySortToPopularGrabQuery() {
+        // given
+        given(dropRepository.findPopularGrabDrops(any(), any(), any(), any(), any()))
+                .willReturn(Page.empty());
+
+        // when
+        dropService.findPublicDrops(DropStatus.GRAB, null, null, true,
+                PublicDropSort.parse("soldQuantity,desc"), 0, 24);
+
+        // then
+        verify(dropRepository).findPopularGrabDrops(
+                eq(null), eq(null), eq(true), any(OffsetDateTime.class), eq(PageRequest.of(0, 24)));
+        verify(dropRepository, never()).findPublicDrops(any(), any(), any(), any(), any());
+        verify(dropRepository, never()).findPopularWishDrops(any(), any(), any(), any(), any());
+    }
+
+    @Test
     @DisplayName("임시 저장 시 옵션 그룹·값·SKU 매핑이 요청대로 조립된다")
     void createDraft_assemblesOptions() {
         // given

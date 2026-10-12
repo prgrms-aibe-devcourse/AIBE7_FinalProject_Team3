@@ -109,6 +109,18 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
             """;
 
     /*
+     * 인기 GRAB 후보: 저장 상태 WISH·GRAB 중 서버 시각상 판매 기간 안이고 활성 SKU 가용 재고가 1개 이상인 상품(DROP.md 1.2).
+     * 시작 배치가 늦어 아직 WISH로 저장된 상품도 판매 기간이면 포함한다. 재고 판정식은 soldOut 판정식의 부정이다.
+     */
+    String POPULAR_GRAB_WHERE = """
+            WHERE d.status IN ('WISH', 'GRAB')
+              AND d.sale_starts_at <= :now
+              AND d.sale_ends_at > :now
+              AND (SELECT COALESCE(SUM(o.total_quantity - o.reserved_quantity - o.sold_quantity - o.withheld_quantity), 0)
+                     FROM drop_options o WHERE o.drop_id = d.id AND o.is_active) > 0
+            """;
+
+    /*
      * 공개 DROP 목록 조회(DISC-001·002·003, STOCK-006). 날짜 정렬은 Pageable Sort로 받는다.
      * statuses는 서비스가 채워 넘기며 DRAFT·CANCELED는 들어오지 않는다. 카테고리는 INNER JOIN이다.
      */
@@ -138,6 +150,32 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
             countQuery = PUBLIC_DROP_COUNT + POPULAR_WISH_WHERE + PUBLIC_DROP_FILTERS,
             nativeQuery = true)
     Page<PublicDropListProjection> findPopularWishDrops(
+            @Param("categoryId") Long categoryId,
+            @Param("keyword") String keyword,
+            @Param("soldOut") Boolean soldOut,
+            @Param("now") OffsetDateTime now,
+            Pageable pageable);
+
+    /*
+     * 인기 GRAB 목록(DISC-007). 판매 수량 내림차순, 동률은 published_at DESC, id DESC로 고정한다.
+     * 판매 수량은 결제 확정·미취소 주문(paid_at IS NOT NULL AND canceled_at IS NULL)의 order_items.quantity 합이다.
+     * 미결제·만료·취소 주문과 결제 시도 횟수는 세지 않는다. 주문은 DROP 하나에만 속하므로
+     * orders(drop_id, ...) 인덱스로 주문을 좁힌 뒤 order_items를 붙이고, 상관 서브쿼리로 DROP별 합을 구해
+     * 다중 옵션·다중 주문이 목록 행을 늘리거나 다른 집계를 부풀리지 않게 한다.
+     * 정렬·페이징·now 처리는 findPopularWishDrops와 같다.
+     */
+    @Query(value = PUBLIC_DROP_SELECT + POPULAR_GRAB_WHERE + PUBLIC_DROP_FILTERS + """
+            ORDER BY (SELECT COALESCE(SUM(oi.quantity), 0)
+                        FROM orders od
+                        JOIN order_items oi ON oi.order_id = od.id AND oi.drop_id = od.drop_id
+                       WHERE od.drop_id = d.id
+                         AND od.paid_at IS NOT NULL
+                         AND od.canceled_at IS NULL) DESC,
+                     d.published_at DESC, d.id DESC
+            """,
+            countQuery = PUBLIC_DROP_COUNT + POPULAR_GRAB_WHERE + PUBLIC_DROP_FILTERS,
+            nativeQuery = true)
+    Page<PublicDropListProjection> findPopularGrabDrops(
             @Param("categoryId") Long categoryId,
             @Param("keyword") String keyword,
             @Param("soldOut") Boolean soldOut,

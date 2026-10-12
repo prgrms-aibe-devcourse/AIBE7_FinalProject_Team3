@@ -464,6 +464,173 @@ class DropRepositoryTest {
     }
 
     @Test
+    @DisplayName("인기 GRAB은 결제 확정·미취소 주문 수량 합 내림차순이고 미결제·만료·취소 주문은 세지 않으며 0건도 포함한다")
+    void ordersPopularGrabByPaidQuantity() {
+        // given
+        Long multi = insertSellingDrop(DropStatus.GRAB, "다중 옵션", 30);
+        Long single = insertSellingDrop(DropStatus.GRAB, "단일 옵션", 20);
+        Long none = insertSellingDrop(DropStatus.GRAB, "판매 없음", 10);
+        Long multiFirst = insertOptionReturningId(multi, 10, 0);
+        Long multiSecond = insertOptionReturningId(multi, 10, 1);
+        Long singleOption = insertOptionReturningId(single, 10, 0);
+        Long noneOption = insertOptionReturningId(none, 10, 0);
+
+        // multi: 결제 주문 2건(2+1, 1) = 4
+        Long paidTwoItems = insertOrder(multi, "PAID");
+        insertOrderItem(paidTwoItems, multi, multiFirst, 2);
+        insertOrderItem(paidTwoItems, multi, multiSecond, 1);
+        insertOrderItem(insertOrder(multi, "DELIVERED"), multi, multiFirst, 1);
+        insertOrderItem(insertOrder(multi, "PAYMENT_PENDING"), multi, multiFirst, 9);
+        insertOrderItem(insertOrder(multi, "EXPIRED"), multi, multiSecond, 9);
+        // single: 결제 3, 결제 후 취소 9는 제외 = 3
+        insertOrderItem(insertOrder(single, "PAID"), single, singleOption, 3);
+        insertOrderItem(insertPaidThenCanceledOrder(single), single, singleOption, 9);
+        // none: 미결제 취소만 있음 = 0
+        insertOrderItem(insertOrder(none, "CANCELED"), none, noneOption, 9);
+        insertWishes(multi, 2);
+
+        // when
+        Page<PublicDropListProjection> page = dropRepository.findPopularGrabDrops(
+                null, null, null, OffsetDateTime.now(ZoneOffset.UTC), PageRequest.of(0, 20));
+
+        // then: 다중 옵션·다중 주문이 행을 늘리거나 다른 집계를 부풀리지 않는다
+        assertThat(idsOf(page)).containsExactly(multi, single, none);
+        assertThat(page.getTotalElements()).isEqualTo(3);
+        assertThat(rowOf(page, multi).getWishCount()).isEqualTo(2L);
+        assertThat(rowOf(page, multi).getMinPrice()).isEqualTo(10000L);
+    }
+
+    @Test
+    @DisplayName("인기 GRAB 동률은 published_at 내림차순, 그다음 id 내림차순이다")
+    void breaksPopularGrabTiesByPublishedAtThenId() {
+        // given: 모두 판매 0건
+        Long oldest = insertSellingDrop(DropStatus.GRAB, "오래됨", 60);
+        Long sameTimeFirst = insertSellingDrop(DropStatus.GRAB, "같은 시각 1", 10);
+        Long sameTimeSecond = insertSellingDrop(DropStatus.GRAB, "같은 시각 2", 10);
+        for (Long dropId : List.of(oldest, sameTimeFirst, sameTimeSecond)) {
+            insertOptionReturningId(dropId, 1, 0);
+        }
+
+        // when
+        List<Long> ids = idsOf(dropRepository.findPopularGrabDrops(
+                null, null, null, OffsetDateTime.now(ZoneOffset.UTC), PageRequest.of(0, 20)));
+
+        // then
+        assertThat(ids).containsExactly(sameTimeSecond, sameTimeFirst, oldest);
+    }
+
+    @Test
+    @DisplayName("인기 GRAB은 판매 기간 안이고 활성 옵션 가용 재고가 있는 WISH·GRAB 저장 상태만 후보로 삼는다")
+    void popularGrabIncludesOnlyPurchasableDrops() {
+        // given
+        Long grab = insertSellingDrop(DropStatus.GRAB, "판매 중", 10);
+        Long startDelayed = insertSellingDrop(DropStatus.WISH, "시작 배치 지연", 10);
+        Long noStock = insertSellingDrop(DropStatus.GRAB, "재고 소진", 10);
+        Long inactiveStockOnly = insertSellingDrop(DropStatus.GRAB, "비활성 옵션만 재고", 10);
+        insertSellingDrop(DropStatus.GRAB, "옵션 없음", 10);
+        Long upcoming = insertUpcomingWishDrop("판매 전", 10);
+        Long endDelayed = insertDrop(DropStatus.GRAB, -2, -1);
+        Long ended = insertDrop(DropStatus.ENDED, -2, -1);
+        insertDraftDrop();
+        insertCanceledDrop();
+        insertOptionReturningId(grab, 1, 0);
+        insertOptionReturningId(startDelayed, 1, 0);
+        insertOption(noStock, 1000L, 3, 1, 1, 1, true, 0);
+        insertOption(inactiveStockOnly, 1000L, 5, 0, 0, 0, false, 0);
+        insertOption(inactiveStockOnly, 1000L, 1, 1, 0, 0, true, 1);
+        for (Long dropId : List.of(upcoming, endDelayed, ended)) {
+            insertOptionReturningId(dropId, 1, 0);
+        }
+
+        // when
+        Page<PublicDropListProjection> page = dropRepository.findPopularGrabDrops(
+                null, null, null, OffsetDateTime.now(ZoneOffset.UTC), PageRequest.of(0, 20));
+
+        // then: 응답 status는 저장 상태를 유지한다
+        assertThat(idsOf(page)).containsExactlyInAnyOrder(grab, startDelayed);
+        assertThat(page.getTotalElements()).isEqualTo(2);
+        assertThat(rowOf(page, startDelayed).getStatus()).isEqualTo("WISH");
+        assertThat(rowOf(page, startDelayed).getSoldOut()).isFalse();
+    }
+
+    @Test
+    @DisplayName("인기 GRAB은 now가 판매 시작 시각이면 포함하고 판매 종료 시각이면 제외한다")
+    void popularGrabSalePeriodBoundaries() {
+        // given
+        Long dropId = insertSellingDrop(DropStatus.GRAB, "경계", 10);
+        insertOptionReturningId(dropId, 1, 0);
+        OffsetDateTime startsAt = jdbcTemplate.queryForObject(
+                "SELECT sale_starts_at FROM drops WHERE id = ?", OffsetDateTime.class, dropId);
+        OffsetDateTime endsAt = jdbcTemplate.queryForObject(
+                "SELECT sale_ends_at FROM drops WHERE id = ?", OffsetDateTime.class, dropId);
+
+        // when & then
+        assertThat(idsOf(dropRepository.findPopularGrabDrops(
+                null, null, null, startsAt, PageRequest.of(0, 20))))
+                .containsExactly(dropId);
+        assertThat(dropRepository.findPopularGrabDrops(
+                null, null, null, endsAt, PageRequest.of(0, 20)).getContent())
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("인기 GRAB은 전체 후보를 정렬한 뒤 페이지를 잘라 페이지가 달라도 전역 순위를 유지한다")
+    void paginatesPopularGrabAfterGlobalOrdering() {
+        // given: id·공개 시각이 앞선 상품일수록 많이 팔려 기본 정렬과 순서가 반대다
+        Long first = insertSellingDrop(DropStatus.GRAB, "1위", 50);
+        Long second = insertSellingDrop(DropStatus.GRAB, "2위", 40);
+        Long third = insertSellingDrop(DropStatus.GRAB, "3위", 30);
+        Long fourth = insertSellingDrop(DropStatus.GRAB, "4위", 20);
+        insertPaidQuantity(first, 4);
+        insertPaidQuantity(second, 3);
+        insertPaidQuantity(third, 2);
+        insertPaidQuantity(fourth, 1);
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+        // when
+        Page<PublicDropListProjection> firstPage = dropRepository.findPopularGrabDrops(
+                null, null, null, now, PageRequest.of(0, 2));
+        Page<PublicDropListProjection> secondPage = dropRepository.findPopularGrabDrops(
+                null, null, null, now, PageRequest.of(1, 2));
+
+        // then
+        assertThat(idsOf(firstPage)).containsExactly(first, second);
+        assertThat(idsOf(secondPage)).containsExactly(third, fourth);
+        assertThat(firstPage.getTotalElements()).isEqualTo(4);
+        assertThat(firstPage.hasNext()).isTrue();
+        assertThat(secondPage.hasNext()).isFalse();
+    }
+
+    @Test
+    @DisplayName("인기 GRAB에 soldOut=true를 주면 빈 목록이고 soldOut=false·keyword·categoryId 필터는 그대로 적용된다")
+    void appliesFiltersToPopularGrab() {
+        // given
+        Long sneakers = insertSellingDrop(DropStatus.GRAB, "스니커즈", 20);
+        Long hoodie = insertSellingDrop(DropStatus.GRAB, "후드티", 10);
+        insertOptionReturningId(sneakers, 1, 0);
+        insertOptionReturningId(hoodie, 1, 0);
+        Long otherCategory = jdbcTemplate.queryForObject(
+                "INSERT INTO categories (code, name) VALUES (?, '잡화') RETURNING id",
+                Long.class, "TEST-" + UUID.randomUUID());
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+        // when & then
+        Page<PublicDropListProjection> soldOut = dropRepository.findPopularGrabDrops(
+                null, null, true, now, PageRequest.of(0, 20));
+        assertThat(soldOut.getContent()).isEmpty();
+        assertThat(soldOut.getTotalElements()).isZero();
+        assertThat(idsOf(dropRepository.findPopularGrabDrops(
+                null, null, false, now, PageRequest.of(0, 20))))
+                .containsExactly(hoodie, sneakers);
+        assertThat(idsOf(dropRepository.findPopularGrabDrops(
+                null, "%스니커%", null, now, PageRequest.of(0, 20))))
+                .containsExactly(sneakers);
+        assertThat(dropRepository.findPopularGrabDrops(
+                otherCategory, null, null, now, PageRequest.of(0, 20)).getTotalElements())
+                .isZero();
+    }
+
+    @Test
     @DisplayName("시작 배치가 시작 시각이 지난 WISH만 GRAB으로 전환하고 전환 시각을 기록한다")
     void startGrabBatchTransitionsDueWishOnly() {
         // given
@@ -730,6 +897,73 @@ class DropRepositoryTest {
         for (int i = 0; i < count; i++) {
             insertWish(insertBuyer(), dropId, false);
         }
+    }
+
+    // 판매 기간(1시간 전 ~ 1시간 후) 안의 상품. 시작 배치가 늦은 경우를 위해 저장 상태 WISH도 받는다.
+    private Long insertSellingDrop(DropStatus status, String name, long publishedMinutesAgo) {
+        return jdbcTemplate.queryForObject(
+                """
+                INSERT INTO drops (seller_id, category_id, status, name, description,
+                                   shipping_fee, shipping_notice, sale_starts_at, sale_ends_at,
+                                   published_at, grab_started_at)
+                VALUES (?, ?, ?, ?, '설명', 3000, '안내',
+                        CURRENT_TIMESTAMP - INTERVAL '1 hour', CURRENT_TIMESTAMP + INTERVAL '1 hour',
+                        CURRENT_TIMESTAMP - (? || ' minutes')::interval,
+                        CASE WHEN ? = 'GRAB' THEN CURRENT_TIMESTAMP - INTERVAL '1 hour' ELSE NULL END)
+                RETURNING id
+                """,
+                Long.class, sellerId, categoryId, status.name(), name, publishedMinutesAgo, status.name());
+    }
+
+    private Long insertOptionReturningId(Long dropId, int total, int sortOrder) {
+        return jdbcTemplate.queryForObject(
+                """
+                INSERT INTO drop_options (drop_id, unit_price, total_quantity, is_active, sort_order)
+                VALUES (?, 10000, ?, TRUE, ?)
+                RETURNING id
+                """,
+                Long.class, dropId, total, sortOrder);
+    }
+
+    // 상태별 필수 시각(paid_at·canceled_at·expired_at)과 취소 사유를 제약에 맞게 채운다.
+    private Long insertOrder(Long dropId, String status) {
+        String suffix = UUID.randomUUID().toString();
+        return jdbcTemplate.queryForObject(
+                """
+                INSERT INTO orders (order_number, buyer_id, drop_id, idempotency_key, request_hash, status,
+                                    product_name_snapshot, seller_name_snapshot, items_amount, shipping_amount,
+                                    total_amount, recipient_name, recipient_phone, postal_code, address_line1,
+                                    payment_expires_at, paid_at, canceled_at, expired_at, cancel_reason)
+                VALUES (?, ?, ?, ?, 'hash', ?, '상품', '브랜드', 1000, 0, 1000,
+                        '수령인', '01000000000', '00000', '주소', CURRENT_TIMESTAMP + INTERVAL '10 minutes',
+                        CASE WHEN ? IN ('PAID', 'PREPARING', 'SHIPPED', 'DELIVERED') THEN CURRENT_TIMESTAMP END,
+                        CASE WHEN ? = 'CANCELED' THEN CURRENT_TIMESTAMP END,
+                        CASE WHEN ? = 'EXPIRED' THEN CURRENT_TIMESTAMP END,
+                        CASE WHEN ? = 'CANCELED' THEN '테스트 취소' END)
+                RETURNING id
+                """,
+                Long.class, "ORDER-" + suffix, buyerId, dropId, suffix, status,
+                status, status, status, status);
+    }
+
+    private Long insertPaidThenCanceledOrder(Long dropId) {
+        Long orderId = insertOrder(dropId, "CANCELED");
+        jdbcTemplate.update("UPDATE orders SET paid_at = CURRENT_TIMESTAMP WHERE id = ?", orderId);
+        return orderId;
+    }
+
+    private void insertOrderItem(Long orderId, Long dropId, Long optionId, int quantity) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO order_items (order_id, drop_id, option_id, option_name_snapshot, unit_price, quantity)
+                VALUES (?, ?, ?, '기본', 10000, ?)
+                """,
+                orderId, dropId, optionId, quantity);
+    }
+
+    private void insertPaidQuantity(Long dropId, int quantity) {
+        Long optionId = insertOptionReturningId(dropId, 10, 0);
+        insertOrderItem(insertOrder(dropId, "PAID"), dropId, optionId, quantity);
     }
 
     private void insertDraftDrop() {

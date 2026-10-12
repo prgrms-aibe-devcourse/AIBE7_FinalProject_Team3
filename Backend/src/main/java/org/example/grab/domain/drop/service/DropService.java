@@ -145,8 +145,9 @@ public class DropService {
             case WISH_COUNT -> dropRepository.findPopularWishDrops(
                     categoryId, normalizedKeyword, soldOut, OffsetDateTime.now(ZoneOffset.UTC),
                     PageRequest.of(page, size));
-            // TODO(GR-76 3단계): 인기 GRAB 쿼리 추가 전까지 임시로 막아 둔다.
-            case SOLD_QUANTITY -> throw new IllegalStateException("인기 GRAB 정렬은 아직 지원하지 않는다");
+            case SOLD_QUANTITY -> dropRepository.findPopularGrabDrops(
+                    categoryId, normalizedKeyword, soldOut, OffsetDateTime.now(ZoneOffset.UTC),
+                    PageRequest.of(page, size));
         };
         return PageResponse.from(drops.map(PublicDropListResponse::from));
     }
