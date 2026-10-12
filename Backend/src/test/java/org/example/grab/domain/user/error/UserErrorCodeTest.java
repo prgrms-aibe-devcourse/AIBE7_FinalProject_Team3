@@ -48,6 +48,20 @@ class UserErrorCodeTest {
         assertThat(errorCode.getMessage()).isNotBlank();
     }
 
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "INVALID_CREDENTIALS | UNAUTHORIZED",
+            "ACCOUNT_DISABLED    | FORBIDDEN"
+    })
+    @DisplayName("로그인 오류 코드는 상수 이름을 코드로, COMMON.md 3절의 HTTP 상태를 가진다")
+    // 자격 증명 오류는 401, 비활성 계정은 403이다(GR-34 M00-02)
+    void definesLoginErrorCodes(UserErrorCode errorCode, HttpStatus status) {
+        // then
+        assertThat(errorCode.getCode()).isEqualTo(errorCode.name());
+        assertThat(errorCode.getStatus()).isEqualTo(status);
+        assertThat(errorCode.getMessage()).isNotBlank();
+    }
+
     @Test
     @DisplayName("닉네임 중복 코드는 COMMON.md 3절대로 HTTP 409다")
     void definesDuplicateNicknameErrorCode() {
