@@ -80,7 +80,7 @@ npx playwright show-trace test-results/<테스트>/trace.zip
 - `src/api`: 공통 요청 클라이언트, 도메인별 API 요청, 생성 스키마
 - `src/types`: 화면·Mock 데이터용 타입
 - `src/utils`: 날짜와 가격 표시 함수
-- `src/styles`: 전역 스타일
+- `src/styles`: `global.css`에서 공통·화면별·반응형 스타일을 순서대로 불러옵니다.
 - 단위 테스트는 각 도메인·소스 디렉터리의 `__tests__/`에 모읍니다. 예: `src/features/drop/__tests__/`, `src/api/category/__tests__/`. E2E·시각 비교 테스트와 전용 fixture는 `e2e/`에 둡니다.
 
 ## Mock 화면과 API 연동 경계

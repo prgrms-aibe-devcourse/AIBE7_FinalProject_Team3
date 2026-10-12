@@ -1,0 +1,38 @@
+footer {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 30px;
+  padding: 34px 5.5%;
+  border-top: 1px solid var(--line);
+}
+footer p {
+  color: var(--muted);
+  font-size: 12px;
+}
+footer small {
+  color: #9a9d94;
+  font-size: 10px;
+  letter-spacing: 0.7px;
+}
+.toast {
+  position: fixed;
+  z-index: 50;
+  right: 24px;
+  bottom: 24px;
+  max-width: calc(100vw - 48px);
+  padding: 14px 18px;
+  border-radius: 9px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 13px;
+  transform: translateY(30px);
+  opacity: 0;
+  pointer-events: none;
+  transition: 0.25s ease;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.18);
+}
+.toast.is-visible {
+  transform: translateY(0);
+  opacity: 1;
+}

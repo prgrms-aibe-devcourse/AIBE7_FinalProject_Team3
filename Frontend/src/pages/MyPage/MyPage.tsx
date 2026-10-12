@@ -5,8 +5,12 @@ import {
   mockSignupErrors,
   nicknameError,
   type MockAccount,
-} from '../../features/auth/mockAuth'
+} from '../../features/auth/mock/mockAuth'
 import { drops } from '../../features/drop/mock/mockDrops'
+import {
+  buyerOrderStatusText,
+  type BuyerOrder,
+} from '../../features/order/mock/mockBuyerOrders'
 import type { SharedProps } from '../../types/store'
 import { dateLabel } from '../../utils/date'
 import { won } from '../../utils/price'
@@ -15,6 +19,7 @@ type Props = SharedProps & {
   account: MockAccount | null
   onAccountChange: (account: MockAccount) => void
   onLogout: () => void
+  buyerOrders: BuyerOrder[]
 }
 
 export default function MyPage({
@@ -23,6 +28,7 @@ export default function MyPage({
   onLogout,
   wishes,
   orders,
+  buyerOrders,
   toggleWish,
   notify,
 }: Props) {
@@ -76,7 +82,11 @@ export default function MyPage({
             <p>{account.email}</p>
             <small>
               {account.provider} 계정 ·{' '}
-              {account.role === 'SELLER' ? '승인된 판매자' : '일반 회원'}
+              {account.role === 'ADMIN'
+                ? '운영자'
+                : account.role === 'SELLER'
+                  ? '승인된 판매자'
+                  : '일반 회원'}
             </small>
           </div>
           <button
@@ -135,7 +145,11 @@ export default function MyPage({
               ? 'LOCAL 계정의 비밀번호 변경과 프로필 이미지 관리는 API 연동 시 제공됩니다.'
               : '소셜 계정에는 비밀번호 변경이 제공되지 않습니다.'}
           </p>
-          {account.role === 'SELLER' ? (
+          {account.role === 'ADMIN' ? (
+            <Link className="secondary-button" to="/admin/seller-applications">
+              판매자 신청 심사 ↗
+            </Link>
+          ) : account.role === 'SELLER' ? (
             <Link className="secondary-button" to="/seller">
               판매자 작업 공간 ↗
             </Link>
@@ -200,12 +214,20 @@ export default function MyPage({
               <div className="compact-item order" key={order.id}>
                 <img src={order.drop.image} alt="" />
                 <div>
-                  <small>{order.id} · 결제 대기</small>
+                  <small>
+                    {order.id} ·{' '}
+                    {
+                      buyerOrderStatusText[
+                        buyerOrders.find((item) => item.id === order.id)
+                          ?.status ?? 'PAYMENT_PENDING'
+                      ]
+                    }
+                  </small>
                   <strong>{order.drop.name}</strong>
                   <small>
                     {order.optionLabel} · {order.quantity}개
                   </small>
-                  <Link className="text-link" to={`/orders/${order.id}`}>
+                  <Link className="text-link" to={`/my/orders/${order.id}`}>
                     주문 상세 ↗
                   </Link>
                 </div>
@@ -227,13 +249,12 @@ export default function MyPage({
           <select
             value={account.role}
             onChange={(event) =>
-              switchAccount(
-                event.target.value === 'SELLER' ? 'SELLER' : 'MEMBER',
-              )
+              switchAccount(event.target.value as MockAccount['role'])
             }
           >
             <option value="MEMBER">일반 회원 예시</option>
             <option value="SELLER">승인 판매자 예시</option>
+            <option value="ADMIN">운영자 예시</option>
           </select>
         </label>
         <small>계정 유형 전환과 목록은 이 화면의 Mock 데모입니다.</small>

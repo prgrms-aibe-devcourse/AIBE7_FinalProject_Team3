@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { nicknameError, passwordError } from '../mockAuth'
+import { nicknameError, passwordError } from '../mock/mockAuth'
 
 describe('Mock 가입 입력 규칙', () => {
   it('닉네임 길이와 허용 문자를 확인한다', () => {

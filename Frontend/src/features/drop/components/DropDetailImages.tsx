@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { DetailImage } from './mock/mockDetailImages'
+import type { DetailImage } from '../mock/mockDetailImages'
 
 function DetailPicture({ image }: { image: DetailImage }) {
   const [failed, setFailed] = useState(false)

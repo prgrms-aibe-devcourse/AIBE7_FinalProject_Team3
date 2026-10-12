@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { validateShipment } from './shipment'
+import { validateShipment } from '../logic/shipment'
 
 type Shipment = { carrier: string; trackingNumber: string }
 

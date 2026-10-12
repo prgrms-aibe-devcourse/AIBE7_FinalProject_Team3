@@ -1,7 +1,7 @@
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { drops } from '../../features/drop/mock/mockDrops'
-import { sellerOrders } from '../../features/order/mockSellerOrders'
-import { upcoming } from '../../features/drop/selectors'
+import { sellerOrders } from '../../features/order/mock/mockSellerOrders'
+import { upcoming } from '../../features/drop/logic/selectors'
 import type { Drop, Sku } from '../../types/drop'
 import { dateLabel } from '../../utils/date'
 import { won } from '../../utils/price'
@@ -68,7 +68,10 @@ export default function SellerDropDetailPage() {
           </span>
           {drop.status === 'DRAFT' && (
             <>
-              <Link className="secondary-button" to="/seller/drops/new">
+              <Link
+                className="secondary-button"
+                to={`/seller/drops/${drop.id}/edit`}
+              >
                 수정
               </Link>
               <button className="primary-button" type="button">

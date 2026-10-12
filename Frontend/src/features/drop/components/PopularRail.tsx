@@ -6,7 +6,7 @@ import {
   type KeyboardEvent,
   type TouchEvent,
 } from 'react'
-import type { Drop } from '../../types/drop'
+import type { Drop } from '../../../types/drop'
 import DropCard from './DropCard'
 
 type Props = {

@@ -222,7 +222,9 @@ test.describe('데모 주문', () => {
     ).toBeDisabled()
   })
 
-  test('옵션을 고르고 주문하면 MY 주문에 담긴다', async ({ page }) => {
+  test('옵션을 고르면 결제 화면으로 이동하고 MY 주문에 담긴다', async ({
+    page,
+  }) => {
     await login(page)
     await page.getByRole('link', { name: 'GRAB', exact: true }).click()
     await page
@@ -237,14 +239,27 @@ test.describe('데모 주문', () => {
     await expect(page.locator('.total-row')).toContainText('86,000원')
     await page.getByRole('button', { name: '데모 GRAB 하기 ↗' }).click()
 
-    await expect(page).toHaveURL(/#\/my$/)
+    await expect(page).toHaveURL(/#\/checkout\/GR-/)
     await expect(toast(page)).toHaveText(
-      '데모 주문을 MY에 담았어요. 실제 주문·결제는 진행되지 않습니다.',
+      'Mock 주문을 만들었어요. 배송지와 결제 결과를 확인해주세요.',
     )
+    await expect(page.locator('.buyer-total')).toContainText('89,000원')
+    await page.getByLabel('받는 분').fill('김그랩')
+    await page.getByLabel('연락처').fill('01012345678')
+    await page.getByLabel('우편번호').fill('06236')
+    await page.getByLabel('기본 주소').fill('서울시 강남구')
+    await page.getByRole('button', { name: 'Mock 결제 결과 보기' }).click()
+    await expect(page.getByText('결제 성공 예시')).toBeVisible()
+    await page.getByRole('link', { name: '주문 상세로 이동 ↗' }).click()
+    await expect(page).toHaveURL(/#\/my\/orders\/GR-/)
+    await expect(page.getByText('결제 완료', { exact: true })).toBeVisible()
+    await page.getByRole('link', { name: '← 내 주문 목록' }).click()
     const order = page.locator('.compact-item.order')
     await expect(order).toContainText('뮤직 클럽 티셔츠 · 리미티드')
     await expect(order).toContainText('착용감: 릴랙스 · 소매: 롱 · 2개')
     // 43,000원 × 2 + 배송비 3,000원
     await expect(order).toContainText('89,000원')
+    await page.getByRole('link', { name: '주문 상세 ↗' }).click()
+    await expect(page).toHaveURL(/#\/my\/orders\/GR-/)
   })
 })

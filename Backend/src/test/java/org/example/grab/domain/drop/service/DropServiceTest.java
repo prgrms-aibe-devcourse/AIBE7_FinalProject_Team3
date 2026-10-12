@@ -24,6 +24,7 @@ import org.example.grab.domain.drop.entity.option.DropOptionGroup;
 import org.example.grab.domain.drop.entity.option.DropOptionValue;
 import org.example.grab.domain.drop.entity.option.DropOptionValueMap;
 import org.example.grab.domain.drop.error.DropErrorCode;
+import org.example.grab.domain.drop.event.DropCanceledEvent;
 import org.example.grab.domain.drop.repository.DropImageRepository;
 import org.example.grab.domain.drop.repository.DropRepository;
 import org.example.grab.global.common.ErrorResponse;
@@ -37,6 +38,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.OffsetDateTime;
@@ -73,6 +75,9 @@ class DropServiceTest {
     @Mock
     private WishQueryService wishQueryService;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private final ImageStorage imageStorage = new ImageStorage() {
         @Override
         public SignedUploadUrl createSignedUploadUrl(String objectKey) {
@@ -90,7 +95,8 @@ class DropServiceTest {
     @BeforeEach
     void setUp() {
         dropService = new DropService(
-                dropRepository, dropImageRepository, categoryService, wishQueryService, imageStorage);
+                dropRepository, dropImageRepository, categoryService, wishQueryService, imageStorage,
+                eventPublisher);
     }
 
     @Test
@@ -207,6 +213,35 @@ class DropServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(DropErrorCode.DROP_ACCESS_DENIED);
+    }
+
+    @Test
+    @DisplayName("WISH DROP 취소에 성공하면 DropCanceledEvent가 발행된다")
+    void cancel_publishesEvent() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        ReflectionTestUtils.setField(drop, "status", DropStatus.WISH);
+        given(dropRepository.findByIdForUpdate(10L)).willReturn(Optional.of(drop));
+
+        // when
+        dropService.cancel(1L, 10L, "재고 소싱 실패");
+
+        // then
+        assertThat(drop.getStatus()).isEqualTo(DropStatus.CANCELED);
+        verify(eventPublisher).publishEvent(new DropCanceledEvent(10L));
+    }
+
+    @Test
+    @DisplayName("취소가 상태 검증에 막히면 이벤트가 발행되지 않는다")
+    void cancel_doesNotPublishEventWhenRejected() {
+        // given: DRAFT 상태라 cancel()이 INVALID_STATE_TRANSITION으로 거부한다
+        Drop drop = Drop.createDraft(1L);
+        given(dropRepository.findByIdForUpdate(10L)).willReturn(Optional.of(drop));
+
+        // when & then
+        assertThatThrownBy(() -> dropService.cancel(1L, 10L, "사유"))
+                .isInstanceOf(BusinessException.class);
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test

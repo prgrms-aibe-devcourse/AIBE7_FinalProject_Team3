@@ -1,4 +1,4 @@
-import type { OptionGroup, Sku } from '../../types/drop'
+import type { OptionGroup, Sku } from '../../../types/drop'
 
 export function findMatchingSku(skus: Sku[], selected: Record<string, string>) {
   return skus.find((sku) =>

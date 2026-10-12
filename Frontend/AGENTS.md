@@ -23,7 +23,7 @@ npm run e2e:docker -- --grep @visual   # 시각 비교 (CI와 같은 Docker 이�
 ## 구조
 
 - `src/components` — 도메인에 의존하지 않는 범용 UI (`Header`, `Footer`, `EmptyState`)
-- `src/features/<도메인>` — 도메인 UI·로직·Mock·테스트 (`drop`, `order`, `wish`, `auth`, `seller`)
+- `src/features/<도메인>` — 도메인별 UI는 `components/`, 훅·계산·검증 코드는 `logic/`, 예시 데이터는 `mock/`, 테스트는 `__tests__/`에 둔다(`drop`, `order`, `wish`, `auth`, `seller`). 파일이 하나뿐인 역할에는 폴더를 강제하지 않는다.
 - `src/pages/<Page>` — 라우트 단위 화면. 라우트는 `src/App.tsx`에서 관리한다.
 - `src/types` — 화면·Mock 타입, `src/utils` — 날짜·가격 표시 함수
 - `src/api/schema` — OpenAPI 생성 타입, `src/api/<도메인>` — 도메인별 요청·테스트, `src/api/client.ts` — 공통 클라이언트
@@ -34,15 +34,15 @@ npm run e2e:docker -- --grep @visual   # 시각 비교 (CI와 같은 Docker 이�
 ## 기술 스택
 
 - `Backend/docs/development/TECHSTACK.md` 3절을 따른다.
-- 스타일은 Tailwind 없이 `src/styles/global.css`의 CSS 변수(`--lime`, `--ink`, `--muted`, `--line`, `--soft`, `--danger`)와 기존 클래스를 사용한다.
+- 스타일은 Tailwind 없이 `src/styles/base.css`의 CSS 변수(`--lime`, `--ink`, `--muted`, `--line`, `--soft`, `--danger`)와 기존 클래스를 사용한다. `global.css`는 스타일 파일의 불러오기 순서를 관리한다.
 - 새 의존성은 기존 코드·표준 API로 해결할 수 없을 때만 추가한다.
 
 ## UI 작성 규칙
 
 - 화면을 구현하거나 수정하기 전에 대상 화면의 `docs/pages/<PageName>.md`와 `docs/wireframes/<PageName>.html`을 함께 확인한다. 페이지 스펙의 라우트·데이터·행동·예외 상태·인수 조건과 와이어프레임의 배치·반응형 구성을 작업 기준으로 삼는다.
-- 와이어프레임의 공통 스타일은 `docs/wireframes/wireframe.css`도 확인한다. 구현은 기존 컴포넌트와 `src/styles/global.css`를 재사용하며, 완료 후 대상 스펙·와이어프레임과 PC·모바일 화면을 대조한다.
+- 와이어프레임의 공통 스타일은 `docs/wireframes/wireframe.css`도 확인한다. 구현은 기존 컴포넌트와 `src/styles/`의 클래스를 재사용하며, 완료 후 대상 스펙·와이어프레임과 PC·모바일 화면을 대조한다.
 - 페이지 스펙·와이어프레임·백엔드 요구사항/API 명세가 서로 어긋나거나 필요한 사양이 없으면 임의로 결정하지 않고 사용자에게 확인한다. Mock UI와 실제 API 연동 범위는 해당 이슈와 `README.md`의 기준을 따른다.
-- 새 UI를 만들기 전에 `src/components`, `src/features`의 기존 컴포넌트와 `global.css` 클래스를 먼저 찾아 재사용한다.
+- 새 UI를 만들기 전에 `src/components`, `src/features`의 기존 컴포넌트와 `src/styles/`의 클래스를 먼저 찾아 재사용한다.
 - 버튼·링크는 `primary-button` / `secondary-button` / `text-link` 클래스를 그대로 쓴다. `button`과 `Link`의 의미, `type`, `disabled`, 키보드 포커스를 유지한다.
 - 페이지 이동은 `Link`, 동작은 `button`을 쓴다. `button`에는 항상 `type`을 적는다(폼 제출은 `submit`, 그 외는 `button`).
 - 빈 상태는 `EmptyState`를 사용한다.
@@ -68,7 +68,7 @@ npm run e2e:docker -- --grep @visual   # 시각 비교 (CI와 같은 Docker 이�
 ```
 
 - `variant`: `block`은 목록 자리의 단독 영역, `compact`는 `.panel` 안, `page`는 페이지 전체를 채운다. 링크는 `link`와 `label`을 함께 줄 때만 표시된다.
-- 도메인 컴포넌트 예: `features/drop/DropCard`, `features/order/SellerOrderDetail`·`ShipmentForm`, `features/seller/OptionGroupBuilder`. 같은 도메인 화면을 만들 때 먼저 확인한다.
+- 도메인 컴포넌트 예: `features/drop/components/DropCard`, `features/order/components/SellerOrderDetail`·`ShipmentForm`, `features/seller/OptionGroupBuilder`. 같은 도메인 화면을 만들 때 먼저 확인한다.
 - 페이지 제목(`eyebrow` + `h1`)은 화면마다 감싸는 레이아웃(`hero`, `auth-copy`, `seller-title` 등)이 달라 컴포넌트로 묶지 않고 마크업을 그대로 쓴다.
 
 ## 판매자 대시보드 계열 (디자인 개선 예정)

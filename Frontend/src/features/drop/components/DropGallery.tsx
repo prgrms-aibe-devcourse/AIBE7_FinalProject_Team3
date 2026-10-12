@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import type { Drop } from '../../types/drop'
-import { galleryImages } from './mock/mockDetailImages'
+import type { Drop } from '../../../types/drop'
+import { galleryImages } from '../mock/mockDetailImages'
 
 export default function DropGallery({ drop }: { drop: Drop }) {
   const images = galleryImages(drop)

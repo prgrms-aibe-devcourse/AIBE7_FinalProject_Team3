@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { MockAccount } from './mockAuth'
+import type { MockAccount } from '../mock/mockAuth'
 
 export default function useAuth() {
   const [account, setAccount] = useState<MockAccount | null>(null)

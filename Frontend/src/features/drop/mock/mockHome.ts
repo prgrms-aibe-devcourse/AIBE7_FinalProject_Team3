@@ -1,5 +1,5 @@
 import type { Drop } from '../../../types/drop'
-import { queryCatalog } from '../catalog'
+import { queryCatalog } from '../logic/catalog'
 import { catalogDrops, type MockCatalogDrop } from './mockCatalog'
 
 export const HOME_LIMIT = 8
