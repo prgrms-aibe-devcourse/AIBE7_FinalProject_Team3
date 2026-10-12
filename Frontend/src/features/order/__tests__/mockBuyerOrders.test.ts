@@ -1,0 +1,30 @@
+import { describe, expect, it } from 'vitest'
+import { canCancel, canPay, demoBuyerOrders } from '../mockBuyerOrders'
+
+const scenario = (id: string) =>
+  demoBuyerOrders.find((order) => order.id === id)!
+
+describe('구매자 주문 Mock 상태', () => {
+  it('결제 대기 또는 명확한 실패이며 마감 전일 때만 재결제를 허용한다', () => {
+    expect(canPay(scenario('demo-pending'))).toBe(true)
+    expect(canPay(scenario('demo-failed'))).toBe(true)
+    expect(canPay(scenario('demo-processing'))).toBe(false)
+    expect(canPay(scenario('demo-unknown'))).toBe(false)
+    expect(canPay(scenario('demo-required'))).toBe(false)
+    expect(canPay(scenario('demo-expired'))).toBe(false)
+    expect(canPay(scenario('demo-pending'), Date.now() + 11 * 60_000)).toBe(
+      false,
+    )
+  })
+
+  it('결제 승인 대기나 배송 시작 후에는 취소를 막는다', () => {
+    expect(canCancel(scenario('demo-pending'))).toBe(true)
+    expect(canCancel(scenario('demo-paid'))).toBe(true)
+    expect(canCancel(scenario('demo-preparing'))).toBe(true)
+    expect(canCancel(scenario('demo-processing'))).toBe(false)
+    expect(canCancel(scenario('demo-shipped'))).toBe(false)
+    expect(canCancel(scenario('demo-delivered'))).toBe(false)
+    expect(canCancel(scenario('demo-canceled'))).toBe(false)
+    expect(canCancel(scenario('demo-expired'))).toBe(false)
+  })
+})
