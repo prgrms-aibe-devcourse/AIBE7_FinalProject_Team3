@@ -16,6 +16,7 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
     ['wish-detail', '/#/drops/102'],
     ['grab-detail', '/#/drops/201'],
     ['login', '/#/login'],
+    ['signup', '/#/signup'],
     ['seller-orders', '/#/seller/orders'],
     ['not-found', '/#/missing'],
   ]) {
@@ -24,6 +25,16 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
       await shot(page, name)
     })
   }
+
+  test('my', async ({ page }) => {
+    await page.goto('/#/login')
+    await page.getByLabel('이메일').fill('grab@example.com')
+    await page.getByLabel('비밀번호').fill('password1234')
+    await page.getByRole('button', { name: '로그인', exact: true }).click()
+    await page.getByRole('link', { name: 'MY', exact: true }).click()
+    await expect(page.getByRole('status')).toBeEmpty()
+    await shot(page, 'my')
+  })
 
   test('home', async ({ page }) => {
     await page.goto('/')

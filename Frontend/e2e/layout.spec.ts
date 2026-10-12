@@ -68,6 +68,11 @@ const pages: {
     actions: (page) => [page.getByRole('button', { name: '로그인' })],
   },
   {
+    name: '회원가입',
+    path: '/#/signup',
+    actions: (page) => [page.getByRole('button', { name: '인증 코드 보내기' })],
+  },
+  {
     name: '판매자 주문',
     path: '/#/seller/orders',
     actions: (page) => [
@@ -130,6 +135,9 @@ test('키보드 포커스가 입력란에 보인다', async ({ page }) => {
 
   await page.goto('/#/drops/201')
   await expectFocusRing(page.getByLabel('수량'))
+
+  await page.goto('/#/signup')
+  await expectFocusRing(page.getByLabel('이메일 주소'))
 
   await page.goto('/#/seller/drops/new')
   await expectFocusRing(page.getByLabel('상품명'))
