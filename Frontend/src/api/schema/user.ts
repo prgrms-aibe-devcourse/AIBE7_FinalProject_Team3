@@ -113,11 +113,6 @@ export interface components {
       email: string
       code: string
     }
-    CsrfToken: {
-      parameterName?: string
-      token?: string
-      headerName?: string
-    }
   }
   responses: never
   parameters: never
@@ -261,9 +256,7 @@ export interface operations {
   }
   issueCsrfToken: {
     parameters: {
-      query: {
-        csrfToken: components['schemas']['CsrfToken']
-      }
+      query?: never
       header?: never
       path?: never
       cookie?: never
