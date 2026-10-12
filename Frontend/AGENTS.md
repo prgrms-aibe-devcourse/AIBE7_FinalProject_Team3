@@ -34,15 +34,15 @@ npm run e2e:docker -- --grep @visual   # 시각 비교 (CI와 같은 Docker 이�
 ## 기술 스택
 
 - `Backend/docs/development/TECHSTACK.md` 3절을 따른다.
-- 스타일은 Tailwind 없이 `src/styles/global.css`의 CSS 변수(`--lime`, `--ink`, `--muted`, `--line`, `--soft`, `--danger`)와 기존 클래스를 사용한다.
+- 스타일은 Tailwind 없이 `src/styles/base.css`의 CSS 변수(`--lime`, `--ink`, `--muted`, `--line`, `--soft`, `--danger`)와 기존 클래스를 사용한다. `global.css`는 스타일 파일의 불러오기 순서를 관리한다.
 - 새 의존성은 기존 코드·표준 API로 해결할 수 없을 때만 추가한다.
 
 ## UI 작성 규칙
 
 - 화면을 구현하거나 수정하기 전에 대상 화면의 `docs/pages/<PageName>.md`와 `docs/wireframes/<PageName>.html`을 함께 확인한다. 페이지 스펙의 라우트·데이터·행동·예외 상태·인수 조건과 와이어프레임의 배치·반응형 구성을 작업 기준으로 삼는다.
-- 와이어프레임의 공통 스타일은 `docs/wireframes/wireframe.css`도 확인한다. 구현은 기존 컴포넌트와 `src/styles/global.css`를 재사용하며, 완료 후 대상 스펙·와이어프레임과 PC·모바일 화면을 대조한다.
+- 와이어프레임의 공통 스타일은 `docs/wireframes/wireframe.css`도 확인한다. 구현은 기존 컴포넌트와 `src/styles/`의 클래스를 재사용하며, 완료 후 대상 스펙·와이어프레임과 PC·모바일 화면을 대조한다.
 - 페이지 스펙·와이어프레임·백엔드 요구사항/API 명세가 서로 어긋나거나 필요한 사양이 없으면 임의로 결정하지 않고 사용자에게 확인한다. Mock UI와 실제 API 연동 범위는 해당 이슈와 `README.md`의 기준을 따른다.
-- 새 UI를 만들기 전에 `src/components`, `src/features`의 기존 컴포넌트와 `global.css` 클래스를 먼저 찾아 재사용한다.
+- 새 UI를 만들기 전에 `src/components`, `src/features`의 기존 컴포넌트와 `src/styles/`의 클래스를 먼저 찾아 재사용한다.
 - 버튼·링크는 `primary-button` / `secondary-button` / `text-link` 클래스를 그대로 쓴다. `button`과 `Link`의 의미, `type`, `disabled`, 키보드 포커스를 유지한다.
 - 페이지 이동은 `Link`, 동작은 `button`을 쓴다. `button`에는 항상 `type`을 적는다(폼 제출은 `submit`, 그 외는 `button`).
 - 빈 상태는 `EmptyState`를 사용한다.
