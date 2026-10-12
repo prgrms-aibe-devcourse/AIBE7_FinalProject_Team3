@@ -97,3 +97,62 @@ export function readSellerDropQuery(params: URLSearchParams) {
   const page = Number.isInteger(rawPage) && rawPage >= 0 ? rawPage : 0
   return { status, page }
 }
+
+export function transitionSellerDrop(
+  drops: SellerMockDrop[],
+  id: string,
+  action: 'PUBLISH' | 'CANCEL',
+  reason = '',
+  now = Date.now(),
+): { drops: SellerMockDrop[]; error: string } {
+  const drop = drops.find((item) => item.id === id)
+  if (!drop) return { drops, error: 'DROP을 찾을 수 없어요.' }
+  if (action === 'PUBLISH') {
+    if (drop.status !== 'DRAFT')
+      return { drops, error: 'DRAFT 상태에서만 공개할 수 있어요.' }
+    if (
+      !drop.name ||
+      !drop.description ||
+      !drop.image ||
+      !drop.category ||
+      !drop.saleStartsAt ||
+      !drop.saleEndsAt ||
+      !drop.shippingNotice ||
+      !drop.skus.length
+    )
+      return {
+        drops,
+        error: '공개에 필요한 상품·GALLERY 이미지·일정·옵션 정보를 채워주세요.',
+      }
+    if (
+      new Date(drop.saleStartsAt).getTime() >=
+      new Date(drop.saleEndsAt).getTime()
+    )
+      return { drops, error: '판매 종료는 시작보다 늦어야 해요.' }
+    if (
+      drop.skus.some((sku) => sku.price < 0 || sku.stock < 0) ||
+      !drop.skus.some((sku) => sku.active !== false && sku.stock > 0)
+    )
+      return {
+        drops,
+        error: '가격·재고가 올바르고 판매 가능한 SKU가 1개 이상 필요해요.',
+      }
+  } else {
+    if (
+      drop.status !== 'WISH' ||
+      !drop.saleStartsAt ||
+      new Date(drop.saleStartsAt).getTime() <= now
+    )
+      return { drops, error: '판매 시작 전 WISH DROP만 취소할 수 있어요.' }
+    if (!reason.trim() || reason.length > 500)
+      return { drops, error: '취소 사유를 1~500자로 입력해주세요.' }
+  }
+  return {
+    drops: drops.map((item) =>
+      item.id === id
+        ? { ...item, status: action === 'PUBLISH' ? 'WISH' : 'CANCELED' }
+        : item,
+    ),
+    error: '',
+  }
+}

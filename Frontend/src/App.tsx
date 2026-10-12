@@ -178,10 +178,10 @@ export default function App() {
             path="/seller/drops"
             element={
               <SellerDropsPage
-                drops={sellerDrops.filter(
-                  (drop) =>
-                    drop.ownerEmail === (account?.email ?? 'grab@example.com'),
-                )}
+                drops={sellerDrops}
+                ownerEmail={account?.email ?? 'grab@example.com'}
+                onChange={setSellerDrops}
+                notify={notify}
               />
             }
           />
@@ -190,6 +190,9 @@ export default function App() {
             element={
               <SellerDropFormPage
                 drafts={sellerDrafts}
+                editableIds={sellerDrops
+                  .filter((drop) => drop.status === 'DRAFT')
+                  .map((drop) => drop.id)}
                 onSave={saveSellerDraft}
                 notify={notify}
               />
@@ -200,6 +203,9 @@ export default function App() {
             element={
               <SellerDropFormPage
                 drafts={sellerDrafts}
+                editableIds={sellerDrops
+                  .filter((drop) => drop.status === 'DRAFT')
+                  .map((drop) => drop.id)}
                 onSave={saveSellerDraft}
                 notify={notify}
               />
@@ -207,7 +213,14 @@ export default function App() {
           />
           <Route
             path="/seller/drops/:dropId"
-            element={<SellerDropDetailPage />}
+            element={
+              <SellerDropDetailPage
+                drops={sellerDrops}
+                ownerEmail={account?.email ?? 'grab@example.com'}
+                onChange={setSellerDrops}
+                notify={notify}
+              />
+            }
           />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>

@@ -3,6 +3,7 @@ import {
   demoSellerDrops,
   dropFromDraft,
   readSellerDropQuery,
+  transitionSellerDrop,
 } from '../mock/mockSellerDrops'
 import type { SellerDraft } from '../mock/mockSellerDrafts'
 
@@ -34,5 +35,34 @@ describe('판매자 DROP Mock 목록', () => {
       status: 'DRAFT',
       ownerEmail: 'grab@example.com',
     })
+  })
+
+  it('공개 필수값과 취소 가능 시각을 검사하고 실패 시 상태를 유지한다', () => {
+    const draft = demoSellerDrops.find((drop) => drop.id === '401')!
+    const missingImage = [{ ...draft, image: null }]
+    expect(transitionSellerDrop(missingImage, '401', 'PUBLISH').drops).toBe(
+      missingImage,
+    )
+    const published = transitionSellerDrop([draft], '401', 'PUBLISH')
+    expect(published.drops[0].status).toBe('WISH')
+    expect(
+      transitionSellerDrop(published.drops, '401', 'PUBLISH').error,
+    ).toMatch(/DRAFT/)
+    expect(
+      transitionSellerDrop(published.drops, '401', 'CANCEL', ' ', 0).error,
+    ).toMatch(/사유/)
+    expect(
+      transitionSellerDrop(published.drops, '401', 'CANCEL', '일정 변경', 0)
+        .drops[0].status,
+    ).toBe('CANCELED')
+    expect(
+      transitionSellerDrop(
+        published.drops,
+        '401',
+        'CANCEL',
+        '일정 변경',
+        Number.MAX_SAFE_INTEGER,
+      ).error,
+    ).toMatch(/판매 시작 전/)
   })
 })

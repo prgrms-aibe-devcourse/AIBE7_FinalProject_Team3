@@ -37,3 +37,29 @@ test('조회 실패·빈 결과를 구분하고 DRAFT 저장 후 목록에 표�
   await page.getByRole('button', { name: 'DRAFT' }).click()
   await expect(page.getByRole('link', { name: '새 Mock DROP' })).toBeVisible()
 })
+
+test('목록에서 공개 실패와 출시 취소를 Mock 상태로 확인한다', async ({
+  page,
+}) => {
+  await page.goto('/#/seller/drops?status=DRAFT&page=0')
+  const draft = page
+    .getByRole('article')
+    .filter({ hasText: '오버핏 니트 가디건' })
+  await page.getByLabel('상태 변경 결과 예시').selectOption('FAILURE')
+  await draft.getByRole('button', { name: '공개 확인' }).click()
+  await draft.getByRole('button', { name: 'Mock 공개 확인' }).click()
+  await expect(draft.getByRole('alert')).toHaveText(/변경하지 못했어요/)
+  await page.getByLabel('상태 변경 결과 예시').selectOption('SUCCESS')
+  await draft.getByRole('button', { name: '공개 확인' }).click()
+  await draft.getByRole('button', { name: 'Mock 공개 확인' }).click()
+  await expect(draft).toHaveCount(0)
+  await page.getByRole('button', { name: 'WISH' }).click()
+  const wish = page
+    .getByRole('article')
+    .filter({ hasText: '오버핏 니트 가디건' })
+  await expect(wish).toBeVisible()
+  await wish.getByRole('button', { name: '출시 취소' }).click()
+  await wish.getByLabel('취소 사유').fill('상품 공급 일정 변경')
+  await wish.getByRole('button', { name: 'Mock 취소 확인' }).click()
+  await expect(wish).toHaveCount(0)
+})
