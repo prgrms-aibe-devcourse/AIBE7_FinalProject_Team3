@@ -2,7 +2,9 @@ package org.example.grab.domain.user.error;
 
 import jakarta.validation.Validation;
 import jakarta.validation.ValidatorFactory;
+import jakarta.validation.constraints.NotEmpty;
 import org.example.grab.domain.user.dto.request.SignupRequest;
+import org.example.grab.domain.user.validation.ValidEmail;
 import org.example.grab.global.error.CommonErrorCode;
 import org.example.grab.global.error.ErrorCode;
 import org.example.grab.global.error.ValidationErrorCodeResolver;
@@ -174,5 +176,51 @@ class UserConstraintErrorCodeMappingTest {
         // then
         assertThat(first).hasSize(3).startsWith("VALIDATION_FAILED");
         assertThat(repeated).allSatisfy(result -> assertThat(result).isEqualTo(first));
+    }
+
+    // 이메일 요청 DTO는 M01-03에서 만든다. 여기서는 같은 제약 조합(@NotEmpty + @ValidEmail)으로 매핑만 확인한다
+    private record EmailHolder(@NotEmpty(message = "이메일은 필수입니다.") @ValidEmail String email) {
+    }
+
+    private ErrorCode resolveEmailError(String email) {
+        EmailHolder holder = new EmailHolder(email);
+        BeanPropertyBindingResult result = new BeanPropertyBindingResult(holder, "emailHolder");
+        springValidator.validate(holder, result);
+
+        List<FieldError> fieldErrors = result.getFieldErrors("email");
+        assertThat(fieldErrors).hasSize(1);
+        return resolver.resolve(fieldErrors.get(0));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"userexample.com", "us er@example.com"})
+    @DisplayName("이메일 길이·형식 위반은 INVALID_EMAIL로 연결한다")
+    void resolvesEmailPolicyViolationToInvalidEmail(String email) {
+        // when
+        ErrorCode errorCode = resolveEmailError(email);
+
+        // then
+        assertThat(errorCode).isEqualTo(UserErrorCode.INVALID_EMAIL);
+    }
+
+    @Test
+    @DisplayName("254자를 넘는 이메일은 INVALID_EMAIL로 연결한다")
+    void resolvesTooLongEmailToInvalidEmail() {
+        // when
+        ErrorCode errorCode = resolveEmailError("a".repeat(243) + "@example.com");
+
+        // then
+        assertThat(errorCode).isEqualTo(UserErrorCode.INVALID_EMAIL);
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @DisplayName("이메일 필수값 위반은 INVALID_EMAIL이 아닌 VALIDATION_FAILED로 둔다")
+    void resolvesEmailRequiredViolationToValidationFailed(String email) {
+        // when
+        ErrorCode errorCode = resolveEmailError(email);
+
+        // then
+        assertThat(errorCode).isEqualTo(CommonErrorCode.VALIDATION_FAILED);
     }
 }

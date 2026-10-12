@@ -134,22 +134,6 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query(value = "SELECT * FROM orders WHERE id = :id FOR UPDATE SKIP LOCKED", nativeQuery = true)
     Optional<Order> findByIdForUpdateSkipLocked(@Param("id") Long id);
 
-    /*
-    payments_cancellations에서 해당 주문의 purpose = 'ORDER_CANCEL', status = 'UNKNOWN'인 기록이 있는지 조회
-    -> 구매자가 취소를 요청했는데 PG 응답이 끊겨 취소됐는지 모르는 상태(UNKNOWN)
-    */
-    @Query(value = """
-            SELECT EXISTS (
-                SELECT 1
-                FROM payment_cancellations pc
-                JOIN payments p ON p.id = pc.payment_id
-                WHERE p.order_id = :orderId
-                  AND pc.purpose = 'ORDER_CANCEL'
-                  AND pc.status = 'UNKNOWN'
-            )
-            """, nativeQuery = true)
-    boolean hasUnknownOrderCancellation(@Param("orderId") Long orderId);
-
     Optional<Order> findByOrderNumber(String orderNumber);
 
     Optional<Order> findByBuyerIdAndIdempotencyKey(Long buyerId, String idempotencyKey);

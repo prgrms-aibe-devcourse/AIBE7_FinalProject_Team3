@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>소비자 상품 상세 와이어프레임</title>
+    <link rel="stylesheet" href="wireframe.css" />
+  </head>
+  <body>
+    <header>
+      <span class="route">/drops/:dropId</span>
+      <h1>소비자 상품 상세 와이어프레임</h1>
+      <p class="muted">배치와 동선을 검토하는 화면 초안 · 실제 API 동작 없음</p>
+      <nav aria-label="와이어프레임 이동">
+        <a href="HomePage.html">메인</a><a href="WishPage.html">WISH</a
+        ><a href="GrabPage.html">GRAB</a
+        ><a href="DropDetailPage.html">상품 상세</a
+        ><a href="CheckoutPage.html">주문·결제</a
+        ><a href="SellerDashboardPage.html">판매자 종합</a
+        ><a href="SellerDropsPage.html">DROP 관리</a
+        ><a href="SellerDropDetailPage.html">DROP 상세</a
+        ><a href="SellerDropFormPage.html">DROP 등록·편집</a
+        ><a href="SellerOrdersPage.html">주문</a
+        ><a href="SellerInventoryPage.html">재고</a
+        ><a href="SellerSalesPage.html">실적</a>
+      </nav>
+    </header>
+    <main>
+      <div class="split">
+        <section>
+          <div class="picture">GALLERY 대표 이미지<br />목록 썸네일</div>
+          <div class="thumbs">
+            <div class="picture selected">1</div>
+            <div class="picture">2</div>
+            <div class="picture">3</div>
+          </div>
+          <small>GALLERY 한 장이면 썸네일 목록 숨김</small>
+        </section>
+        <section class="panel stack">
+          <span class="tag">WISH / GRAB</span>
+          <h1>상품명 · 브랜드</h1>
+          <p>상품 설명 요약 · 최저가</p>
+          <span class="field">옵션 선택</span
+          ><span class="field">수량 선택</span
+          ><span class="field">판매 기간 · 재고</span
+          ><span class="control primary">WISH 또는 GRAB</span>
+        </section>
+      </div>
+      <section class="section">
+        <h2>상품 상세 설명</h2>
+        <p>실제 상품 설명 텍스트</p>
+        <div class="picture detail">DETAIL 이미지 1 · 대체 설명</div>
+        <div class="picture detail">DETAIL 이미지 2 · 대체 설명</div>
+      </section>
+      <section class="section panel">
+        <h2>배송 안내</h2>
+        <p>배송비 · 배송 공지</p>
+      </section>
+    </main>
+    <footer>
+      화면별 동작·예외·조회 조건은
+      <a href="../pages/DropDetailPage.md">DropDetailPage.md</a>를 확인하세요.
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,29 @@
+apis:
+  category:
+    root: ./openapi/category.json
+    x-openapi-ts:
+      output: ./src/api/schema/category.ts
+  dashboard:
+    root: ./openapi/dashboard.json
+    x-openapi-ts:
+      output: ./src/api/schema/dashboard.ts
+  drop:
+    root: ./openapi/drop.json
+    x-openapi-ts:
+      output: ./src/api/schema/drop.ts
+  order:
+    root: ./openapi/order.json
+    x-openapi-ts:
+      output: ./src/api/schema/order.ts
+  payment:
+    root: ./openapi/payment.json
+    x-openapi-ts:
+      output: ./src/api/schema/payment.ts
+  user:
+    root: ./openapi/user.json
+    x-openapi-ts:
+      output: ./src/api/schema/user.ts
+  wish:
+    root: ./openapi/wish.json
+    x-openapi-ts:
+      output: ./src/api/schema/wish.ts

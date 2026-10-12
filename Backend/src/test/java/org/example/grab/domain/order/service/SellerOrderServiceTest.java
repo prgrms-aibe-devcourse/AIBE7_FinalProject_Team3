@@ -119,7 +119,6 @@ class SellerOrderServiceTest {
         ReflectionTestUtils.setField(order, "status", OrderStatus.PAID);
         when(orderRepository.findByUuidForUpdate(orderId)).thenReturn(Optional.of(order));
         when(orderRepository.ownsDrop(SELLER_ID, 42L)).thenReturn(true);
-        when(orderRepository.hasUnknownOrderCancellation(100L)).thenReturn(false);
 
         // when
         var response = sellerOrderService.prepareShipment(SELLER_ID, orderId);
@@ -128,7 +127,6 @@ class SellerOrderServiceTest {
         assertThat(response.orderId()).isEqualTo(order.getUuid());
         assertThat(response.status()).isEqualTo("PREPARING");
         verify(orderRepository).findByUuidForUpdate(orderId);
-        verify(orderRepository).hasUnknownOrderCancellation(100L);
     }
 
     @Test
@@ -138,9 +136,10 @@ class SellerOrderServiceTest {
         Order order = createOrder();
         ReflectionTestUtils.setField(order, "id", 100L);
         ReflectionTestUtils.setField(order, "status", OrderStatus.PAID);
+        // 소비자 취소로 PG 결제 취소를 진행·확인 중이다
+        order.requestCancel("550e8400-e29b-41d4-a716-446655440009", "c".repeat(64), "단순 변심");
         when(orderRepository.findByUuidForUpdate(orderId)).thenReturn(Optional.of(order));
         when(orderRepository.ownsDrop(SELLER_ID, 42L)).thenReturn(true);
-        when(orderRepository.hasUnknownOrderCancellation(100L)).thenReturn(true);
 
         // when
         Throwable exception = catchThrowable(() -> sellerOrderService.prepareShipment(SELLER_ID, orderId));
@@ -264,6 +263,29 @@ class SellerOrderServiceTest {
         assertThat(exception).isInstanceOfSatisfying(BusinessException.class,
                 actual -> assertThat(actual.getErrorCode()).isEqualTo(CommonErrorCode.ORDER_STATUS_CONFLICT));
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+    }
+
+    @Test
+    void rejectsShipmentWhileCancellationIsInProgress() {
+        // given: 배송 준비 중인 주문에 소비자 취소로 PG 결제 취소를 진행·확인 중이다
+        UUID orderId = UUID.randomUUID();
+        Order order = createOrder();
+        ReflectionTestUtils.setField(order, "id", 100L);
+        ReflectionTestUtils.setField(order, "status", OrderStatus.PREPARING);
+        order.requestCancel("550e8400-e29b-41d4-a716-446655440009", "c".repeat(64), "단순 변심");
+        when(orderRepository.findByUuidForUpdate(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.ownsDrop(SELLER_ID, 42L)).thenReturn(true);
+        when(shipmentRepository.findByOrderId(100L)).thenReturn(Optional.empty());
+
+        // when
+        Throwable exception = catchThrowable(() -> sellerOrderService.registerShipment(SELLER_ID, orderId,
+                "123e4567-e89b-12d3-a456-426614174000", new ShipmentRegisterRequest("CJ대한통운", "1234567890")));
+
+        // then
+        assertThat(exception).isInstanceOfSatisfying(BusinessException.class,
+                actual -> assertThat(actual.getErrorCode()).isEqualTo(OrderErrorCode.PAYMENT_CANCELLATION_UNKNOWN));
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PREPARING);
+        verify(shipmentRepository, org.mockito.Mockito.never()).save(org.mockito.ArgumentMatchers.any());
     }
 
     @Test

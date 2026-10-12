@@ -84,6 +84,17 @@ public interface OrderInventoryRepository extends Repository<Order, Long> {
             """, nativeQuery = true)
     int releaseReservedQuantity(@Param("optionId") Long optionId, @Param("quantity") int quantity);
 
+    // 결제 후 주문 취소: 판매 수량을 가용 재고로 되돌린다(반환 목적지 AVAILABLE, ERD.md 3.3).
+    // 판매 수량이 모자라면 0행을 돌려주고, 호출하는 쪽이 정합성 오류로 처리한다.
+    @Modifying
+    @Query(value = """
+            UPDATE drop_options
+            SET sold_quantity = sold_quantity - :quantity,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = :optionId AND sold_quantity >= :quantity
+            """, nativeQuery = true)
+    int returnSoldQuantity(@Param("optionId") Long optionId, @Param("quantity") int quantity);
+
     interface DropSnapshot {
 
         Long getId();

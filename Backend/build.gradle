@@ -26,6 +26,9 @@ ext {
 }
 
 dependencies {
+    // Source: https://mvnrepository.com/artifact/org.bouncycastle/bcprov-jdk18on
+    // Argon2id 비밀번호 해시(Spring Security Argon2PasswordEncoder)용
+    implementation 'org.bouncycastle:bcprov-jdk18on:1.86'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-flyway'

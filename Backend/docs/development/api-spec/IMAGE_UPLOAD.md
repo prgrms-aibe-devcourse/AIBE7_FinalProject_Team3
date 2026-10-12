@@ -47,6 +47,7 @@ POST /api/v1/uploads/images/presigned-url
 - `uploadUrl`은 Supabase 서명 업로드 URL이며, 클라이언트가 이 URL로 파일을 직접 업로드(HTTP PUT)합니다. 만료는 Supabase 정책에 따라 발급 시각 + 2시간으로 고정됩니다.
 - `imageUrl`은 서버가 만든 공개 버킷 URL입니다. DROP 등록 시 `imageId`와 함께 그대로 다시 사용합니다(2.1·2.4 참고).
 - 발급한 `imageId`는 해당 이미지를 DROP에 등록할 때 `drop_images.public_id`로 그대로 저장합니다.
+- GALLERY와 DETAIL은 같은 업로드 경로·MIME·파일당 5MB 제한을 사용합니다. 용도와 대체 설명은 업로드 요청이 아니라 DROP 생성·수정 요청(DROP.md 2.1·2.4)에서 지정합니다. 두 용도의 DROP별 합계는 최대 10개입니다.
 - 형식·크기의 최종 차단은 버킷 설정(`allowedMimeTypes`, `fileSizeLimit`)이 맡고, 서버 검증은 빠른 400 응답을 위한 1차 방어입니다. 두 값은 위 허용 목록·최대 크기와 같게 유지합니다.
 
 **오류 코드:**

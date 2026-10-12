@@ -4,8 +4,8 @@ import org.example.grab.domain.drop.upload.dto.ImageUploadUrlResponse;
 import org.example.grab.global.common.ErrorResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
-import org.example.grab.global.storage.supabase.SignedUploadUrl;
-import org.example.grab.global.storage.supabase.SupabaseStorageClient;
+import org.example.grab.global.storage.ImageStorage;
+import org.example.grab.global.storage.SignedUploadUrl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,21 +24,21 @@ import static org.mockito.Mockito.verify;
 
 class DropImageUploadServiceTest {
 
-    private SupabaseStorageClient supabaseStorageClient;
+    private ImageStorage imageStorage;
     private DropImageUploadService service;
 
     @BeforeEach
     void setUp() {
-        supabaseStorageClient = mock(SupabaseStorageClient.class);
-        service = new DropImageUploadService(supabaseStorageClient);
+        imageStorage = mock(ImageStorage.class);
+        service = new DropImageUploadService(imageStorage);
     }
 
     @Test
     @DisplayName("contentType에서 확장자를 정해 images/{imageId}.{ext} 키로 발급하고 2시간 만료를 담는다")
     void issue() {
         // given
-        given(supabaseStorageClient.createSignedUploadUrl(anyString()))
-                .willReturn(new SignedUploadUrl("https://project.supabase.co/signed", "https://project.supabase.co/public"));
+        given(imageStorage.createSignedUploadUrl(anyString()))
+                .willReturn(new SignedUploadUrl("https://storage.example.com/signed", "https://storage.example.com/public"));
 
         // when
         OffsetDateTime before = OffsetDateTime.now();
@@ -47,12 +47,12 @@ class DropImageUploadServiceTest {
 
         // then
         ArgumentCaptor<String> objectKey = ArgumentCaptor.forClass(String.class);
-        verify(supabaseStorageClient).createSignedUploadUrl(objectKey.capture());
+        verify(imageStorage).createSignedUploadUrl(objectKey.capture());
         assertThat(objectKey.getValue()).matches("images/[0-9a-f-]{36}\\.png");
         assertThat(response.imageId()).isNotNull();
         assertThat(objectKey.getValue()).contains(response.imageId().toString());
-        assertThat(response.uploadUrl()).isEqualTo("https://project.supabase.co/signed");
-        assertThat(response.imageUrl()).isEqualTo("https://project.supabase.co/public");
+        assertThat(response.uploadUrl()).isEqualTo("https://storage.example.com/signed");
+        assertThat(response.imageUrl()).isEqualTo("https://storage.example.com/public");
         assertThat(response.expiresAt())
                 .isBetween(before.plus(DropImageUploadService.UPLOAD_URL_TTL),
                         after.plus(DropImageUploadService.UPLOAD_URL_TTL));
@@ -62,7 +62,7 @@ class DropImageUploadServiceTest {
     @DisplayName("jpeg·webp 확장자를 contentType에서 결정하고 fileName은 쓰지 않는다")
     void mapsExtensionsFromContentType() {
         // given
-        given(supabaseStorageClient.createSignedUploadUrl(anyString()))
+        given(imageStorage.createSignedUploadUrl(anyString()))
                 .willReturn(new SignedUploadUrl("u", "i"));
 
         // when
@@ -71,7 +71,7 @@ class DropImageUploadServiceTest {
 
         // then
         ArgumentCaptor<String> objectKey = ArgumentCaptor.forClass(String.class);
-        verify(supabaseStorageClient, org.mockito.Mockito.times(2)).createSignedUploadUrl(objectKey.capture());
+        verify(imageStorage, org.mockito.Mockito.times(2)).createSignedUploadUrl(objectKey.capture());
         assertThat(objectKey.getAllValues().get(0)).endsWith(".jpg");
         assertThat(objectKey.getAllValues().get(1)).endsWith(".webp");
     }
@@ -85,7 +85,7 @@ class DropImageUploadServiceTest {
                     assertThat(e.getErrorCode()).isEqualTo(CommonErrorCode.VALIDATION_FAILED);
                     assertThat(fieldNames(e)).containsExactly("contentType");
                 });
-        verify(supabaseStorageClient, never()).createSignedUploadUrl(anyString());
+        verify(imageStorage, never()).createSignedUploadUrl(anyString());
     }
 
     @Test
@@ -97,7 +97,7 @@ class DropImageUploadServiceTest {
                     assertThat(e.getErrorCode()).isEqualTo(CommonErrorCode.VALIDATION_FAILED);
                     assertThat(fieldNames(e)).containsExactly("fileSize");
                 });
-        verify(supabaseStorageClient, never()).createSignedUploadUrl(anyString());
+        verify(imageStorage, never()).createSignedUploadUrl(anyString());
     }
 
     private static List<String> fieldNames(BusinessException e) {

@@ -29,8 +29,8 @@ import org.example.grab.domain.drop.repository.DropRepository;
 import org.example.grab.global.common.ErrorResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
-import org.example.grab.global.storage.supabase.SupabaseStorageClient;
-import org.example.grab.global.storage.supabase.SupabaseStorageProperties;
+import org.example.grab.global.storage.ImageStorage;
+import org.example.grab.global.storage.SignedUploadUrl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,9 +38,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.client.RestClient;
 
-import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -61,7 +59,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 class DropServiceTest {
 
     private static final String IMAGE_URL_PREFIX =
-            "https://project.supabase.co/storage/v1/object/public/drop-images/images/";
+            "https://storage.example.com/";
 
     @Mock
     private DropRepository dropRepository;
@@ -75,18 +73,24 @@ class DropServiceTest {
     @Mock
     private WishQueryService wishQueryService;
 
-    // imageUrl 검증은 실제 공개 URL 조립이 필요하므로 진짜 클라이언트를 쓴다(HTTP 호출은 하지 않는다).
-    private final SupabaseStorageClient supabaseStorageClient = new SupabaseStorageClient(
-            RestClient.builder(),
-            new SupabaseStorageProperties("https://project.supabase.co", "sb_secret_test", "drop-images",
-                    Duration.ofSeconds(3), Duration.ofSeconds(5)));
+    private final ImageStorage imageStorage = new ImageStorage() {
+        @Override
+        public SignedUploadUrl createSignedUploadUrl(String objectKey) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public String publicUrl(String objectKey) {
+            return IMAGE_URL_PREFIX + objectKey;
+        }
+    };
 
     private DropService dropService;
 
     @BeforeEach
     void setUp() {
         dropService = new DropService(
-                dropRepository, dropImageRepository, categoryService, wishQueryService, supabaseStorageClient);
+                dropRepository, dropImageRepository, categoryService, wishQueryService, imageStorage);
     }
 
     @Test
@@ -714,7 +718,7 @@ class DropServiceTest {
     }
 
     private static DropImageRequest image(UUID imageId) {
-        return new DropImageRequest(imageId, IMAGE_URL_PREFIX + imageId + ".jpg");
+        return new DropImageRequest(imageId, IMAGE_URL_PREFIX + "images/" + imageId + ".jpg");
     }
 
     @Test

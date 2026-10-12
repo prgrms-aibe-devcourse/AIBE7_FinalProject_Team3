@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>주문·결제 와이어프레임</title>
+    <link rel="stylesheet" href="wireframe.css" />
+  </head>
+  <body>
+    <header>
+      <span class="route">/checkout/:orderId</span>
+      <h1>주문·결제 와이어프레임</h1>
+      <p class="muted">배치와 동선을 검토하는 화면 초안 · 실제 API 동작 없음</p>
+      <nav aria-label="와이어프레임 이동">
+        <a href="DropDetailPage.html">상품 상세</a
+        ><a href="CheckoutPage.html">주문·결제</a
+        ><a href="OrderDetailPage.html">주문 상세</a
+        ><a href="MyPage.html">마이페이지</a>
+      </nav>
+    </header>
+    <main>
+      <p class="eyebrow">GRAB CHECKOUT</p>
+      <h1>주문을 확인해 주세요</h1>
+      <p>주문 생성 후 서버가 확정한 금액과 결제 마감 시각을 표시합니다.</p>
+      <div class="side section">
+        <div class="stack">
+          <section class="panel stack">
+            <h2>배송지</h2>
+            <span class="field">받는 분</span><span class="field">연락처</span
+            ><span class="field">우편번호 · 주소 검색</span
+            ><span class="field">기본 주소</span
+            ><span class="field">상세 주소</span>
+          </section>
+          <section class="panel">
+            <h2>주문 상품</h2>
+            <div class="row">
+              <strong>상품명 · 선택 옵션 × 2</strong><span>258,000원</span>
+            </div>
+          </section>
+        </div>
+        <section class="panel stack">
+          <h2>결제 금액</h2>
+          <div class="row">
+            <span>상품 금액</span><strong>258,000원</strong>
+          </div>
+          <div class="row"><span>배송비</span><strong>3,000원</strong></div>
+          <hr />
+          <div class="row">
+            <strong>총 결제 금액</strong><strong>261,000원</strong>
+          </div>
+          <p class="note">결제 마감: 14:10 · 마감 후 결제할 수 없습니다.</p>
+          <span class="control primary">테스트 결제 진행</span>
+        </section>
+      </div>
+      <section class="section panel">
+        <h2>결제 결과 상태</h2>
+        <div class="grid cols-3">
+          <div class="card">
+            <strong>성공</strong>
+            <p>주문 PAID 확인 후 완료 안내</p>
+            <span class="control">주문 상세 보기</span>
+          </div>
+          <div class="card">
+            <strong>실패</strong>
+            <p>결제 대기·마감 전이면 다시 시도</p>
+            <span class="control">결제 다시 시도</span>
+          </div>
+          <div class="card">
+            <strong>확인 중</strong>
+            <p>결과 불명·보정 필요: 재결제 금지</p>
+            <span class="control">결과 확인</span>
+          </div>
+        </div>
+      </section>
+    </main>
+    <footer>
+      화면별 동작·예외·조회 조건은
+      <a href="../pages/CheckoutPage.md">CheckoutPage.md</a>를 확인하세요.
+    </footer>
+  </body>
+</html>

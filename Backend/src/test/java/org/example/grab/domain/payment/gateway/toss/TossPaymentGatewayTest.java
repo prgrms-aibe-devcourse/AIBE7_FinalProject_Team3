@@ -1,5 +1,7 @@
 package org.example.grab.domain.payment.gateway.toss;
 
+import org.example.grab.domain.payment.gateway.PaymentCancelCommand;
+import org.example.grab.domain.payment.gateway.PaymentCancelResult;
 import org.example.grab.domain.payment.gateway.PaymentConfirmCommand;
 import org.example.grab.domain.payment.gateway.PaymentGatewayResult;
 import org.example.grab.domain.payment.gateway.PaymentGatewayResult.Outcome;
@@ -33,6 +35,8 @@ class TossPaymentGatewayTest {
     private static final String SECRET_KEY = "test_sk_dummy";
     private static final PaymentConfirmCommand COMMAND =
             new PaymentConfirmCommand("payment-key", "ORD-20260929-000001", 33000, "server-idempotency-key");
+    private static final PaymentCancelCommand CANCEL_COMMAND =
+            new PaymentCancelCommand("payment-key", "단순 변심", "server-cancel-key");
 
     private RestClient.Builder builder;
     private MockRestServiceServer server;
@@ -232,6 +236,158 @@ class TossPaymentGatewayTest {
         // when & then
         assertThat(properties.toString()).doesNotContain(SECRET_KEY).contains("masked");
         assertThat(COMMAND.toString()).doesNotContain("payment-key").doesNotContain("server-idempotency-key");
+    }
+
+    @Test
+    @DisplayName("취소 요청에 서버 멱등 키·사유를 담고 전액 취소되면 마지막 완료 취소 이력의 거래 키·시각을 돌려준다")
+    void cancelCanceled() {
+        // given
+        TossPaymentGateway gateway = new TossPaymentGateway(builder, SECRET_KEY);
+        server.expect(requestTo(BASE_URL + "/v1/payments/payment-key/cancel"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header("Idempotency-Key", "server-cancel-key"))
+                .andExpect(jsonPath("$.cancelReason").value("단순 변심"))
+                .andExpect(jsonPath("$.cancelAmount").doesNotExist())
+                .andRespond(withSuccess(canceledPayment("CANCELED", "DONE"), MediaType.APPLICATION_JSON));
+
+        // when
+        PaymentCancelResult result = gateway.cancel(CANCEL_COMMAND);
+
+        // then
+        server.verify();
+        assertThat(result.outcome()).isEqualTo(PaymentCancelResult.Outcome.CANCELED);
+        assertThat(result.pgStatus()).isEqualTo("CANCELED");
+        assertThat(result.transactionKey()).isEqualTo("cancel-transaction-key");
+        assertThat(result.canceledAt()).isEqualTo(OffsetDateTime.parse("2026-10-06T14:10:00+09:00"));
+    }
+
+    @Test
+    @DisplayName("취소 응답이 전액 취소 상태가 아니거나 완료된 취소 이력이 없으면 결과 불명으로 돌려준다")
+    void cancelResponseNotFullyCanceled() {
+        // given
+        TossPaymentGateway gateway = new TossPaymentGateway(builder, SECRET_KEY);
+        server.expect(requestTo(BASE_URL + "/v1/payments/payment-key/cancel"))
+                .andRespond(withSuccess(canceledPayment("PARTIAL_CANCELED", "DONE"), MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE_URL + "/v1/payments/payment-key/cancel"))
+                .andRespond(withSuccess(canceledPayment("CANCELED", "IN_PROGRESS"), MediaType.APPLICATION_JSON));
+
+        // when
+        PaymentCancelResult partial = gateway.cancel(CANCEL_COMMAND);
+        PaymentCancelResult inProgress = gateway.cancel(CANCEL_COMMAND);
+
+        // then
+        assertThat(partial.outcome()).isEqualTo(PaymentCancelResult.Outcome.UNKNOWN);
+        assertThat(partial.pgStatus()).isEqualTo("PARTIAL_CANCELED");
+        assertThat(inProgress.outcome()).isEqualTo(PaymentCancelResult.Outcome.UNKNOWN);
+    }
+
+    @Test
+    @DisplayName("취소할 수 없는 결제·기간 경과처럼 토스가 명확히 거절하면 거절과 실패 코드를 돌려준다")
+    void cancelRejected() {
+        // given
+        TossPaymentGateway gateway = new TossPaymentGateway(builder, SECRET_KEY);
+        server.expect(requestTo(BASE_URL + "/v1/payments/payment-key/cancel"))
+                .andRespond(withStatus(HttpStatus.FORBIDDEN).contentType(MediaType.APPLICATION_JSON)
+                        .body(error("NOT_CANCELABLE_PAYMENT", "취소 할 수 없는 결제 입니다.")));
+
+        // when
+        PaymentCancelResult result = gateway.cancel(CANCEL_COMMAND);
+
+        // then
+        assertThat(result.outcome()).isEqualTo(PaymentCancelResult.Outcome.REJECTED);
+        assertThat(result.failureCode()).isEqualTo("NOT_CANCELABLE_PAYMENT");
+        assertThat(result.failureMessage()).isEqualTo("취소 할 수 없는 결제 입니다.");
+    }
+
+    @Test
+    @DisplayName("처리 중·일시 오류·5xx·타임아웃은 거절로 단정하지 않고 결과 불명으로 돌려준다")
+    void cancelUncertain() {
+        // given
+        TossPaymentGateway gateway = new TossPaymentGateway(builder, SECRET_KEY);
+        server.expect(requestTo(BASE_URL + "/v1/payments/payment-key/cancel"))
+                .andRespond(withStatus(HttpStatus.CONFLICT).contentType(MediaType.APPLICATION_JSON)
+                        .body(error("IDEMPOTENT_REQUEST_PROCESSING", "이전 멱등 요청이 처리중이에요.")));
+        server.expect(requestTo(BASE_URL + "/v1/payments/payment-key/cancel"))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON)
+                        .body(error("PROVIDER_ERROR", "일시적인 오류가 발생했습니다.")));
+        server.expect(requestTo(BASE_URL + "/v1/payments/payment-key/cancel"))
+                .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR).contentType(MediaType.APPLICATION_JSON)
+                        .body(error("FAILED_INTERNAL_SYSTEM_PROCESSING", "내부 시스템 처리 작업이 실패했습니다.")));
+        server.expect(requestTo(BASE_URL + "/v1/payments/payment-key/cancel"))
+                .andRespond(withException(new SocketTimeoutException("Read timed out")));
+
+        // when & then
+        for (int i = 0; i < 4; i++) {
+            assertThat(gateway.cancel(CANCEL_COMMAND).outcome()).isEqualTo(PaymentCancelResult.Outcome.UNKNOWN);
+        }
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("이미 취소된 결제라는 오류면 결제를 조회해, 전액 취소 상태면 취소 성공으로 아니면 결과 불명으로 돌려준다")
+    void cancelAlreadyCanceled() {
+        // given
+        TossPaymentGateway gateway = new TossPaymentGateway(builder, SECRET_KEY);
+        server.expect(requestTo(BASE_URL + "/v1/payments/payment-key/cancel"))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON)
+                        .body(error("ALREADY_CANCELED_PAYMENT", "이미 취소된 결제 입니다.")));
+        server.expect(requestTo(BASE_URL + "/v1/payments/payment-key"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess(canceledPayment("CANCELED", "DONE"), MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE_URL + "/v1/payments/payment-key/cancel"))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON)
+                        .body(error("ALREADY_CANCELED_PAYMENT", "이미 취소된 결제 입니다.")));
+        server.expect(requestTo(BASE_URL + "/v1/payments/payment-key"))
+                .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR).contentType(MediaType.APPLICATION_JSON)
+                        .body(error("FAILED_INTERNAL_SYSTEM_PROCESSING", "내부 시스템 처리 작업이 실패했습니다.")));
+
+        // when
+        PaymentCancelResult confirmed = gateway.cancel(CANCEL_COMMAND);
+        PaymentCancelResult unconfirmed = gateway.cancel(CANCEL_COMMAND);
+
+        // then
+        server.verify();
+        assertThat(confirmed.outcome()).isEqualTo(PaymentCancelResult.Outcome.CANCELED);
+        assertThat(confirmed.transactionKey()).isEqualTo("cancel-transaction-key");
+        assertThat(unconfirmed.outcome()).isEqualTo(PaymentCancelResult.Outcome.UNKNOWN);
+    }
+
+    @Test
+    @DisplayName("시크릿 키가 없으면 토스를 호출하지 않고 취소를 거절로 돌려준다")
+    void cancelNotConfigured() {
+        // given
+        TossPaymentGateway gateway = new TossPaymentGateway(builder, " ");
+
+        // when
+        PaymentCancelResult result = gateway.cancel(CANCEL_COMMAND);
+
+        // then
+        server.verify();
+        assertThat(result.outcome()).isEqualTo(PaymentCancelResult.Outcome.REJECTED);
+        assertThat(result.failureCode()).isEqualTo(TossPaymentGateway.NOT_CONFIGURED_CODE);
+    }
+
+    @Test
+    @DisplayName("취소 사유는 토스 제한인 200자로 잘라 보내고, 문자열 표현에 paymentKey·멱등 키·사유 원문을 담지 않는다")
+    void cancelCommandTruncatesAndMasks() {
+        // when
+        PaymentCancelCommand command = new PaymentCancelCommand("payment-key", "가".repeat(300), "server-cancel-key");
+
+        // then
+        assertThat(command.cancelReason()).hasSize(PaymentCancelCommand.MAX_CANCEL_REASON_LENGTH);
+        assertThat(command.toString())
+                .doesNotContain("payment-key")
+                .doesNotContain("server-cancel-key")
+                .doesNotContain("가");
+    }
+
+    private static String canceledPayment(String status, String cancelStatus) {
+        return """
+                {"paymentKey":"payment-key","orderId":"ORD-20260929-000001","status":"%s","totalAmount":33000,
+                 "approvedAt":"2026-09-29T21:00:00+09:00",
+                 "cancels":[{"transactionKey":"cancel-transaction-key","cancelReason":"단순 변심","cancelAmount":33000,
+                             "cancelStatus":"%s","canceledAt":"2026-10-06T14:10:00+09:00"}]}
+                """.formatted(status, cancelStatus);
     }
 
     private static String payment(String status, String approvedAt) {

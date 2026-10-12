@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.grab.global.security.AuthCookies;
 import org.example.grab.global.security.AuthRole;
 import org.example.grab.global.security.jwt.InvalidAccessTokenException.Reason;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -37,7 +38,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    static final String ACCESS_TOKEN_COOKIE = "access_token";
     // 로그인·회원가입·재발급·로그아웃은 무효 토큰을 가진 채로도 호출할 수 있어야 함
     private static final String AUTH_PATH_PREFIX = "/api/v1/auth/";
 
@@ -55,7 +55,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         // 요청 사용자의 access_token 의 값을 불러옴
-        Cookie cookie = WebUtils.getCookie(request, ACCESS_TOKEN_COOKIE);
+        Cookie cookie = WebUtils.getCookie(request, AuthCookies.ACCESS_TOKEN_NAME);
         if (cookie == null) {
             chain.doFilter(request, response);
             return;

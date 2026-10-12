@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>회원가입·이메일 인증 와이어프레임</title>
+    <link rel="stylesheet" href="wireframe.css" />
+  </head>
+  <body>
+    <header>
+      <span class="route">/signup</span>
+      <h1>회원가입·이메일 인증 와이어프레임</h1>
+      <p class="muted">배치와 동선을 검토하는 화면 초안 · 실제 API 동작 없음</p>
+      <nav aria-label="와이어프레임 이동">
+        <a href="LoginPage.html">로그인</a><a href="SignupPage.html">회원가입</a
+        ><a href="MyPage.html">마이페이지</a>
+      </nav>
+    </header>
+    <main>
+      <div class="split">
+        <section class="hero">
+          <p class="eyebrow">WELCOME TO GRAB</p>
+          <h2>취향을 발견할 준비가 됐나요?</h2>
+          <p>이메일을 확인한 뒤 닉네임과 비밀번호를 정합니다.</p>
+        </section>
+        <section class="panel stack">
+          <h2>LOCAL 회원가입</h2>
+          <div class="controls">
+            <span class="chip">1 이메일</span
+            ><span class="chip">2 코드 확인</span
+            ><span class="chip">3 계정 만들기</span>
+          </div>
+          <span class="field">이메일 주소</span
+          ><span class="control">인증 코드 보내기</span
+          ><span class="field">인증 코드 6자리</span>
+          <div class="row">
+            <small>5분 유효 · 재발송 60초 뒤</small
+            ><span class="control">코드 확인</span>
+          </div>
+          <span class="field">인증된 이메일 (읽기 전용)</span
+          ><span class="field">닉네임</span><span class="field">비밀번호</span
+          ><span class="control primary">회원가입 완료</span>
+        </section>
+      </div>
+      <section class="section panel stack">
+        <h2>소셜 첫 가입: 닉네임 단계</h2>
+        <p>KAKAO / GOOGLE 인증이 끝난 뒤에만 표시</p>
+        <span class="field">닉네임</span
+        ><span class="control primary">가입 완료</span
+        ><small>이메일·제공자 정보는 서버의 가입 컨텍스트를 사용</small>
+      </section>
+    </main>
+    <footer>
+      화면별 동작·예외·조회 조건은
+      <a href="../pages/SignupPage.md">SignupPage.md</a>를 확인하세요.
+    </footer>
+  </body>
+</html>

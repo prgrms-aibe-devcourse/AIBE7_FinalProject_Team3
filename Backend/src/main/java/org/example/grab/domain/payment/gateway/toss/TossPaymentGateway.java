@@ -1,6 +1,8 @@
 package org.example.grab.domain.payment.gateway.toss;
 
 import lombok.extern.slf4j.Slf4j;
+import org.example.grab.domain.payment.gateway.PaymentCancelCommand;
+import org.example.grab.domain.payment.gateway.PaymentCancelResult;
 import org.example.grab.domain.payment.gateway.PaymentConfirmCommand;
 import org.example.grab.domain.payment.gateway.PaymentGateway;
 import org.example.grab.domain.payment.gateway.PaymentGatewayResult;
@@ -18,7 +20,7 @@ import java.util.Map;
 import java.util.Set;
 
 /*
-    토스페이먼츠 결제 승인·조회 API 호출(TECHSTACK.md 4.4).
+    토스페이먼츠 결제 승인·조회·취소 API 호출(TECHSTACK.md 4.4).
     승인하지 않았음이 확실한 경우만 NOT_APPROVED로 돌려주고, 판단이 애매하면 UNKNOWN으로 돌려 결제 서비스가 조회로 다시 확인하게 한다.
     UNKNOWN을 NOT_APPROVED로 잘못 판정하면 사용자가 재결제해 이중 결제가 생기므로, 분류가 애매하면 UNKNOWN 쪽을 고른다.
  */
@@ -44,6 +46,21 @@ public class TossPaymentGateway implements PaymentGateway {
     private static final String NOT_FOUND_PAYMENT_CODE = "NOT_FOUND_PAYMENT";
 
     private static final String DUPLICATED_ORDER_ID_CODE = "DUPLICATED_ORDER_ID";
+
+    private static final String CANCELED_STATUS = "CANCELED";
+
+    private static final String CANCEL_DONE_STATUS = "DONE";
+
+    private static final String ALREADY_CANCELED_CODE = "ALREADY_CANCELED_PAYMENT";
+
+    // 취소가 처리 중이거나 일시 오류라 취소됐는지 알 수 없는 오류. 같은 멱등 키로 다시 요청해 확정한다.
+    // 그 밖의 4xx(NOT_CANCELABLE_PAYMENT, EXCEED_MAX_REFUND_DUE 등)는 취소하지 않았음이 확실하므로 거절로 본다.
+    private static final Set<String> UNCERTAIN_CANCEL_ERROR_CODES = Set.of(
+            "IDEMPOTENT_REQUEST_PROCESSING",
+            "PROVIDER_ERROR",
+            "FAILED_INTERNAL_SYSTEM_PROCESSING",
+            "FAILED_METHOD_HANDLING_CANCEL"
+    );
 
     private final RestClient restClient;
     private final boolean configured;
@@ -105,6 +122,91 @@ public class TossPaymentGateway implements PaymentGateway {
         } catch (RestClientException e) {
             log.warn("토스페이먼츠 결제 조회 실패: cause={}", e.getClass().getSimpleName());
             return PaymentGatewayResult.unknown(null, null, "결제 상태를 확인하지 못했습니다.");
+        }
+    }
+
+    @Override
+    public PaymentCancelResult cancel(PaymentCancelCommand command) {
+        if (!configured) {
+            log.error("토스페이먼츠 시크릿 키가 설정되지 않아 결제 취소를 시도하지 않음");
+            return PaymentCancelResult.rejected(NOT_CONFIGURED_CODE, "결제 PG가 설정되지 않았습니다.");
+        }
+        try {
+            return restClient.post()
+                    .uri("/v1/payments/{paymentKey}/cancel", command.paymentKey())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header("Idempotency-Key", command.idempotencyKey())
+                    .body(Map.of("cancelReason", command.cancelReason()))
+                    .exchange((request, response) -> {
+                        if (response.getStatusCode().is2xxSuccessful()) {
+                            return fromCanceledPayment(response.bodyTo(TossPaymentResponse.class));
+                        }
+                        return fromCancelError(response.getStatusCode(), readError(response), command.paymentKey());
+                    });
+        } catch (RestClientException e) {
+            // 타임아웃·연결 실패·응답 해석 실패. 토스에서 취소가 끝났을 수 있으므로 거절로 단정하지 않는다.
+            log.warn("토스페이먼츠 결제 취소 결과 불명: cause={}", e.getClass().getSimpleName());
+            return PaymentCancelResult.unknown(null, null, "결제 취소 응답을 확인하지 못했습니다.");
+        }
+    }
+
+    // 전액 취소가 끝났으면 status가 CANCELED이고 마지막 취소 이력이 DONE이다. 그 외(부분 취소 등)는 확정하지 않는다.
+    private PaymentCancelResult fromCanceledPayment(TossPaymentResponse payment) {
+        if (payment == null || !CANCELED_STATUS.equals(payment.status())) {
+            String status = payment == null ? null : payment.status();
+            return PaymentCancelResult.unknown(status, null, "결제가 전액 취소 상태가 아닙니다.");
+        }
+        TossPaymentResponse.Cancel cancel = lastCompletedCancel(payment);
+        if (cancel == null || cancel.canceledAt() == null) {
+            return PaymentCancelResult.unknown(payment.status(), null, "완료된 취소 이력이 없습니다.");
+        }
+        return PaymentCancelResult.canceled(payment.status(), cancel.transactionKey(), cancel.canceledAt());
+    }
+
+    private static TossPaymentResponse.Cancel lastCompletedCancel(TossPaymentResponse payment) {
+        if (payment.cancels() == null) {
+            return null;
+        }
+        TossPaymentResponse.Cancel completed = null;
+        for (TossPaymentResponse.Cancel cancel : payment.cancels()) {
+            if (CANCEL_DONE_STATUS.equals(cancel.cancelStatus())) {
+                completed = cancel;
+            }
+        }
+        return completed;
+    }
+
+    private PaymentCancelResult fromCancelError(HttpStatusCode status, TossErrorResponse error, String paymentKey) {
+        // 이미 취소된 결제다. 같은 멱등 키의 재요청이면 토스가 최초 결과를 돌려주므로, 다른 경로(관리자 취소 등)로
+        // 취소된 경우다. 결제를 조회해 실제로 전액 취소됐는지 확인한다.
+        if (ALREADY_CANCELED_CODE.equals(error.code())) {
+            return lookupCanceled(paymentKey);
+        }
+        if (status.is5xxServerError() || error.code() == null || UNCERTAIN_CANCEL_ERROR_CODES.contains(error.code())) {
+            log.warn("토스페이먼츠 결제 취소 결과 불명: status={}, code={}", status.value(), error.code());
+            return PaymentCancelResult.unknown(null, error.code(), error.message());
+        }
+        if (status.value() == HttpStatus.UNAUTHORIZED.value()) {
+            log.error("토스페이먼츠 인증 실패. 시크릿 키 설정을 확인해야 함: code={}", error.code());
+        }
+        log.warn("토스페이먼츠 결제 취소 거절: status={}, code={}", status.value(), error.code());
+        return PaymentCancelResult.rejected(error.code(), error.message());
+    }
+
+    private PaymentCancelResult lookupCanceled(String paymentKey) {
+        try {
+            return restClient.get()
+                    .uri("/v1/payments/{paymentKey}", paymentKey)
+                    .exchange((request, response) -> {
+                        if (response.getStatusCode().is2xxSuccessful()) {
+                            return fromCanceledPayment(response.bodyTo(TossPaymentResponse.class));
+                        }
+                        TossErrorResponse error = readError(response);
+                        return PaymentCancelResult.unknown(null, error.code(), error.message());
+                    });
+        } catch (RestClientException e) {
+            log.warn("토스페이먼츠 결제 조회 실패: cause={}", e.getClass().getSimpleName());
+            return PaymentCancelResult.unknown(null, ALREADY_CANCELED_CODE, "취소된 결제를 확인하지 못했습니다.");
         }
     }
 

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>운영자 판매자 신청 심사 와이어프레임</title>
+    <link rel="stylesheet" href="wireframe.css" />
+  </head>
+  <body>
+    <header>
+      <span class="route">/admin/seller-applications</span>
+      <h1>운영자 판매자 신청 심사 와이어프레임</h1>
+      <p class="muted">배치와 동선을 검토하는 화면 초안 · 실제 API 동작 없음</p>
+      <nav aria-label="와이어프레임 이동">
+        <a href="SellerApplyPage.html">판매자 신청</a
+        ><a href="AdminSellerApplicationsPage.html">운영자 심사</a>
+      </nav>
+    </header>
+    <main>
+      <p class="eyebrow">ADMIN</p>
+      <h1>판매자 신청 심사</h1>
+      <section class="panel section stack">
+        <div class="controls">
+          <span class="chip">대기</span><span class="chip">승인</span
+          ><span class="chip">반려</span>
+        </div>
+        <small>상태 필터와 페이지를 URL에 유지</small>
+      </section>
+      <div class="side section">
+        <section class="panel stack">
+          <h2>신청 목록</h2>
+          <div class="card">
+            <div class="row">
+              <strong>길동상점</strong><span class="control">선택</span>
+            </div>
+            <small>seller@example.com · 2026.09.18 · PENDING</small>
+          </div>
+          <div class="card">
+            <div class="row">
+              <strong>두 번째 브랜드</strong><span class="control">선택</span>
+            </div>
+            <small>contact@example.com · 2026.09.17 · PENDING</small>
+          </div>
+          <div class="controls">
+            <span class="control">이전</span><span class="control">다음</span>
+          </div>
+        </section>
+        <section class="panel stack">
+          <h2>선택 신청 심사</h2>
+          <p>길동상점 · seller@example.com</p>
+          <p class="note">브랜드 소개는 현 조회 API에 없음</p>
+          <span class="control primary">승인 확인</span
+          ><span class="field">반려 사유 (필수)</span
+          ><span class="control">반려 확인</span>
+        </section>
+      </div>
+    </main>
+    <footer>
+      화면별 동작·예외·조회 조건은
+      <a href="../pages/AdminSellerApplicationsPage.md"
+        >AdminSellerApplicationsPage.md</a
+      >를 확인하세요.
+    </footer>
+  </body>
+</html>

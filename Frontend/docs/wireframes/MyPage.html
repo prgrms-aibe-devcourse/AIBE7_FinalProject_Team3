@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>마이페이지·내 정보 와이어프레임</title>
+    <link rel="stylesheet" href="wireframe.css" />
+  </head>
+  <body>
+    <header>
+      <span class="route">/my</span>
+      <h1>마이페이지·내 정보 와이어프레임</h1>
+      <p class="muted">배치와 동선을 검토하는 화면 초안 · 실제 API 동작 없음</p>
+      <nav aria-label="와이어프레임 이동">
+        <a href="WishPage.html">WISH</a><a href="GrabPage.html">GRAB</a
+        ><a href="MyPage.html">마이페이지</a
+        ><a href="OrderDetailPage.html">주문 상세</a
+        ><a href="SellerApplyPage.html">판매자 신청</a>
+      </nav>
+    </header>
+    <main>
+      <p class="eyebrow">MY GRAB</p>
+      <h1>나의 취향과 주문</h1>
+      <section class="panel section stack">
+        <div class="row">
+          <div>
+            <h2>내 계정</h2>
+            <p>드롭헌터 · user@example.com</p>
+          </div>
+          <span class="control">정보 수정</span>
+        </div>
+        <div class="split">
+          <span class="field">닉네임 변경</span
+          ><span class="control primary">저장</span>
+        </div>
+        <small>LOCAL 계정에만 비밀번호 변경 · 프로필 이미지 관리</small>
+        <div class="controls">
+          <span class="control">판매자 신청</span>
+        </div>
+        <small>승인된 판매자에게는 판매자 작업 공간 링크로 대체</small>
+      </section>
+      <div class="split section">
+        <section class="panel">
+          <h2>주문</h2>
+          <div class="list-row">
+            <strong>주문 ORD-... · 상품 A</strong
+            ><span class="secondary">결제 완료</span
+            ><span class="secondary">옵션 · 수량</span
+            ><span class="secondary">총액</span
+            ><a class="control" href="OrderDetailPage.html">상세 보기</a>
+          </div>
+          <p class="muted">빈 목록일 때: 아직 주문이 없어요.</p>
+        </section>
+        <section class="panel">
+          <h2>WISH</h2>
+          <div class="list-row">
+            <strong>상품 B</strong><span class="secondary">오픈 예정</span
+            ><span class="secondary">오픈 일정</span
+            ><span class="secondary">상품 정보</span
+            ><a class="control" href="DropDetailPage.html">상품 보기</a>
+          </div>
+          <p class="muted">빈 목록일 때: 아직 담은 WISH가 없어요.</p>
+        </section>
+      </div>
+    </main>
+    <footer>
+      화면별 동작·예외·조회 조건은 <a href="../pages/MyPage.md">MyPage.md</a>를
+      확인하세요.
+    </footer>
+  </body>
+</html>

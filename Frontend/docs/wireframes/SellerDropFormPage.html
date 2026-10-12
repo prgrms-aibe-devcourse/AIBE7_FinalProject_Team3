@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>판매자 DROP 등록·편집 와이어프레임</title>
+    <link rel="stylesheet" href="wireframe.css" />
+  </head>
+  <body>
+    <header>
+      <span class="route">/seller/drops/new · /seller/drops/:dropId/edit</span>
+      <h1>판매자 DROP 등록·편집 와이어프레임</h1>
+      <p class="muted">배치와 동선을 검토하는 화면 초안 · 실제 API 동작 없음</p>
+      <nav aria-label="와이어프레임 이동">
+        <a href="HomePage.html">메인</a><a href="WishPage.html">WISH</a
+        ><a href="GrabPage.html">GRAB</a
+        ><a href="DropDetailPage.html">상품 상세</a
+        ><a href="SellerDashboardPage.html">판매자 종합</a
+        ><a href="SellerDropsPage.html">DROP 관리</a
+        ><a href="SellerDropDetailPage.html">DROP 상세</a
+        ><a href="SellerDropFormPage.html">DROP 등록·편집</a
+        ><a href="SellerOrdersPage.html">주문</a
+        ><a href="SellerInventoryPage.html">재고</a
+        ><a href="SellerSalesPage.html">실적</a>
+      </nav>
+    </header>
+    <main>
+      <section>
+        <p class="eyebrow">ONE DROP, ONE PRODUCT</p>
+        <h1>새 DROP 만들기 · DRAFT 편집</h1>
+      </section>
+      <section class="section panel stack">
+        <h2>01 기본 정보</h2>
+        <span class="field">상품명</span><span class="field">상품 설명</span
+        ><span class="field">카테고리</span>
+      </section>
+      <section class="section split">
+        <div class="panel stack">
+          <h2>02 GALLERY 이미지</h2>
+          <p>상단 갤러리 · 첫 장이 썸네일 · 공개 시 필수</p>
+          <div class="picture wide">이미지 추가</div>
+          <span class="field">1 대표 이미지 · ↑ ↓ · 삭제</span
+          ><span class="field">대체 설명</span
+          ><span class="field">2 이미지 · ↑ ↓ · 삭제</span>
+        </div>
+        <div class="panel stack">
+          <h2>03 DETAIL 이미지</h2>
+          <p>하단 상세 설명 · 선택</p>
+          <div class="picture wide">이미지 추가</div>
+          <span class="field">1 이미지 · ↑ ↓ · 삭제</span
+          ><span class="field">대체 설명</span>
+        </div>
+      </section>
+      <p class="note">두 용도 합계 10장 · 파일당 5MB · JPEG/PNG/WebP</p>
+      <section class="section panel">
+        <h2>04 옵션 그룹·SKU</h2>
+        <span class="field">옵션 그룹 · 선택값 · 가격 · 재고</span>
+      </section>
+      <section class="section panel">
+        <h2>05 판매·배송</h2>
+        <div class="split">
+          <span class="field">판매 시작 · 종료</span
+          ><span class="field">배송비 · 안내</span>
+        </div>
+      </section>
+      <section class="section controls">
+        <span class="control">취소</span
+        ><span class="control primary">임시 저장</span
+        ><span class="control">공개</span>
+      </section>
+    </main>
+    <footer>
+      화면별 동작·예외·조회 조건은
+      <a href="../pages/SellerDropFormPage.md">SellerDropFormPage.md</a>를
+      확인하세요.
+    </footer>
+  </body>
+</html>

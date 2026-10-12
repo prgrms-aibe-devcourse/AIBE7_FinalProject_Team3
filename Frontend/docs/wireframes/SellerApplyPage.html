@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>판매자 등록 신청 와이어프레임</title>
+    <link rel="stylesheet" href="wireframe.css" />
+  </head>
+  <body>
+    <header>
+      <span class="route">/seller/apply</span>
+      <h1>판매자 등록 신청 와이어프레임</h1>
+      <p class="muted">배치와 동선을 검토하는 화면 초안 · 실제 API 동작 없음</p>
+      <nav aria-label="와이어프레임 이동">
+        <a href="MyPage.html">마이페이지</a
+        ><a href="SellerApplyPage.html">판매자 신청</a
+        ><a href="SellerDashboardPage.html">판매자 종합</a
+        ><a href="AdminSellerApplicationsPage.html">운영자 심사</a>
+      </nav>
+    </header>
+    <main>
+      <div class="split">
+        <section class="hero">
+          <p class="eyebrow">BECOME A SELLER</p>
+          <h2>나만의 DROP을 열어보세요</h2>
+          <p>신청 후 운영자 승인을 받으면 판매자 기능을 사용할 수 있습니다.</p>
+        </section>
+        <section class="panel stack">
+          <h2>판매자 신청</h2>
+          <span class="field">브랜드명 *</span
+          ><span class="field">연락 이메일 *</span
+          ><span class="field">브랜드 소개 *</span
+          ><span class="control primary">신청하기</span>
+        </section>
+      </div>
+      <section class="section panel">
+        <h2>신청 후 상태</h2>
+        <div class="grid cols-3">
+          <div class="card">
+            <span class="tag">PENDING</span>
+            <p>심사를 기다리고 있어요.</p>
+          </div>
+          <div class="card">
+            <span class="tag">APPROVED</span>
+            <p>판매자 작업 공간으로 이동</p>
+          </div>
+          <div class="card">
+            <span class="tag">REJECTED</span>
+            <p>반려 사유 표시 · 재신청 계약 대기</p>
+          </div>
+        </div>
+      </section>
+    </main>
+    <footer>
+      화면별 동작·예외·조회 조건은
+      <a href="../pages/SellerApplyPage.md">SellerApplyPage.md</a>를 확인하세요.
+    </footer>
+  </body>
+</html>

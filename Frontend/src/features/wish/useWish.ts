@@ -1,5 +1,7 @@
 import { useState } from 'react'
 
+const NO_WISHES = new Set<number>()
+
 export default function useWish(
   authenticated: boolean,
   notify: (message: string) => void,
@@ -23,5 +25,6 @@ export default function useWish(
     return true
   }
 
-  return { wishes, toggleWish }
+  // 데모 기본 WISH(101)는 로그인한 사용자의 것이다. 비로그인 상태에서는 담긴 WISH가 없다.
+  return { wishes: authenticated ? wishes : NO_WISHES, toggleWish }
 }

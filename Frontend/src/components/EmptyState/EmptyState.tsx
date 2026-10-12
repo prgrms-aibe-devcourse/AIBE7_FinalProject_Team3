@@ -2,23 +2,34 @@ import { Link } from 'react-router-dom'
 
 type Props = {
   title: string
-  link: string
-  label: string
-  page?: boolean
+  description?: string
+  link?: string
+  label?: string
+  // block: 단독 영역(목록 빈 결과), compact: 패널 안, page: 페이지 전체
+  variant?: 'block' | 'compact' | 'page'
 }
 
 export default function EmptyState({
   title,
+  description,
   link,
   label,
-  page = false,
+  variant = 'compact',
 }: Props) {
   return (
-    <div className={`empty-state ${page ? 'page' : 'compact'}`}>
+    <div
+      className={variant === 'block' ? 'empty-state' : `empty-state ${variant}`}
+    >
       <strong>{title}</strong>
-      <Link className={page ? 'primary-button' : 'secondary-button'} to={link}>
-        {label}
-      </Link>
+      {description && <p>{description}</p>}
+      {link && label && (
+        <Link
+          className={variant === 'page' ? 'primary-button' : 'secondary-button'}
+          to={link}
+        >
+          {label}
+        </Link>
+      )}
     </div>
   )
 }

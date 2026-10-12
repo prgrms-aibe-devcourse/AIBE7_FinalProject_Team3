@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>판매자 주문·배송 와이어프레임</title>
+    <link rel="stylesheet" href="wireframe.css" />
+  </head>
+  <body>
+    <header>
+      <span class="route">/seller/orders</span>
+      <h1>판매자 주문·배송 와이어프레임</h1>
+      <p class="muted">배치와 동선을 검토하는 화면 초안 · 실제 API 동작 없음</p>
+      <nav aria-label="와이어프레임 이동">
+        <a href="HomePage.html">메인</a><a href="WishPage.html">WISH</a
+        ><a href="GrabPage.html">GRAB</a
+        ><a href="DropDetailPage.html">상품 상세</a
+        ><a href="SellerDashboardPage.html">판매자 종합</a
+        ><a href="SellerDropsPage.html">DROP 관리</a
+        ><a href="SellerDropDetailPage.html">DROP 상세</a
+        ><a href="SellerDropFormPage.html">DROP 등록·편집</a
+        ><a href="SellerOrdersPage.html">주문</a
+        ><a href="SellerInventoryPage.html">재고</a
+        ><a href="SellerSalesPage.html">실적</a>
+      </nav>
+    </header>
+    <main>
+      <section>
+        <p class="eyebrow">ORDER DESK</p>
+        <h1>주문·배송</h1>
+        <p>본인 DROP의 주문과 발송 작업.</p>
+      </section>
+      <section class="section panel stack">
+        <div class="controls">
+          <span class="chip">PAID</span><span class="chip">PREPARING</span
+          ><span class="chip">SHIPPED</span><span class="chip">DELIVERED</span>
+        </div>
+        <div class="split">
+          <span class="field">DROP 필터</span
+          ><span class="field">결제 상태 필터</span>
+        </div>
+      </section>
+      <section class="section panel">
+        <h2>주문 목록</h2>
+        <div class="list-row">
+          <strong>주문 #1001 · 상품 A</strong
+          ><span class="secondary">상태 · 수량</span
+          ><span class="secondary">일정 · 금액</span
+          ><span class="secondary">상세 정보</span
+          ><span class="control">보기 ↗</span>
+        </div>
+        <div class="list-row">
+          <strong>주문 #1002 · 상품 B</strong
+          ><span class="secondary">상태 · 수량</span
+          ><span class="secondary">일정 · 금액</span
+          ><span class="secondary">상세 정보</span
+          ><span class="control">보기 ↗</span>
+        </div>
+        <div class="list-row">
+          <strong>주문 #1003 · 상품 C</strong
+          ><span class="secondary">상태 · 수량</span
+          ><span class="secondary">일정 · 금액</span
+          ><span class="secondary">상세 정보</span
+          ><span class="control">보기 ↗</span>
+        </div>
+        <div class="note">
+          선택 주문 상세: 주문 상품·수령인·배송 정보·결제 상태
+        </div>
+        <div class="controls">
+          <span class="control primary">배송 준비</span
+          ><span class="control">송장 등록 / 수정</span>
+        </div>
+      </section>
+    </main>
+    <footer>
+      화면별 동작·예외·조회 조건은
+      <a href="../pages/SellerOrdersPage.md">SellerOrdersPage.md</a>를
+      확인하세요.
+    </footer>
+  </body>
+</html>

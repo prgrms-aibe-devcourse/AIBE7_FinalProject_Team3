@@ -43,7 +43,7 @@ GET /api/v1/drops
 | `categoryId` | 정수 | 전체 | 카테고리 ID (예: `1`) |
 | `keyword` | 문자열 (최대 100자) | 전체 | 상품명 부분 일치 검색 |
 | `soldOut` | `true` \| `false` | 전체 | 품절 여부 |
-| `sort` | `publishedAt` \| `saleStartsAt` \| `createdAt` + `,asc`\|`,desc` | `publishedAt,desc` | 정렬 조건 (예: `createdAt,desc`) |
+| `sort` | `publishedAt` \| `saleStartsAt` \| `createdAt` + `,asc`\|`,desc`; `wishCount,desc`; `soldQuantity,desc` | `publishedAt,desc` | 인기 정렬은 아래 상태 조합만 허용합니다. |
 | `page` | 0 이상 정수 | `0` | 페이지 번호 (0부터 시작) |
 | `size` | 1 ~ 100 | `20` | 페이지 크기 |
 
@@ -86,13 +86,15 @@ GET /api/v1/drops
 > - `soldOut`은 활성 옵션(`is_active = true`)의 가용 재고(`total - reserved - sold - withheld`) 합이 0이면 `true`입니다. 활성 옵션이 하나도 없으면 `true`입니다. DROP 상태가 `GRAB`이어도 재고가 없으면 `true`입니다.
 > - `minPrice`는 활성 SKU(`is_active = true`) 중 최저 `unitPrice`이며, 활성 SKU가 없으면 `null`입니다(2.2와 같은 규칙).
 > - `wishCount`는 취소되지 않은(`canceled_at IS NULL`) WISH 수입니다.
-> - `thumbnailUrl`은 `sort_order`가 가장 작은 이미지이며, 이미지가 없으면 `null`입니다.
-> - 정렬 값이 같으면 `id` 내림차순으로 정렬합니다. `minPrice`·`wishCount` 정렬은 지원하지 않습니다.
+> - `thumbnailUrl`은 GALLERY의 첫 이미지(`sort_order = 0`)이며, 이미지가 없으면 `null`입니다. DETAIL은 썸네일에 사용하지 않습니다.
+> - 날짜 정렬 값이 같으면 `id` 내림차순으로 정렬합니다. 인기 정렬은 페이지를 자르기 전에 전체 후보를 DB에서 집계·정렬합니다.
 >
 > `status`는 저장된 DROP 상태 기준입니다. 판매 시작 시각(`saleStartsAt`)이 지나도 전환 배치(GR-18)가 실행되기 전까지 `WISH`로 보일 수 있으며, 이때 WISH 등록·취소는 `GRAB_ALREADY_STARTED`(409)로 거부됩니다.
 
+인기 정렬은 예외적으로 서버 시각의 실제 탐색 단계로 후보를 정합니다. `status=WISH&sort=wishCount,desc`는 저장 상태 WISH이면서 `now < saleStartsAt`인 상품의 활성 WISH(`wishes.canceled_at IS NULL`) 수를 사용합니다. `status=GRAB&sort=soldQuantity,desc`는 저장 상태 WISH 또는 GRAB이며 `saleStartsAt <= now < saleEndsAt`인 상품 중 활성 SKU의 가용 재고가 1개 이상인 상품만 반환합니다. 취소·종료·비공개 상품은 제외합니다. GRAB 점수는 `paid_at IS NOT NULL AND canceled_at IS NULL`인 주문의 `order_items.quantity` 합계이며 미결제·만료·취소 주문과 결제 시도 횟수는 포함하지 않습니다. 점수가 같으면 두 정렬 모두 `publishedAt DESC, id DESC`를 적용하고 0건 상품도 포함합니다. 해당 인기 정렬은 지정한 상태 조합에서만 허용하며 `status` 생략·다른 상태·오름차순은 거부합니다. 메인은 각각 `page=0&size=8`, 목록은 `size=24`로 조회하며, `categoryId`·`keyword`·`soldOut` 필터는 기존대로 적용합니다. 서버 시각은 조회 시 한 번 고정하고 상태 전환 배치 지연과 무관하게 판정합니다. 응답의 `status`는 기존처럼 저장 상태를 표시하므로 인기 GRAB 결과가 전환 지연 중에는 `WISH`일 수 있습니다. 화면은 조회 영역과 상세 `actions`를 기준으로 구매 동작을 결정합니다.
+
 **오류 코드:**
-- `INVALID_REQUEST` — `page`가 0 미만, `size`가 1 미만 또는 100 초과, 허용되지 않은 `status`·`sort` 값, 숫자가 아닌 `categoryId`, `keyword` 100자 초과
+- `INVALID_REQUEST` — `page`가 0 미만, `size`가 1 미만 또는 100 초과, 허용되지 않은 `status`·`sort` 값·인기 정렬/상태 조합, 숫자가 아닌 `categoryId`, `keyword` 100자 초과
 
 ### 1.3 DROP 상세 조회
 
@@ -113,6 +115,12 @@ GET /api/v1/drops/{dropId}
     "description": "상품 설명",
     "imageUrls": [
       "https://example.com/image1.jpg"
+    ],
+    "galleryImages": [
+      { "imageUrl": "https://example.com/image1.jpg", "altText": "한정판 스니커즈 정면" }
+    ],
+    "detailImages": [
+      { "imageUrl": "https://example.com/detail1.jpg", "altText": "신발의 소재와 크기" }
     ],
     "minPrice": 129000,
     "category": {
@@ -177,6 +185,7 @@ GET /api/v1/drops/{dropId}
 > `options`에는 활성 SKU(`is_active = true`)만 포함하고, 각 SKU의 `soldOut`은 `availableStock == 0`입니다. `optionGroups`·`values`는 활성 개념 없이 전부 반환합니다.
 > 없는 DROP과 `DRAFT`는 `DROP_NOT_FOUND`로 숨깁니다. `CANCELED`는 200으로 보여 주고 `actions`가 모두 `false`입니다.
 > `wishNotice`는 WISH 안내 문구이고, `serverTime`은 `actions`를 판정한 서버 시각입니다.
+> `galleryImages`와 `detailImages`는 용도별 `sort_order` 순으로 반환하고 이미지가 없으면 빈 배열입니다. 기존 `imageUrls`는 GALLERY URL만 같은 순서로 반환해 구버전 소비자 화면과 호환합니다. 상세 설명 텍스트는 `description`이고 DETAIL 이미지는 그 아래에 표시합니다.
 >
 > `actions`는 비로그인 API이므로 사용자와 무관하게 DROP 상태·시각으로만 정합니다.
 > `orderable`은 저장 상태가 아니라 서버 시각(`serverTime`)과 판매 기간으로 판정합니다. 시작 전환 배치(GR-18)가 아직 실행되지 않아 저장 상태가 `WISH`여도 `saleStartsAt <= now < saleEndsAt`이면 `true`입니다.
@@ -220,7 +229,15 @@ POST /api/v1/seller/drops
   "images": [
     {
       "imageId": "1d0f9e8c-7b6a-4539-8412-6c5d4e3f2a1b",
-      "imageUrl": "https://<project>.supabase.co/storage/v1/object/public/drop-images/images/1d0f9e8c-7b6a-4539-8412-6c5d4e3f2a1b.jpg"
+      "imageUrl": "https://<project>.supabase.co/storage/v1/object/public/drop-images/images/1d0f9e8c-7b6a-4539-8412-6c5d4e3f2a1b.jpg",
+      "altText": "한정판 스니커즈 정면"
+    }
+  ],
+  "detailImages": [
+    {
+      "imageId": "2d0f9e8c-7b6a-4539-8412-6c5d4e3f2a1b",
+      "imageUrl": "https://<project>.supabase.co/storage/v1/object/public/drop-images/images/2d0f9e8c-7b6a-4539-8412-6c5d4e3f2a1b.jpg",
+      "altText": "신발의 소재와 크기"
     }
   ],
   "categoryId": 1,
@@ -290,16 +307,16 @@ POST /api/v1/seller/drops
 
 > 임시 저장은 일부 필수 정보가 없어도 허용할 수 있으나 공개 시 전체 항목을 검증합니다. 요청의 `key`, `groupKey`, `valueKey`는 같은 요청 안에서 그룹·값·SKU를 연결하기 위한 클라이언트 키이며 저장 후 응답에서는 서버 ID를 사용합니다.
 >
-> `images`는 이미지 업로드 URL 발급(IMAGE_UPLOAD.md 1.1)에서 받은 `{ imageId, imageUrl }` 객체 배열입니다.
-> - `images`를 생략(null)하면 기존 이미지를 변경하지 않고, `[]`이면 전부 삭제합니다.
-> - 상품 이미지는 최대 10개까지 등록할 수 있습니다.
-> - `sort_order`는 배열 인덱스, `alt_text`는 상품명(없으면 빈 문자열)입니다.
+> `images`는 기존 계약과 같은 GALLERY 배열, `detailImages`는 선택적인 DETAIL 배열입니다. 원소는 이미지 업로드 URL 발급(IMAGE_UPLOAD.md 1.1)에서 받은 `{ imageId, imageUrl }`에 선택적인 `altText`를 더한 객체입니다. 구버전 요청의 `images`만 보내는 방식은 계속 허용합니다.
+> - 생성에서 누락/null은 빈 용도 배열입니다. DRAFT 수정에서 각 필드의 누락/null은 해당 용도를 유지하고, `[]`는 해당 용도만 전부 삭제하며, 비어 있지 않은 배열은 해당 용도 전체를 순서대로 교체합니다. 한 용도만 수정해도 다른 용도는 유지됩니다.
+> - 상품 이미지는 두 용도를 합쳐 최대 10개입니다. 공개 시 GALLERY가 최소 한 장 필요하고 DETAIL은 선택입니다.
+> - `sort_order`는 각 배열 인덱스(0부터)입니다. `altText`는 최대 300자이며 빈 문자열은 장식 이미지에 사용합니다. 기존 이미지의 `altText`를 누락/null로 보내면 저장된 설명을 유지하고 새 이미지에서 누락/null이면 상품명(없으면 빈 문자열)을 사용합니다.
 > - `imageUrl`은 `imageId`와의 관계를 검증합니다. 정확히 `{공개 URL 접두사}images/{imageId}.{jpg|png|webp}` 형식이어야 하며, 다른 사이트 URL이나 다른 이미지의 URL은 거부합니다.
-> - 같은 요청 안에서 `imageId`가 중복되면 거부합니다.
+> - 두 용도 전체에서 `imageId`가 중복되면 거부합니다. 같은 DROP의 이미지를 다른 용도로 옮길 때는 두 배열을 함께 보내고 기존 용도에서 제거합니다.
 > - 다른 DROP이 이미 사용 중인 `imageId`는 거부합니다. 같은 DROP의 이미지를 다시 보내는 수정은 허용하며 `public_id`는 유지됩니다.
 
 **오류 코드:**
-- `VALIDATION_FAILED` — 존재하지 않거나 비활성인 카테고리(`fieldErrors`의 `field`는 `categoryId`), 이미지 10개 초과·원소 누락(null), `imageUrl` 형식 불일치(`images[i].imageUrl`), 같은 요청 안 `imageId` 중복 또는 다른 DROP이 사용 중인 `imageId`(`images[i].imageId`)
+- `VALIDATION_FAILED` — 존재하지 않거나 비활성인 카테고리(`fieldErrors`의 `field`는 `categoryId`), 두 용도 합계 이미지 10개 초과·원소 누락(null), URL 형식 불일치·`altText` 300자 초과, 두 용도 사이 중복 또는 다른 DROP이 사용 중인 `imageId` (이미지 오류의 `field`는 `images[i]` 또는 `detailImages[i]`로 시작)
 
 ### 2.2 판매자 DROP 목록
 
@@ -335,7 +352,7 @@ GET /api/v1/seller/drops?status=DRAFT&page=0&size=20
 ```
 
 > `minPrice`는 활성 SKU(`is_active = true`) 중 최저 `unitPrice`이며, 활성 SKU가 없으면 `null`입니다. 정렬은 `id` 내림차순(최근 생성 순)입니다.
-> `thumbnailUrl`은 `sort_order`가 가장 작은 이미지이며, 이미지가 없으면 `null`입니다. 이미지를 등록하지 않은 DRAFT는 `null`이 흔합니다.
+> `thumbnailUrl`은 GALLERY의 첫 이미지이며, GALLERY가 없는 DRAFT는 `null`입니다. DETAIL은 썸네일에 사용하지 않습니다.
 
 **오류 코드:**
 - `INVALID_REQUEST` — `page`가 0 미만, `size`가 1 미만 또는 100 초과, 잘못된 `status` 값
@@ -360,7 +377,15 @@ GET /api/v1/seller/drops/{dropId}
     "images": [
       {
         "imageId": "1d0f9e8c-7b6a-4539-8412-6c5d4e3f2a1b",
-        "imageUrl": "https://<project>.supabase.co/storage/v1/object/public/drop-images/images/1d0f9e8c-7b6a-4539-8412-6c5d4e3f2a1b.jpg"
+        "imageUrl": "https://<project>.supabase.co/storage/v1/object/public/drop-images/images/1d0f9e8c-7b6a-4539-8412-6c5d4e3f2a1b.jpg",
+        "altText": "한정판 스니커즈 정면"
+      }
+    ],
+    "detailImages": [
+      {
+        "imageId": "2d0f9e8c-7b6a-4539-8412-6c5d4e3f2a1b",
+        "imageUrl": "https://<project>.supabase.co/storage/v1/object/public/drop-images/images/2d0f9e8c-7b6a-4539-8412-6c5d4e3f2a1b.jpg",
+        "altText": "신발의 소재와 크기"
       }
     ],
     "minPrice": 129000,
@@ -412,7 +437,7 @@ GET /api/v1/seller/drops/{dropId}
 ```
 
 > `minPrice`는 목록과 같은 규칙(활성 SKU 중 최저 `unitPrice`, 활성 SKU가 없으면 `null`)입니다. 옵션 그룹·값·SKU와 각 `selections`는 `sortOrder` 순으로 반환합니다.
-> `images`는 `{ imageId, imageUrl }` 객체를 `sort_order` 순으로 반환합니다. 수정 화면이 받은 값을 그대로 다시 보낼 수 있습니다. 공개 상세(1.3)·공개 목록(1.2)은 기존 `imageUrls`·`thumbnailUrl` 형식을 유지합니다.
+> `images`는 GALLERY, `detailImages`는 DETAIL의 `{ imageId, imageUrl, altText }` 객체를 용도별 `sort_order` 순으로 반환하며 없는 용도는 `[]`입니다. 수정 화면은 받은 값을 다시 보낼 수 있습니다. 구버전 판매자 화면은 `images`만 사용해도 DETAIL을 삭제하지 않습니다. 공개 상세(1.3)·공개 목록(1.2)은 기존 `imageUrls`·`thumbnailUrl` 형식을 유지합니다.
 
 **오류 코드:**
 - `DROP_NOT_FOUND`
@@ -426,14 +451,14 @@ PATCH /api/v1/seller/drops/{dropId}
 
 - **인증**: `SELLER`
 
-> 요청 본문은 생성 API와 동일하며 변경할 필드만 전달합니다. `images`의 생략·빈 배열 의미와 `imageId`·`imageUrl` 검증 규칙도 2.1과 같습니다.
+> 요청 본문은 생성 API와 동일하며 변경할 필드만 전달합니다. `images`·`detailImages` 각각의 누락/null/빈 배열 의미와 `imageId`·`imageUrl`·`altText` 검증 규칙은 2.1과 같습니다.
 
 **오류 코드:**
 - `DROP_NOT_FOUND`
 - `DROP_ACCESS_DENIED`
 - `DROP_NOT_EDITABLE`
 - `INVALID_SCHEDULE`
-- `VALIDATION_FAILED` — 존재하지 않거나 비활성인 카테고리(`fieldErrors`의 `field`는 `categoryId`), 이미지 10개 초과·원소 누락(null), `imageUrl` 형식 불일치(`images[i].imageUrl`), `imageId` 중복·타 DROP 사용(`images[i].imageId`)
+- `VALIDATION_FAILED` — 존재하지 않거나 비활성인 카테고리(`fieldErrors`의 `field`는 `categoryId`), 두 용도 합계 이미지 10개 초과·원소 누락(null), URL 형식 불일치·`altText` 300자 초과, 두 용도 사이 중복 또는 다른 DROP이 사용 중인 `imageId` (이미지 오류의 `field`는 `images[i]` 또는 `detailImages[i]`로 시작)
 
 ### 2.5 DROP 공개
 
@@ -447,7 +472,7 @@ POST /api/v1/seller/drops/{dropId}/publish
 - `DRAFT` → `WISH`
 
 **공개 전 검증:**
-- 상품명, 설명, 이미지, 카테고리, 배송 정보 필수
+- 상품명, 설명, GALLERY 이미지 1장 이상, 카테고리, 배송 정보 필수. DETAIL은 선택
 - 판매 시작·종료 시각 필수
 - 시작 시각은 종료 시각보다 이전
 - 옵션 그룹명은 DROP 안에서 중복될 수 없음

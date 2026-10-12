@@ -73,9 +73,21 @@ public class StockReservation extends BaseEntity {
         this.committedAt = Objects.requireNonNull(committedAt);
     }
 
-    // 결제 전 만료·실패로 선점을 푼다. 결제 후 취소(COMMITTED → RELEASED)는 GR-24에서 다룬다.
+    // 결제 전 만료·실패·주문 취소로 선점을 푼다.
     public void release(ReleaseReason reason, ReleaseDestination destination, OffsetDateTime releasedAt) {
         requireHeld();
+        markReleased(reason, destination, releasedAt);
+    }
+
+    // 결제 후 주문 취소로 판매 확정을 되돌린다. COMMITTED → RELEASED는 이 경로만 허용한다(ERD.md 2절 재고 예약).
+    public void releaseCommitted(ReleaseDestination destination, OffsetDateTime releasedAt) {
+        if (status != ReservationStatus.COMMITTED) {
+            throw new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION);
+        }
+        markReleased(ReleaseReason.ORDER_CANCELED, destination, releasedAt);
+    }
+
+    private void markReleased(ReleaseReason reason, ReleaseDestination destination, OffsetDateTime releasedAt) {
         this.status = ReservationStatus.RELEASED;
         this.releaseReason = Objects.requireNonNull(reason);
         this.releaseDestination = Objects.requireNonNull(destination);

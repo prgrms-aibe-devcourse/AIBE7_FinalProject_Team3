@@ -63,9 +63,7 @@ public class SellerOrderService {
         if (!orderRepository.ownsDrop(sellerId, order.getDropId())) {
             throw new BusinessException(OrderErrorCode.ORDER_ACCESS_DENIED);
         }
-        if (order.getStatus() == OrderStatus.PAID && orderRepository.hasUnknownOrderCancellation(order.getId())) {
-            throw new BusinessException(OrderErrorCode.PAYMENT_CANCELLATION_UNKNOWN);
-        }
+        rejectWhileCancelInProgress(order);
 
         order.prepareShipment();
         return new OrderStatusResponse(order.getUuid(), order.getStatus().name());
@@ -99,10 +97,22 @@ public class SellerOrderService {
             throw new BusinessException(CommonErrorCode.ORDER_STATUS_CONFLICT);
         }
 
+        rejectWhileCancelInProgress(order);
         order.ship();
         shipmentRepository.save(Shipment.register(order, request.carrier(), request.trackingNumber(),
                 idempotencyKey.value(), requestHash.value(), OffsetDateTime.now()));
         return new OrderStatusResponse(order.getUuid(), order.getStatus().name());
+    }
+
+    /*
+        소비자 취소로 PG 결제 취소를 진행·확인 중인 주문은 배송 준비·발송을 막는다(ORDER.md 2.3·2.4, ERD.md 3.3).
+        결제 후 취소는 PG 결과를 받을 때까지 주문에 취소 요청 기록을 남기므로, 잠근 주문의 기록만 보면 된다.
+        취소가 끝나면 주문이 CANCELED가 되고, 거절되면 기록이 지워진다.
+     */
+    private static void rejectWhileCancelInProgress(Order order) {
+        if (order.isCancelable() && order.hasCancelRequest()) {
+            throw new BusinessException(OrderErrorCode.PAYMENT_CANCELLATION_UNKNOWN);
+        }
     }
 
     /**

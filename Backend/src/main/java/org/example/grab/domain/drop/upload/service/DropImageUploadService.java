@@ -5,8 +5,8 @@ import org.example.grab.domain.drop.upload.dto.ImageUploadUrlResponse;
 import org.example.grab.global.common.ErrorResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
-import org.example.grab.global.storage.supabase.SignedUploadUrl;
-import org.example.grab.global.storage.supabase.SupabaseStorageClient;
+import org.example.grab.global.storage.ImageStorage;
+import org.example.grab.global.storage.SignedUploadUrl;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -33,13 +33,13 @@ public class DropImageUploadService {
             "image/png", "png",
             "image/webp", "webp");
 
-    private final SupabaseStorageClient supabaseStorageClient;
+    private final ImageStorage imageStorage;
 
     public ImageUploadUrlResponse issue(String contentType, long fileSize) {
         String extension = validate(contentType, fileSize);
         UUID imageId = UUID.randomUUID();
         // 객체 키에는 원본 파일명을 쓰지 않고, 확장자는 contentType에서 결정한다.
-        SignedUploadUrl signed = supabaseStorageClient.createSignedUploadUrl("images/" + imageId + "." + extension);
+        SignedUploadUrl signed = imageStorage.createSignedUploadUrl("images/" + imageId + "." + extension);
         return new ImageUploadUrlResponse(
                 imageId, signed.uploadUrl(), signed.imageUrl(), OffsetDateTime.now().plus(UPLOAD_URL_TTL));
     }

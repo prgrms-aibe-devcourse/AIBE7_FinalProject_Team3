@@ -6,7 +6,8 @@ export const validateShipment = (carrier: string, trackingNumber: string) => {
   const name = carrier.trim()
   const tracking = trackingNumber.trim()
   if (!name) return '택배사를 입력하세요.'
-  if (name.length > CARRIER_MAX) return `택배사는 ${CARRIER_MAX}자 이하여야 합니다.`
+  if (name.length > CARRIER_MAX)
+    return `택배사는 ${CARRIER_MAX}자 이하여야 합니다.`
   if (!tracking) return '송장번호를 입력하세요.'
   if (tracking.length > TRACKING_MAX)
     return `송장번호는 ${TRACKING_MAX}자 이하여야 합니다.`

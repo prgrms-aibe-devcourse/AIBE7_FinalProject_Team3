@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>내 주문 상세 와이어프레임</title>
+    <link rel="stylesheet" href="wireframe.css" />
+  </head>
+  <body>
+    <header>
+      <span class="route">/my/orders/:orderId</span>
+      <h1>내 주문 상세 와이어프레임</h1>
+      <p class="muted">배치와 동선을 검토하는 화면 초안 · 실제 API 동작 없음</p>
+      <nav aria-label="와이어프레임 이동">
+        <a href="MyPage.html">마이페이지</a
+        ><a href="OrderDetailPage.html">주문 상세</a
+        ><a href="CheckoutPage.html">주문·결제</a>
+      </nav>
+    </header>
+    <main>
+      <p class="eyebrow">MY ORDER</p>
+      <h1>주문 ORD-20260918-000500</h1>
+      <p><span class="tag">결제 완료</span> · 주문일 2026.09.18</p>
+      <div class="side section">
+        <div class="stack">
+          <section class="panel">
+            <h2>주문 상품</h2>
+            <div class="row">
+              <strong>상품명 · 코튼 / 롱 × 2</strong><span>258,000원</span>
+            </div>
+          </section>
+          <section class="panel stack">
+            <h2>배송</h2>
+            <p>상태: 배송 준비 전</p>
+            <p class="muted">
+              송장 등록 전에는 택배사와 운송장번호를 표시하지 않습니다.
+            </p>
+            <div class="note">
+              발송 후 택배사 · 송장번호 · 배송 완료 시각 표시
+            </div>
+          </section>
+        </div>
+        <div class="stack">
+          <section class="panel stack">
+            <h2>결제</h2>
+            <p>최근 결제 상태: 성공</p>
+            <div class="row"><span>상품 금액</span><span>258,000원</span></div>
+            <div class="row"><span>배송비</span><span>3,000원</span></div>
+            <div class="row">
+              <strong>총액</strong><strong>261,000원</strong>
+            </div>
+            <small>전체 결제 시도 이력은 조회 API 확정 후 연결</small>
+          </section>
+          <section class="panel stack">
+            <h2>주문 취소</h2>
+            <span class="field">취소 사유 (필수)</span
+            ><span class="control">취소 확인</span
+            ><small>배송이 시작되면 취소할 수 없습니다.</small>
+          </section>
+        </div>
+      </div>
+      <section class="section note">
+        결제 대기: 마감 전 결제 이동 · 취소 결과 불명: 완료 처리 없이 결과 확인
+      </section>
+    </main>
+    <footer>
+      화면별 동작·예외·조회 조건은
+      <a href="../pages/OrderDetailPage.md">OrderDetailPage.md</a>를 확인하세요.
+    </footer>
+  </body>
+</html>
