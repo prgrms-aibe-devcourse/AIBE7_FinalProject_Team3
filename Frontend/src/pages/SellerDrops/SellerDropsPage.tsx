@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import EmptyState from '../../components/EmptyState/EmptyState'
+import type { MockAccount } from '../../features/auth/mock/mockAuth'
 import {
   readSellerDropQuery,
   sellerDropStatuses,
@@ -13,11 +14,13 @@ import { won } from '../../utils/price'
 const PAGE_SIZE = 4
 
 export default function SellerDropsPage({
+  account,
   drops,
   ownerEmail,
   onChange,
   notify,
 }: {
+  account: MockAccount | null
   drops: SellerMockDrop[]
   ownerEmail: string
   onChange: (drops: SellerMockDrop[]) => void
@@ -37,6 +40,28 @@ export default function SellerDropsPage({
   const [reason, setReason] = useState('')
   const [error, setError] = useState('')
   const [now] = useState(() => Date.now())
+  const location = useLocation()
+  if (!account)
+    return (
+      <Navigate
+        to="/login"
+        state={{ from: location.pathname + location.search }}
+        replace
+      />
+    )
+  if (account.role !== 'SELLER')
+    return (
+      <EmptyState
+        title="판매자 권한이 필요해요."
+        link={account.role === 'MEMBER' ? '/seller/apply' : '/my'}
+        label={
+          account.role === 'MEMBER'
+            ? '판매자 신청 보기'
+            : '내 계정으로 돌아가기'
+        }
+        variant="page"
+      />
+    )
   const { status, page } = readSellerDropQuery(params)
   const filtered = drops.filter(
     (drop) =>

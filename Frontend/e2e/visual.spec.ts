@@ -1,9 +1,9 @@
-import { expect, test, type Page } from './fixtures'
+import { expect, loginSeller, test, type Page } from './fixtures'
 import { installCatalogScenario } from './mock/catalog'
 import { installHomeScenario } from './mock/home'
 
 // 기준 이미지는 CI와 같은 Playwright Docker 이미지에서만 만든다(npm run e2e:docker).
-// 판매자 대시보드·판매자 DROP 상세는 디자인 개선 예정이라 기준에서 제외한다.
+// 판매자 대시보드는 디자인 개선 예정이라 기준에서 제외한다.
 test.describe('화면 기준', { tag: '@visual' }, () => {
   const shot = async (page: Page, name: string) => {
     await page.evaluate(() => document.fonts.ready)
@@ -58,6 +58,24 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
   test('seller-drop-form', async ({ page }) => {
     await page.goto('/#/seller/drops/new')
     await shot(page, 'seller-drop-form')
+  })
+
+  test('seller-drops', async ({ page }) => {
+    await loginSeller(page)
+    await page.evaluate(() => {
+      window.location.hash = '#/seller/drops'
+    })
+    await expect(page.getByRole('status')).toBeEmpty()
+    await shot(page, 'seller-drops')
+  })
+
+  test('seller-drop-detail', async ({ page }) => {
+    await loginSeller(page)
+    await page.evaluate(() => {
+      window.location.hash = '#/seller/drops/401'
+    })
+    await expect(page.getByRole('status')).toBeEmpty()
+    await shot(page, 'seller-drop-detail')
   })
 
   test('checkout', async ({ page }) => {

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import EmptyState from '../../components/EmptyState/EmptyState'
 import type {
   SellerOrder,
@@ -25,6 +26,8 @@ export default function SellerOrdersPage({
 }: {
   notify: (message: string) => void
 }) {
+  const [params] = useSearchParams()
+  const dropId = params.get('dropId')
   const [orders, setOrders] = useState(sellerOrders)
   const [details, setDetails] = useState(orderDetails)
   const [tab, setTab] = useState<SellerOrderStatus>('PAID')
@@ -33,9 +36,12 @@ export default function SellerOrdersPage({
   // 송장 버튼을 다시 누르면 입력을 저장된 값으로 되돌린다. key를 바꿔 폼을 새로 그린다.
   const [formKey, setFormKey] = useState(0)
 
+  const matching = orders.filter(
+    (order) => !dropId || String(order.dropId) === dropId,
+  )
   const countOf = (status: SellerOrderStatus) =>
-    orders.filter((order) => order.orderStatus === status).length
-  const visible = orders.filter((order) => order.orderStatus === tab)
+    matching.filter((order) => order.orderStatus === status).length
+  const visible = matching.filter((order) => order.orderStatus === tab)
 
   const close = () => {
     setOpenId(null)
@@ -104,6 +110,14 @@ export default function SellerOrdersPage({
           <p className="eyebrow">ORDER DESK</p>
           <h1>주문 관리</h1>
           <p>결제 완료 주문을 배송 준비로 바꾸고 송장을 등록합니다.</p>
+          {dropId && (
+            <p>
+              DROP #{dropId} 주문 ·{' '}
+              <Link className="text-link" to="/seller/orders">
+                전체 주문 보기
+              </Link>
+            </p>
+          )}
         </div>
       </div>
       <div className="chips order-tabs">

@@ -36,4 +36,10 @@ export async function login(page: Page) {
   await expect(page).toHaveURL(/#\/wish$/)
 }
 
+export async function loginSeller(page: Page) {
+  await login(page)
+  await page.getByRole('link', { name: 'MY', exact: true }).click()
+  await page.getByLabel('계정 유형 예시').selectOption('SELLER')
+}
+
 export const toast = (page: Page) => page.getByRole('status')

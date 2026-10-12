@@ -1,6 +1,13 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import {
+  Link,
+  Navigate,
+  useLocation,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom'
 import EmptyState from '../../components/EmptyState/EmptyState'
+import type { MockAccount } from '../../features/auth/mock/mockAuth'
 import { endedDrops } from '../../features/drop/mock/mockEndedDrops'
 import { sellerOrders } from '../../features/order/mock/mockSellerOrders'
 import {
@@ -14,6 +21,7 @@ import { dateLabel } from '../../utils/date'
 import { won } from '../../utils/price'
 
 type Props = {
+  account: MockAccount | null
   drops: SellerMockDrop[]
   ownerEmail: string
   onChange: (drops: SellerMockDrop[]) => void
@@ -42,6 +50,7 @@ const optionLabel = (drop: SellerMockDrop, sku: Sku) =>
     .join(' / ') || '기본 옵션'
 
 export default function SellerDropDetailPage({
+  account,
   drops,
   ownerEmail,
   onChange,
@@ -49,6 +58,7 @@ export default function SellerDropDetailPage({
 }: Props) {
   const { dropId } = useParams()
   const [params] = useSearchParams()
+  const location = useLocation()
   const { status, page } = readSellerDropQuery(params)
   const backTo = `/seller/drops?status=${status}&page=${page}`
   const [result, setResult] = useState<'SUCCESS' | 'FAILURE' | 'CONFLICT'>(
@@ -69,6 +79,28 @@ export default function SellerDropDetailPage({
   const drop =
     drops.find((item) => item.id === dropId) ??
     (dropId === '999' ? otherSellerDrop : undefined)
+
+  if (!account)
+    return (
+      <Navigate
+        to="/login"
+        state={{ from: location.pathname + location.search }}
+        replace
+      />
+    )
+  if (account.role !== 'SELLER')
+    return (
+      <EmptyState
+        title="판매자 권한이 필요해요."
+        link={account.role === 'MEMBER' ? '/seller/apply' : '/my'}
+        label={
+          account.role === 'MEMBER'
+            ? '판매자 신청 보기'
+            : '내 계정으로 돌아가기'
+        }
+        variant="page"
+      />
+    )
 
   if (!drop)
     return (

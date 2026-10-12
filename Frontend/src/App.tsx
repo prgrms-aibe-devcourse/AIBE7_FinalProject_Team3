@@ -178,6 +178,7 @@ export default function App() {
             path="/seller/drops"
             element={
               <SellerDropsPage
+                account={account}
                 drops={sellerDrops}
                 ownerEmail={account?.email ?? 'grab@example.com'}
                 onChange={setSellerDrops}
@@ -215,6 +216,7 @@ export default function App() {
             path="/seller/drops/:dropId"
             element={
               <SellerDropDetailPage
+                account={account}
                 drops={sellerDrops}
                 ownerEmail={account?.email ?? 'grab@example.com'}
                 onChange={setSellerDrops}
