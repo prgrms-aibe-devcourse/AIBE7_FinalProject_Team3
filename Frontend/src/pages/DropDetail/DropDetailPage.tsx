@@ -2,8 +2,8 @@ import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import DropDetailImages from '../../features/drop/DropDetailImages'
 import DropGallery from '../../features/drop/DropGallery'
+import { findMockDetailDrop } from '../../features/drop/mock/mockDetailDrops'
 import { detailImages } from '../../features/drop/mock/mockDetailImages'
-import { drops } from '../../features/drop/mock/mockDrops'
 import { findMatchingSku, selectionLabel } from '../../features/drop/option'
 import { minPrice, stock } from '../../features/drop/selectors'
 import type { SharedProps } from '../../types/store'
@@ -24,16 +24,22 @@ export default function DropDetailPage({
 }: SharedProps) {
   const { dropId } = useParams()
   const navigate = useNavigate()
-  const drop = drops.find((item) => item.id === Number(dropId))
+  const drop = findMockDetailDrop(Number(dropId))
   const [selected, setSelected] = useState<Record<string, string>>({})
   const [quantity, setQuantity] = useState(1)
 
-  if (!drop) return <NotFoundPage />
+  if (!drop || drop.status === 'DRAFT') return <NotFoundPage />
 
   const selectedSku = findMatchingSku(drop.skus, selected)
   const wished = wishes.has(drop.id)
+  const soldOut = stock(drop) === 0
+  const maxQuantity = Math.min(5, selectedSku?.stock ?? 1)
   const orderable =
-    drop.status === 'GRAB' && selectedSku && selectedSku.stock > 0
+    drop.status === 'GRAB' &&
+    selectedSku &&
+    selectedSku.stock > 0 &&
+    quantity >= 1 &&
+    quantity <= maxQuantity
   const optionLabel = selectedSku
     ? selectionLabel(drop.optionGroups, selectedSku.selections) || '기본 옵션'
     : ''
@@ -53,7 +59,7 @@ export default function DropDetailPage({
       quantity,
       total: selectedSku.price * quantity + drop.shippingFee,
     })
-    notify('주문이 생성됐어요. 결제는 데모에서 생략합니다.')
+    notify('데모 주문을 MY에 담았어요. 실제 주문·결제는 진행되지 않습니다.')
     navigate('/my')
   }
 
@@ -71,12 +77,18 @@ export default function DropDetailPage({
             <b>
               {drop.status === 'WISH'
                 ? `오픈 D−${daysUntil(drop.saleStartsAt)}`
-                : 'LIMITED DROP'}
+                : drop.status === 'GRAB'
+                  ? 'LIMITED DROP'
+                  : drop.status === 'ENDED'
+                    ? '판매 종료'
+                    : '판매 취소'}
             </b>
             <span>
               {drop.status === 'WISH'
                 ? `${drop.wishCount} WISH`
-                : `재고 ${stock(drop)}개`}
+                : drop.status === 'GRAB'
+                  ? `재고 ${stock(drop)}개`
+                  : ''}
             </span>
           </div>
           <p className="creator">{drop.brand}</p>
@@ -123,7 +135,7 @@ export default function DropDetailPage({
                 {wished ? '✓ WISH 취소하기' : '♡ WISH 등록하기'}
               </button>
             </div>
-          ) : (
+          ) : drop.status === 'GRAB' ? (
             <form className="buy-form" onSubmit={order}>
               {drop.optionGroups.map((group) => (
                 <label key={group.id}>
@@ -158,7 +170,7 @@ export default function DropDetailPage({
                 <input
                   type="number"
                   min="1"
-                  max={Math.min(5, selectedSku?.stock ?? 1)}
+                  max={maxQuantity}
                   value={quantity}
                   onChange={(event) =>
                     setQuantity(Math.max(1, Number(event.target.value)))
@@ -192,15 +204,28 @@ export default function DropDetailPage({
                 className="primary-button full"
                 disabled={!orderable}
               >
-                {orderable
-                  ? authenticated
-                    ? '지금 GRAB 하기 ↗'
-                    : '로그인 후 GRAB ↗'
-                  : selectedSku?.stock === 0
-                    ? '선택 옵션 품절'
-                    : '옵션을 선택해주세요'}
+                {soldOut
+                  ? '전체 품절'
+                  : orderable
+                    ? authenticated
+                      ? '데모 GRAB 하기 ↗'
+                      : '로그인 후 GRAB ↗'
+                    : selectedSku?.stock === 0
+                      ? '선택 옵션 품절'
+                      : quantity > maxQuantity
+                        ? '수량을 확인해주세요'
+                        : '옵션을 선택해주세요'}
               </button>
             </form>
+          ) : (
+            <div className="wish-panel">
+              <strong>
+                {drop.status === 'ENDED'
+                  ? '이 DROP은 판매가 종료됐어요.'
+                  : '이 DROP은 판매가 취소됐어요.'}
+              </strong>
+              <p>상품 정보는 계속 확인할 수 있어요.</p>
+            </div>
           )}
         </div>
       </section>

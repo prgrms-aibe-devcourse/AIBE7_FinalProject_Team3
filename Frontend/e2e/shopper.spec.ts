@@ -4,6 +4,32 @@ const card = (page: import('@playwright/test').Page, name: string) =>
   page.getByRole('article').filter({ hasText: name })
 
 test.describe('상품 탐색', () => {
+  test('종료·취소는 상세만 보이고 DRAFT는 숨긴다', async ({ page }) => {
+    await page.goto('/#/drops/301')
+    await expect(page.getByText('이 DROP은 판매가 종료됐어요.')).toBeVisible()
+    await expect(page.locator('.buy-form')).toHaveCount(0)
+
+    await page.goto('/#/drops/403')
+    await expect(page.getByText('이 DROP은 판매가 취소됐어요.')).toBeVisible()
+    await expect(page.locator('.buy-form')).toHaveCount(0)
+
+    await page.goto('/#/drops/401')
+    await expect(page.getByText('페이지를 찾을 수 없어요.')).toBeVisible()
+  })
+
+  test('전체 품절과 수량 초과는 데모 주문을 막는다', async ({ page }) => {
+    await page.goto('/#/drops/204')
+    await expect(page.getByRole('button', { name: '전체 품절' })).toBeDisabled()
+
+    await page.goto('/#/drops/201')
+    await page.getByLabel('착용감').selectOption({ label: '릴랙스' })
+    await page.getByLabel('소매').selectOption({ label: '롱' })
+    await page.getByLabel('수량').fill('6')
+    await expect(
+      page.getByRole('button', { name: '수량을 확인해주세요' }),
+    ).toBeDisabled()
+  })
+
   test('DETAIL 이미지는 설명 아래 순서대로 보이고 빈 경우와 실패를 처리한다', async ({
     page,
   }) => {
@@ -202,11 +228,11 @@ test.describe('데모 주문', () => {
     await expect(page.getByText('재고 5개')).toBeVisible()
     await page.getByLabel('수량').fill('2')
     await expect(page.locator('.total-row')).toContainText('86,000원')
-    await page.getByRole('button', { name: '지금 GRAB 하기 ↗' }).click()
+    await page.getByRole('button', { name: '데모 GRAB 하기 ↗' }).click()
 
     await expect(page).toHaveURL(/#\/my$/)
     await expect(toast(page)).toHaveText(
-      '주문이 생성됐어요. 결제는 데모에서 생략합니다.',
+      '데모 주문을 MY에 담았어요. 실제 주문·결제는 진행되지 않습니다.',
     )
     const order = page.locator('.compact-item.order')
     await expect(order).toContainText('뮤직 클럽 티셔츠 · 리미티드')
