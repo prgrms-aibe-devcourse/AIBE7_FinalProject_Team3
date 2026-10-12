@@ -1,6 +1,7 @@
 package org.example.grab.domain.auth.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
@@ -21,12 +22,13 @@ public class CsrfController {
     /*
         CSRF 토큰은 필요할 때 만들어지는 지연 토큰이다. getToken()으로 값을 읽어야 토큰이 만들어지고 쿠키가 응답에 실린다.
         요청에 이미 유효한 XSRF-TOKEN 쿠키가 있으면 그 토큰을 그대로 쓰므로 Set-Cookie가 없을 수 있다.
+        CsrfToken은 Spring Security가 주입하는 인자인데 springdoc이 쿼리 파라미터로 추론하므로 문서에서 숨긴다.
      */
     @Operation(summary = "CSRF 토큰 발급",
             description = "XSRF-TOKEN 쿠키를 발급한다. POST·PUT·PATCH·DELETE 요청 전에 먼저 호출한다(Swagger UI의 Try it out 포함)")
     @ApiResponse(responseCode = "204", description = "발급 완료, Set-Cookie로 XSRF-TOKEN 전달")
     @GetMapping
-    public ResponseEntity<Void> issueCsrfToken(CsrfToken csrfToken) {
+    public ResponseEntity<Void> issueCsrfToken(@Parameter(hidden = true) CsrfToken csrfToken) {
         csrfToken.getToken();
         return ResponseEntity.noContent().build();
     }
