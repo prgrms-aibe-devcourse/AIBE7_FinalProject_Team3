@@ -7,6 +7,10 @@ import {
   type MockAccount,
 } from '../../features/auth/mockAuth'
 import { drops } from '../../features/drop/mock/mockDrops'
+import {
+  buyerOrderStatusText,
+  type BuyerOrder,
+} from '../../features/order/mockBuyerOrders'
 import type { SharedProps } from '../../types/store'
 import { dateLabel } from '../../utils/date'
 import { won } from '../../utils/price'
@@ -15,6 +19,7 @@ type Props = SharedProps & {
   account: MockAccount | null
   onAccountChange: (account: MockAccount) => void
   onLogout: () => void
+  buyerOrders: BuyerOrder[]
 }
 
 export default function MyPage({
@@ -23,6 +28,7 @@ export default function MyPage({
   onLogout,
   wishes,
   orders,
+  buyerOrders,
   toggleWish,
   notify,
 }: Props) {
@@ -200,12 +206,20 @@ export default function MyPage({
               <div className="compact-item order" key={order.id}>
                 <img src={order.drop.image} alt="" />
                 <div>
-                  <small>{order.id} · 결제 대기</small>
+                  <small>
+                    {order.id} ·{' '}
+                    {
+                      buyerOrderStatusText[
+                        buyerOrders.find((item) => item.id === order.id)
+                          ?.status ?? 'PAYMENT_PENDING'
+                      ]
+                    }
+                  </small>
                   <strong>{order.drop.name}</strong>
                   <small>
                     {order.optionLabel} · {order.quantity}개
                   </small>
-                  <Link className="text-link" to={`/orders/${order.id}`}>
+                  <Link className="text-link" to={`/my/orders/${order.id}`}>
                     주문 상세 ↗
                   </Link>
                 </div>

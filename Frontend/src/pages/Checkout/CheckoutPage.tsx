@@ -195,8 +195,8 @@ function CheckoutContent({
             <strong>결제 대기</strong> · 배송지와 서버 확정 금액을 확인해주세요.
           </p>
         )}
-        <Link className="secondary-button" to="/my">
-          내 주문으로 이동 ↗
+        <Link className="secondary-button" to={`/my/orders/${order.id}`}>
+          주문 상세로 이동 ↗
         </Link>
       </section>
     </section>

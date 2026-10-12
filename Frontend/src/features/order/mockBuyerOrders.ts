@@ -222,6 +222,8 @@ export function canCancel(order: BuyerOrder) {
       order.status === 'PAID' ||
       order.status === 'PREPARING') &&
     order.paymentStatus !== 'PENDING' &&
+    order.paymentStatus !== 'UNKNOWN' &&
+    order.reconciliationStatus === 'NONE' &&
     order.refundStatus !== 'UNKNOWN'
   )
 }

@@ -36,6 +36,24 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
     await shot(page, 'my')
   })
 
+  test('checkout', async ({ page }) => {
+    await page.goto('/#/checkout/demo-pending')
+    await page.getByLabel('이메일').fill('grab@example.com')
+    await page.getByLabel('비밀번호').fill('password1234')
+    await page.getByRole('button', { name: '로그인', exact: true }).click()
+    await expect(page.getByRole('status')).toBeEmpty()
+    await shot(page, 'checkout')
+  })
+
+  test('order-detail', async ({ page }) => {
+    await page.goto('/#/my/orders/demo-paid')
+    await page.getByLabel('이메일').fill('grab@example.com')
+    await page.getByLabel('비밀번호').fill('password1234')
+    await page.getByRole('button', { name: '로그인', exact: true }).click()
+    await expect(page.getByRole('status')).toBeEmpty()
+    await shot(page, 'order-detail')
+  })
+
   test('home', async ({ page }) => {
     await page.goto('/')
     await expect(

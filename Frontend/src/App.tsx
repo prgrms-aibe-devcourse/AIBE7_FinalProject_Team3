@@ -11,6 +11,7 @@ import DropListPage from './pages/DropList/DropListPage'
 import HomePage from './pages/Home/HomePage'
 import LoginPage from './pages/Login/LoginPage'
 import MyPage from './pages/MyPage/MyPage'
+import OrderDetailPage from './pages/OrderDetail/OrderDetailPage'
 import SignupPage from './pages/Signup/SignupPage'
 import NotFoundPage from './pages/NotFound/NotFoundPage'
 import SellerDashboardPage from './pages/SellerDashboard/SellerDashboardPage'
@@ -69,10 +70,22 @@ export default function App() {
             }
           />
           <Route
+            path="/my/orders/:orderId"
+            element={
+              <OrderDetailPage
+                authenticated={authenticated}
+                buyerOrders={buyerOrders}
+                updateBuyerOrder={updateBuyerOrder}
+                notify={notify}
+              />
+            }
+          />
+          <Route
             path="/my"
             element={
               <MyPage
                 {...shared}
+                buyerOrders={buyerOrders}
                 account={account}
                 onAccountChange={login}
                 onLogout={logout}

@@ -28,6 +28,8 @@ describe('구매자 주문 Mock 상태', () => {
     expect(canCancel(scenario('demo-paid'))).toBe(true)
     expect(canCancel(scenario('demo-preparing'))).toBe(true)
     expect(canCancel(scenario('demo-processing'))).toBe(false)
+    expect(canCancel(scenario('demo-unknown'))).toBe(false)
+    expect(canCancel(scenario('demo-required'))).toBe(false)
     expect(canCancel(scenario('demo-shipped'))).toBe(false)
     expect(canCancel(scenario('demo-delivered'))).toBe(false)
     expect(canCancel(scenario('demo-canceled'))).toBe(false)

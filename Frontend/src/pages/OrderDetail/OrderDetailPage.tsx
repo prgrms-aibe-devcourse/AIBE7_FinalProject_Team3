@@ -165,6 +165,10 @@ function OrderContent({
                 ? '완료 예시'
                 : '결제 전 취소'}
             </p>
+          ) : paymentChecking ? (
+            <p className="buyer-note">
+              결제 결과를 확인 중이라 취소할 수 없습니다.
+            </p>
           ) : cancelable ? (
             <form className="buyer-cancel-form" onSubmit={cancel}>
               <label>
