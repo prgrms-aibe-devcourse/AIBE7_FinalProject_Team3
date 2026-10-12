@@ -38,6 +38,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.OffsetDateTime;
@@ -111,6 +113,23 @@ class DropServiceTest {
                 .extracting("errorCode")
                 .isEqualTo(CommonErrorCode.INVALID_REQUEST);
         verifyNoInteractions(dropRepository);
+    }
+
+    @Test
+    @DisplayName("인기 WISH 정렬은 정렬 없는 페이지와 정규화한 keyword로 인기 WISH 쿼리를 호출한다")
+    void findPublicDrops_routesWishCountSortToPopularWishQuery() {
+        // given
+        given(dropRepository.findPopularWishDrops(any(), any(), any(), any(), any()))
+                .willReturn(Page.empty());
+
+        // when
+        dropService.findPublicDrops(DropStatus.WISH, 1L, "  50%  ", false,
+                PublicDropSort.parse("wishCount,desc"), 2, 8);
+
+        // then
+        verify(dropRepository).findPopularWishDrops(
+                eq(1L), eq("%50\\%%"), eq(false), any(OffsetDateTime.class), eq(PageRequest.of(2, 8)));
+        verify(dropRepository, never()).findPublicDrops(any(), any(), any(), any(), any());
     }
 
     @Test

@@ -128,7 +128,8 @@ public class DropService {
      * 공개 DROP 목록. DRAFT·CANCELED는 어떤 경우에도 제외한다(DISC-001).
      * status가 없으면 WISH·GRAB·ENDED를 모두, 있으면 그 상태만 조회한다.
      * 인기 정렬은 지정된 status와 함께일 때만 허용한다(DROP.md 1.2).
-     * 정렬은 허용 속성을 컬럼명으로 매핑한 Sort를 쓰고, keyword는 trim·이스케이프해 넘긴다.
+     * 날짜 정렬은 허용 속성을 컬럼명으로 매핑한 Sort를, 인기 정렬은 정렬을 고정한 전용 쿼리를 쓴다.
+     * 인기 정렬의 후보 판정 시각(now)은 조회마다 한 번만 만든다. keyword는 trim·이스케이프해 넘긴다.
      */
     public PageResponse<PublicDropListResponse> findPublicDrops(
             DropStatus status, Long categoryId, String keyword, Boolean soldOut,
@@ -136,9 +137,17 @@ public class DropService {
         List<String> statuses = resolvePublicStatuses(status);
         PublicDropSort effectiveSort = sort != null ? sort : PublicDropSort.parse(null);
         effectiveSort.requireCompatibleWith(status);
-        Page<PublicDropListProjection> drops = dropRepository.findPublicDrops(
-                statuses, categoryId, normalizeKeyword(keyword), soldOut,
-                PageRequest.of(page, size, effectiveSort.toSort()));
+        String normalizedKeyword = normalizeKeyword(keyword);
+        Page<PublicDropListProjection> drops = switch (effectiveSort.type()) {
+            case DATE -> dropRepository.findPublicDrops(
+                    statuses, categoryId, normalizedKeyword, soldOut,
+                    PageRequest.of(page, size, effectiveSort.toSort()));
+            case WISH_COUNT -> dropRepository.findPopularWishDrops(
+                    categoryId, normalizedKeyword, soldOut, OffsetDateTime.now(ZoneOffset.UTC),
+                    PageRequest.of(page, size));
+            // TODO(GR-76 3단계): 인기 GRAB 쿼리 추가 전까지 임시로 막아 둔다.
+            case SOLD_QUANTITY -> throw new IllegalStateException("인기 GRAB 정렬은 아직 지원하지 않는다");
+        };
         return PageResponse.from(drops.map(PublicDropListResponse::from));
     }
 

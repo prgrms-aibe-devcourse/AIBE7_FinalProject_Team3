@@ -62,15 +62,13 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
             Pageable pageable);
 
     /*
-     * 공개 DROP 목록 조회(DISC-001·002·003, STOCK-006).
+     * 공개 DROP 목록 쿼리의 공통 SELECT·FROM. 날짜 정렬과 인기 정렬 쿼리가 같은 응답 형태를 쓰도록 공유한다.
      * 썸네일(LIMIT 1)·ILIKE ESCAPE·컬럼명 기준 정렬 때문에 네이티브로 작성하고, 목록에 필요한 값
      * (minPrice·soldOut·wishCount·thumbnailUrl)을 한 쿼리 안에서 서브쿼리로 계산해 N+1을 막는다.
      * 활성 WISH 집계(canceled_at IS NULL)는 WishRepository 대신 같은 쿼리 안에서 네이티브로 센다.
-     * PostgreSQL은 네이티브 쿼리의 null 파라미터 타입을 추론하지 못하므로 CAST로 타입을 지정한다.
-     * soldOut 판정식은 SELECT와 WHERE 두 곳에 중복되므로 한쪽만 바꾸지 않도록 주의한다.
-     * statuses는 서비스가 채워 넘기며 DRAFT·CANCELED는 들어오지 않는다. 카테고리는 INNER JOIN이다.
+     * soldOut 판정식은 SELECT와 PUBLIC_DROP_FILTERS 두 곳에 중복되므로 한쪽만 바꾸지 않도록 주의한다.
      */
-    @Query(value = """
+    String PUBLIC_DROP_SELECT = """
             SELECT d.id AS "dropId", d.name AS "name", d.status AS "status",
                    d.sale_starts_at AS "saleStartsAt", d.sale_ends_at AS "saleEndsAt",
                    c.id AS "categoryId", c.name AS "categoryName",
@@ -84,30 +82,66 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
                      WHERE w.drop_id = d.id AND w.canceled_at IS NULL) AS "wishCount"
             FROM drops d
             JOIN categories c ON c.id = d.category_id
-            WHERE d.status IN (:statuses)
-              AND (CAST(:categoryId AS BIGINT) IS NULL OR d.category_id = :categoryId)
-              AND (CAST(:keyword AS TEXT) IS NULL OR d.name ILIKE :keyword ESCAPE '\\')
-              AND (CAST(:soldOut AS BOOLEAN) IS NULL
-                   OR (SELECT COALESCE(SUM(o.total_quantity - o.reserved_quantity - o.sold_quantity - o.withheld_quantity), 0) = 0
-                         FROM drop_options o WHERE o.drop_id = d.id AND o.is_active) = :soldOut)
-            """,
-            countQuery = """
+            """;
+
+    String PUBLIC_DROP_COUNT = """
             SELECT COUNT(*)
             FROM drops d
             JOIN categories c ON c.id = d.category_id
-            WHERE d.status IN (:statuses)
+            """;
+
+    /*
+     * categoryId·keyword·soldOut 필터. WHERE 절 뒤에 AND로 이어 붙인다.
+     * PostgreSQL은 네이티브 쿼리의 null 파라미터 타입을 추론하지 못하므로 CAST로 타입을 지정한다.
+     */
+    String PUBLIC_DROP_FILTERS = """
               AND (CAST(:categoryId AS BIGINT) IS NULL OR d.category_id = :categoryId)
               AND (CAST(:keyword AS TEXT) IS NULL OR d.name ILIKE :keyword ESCAPE '\\')
               AND (CAST(:soldOut AS BOOLEAN) IS NULL
                    OR (SELECT COALESCE(SUM(o.total_quantity - o.reserved_quantity - o.sold_quantity - o.withheld_quantity), 0) = 0
                          FROM drop_options o WHERE o.drop_id = d.id AND o.is_active) = :soldOut)
-            """,
+            """;
+
+    // 인기 WISH 후보: 저장 상태 WISH이면서 서버 시각상 아직 판매 전인 상품(DROP.md 1.2).
+    String POPULAR_WISH_WHERE = """
+            WHERE d.status = 'WISH'
+              AND d.sale_starts_at > :now
+            """;
+
+    /*
+     * 공개 DROP 목록 조회(DISC-001·002·003, STOCK-006). 날짜 정렬은 Pageable Sort로 받는다.
+     * statuses는 서비스가 채워 넘기며 DRAFT·CANCELED는 들어오지 않는다. 카테고리는 INNER JOIN이다.
+     */
+    @Query(value = PUBLIC_DROP_SELECT + """
+            WHERE d.status IN (:statuses)
+            """ + PUBLIC_DROP_FILTERS,
+            countQuery = PUBLIC_DROP_COUNT + """
+            WHERE d.status IN (:statuses)
+            """ + PUBLIC_DROP_FILTERS,
             nativeQuery = true)
     Page<PublicDropListProjection> findPublicDrops(
             @Param("statuses") List<String> statuses,
             @Param("categoryId") Long categoryId,
             @Param("keyword") String keyword,
             @Param("soldOut") Boolean soldOut,
+            Pageable pageable);
+
+    /*
+     * 인기 WISH 목록(DISC-007). 활성 WISH 수 내림차순, 동률은 published_at DESC, id DESC로 고정한다.
+     * 집계값 정렬은 Pageable Sort로 표현할 수 없어 ORDER BY를 쿼리에 두고, pageable은 정렬 없이 페이지만 넘긴다.
+     * 전체 후보를 DB에서 정렬한 뒤 LIMIT/OFFSET으로 자르므로 페이지가 달라도 전역 순위가 유지된다.
+     * now는 서비스가 조회마다 한 번 고정해 넘기며, 상태 전환 배치 지연과 무관하게 판매 전 여부를 판정한다.
+     */
+    @Query(value = PUBLIC_DROP_SELECT + POPULAR_WISH_WHERE + PUBLIC_DROP_FILTERS + """
+            ORDER BY "wishCount" DESC, d.published_at DESC, d.id DESC
+            """,
+            countQuery = PUBLIC_DROP_COUNT + POPULAR_WISH_WHERE + PUBLIC_DROP_FILTERS,
+            nativeQuery = true)
+    Page<PublicDropListProjection> findPopularWishDrops(
+            @Param("categoryId") Long categoryId,
+            @Param("keyword") String keyword,
+            @Param("soldOut") Boolean soldOut,
+            @Param("now") OffsetDateTime now,
             Pageable pageable);
 
     /*

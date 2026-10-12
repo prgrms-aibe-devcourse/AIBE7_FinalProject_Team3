@@ -326,6 +326,144 @@ class DropRepositoryTest {
     }
 
     @Test
+    @DisplayName("인기 WISH는 활성 WISH 수 내림차순이고 취소 WISH는 세지 않으며 0건도 포함한다")
+    void ordersPopularWishByActiveWishCount() {
+        // given
+        Long two = insertUpcomingWishDrop("둘", 30);
+        Long one = insertUpcomingWishDrop("하나", 20);
+        Long zero = insertUpcomingWishDrop("영", 10);
+        insertWish(insertBuyer(), two, false);
+        insertWish(insertBuyer(), two, false);
+        insertWish(insertBuyer(), one, false);
+        insertWish(insertBuyer(), one, true);
+        insertWish(insertBuyer(), one, true);
+        insertWish(insertBuyer(), zero, true);
+
+        // when
+        Page<PublicDropListProjection> page = dropRepository.findPopularWishDrops(
+                null, null, null, OffsetDateTime.now(ZoneOffset.UTC), PageRequest.of(0, 20));
+
+        // then
+        assertThat(idsOf(page)).containsExactly(two, one, zero);
+        assertThat(rowOf(page, two).getWishCount()).isEqualTo(2L);
+        assertThat(rowOf(page, one).getWishCount()).isEqualTo(1L);
+        assertThat(rowOf(page, zero).getWishCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("인기 WISH 동률은 published_at 내림차순, 그다음 id 내림차순이다")
+    void breaksPopularWishTiesByPublishedAtThenId() {
+        // given: 모두 WISH 0건
+        Long oldest = insertUpcomingWishDrop("오래됨", 60);
+        Long sameTimeFirst = insertUpcomingWishDrop("같은 시각 1", 10);
+        Long sameTimeSecond = insertUpcomingWishDrop("같은 시각 2", 10);
+
+        // when
+        List<Long> ids = idsOf(dropRepository.findPopularWishDrops(
+                null, null, null, OffsetDateTime.now(ZoneOffset.UTC), PageRequest.of(0, 20)));
+
+        // then
+        assertThat(ids).containsExactly(sameTimeSecond, sameTimeFirst, oldest);
+    }
+
+    @Test
+    @DisplayName("인기 WISH는 저장 상태 WISH이면서 판매 시작 전인 상품만 후보로 삼는다")
+    void popularWishIncludesOnlyWishBeforeSaleStart() {
+        // given
+        Long upcoming = insertUpcomingWishDrop("판매 전", 10);
+        Long batchDelayed = insertDrop(DropStatus.WISH, -1, 1);
+        Long grab = insertDrop(DropStatus.GRAB, -1, 1);
+        Long ended = insertDrop(DropStatus.ENDED, -2, -1);
+        insertDraftDrop();
+        insertCanceledDrop();
+        for (Long dropId : List.of(batchDelayed, grab, ended)) {
+            insertWish(insertBuyer(), dropId, false);
+        }
+
+        // when
+        Page<PublicDropListProjection> page = dropRepository.findPopularWishDrops(
+                null, null, null, OffsetDateTime.now(ZoneOffset.UTC), PageRequest.of(0, 20));
+
+        // then
+        assertThat(idsOf(page)).containsExactly(upcoming);
+        assertThat(page.getTotalElements()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("판매 시작 시각과 now가 같으면 인기 WISH 후보에서 빠진다")
+    void popularWishExcludesDropStartingExactlyNow() {
+        // given
+        Long upcoming = insertUpcomingWishDrop("판매 전", 10);
+        OffsetDateTime now = jdbcTemplate.queryForObject(
+                "SELECT sale_starts_at FROM drops WHERE id = ?", OffsetDateTime.class, upcoming);
+
+        // when
+        Page<PublicDropListProjection> page = dropRepository.findPopularWishDrops(
+                null, null, null, now, PageRequest.of(0, 20));
+
+        // then
+        assertThat(page.getContent()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("인기 WISH는 전체 후보를 정렬한 뒤 페이지를 잘라 페이지가 달라도 전역 순위를 유지한다")
+    void paginatesPopularWishAfterGlobalOrdering() {
+        // given: id·공개 시각이 앞선 상품일수록 WISH가 많아 기본 정렬과 순서가 반대다
+        Long first = insertUpcomingWishDrop("1위", 50);
+        Long second = insertUpcomingWishDrop("2위", 40);
+        Long third = insertUpcomingWishDrop("3위", 30);
+        Long fourth = insertUpcomingWishDrop("4위", 20);
+        insertWishes(first, 4);
+        insertWishes(second, 3);
+        insertWishes(third, 2);
+        insertWishes(fourth, 1);
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+        // when
+        Page<PublicDropListProjection> firstPage = dropRepository.findPopularWishDrops(
+                null, null, null, now, PageRequest.of(0, 2));
+        Page<PublicDropListProjection> secondPage = dropRepository.findPopularWishDrops(
+                null, null, null, now, PageRequest.of(1, 2));
+
+        // then
+        assertThat(idsOf(firstPage)).containsExactly(first, second);
+        assertThat(idsOf(secondPage)).containsExactly(third, fourth);
+        assertThat(firstPage.getTotalElements()).isEqualTo(4);
+        assertThat(firstPage.hasNext()).isTrue();
+        assertThat(secondPage.hasNext()).isFalse();
+    }
+
+    @Test
+    @DisplayName("인기 WISH에도 categoryId·keyword·soldOut 필터가 그대로 적용된다")
+    void appliesFiltersToPopularWish() {
+        // given
+        Long inStock = insertUpcomingWishDrop("스니커즈 재고", 20);
+        Long soldOut = insertUpcomingWishDrop("스니커즈 품절", 10);
+        Long otherName = insertUpcomingWishDrop("후드티", 5);
+        insertOption(inStock, 1000L, 1, 0, 0, 0, true, 0);
+        insertOption(soldOut, 1000L, 1, 1, 0, 0, true, 0);
+        insertOption(otherName, 1000L, 1, 0, 0, 0, true, 0);
+        Long otherCategory = jdbcTemplate.queryForObject(
+                "INSERT INTO categories (code, name) VALUES (?, '잡화') RETURNING id",
+                Long.class, "TEST-" + UUID.randomUUID());
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+        // when & then
+        assertThat(idsOf(dropRepository.findPopularWishDrops(
+                null, "%스니커즈%", null, now, PageRequest.of(0, 20))))
+                .containsExactly(soldOut, inStock);
+        assertThat(idsOf(dropRepository.findPopularWishDrops(
+                null, null, true, now, PageRequest.of(0, 20))))
+                .containsExactly(soldOut);
+        assertThat(idsOf(dropRepository.findPopularWishDrops(
+                null, null, false, now, PageRequest.of(0, 20))))
+                .containsExactly(otherName, inStock);
+        assertThat(dropRepository.findPopularWishDrops(
+                otherCategory, null, null, now, PageRequest.of(0, 20)).getTotalElements())
+                .isZero();
+    }
+
+    @Test
     @DisplayName("시작 배치가 시작 시각이 지난 WISH만 GRAB으로 전환하고 전환 시각을 기록한다")
     void startGrabBatchTransitionsDueWishOnly() {
         // given
@@ -572,6 +710,26 @@ class DropRepositoryTest {
                 RETURNING id
                 """,
                 Long.class, sellerId, categoryId, status.name(), name, grab, ended, ended);
+    }
+
+    // 판매 시작 1시간 전인 WISH 상품. published_at은 minutesAgo분 전으로 둬 동률 정렬을 검증한다.
+    private Long insertUpcomingWishDrop(String name, long minutesAgo) {
+        return jdbcTemplate.queryForObject(
+                """
+                INSERT INTO drops (seller_id, category_id, status, name, description,
+                                   shipping_fee, shipping_notice, sale_starts_at, sale_ends_at, published_at)
+                VALUES (?, ?, 'WISH', ?, '설명', 3000, '안내',
+                        CURRENT_TIMESTAMP + INTERVAL '1 hour', CURRENT_TIMESTAMP + INTERVAL '2 hours',
+                        CURRENT_TIMESTAMP - (? || ' minutes')::interval)
+                RETURNING id
+                """,
+                Long.class, sellerId, categoryId, name, minutesAgo);
+    }
+
+    private void insertWishes(Long dropId, int count) {
+        for (int i = 0; i < count; i++) {
+            insertWish(insertBuyer(), dropId, false);
+        }
     }
 
     private void insertDraftDrop() {
