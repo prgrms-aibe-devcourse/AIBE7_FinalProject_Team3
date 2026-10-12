@@ -69,6 +69,7 @@ org.example.grab
 - 트랜잭션은 Service에만 선언한다. 조회 메서드는 `@Transactional(readOnly = true)`를 사용한다.
 - 의존성은 `final` 필드 + `@RequiredArgsConstructor` 생성자 주입만 사용한다. `@Autowired` 필드 주입은 사용하지 않는다.
 - Controller는 항상 `ApiResponse`로 감싼 응답을 반환한다. 형식은 [공통 API 규칙](../development/api-spec/COMMON.md) 1.3·1.4를 따른다.
+- 새 API에는 클래스에 `@Tag(name, description)`, 메서드에 `@Operation(summary, description)`과 성공·주요 오류 상태별 `@ApiResponse`(설명에 오류 코드 나열)를 단다. 세부 규칙은 api-spec 문서에 두고 Swagger에는 요약만 적는다. 공통 `ApiResponse`와 이름이 겹치면 `@io.swagger.v3.oas.annotations.responses.ApiResponse`로 쓴다.
 
 ### 2.4 Entity
 
