@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import logo from '../../assets/images/grab-symbol.png'
+import DropDetailImages from '../../features/drop/DropDetailImages'
 import DropGallery from '../../features/drop/DropGallery'
+import { detailImages } from '../../features/drop/mock/mockDetailImages'
 import { drops } from '../../features/drop/mock/mockDrops'
 import { findMatchingSku, selectionLabel } from '../../features/drop/option'
 import { minPrice, stock } from '../../features/drop/selectors'
@@ -205,20 +206,14 @@ export default function DropDetailPage({
       </section>
 
       <section className="story-section">
-        <p className="eyebrow">SMALL BRAND, SPECIAL FIND</p>
-        <h2>작은 취향이 특별한 상품이 되는 순간.</h2>
-        <p>
-          {drop.description} GRAB은 브랜드의 이야기가 필요한 사람에게 정확히
-          닿도록 돕습니다.
-        </p>
-        <div className="creator-card">
-          <img src={logo} alt="" />
-          <div>
-            <small>MEET THE CREATOR</small>
-            <strong>{drop.brand}</strong>
-            <p>이번 DROP을 위해 준비한 한정 컬렉션입니다.</p>
-          </div>
-        </div>
+        <h2>상품 상세 설명</h2>
+        <p>{drop.description}</p>
+        <DropDetailImages images={detailImages(drop.id)} />
+      </section>
+      <section className="detail-shipping panel">
+        <h2>배송 안내</h2>
+        <p>배송비 {won(drop.shippingFee)}</p>
+        <p>{drop.shippingNotice}</p>
       </section>
     </>
   )

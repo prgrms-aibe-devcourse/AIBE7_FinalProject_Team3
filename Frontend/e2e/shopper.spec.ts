@@ -4,6 +4,39 @@ const card = (page: import('@playwright/test').Page, name: string) =>
   page.getByRole('article').filter({ hasText: name })
 
 test.describe('상품 탐색', () => {
+  test('DETAIL 이미지는 설명 아래 순서대로 보이고 빈 경우와 실패를 처리한다', async ({
+    page,
+  }) => {
+    await page.goto('/#/drops/102')
+    const pictures = page.locator('.detail-pictures img')
+    await expect(pictures).toHaveCount(2)
+    await expect(pictures.nth(0)).toHaveAttribute(
+      'alt',
+      '데일리 머그의 전체 형태와 유약 색상',
+    )
+    await expect(pictures.nth(1)).toHaveAttribute('loading', 'lazy')
+    await expect(page.locator('.detail-shipping')).toContainText(
+      '주문 후 순차 제작, 5영업일 이내 출고',
+    )
+
+    await page.goto('/#/drops/101')
+    await expect(page.locator('.detail-pictures')).toHaveCount(0)
+    await expect(
+      page.getByRole('heading', { name: '상품 상세 설명' }),
+    ).toBeVisible()
+
+    await page.route('**/photo-1529139574466-a303027c1d8b*', (route) =>
+      route.abort(),
+    )
+    await page.goto('/#/drops/201')
+    await page.locator('.detail-pictures').scrollIntoViewIfNeeded()
+    await expect(
+      page.locator('.detail-pictures').getByRole('img', {
+        name: '뮤직 클럽 티셔츠의 프린트와 소재',
+      }),
+    ).toBeVisible()
+  })
+
   test('상세 갤러리는 키보드로 전환하고 한 장·이미지 실패를 처리한다', async ({
     page,
   }) => {

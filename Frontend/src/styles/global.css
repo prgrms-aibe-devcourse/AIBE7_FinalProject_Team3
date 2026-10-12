@@ -961,40 +961,38 @@ main {
 }
 .story-section > p:not(.eyebrow) {
   max-width: 650px;
-  margin: auto;
+  margin: 0 auto;
   color: var(--muted);
   line-height: 1.8;
 }
-.creator-card {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  margin-top: 42px;
-  padding: 24px;
-  border-radius: 14px;
-  background: var(--soft);
-  text-align: left;
-}
-.creator-card img {
-  width: 76px;
-  height: 76px;
-  object-fit: contain;
-}
-.creator-card div {
+.detail-pictures {
   display: grid;
-  gap: 4px;
+  gap: 16px;
+  margin-top: 32px;
 }
-.creator-card small {
+.detail-pictures img {
+  width: 100%;
+  height: auto;
+}
+.detail-picture-fallback {
+  display: grid;
+  min-height: 160px;
+  padding: 24px;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--soft);
   color: var(--muted);
-  letter-spacing: 1.2px;
 }
-.creator-card strong {
-  font-size: 20px;
+.detail-shipping {
+  max-width: 880px;
+  margin: 30px auto 0;
 }
-.creator-card p {
-  margin: 0;
+.detail-shipping h2 {
+  margin-bottom: 16px;
+}
+.detail-shipping p {
+  margin: 8px 0 0;
   color: var(--muted);
-  font-size: 13px;
 }
 
 .page-section {
