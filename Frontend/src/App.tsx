@@ -10,6 +10,7 @@ import DropListPage from './pages/DropList/DropListPage'
 import HomePage from './pages/Home/HomePage'
 import LoginPage from './pages/Login/LoginPage'
 import MyPage from './pages/MyPage/MyPage'
+import SignupPage from './pages/Signup/SignupPage'
 import NotFoundPage from './pages/NotFound/NotFoundPage'
 import SellerDashboardPage from './pages/SellerDashboard/SellerDashboardPage'
 import SellerDropDetailPage from './pages/SellerDropDetail/SellerDropDetailPage'
@@ -24,7 +25,7 @@ export default function App() {
     setToast(message)
     window.setTimeout(() => setToast(''), 2600)
   }
-  const { authenticated, login } = useAuth()
+  const { account, authenticated, login, logout } = useAuth()
   const { wishes, toggleWish } = useWish(authenticated, notify)
   const { orders, addOrder } = useOrders()
 
@@ -55,16 +56,24 @@ export default function App() {
             path="/drops/:dropId"
             element={<DropDetailPage {...shared} />}
           />
-          <Route path="/my" element={<MyPage {...shared} />} />
+          <Route
+            path="/my"
+            element={
+              <MyPage
+                {...shared}
+                account={account}
+                onAccountChange={login}
+                onLogout={logout}
+              />
+            }
+          />
           <Route
             path="/login"
-            element={<LoginPage mode="login" onLogin={login} notify={notify} />}
+            element={<LoginPage onLogin={login} notify={notify} />}
           />
           <Route
             path="/signup"
-            element={
-              <LoginPage mode="signup" onLogin={login} notify={notify} />
-            }
+            element={<SignupPage onLogin={login} notify={notify} />}
           />
           <Route
             path="/seller"

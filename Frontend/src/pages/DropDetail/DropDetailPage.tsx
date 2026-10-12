@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import DropDetailImages from '../../features/drop/DropDetailImages'
 import DropGallery from '../../features/drop/DropGallery'
 import { findMockDetailDrop } from '../../features/drop/mock/mockDetailDrops'
@@ -24,6 +24,7 @@ export default function DropDetailPage({
 }: SharedProps) {
   const { dropId } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const drop = findMockDetailDrop(Number(dropId))
   const [selected, setSelected] = useState<Record<string, string>>({})
   const [quantity, setQuantity] = useState(1)
@@ -49,7 +50,7 @@ export default function DropDetailPage({
     if (!selectedSku || !orderable) return
     if (!authenticated) {
       notify('로그인 후 주문할 수 있어요.')
-      navigate('/login')
+      navigate('/login', { state: { from: location.pathname } })
       return
     }
     addOrder({

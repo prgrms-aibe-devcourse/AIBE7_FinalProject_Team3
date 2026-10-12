@@ -1007,6 +1007,88 @@ main {
   gap: 24px;
   align-items: start;
 }
+.account-panel {
+  margin-bottom: 24px;
+  padding: 26px;
+}
+.account-heading,
+.account-footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+.account-heading h2 {
+  margin: 4px 0 16px;
+}
+.account-heading strong {
+  font-size: 20px;
+}
+.account-heading p:not(.eyebrow) {
+  margin: 6px 0;
+  color: var(--muted);
+}
+.account-heading small,
+.account-footer p,
+.my-demo-controls small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.account-edit {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 22px;
+  padding: 22px;
+  border-radius: 10px;
+  background: var(--soft);
+}
+.account-edit label,
+.my-demo-controls label {
+  display: grid;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.account-edit input,
+.account-edit select,
+.my-demo-controls select {
+  min-width: 0;
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+.account-edit .form-error {
+  grid-column: 1 / -1;
+}
+.account-edit button {
+  justify-self: start;
+}
+.account-footer {
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.account-footer p {
+  flex: 1 1 260px;
+  margin: 0;
+}
+.account-footer .text-link {
+  border: 0;
+  background: none;
+}
+.my-demo-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
 .panel {
   overflow: hidden;
   border: 1px solid var(--line);
@@ -1157,6 +1239,61 @@ main {
   gap: 17px;
   padding: clamp(34px, 6vw, 80px);
   background: #fff;
+}
+.auth-stack {
+  display: grid;
+  gap: 16px;
+}
+.auth-social {
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.auth-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.auth-form select {
+  min-width: 0;
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+.auth-form .demo-select {
+  color: var(--muted);
+}
+.auth-form .form-error,
+.form-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 12px;
+  text-align: left;
+}
+.auth-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.auth-steps li {
+  padding: 7px 10px;
+  border-radius: 30px;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 11px;
+}
+.auth-steps li[aria-current] {
+  background: var(--lime);
+  color: var(--ink);
+  font-weight: 800;
+}
+.auth-form .secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 .auth-form h2 {
   margin: 0 0 12px;
@@ -1955,6 +2092,9 @@ footer small {
   .auth-page {
     grid-template-columns: 1fr;
   }
+  .order-panel {
+    grid-row: 1;
+  }
   .auth-copy {
     min-height: 280px;
     padding: 34px;
@@ -2084,6 +2224,14 @@ footer small {
   }
   .compact-item {
     grid-template-columns: 56px 1fr;
+  }
+  .account-panel {
+    padding: 20px;
+  }
+  .account-heading,
+  .account-edit {
+    display: grid;
+    grid-template-columns: 1fr;
   }
   .compact-item img {
     width: 56px;
