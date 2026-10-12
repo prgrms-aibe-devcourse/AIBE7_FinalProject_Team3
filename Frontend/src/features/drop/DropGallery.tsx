@@ -9,7 +9,11 @@ export default function DropGallery({ drop }: { drop: Drop }) {
   const image = images[selected]
 
   return (
-    <div className="detail-gallery" aria-label={`${drop.name} 상품 갤러리`}>
+    <div
+      className="detail-gallery"
+      role="group"
+      aria-label={`${drop.name} 상품 갤러리`}
+    >
       <div className="detail-media">
         {image.imageUrl && failedImage !== image.imageUrl ? (
           <img
@@ -18,7 +22,7 @@ export default function DropGallery({ drop }: { drop: Drop }) {
             onError={() => setFailedImage(image.imageUrl)}
           />
         ) : (
-          <span role="img" aria-label={`${drop.name} 이미지 없음`}>
+          <span role="img" aria-label={`${image.altText} 이미지 없음`}>
             상품 이미지 준비 중
           </span>
         )}

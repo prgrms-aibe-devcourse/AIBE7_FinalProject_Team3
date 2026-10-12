@@ -70,13 +70,20 @@ test.describe('상품 탐색', () => {
       route.abort(),
     )
     await page.goto('/#/drops/102')
+    await expect(
+      page.getByRole('group', {
+        name: '나의 작은 휴식, 데일리 머그 상품 갤러리',
+      }),
+    ).toBeVisible()
     const second = page.getByRole('button', { name: /2번 이미지:/ })
     await expect(second).toBeVisible()
     await second.focus()
     await page.keyboard.press('Enter')
     await expect(second).toHaveAttribute('aria-pressed', 'true')
     await expect(
-      page.locator('.detail-media').getByRole('img', { name: /이미지 없음/ }),
+      page.locator('.detail-media').getByRole('img', {
+        name: '데일리 머그의 손잡이와 표면 질감 이미지 없음',
+      }),
     ).toBeVisible()
 
     await page.goto('/#/drops/101')
