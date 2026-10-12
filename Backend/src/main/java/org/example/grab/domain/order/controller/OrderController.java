@@ -1,5 +1,7 @@
 package org.example.grab.domain.order.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.grab.domain.order.dto.MyOrderDetailResponse;
@@ -29,12 +31,22 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/orders")
+@Tag(name = "주문", description = "구매자의 주문 생성과 내 주문 조회")
 public class OrderController {
 
     private final OrderCreateService orderCreateService;
     private final OrderQueryService orderQueryService;
     private final CurrentUserIdProvider currentUserIdProvider;
 
+    @Operation(summary = "주문 생성",
+            description = "옵션별 재고를 확보하고 PAYMENT_PENDING 주문을 만든다. Idempotency-Key(UUID) 헤더가 필요하다. 가격은 서버 값으로 계산한다")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "주문 생성 성공")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "INVALID_REQUEST, INVALID_IDEMPOTENCY_KEY, VALIDATION_FAILED")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "AUTHENTICATION_REQUIRED, INVALID_TOKEN")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "ACCESS_DENIED (CSRF 토큰 누락)")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "OPTION_NOT_FOUND")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "DROP_NOT_ON_SALE, SALE_NOT_STARTED, SALE_ENDED, DUPLICATE_IDEMPOTENCY_KEY")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "422", description = "INSUFFICIENT_STOCK")
     @PostMapping
     public ResponseEntity<ApiResponse<OrderCreateResponse>> create(
             @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
@@ -48,6 +60,10 @@ public class OrderController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
 
+    @Operation(summary = "내 주문 목록 조회", description = "본인 주문을 최신순으로 반환한다. 주문 상태로 거를 수 있다")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "INVALID_REQUEST")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "AUTHENTICATION_REQUIRED, INVALID_TOKEN")
     @GetMapping
     public ApiResponse<PageResponse<MyOrderListResponse>> findMyOrders(
             @RequestParam(required = false) OrderStatus status,
@@ -61,6 +77,11 @@ public class OrderController {
                 currentUserIdProvider.currentUserId(), status, page, size));
     }
 
+    @Operation(summary = "내 주문 상세 조회",
+            description = "주문·결제·배송 정보를 반환한다. 다른 사용자의 주문은 없는 주문과 같이 ORDER_NOT_FOUND로 응답한다")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "AUTHENTICATION_REQUIRED, INVALID_TOKEN")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "RESOURCE_NOT_FOUND (UUID 형식 오류), ORDER_NOT_FOUND")
     @GetMapping("/{orderId}")
     public ApiResponse<MyOrderDetailResponse> findMyOrder(@PathVariable String orderId) {
         return ApiResponse.success(orderQueryService.findMyOrder(
