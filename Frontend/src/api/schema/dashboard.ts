@@ -11,6 +11,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * 임박 DROP 조회
+     * @description 판매 시작(START, WISH 기준) 또는 종료(END, GRAB 기준)가 임박한 DROP을 임박 순으로 반환한다. withinMinutes는 60 또는 1440만 허용한다
+     */
     get: operations['findUpcomingDrops']
     put?: never
     post?: never
@@ -27,6 +31,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * 대시보드 요약 조회
+     * @description DROP·주문·결제·재고 상태별 건수를 반환한다. from·to 기간은 주문·결제 건수에만 적용하며 from이 to보다 뒤면 400이다
+     */
     get: operations['findSummary']
     put?: never
     post?: never
@@ -43,6 +51,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * DROP별 통계 조회
+     * @description DROP별 WISH·주문·판매·재고 통계를 최근 생성순으로 반환한다. 집계 기준은 SELLER.md 2.2 참고
+     */
     get: operations['findDropStats']
     put?: never
     post?: never
@@ -156,8 +168,35 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description OK */
+      /** @description 조회 성공 */
       200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseListUpcomingDropResponse']
+        }
+      }
+      /** @description INVALID_REQUEST */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseListUpcomingDropResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseListUpcomingDropResponse']
+        }
+      }
+      /** @description ACCESS_DENIED */
+      403: {
         headers: {
           [name: string]: unknown
         }
@@ -179,8 +218,35 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description OK */
+      /** @description 조회 성공 */
       200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerDashboardSummaryResponse']
+        }
+      }
+      /** @description INVALID_REQUEST */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerDashboardSummaryResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerDashboardSummaryResponse']
+        }
+      }
+      /** @description ACCESS_DENIED */
+      403: {
         headers: {
           [name: string]: unknown
         }
@@ -203,8 +269,35 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description OK */
+      /** @description 조회 성공 */
       200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePageResponseDropStatsResponse']
+        }
+      }
+      /** @description INVALID_REQUEST */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePageResponseDropStatsResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePageResponseDropStatsResponse']
+        }
+      }
+      /** @description ACCESS_DENIED */
+      403: {
         headers: {
           [name: string]: unknown
         }

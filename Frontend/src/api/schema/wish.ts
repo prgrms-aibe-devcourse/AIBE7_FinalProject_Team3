@@ -12,8 +12,16 @@ export interface paths {
       cookie?: never
     }
     get?: never
+    /**
+     * WISH 등록
+     * @description 판매 시작 전인 WISH DROP에만 등록한다. 반복 요청해도 활성 WISH는 하나이며 기존 wishedAt을 그대로 반환한다
+     */
     put: operations['register']
     post?: never
+    /**
+     * WISH 취소
+     * @description 판매 시작 전에만 취소한다. 활성 WISH가 없어도 204로 응답한다
+     */
     delete: operations['cancel']
     options?: never
     head?: never
@@ -27,6 +35,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * 내 WISH 목록 조회
+     * @description 본인이 등록한 활성 WISH를 반환한다
+     */
     get: operations['listMyWishes']
     put?: never
     post?: never
@@ -102,8 +114,53 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description OK */
+      /** @description 등록 성공 또는 이미 등록됨 */
       200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseWishResponse']
+        }
+      }
+      /** @description INVALID_REQUEST */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseWishResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseWishResponse']
+        }
+      }
+      /** @description ACCESS_DENIED (CSRF 토큰 누락) */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseWishResponse']
+        }
+      }
+      /** @description DROP_NOT_FOUND */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseWishResponse']
+        }
+      }
+      /** @description GRAB_ALREADY_STARTED, DROP_NOT_WISHABLE */
+      409: {
         headers: {
           [name: string]: unknown
         }
@@ -124,8 +181,43 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description OK */
-      200: {
+      /** @description 취소 완료 */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description INVALID_REQUEST */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description ACCESS_DENIED (CSRF 토큰 누락) */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description DROP_NOT_FOUND */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description GRAB_ALREADY_STARTED, DROP_NOT_WISHABLE */
+      409: {
         headers: {
           [name: string]: unknown
         }
@@ -145,8 +237,35 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description OK */
+      /** @description 조회 성공 */
       200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePageResponseWishListResponse']
+        }
+      }
+      /** @description INVALID_REQUEST */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePageResponseWishListResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePageResponseWishListResponse']
+        }
+      }
+      /** @description ACCESS_DENIED */
+      403: {
         headers: {
           [name: string]: unknown
         }

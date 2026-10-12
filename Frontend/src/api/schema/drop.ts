@@ -13,6 +13,10 @@ export interface paths {
     }
     get?: never
     put?: never
+    /**
+     * 이미지 업로드 URL 발급
+     * @description SELLER 전용. 받은 uploadUrl로 클라이언트가 직접 PUT 업로드하고, imageId·imageUrl을 DROP 저장 요청에 쓴다. 형식·크기 제한은 IMAGE_UPLOAD.md 참고
+     */
     post: operations['issuePresignedUrl']
     delete?: never
     options?: never
@@ -27,8 +31,16 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * 판매자 DROP 목록 조회
+     * @description 본인 DROP만 반환한다. 상태로 거를 수 있다
+     */
     get: operations['listDrops']
     put?: never
+    /**
+     * DROP 임시 저장
+     * @description DRAFT로 저장하며 일부 항목이 비어 있어도 된다. 이미지·옵션 규칙은 DROP.md 2.1 참고
+     */
     post: operations['createDraft']
     delete?: never
     options?: never
@@ -45,6 +57,10 @@ export interface paths {
     }
     get?: never
     put?: never
+    /**
+     * DROP 공개
+     * @description DRAFT를 WISH로 바꾼다. 공개 전에 필수 항목·일정·옵션을 모두 검증하고 위반 항목은 fieldErrors로 알려준다
+     */
     post: operations['publish']
     delete?: never
     options?: never
@@ -61,6 +77,10 @@ export interface paths {
     }
     get?: never
     put?: never
+    /**
+     * WISH DROP 출시 취소
+     * @description 판매 시작 전인 WISH DROP만 취소할 수 있다. 취소 사유가 필요하다
+     */
     post: operations['cancel']
     delete?: never
     options?: never
@@ -75,12 +95,20 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * 판매자 DROP 상세 조회
+     * @description DRAFT를 포함해 본인 DROP의 상세를 반환한다
+     */
     get: operations['findDrop']
     put?: never
     post?: never
     delete?: never
     options?: never
     head?: never
+    /**
+     * DRAFT DROP 수정
+     * @description 보낸 필드만 바꾼다. DRAFT 상태에서만 수정할 수 있다. 누락·빈 배열의 의미는 DROP.md 2.4 참고
+     */
     patch: operations['updateDraft']
     trace?: never
   }
@@ -91,6 +119,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * DROP 활성 WISH 수 조회
+     * @description 본인 DROP에 등록된 활성 WISH 수를 반환한다
+     */
     get: operations['findWishCount']
     put?: never
     post?: never
@@ -107,6 +139,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * 판매자 재고 현황 조회
+     * @description 비활성 옵션을 포함해 옵션별 전체·가용·확보·판매 재고를 반환한다. 상태와 관계없이 조회할 수 있다
+     */
     get: operations['findStocks']
     put?: never
     post?: never
@@ -123,6 +159,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * 공개 DROP 목록 조회
+     * @description WISH·GRAB·ENDED DROP을 상태·카테고리·상품명·품절 여부로 거른다. 인기 정렬은 status=WISH&sort=wishCount,desc, status=GRAB&sort=soldQuantity,desc 조합만 허용한다. 정렬·조합 규칙은 DROP.md 1.2 참고
+     */
     get: operations['listDrops_1']
     put?: never
     post?: never
@@ -139,6 +179,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * 공개 DROP 상세 조회
+     * @description 옵션, 판매 일정, 배송 정보를 함께 반환한다. DRAFT는 없는 DROP으로 처리한다
+     */
     get: operations['getDrop']
     put?: never
     post?: never
@@ -155,6 +199,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * 옵션별 재고 재조회
+     * @description 활성 옵션의 현재 가용 재고를 반환한다. 표시용이며 실제 구매 가능 여부는 주문 API가 다시 판단한다
+     */
     get: operations['getStocks']
     put?: never
     post?: never
@@ -512,8 +560,44 @@ export interface operations {
       }
     }
     responses: {
-      /** @description OK */
+      /** @description 발급 성공 */
       200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseImageUploadUrlResponse']
+        }
+      }
+      /** @description INVALID_REQUEST, VALIDATION_FAILED */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseImageUploadUrlResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseImageUploadUrlResponse']
+        }
+      }
+      /** @description ACCESS_DENIED (SELLER 권한 없음·CSRF 토큰 누락) */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseImageUploadUrlResponse']
+        }
+      }
+      /** @description EXTERNAL_SERVICE_ERROR */
+      502: {
         headers: {
           [name: string]: unknown
         }
@@ -536,8 +620,35 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description OK */
+      /** @description 조회 성공 */
       200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePageResponseSellerDropListResponse']
+        }
+      }
+      /** @description INVALID_REQUEST */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePageResponseSellerDropListResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePageResponseSellerDropListResponse']
+        }
+      }
+      /** @description ACCESS_DENIED */
+      403: {
         headers: {
           [name: string]: unknown
         }
@@ -560,8 +671,44 @@ export interface operations {
       }
     }
     responses: {
-      /** @description OK */
-      200: {
+      /** @description 저장 성공 */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropDraftResponse']
+        }
+      }
+      /** @description INVALID_REQUEST, VALIDATION_FAILED */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropDraftResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropDraftResponse']
+        }
+      }
+      /** @description ACCESS_DENIED */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropDraftResponse']
+        }
+      }
+      /** @description INVALID_SCHEDULE, INVALID_OPTION_COMBINATION */
+      422: {
         headers: {
           [name: string]: unknown
         }
@@ -582,8 +729,62 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description OK */
+      /** @description 공개 성공 */
       200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropPublishResponse']
+        }
+      }
+      /** @description INVALID_REQUEST, VALIDATION_FAILED */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropPublishResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropPublishResponse']
+        }
+      }
+      /** @description ACCESS_DENIED, DROP_ACCESS_DENIED */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropPublishResponse']
+        }
+      }
+      /** @description DROP_NOT_FOUND */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropPublishResponse']
+        }
+      }
+      /** @description INVALID_STATE_TRANSITION, DUPLICATE_OPTION_COMBINATION */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropPublishResponse']
+        }
+      }
+      /** @description INVALID_SCHEDULE, INVALID_OPTION_COMBINATION */
+      422: {
         headers: {
           [name: string]: unknown
         }
@@ -608,8 +809,53 @@ export interface operations {
       }
     }
     responses: {
-      /** @description OK */
+      /** @description 취소 성공 */
       200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropCancelResponse']
+        }
+      }
+      /** @description INVALID_REQUEST, VALIDATION_FAILED */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropCancelResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropCancelResponse']
+        }
+      }
+      /** @description ACCESS_DENIED, DROP_ACCESS_DENIED */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropCancelResponse']
+        }
+      }
+      /** @description DROP_NOT_FOUND */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropCancelResponse']
+        }
+      }
+      /** @description INVALID_STATE_TRANSITION */
+      409: {
         headers: {
           [name: string]: unknown
         }
@@ -630,8 +876,44 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description OK */
+      /** @description 조회 성공 */
       200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerDropDetailResponse']
+        }
+      }
+      /** @description INVALID_REQUEST */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerDropDetailResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerDropDetailResponse']
+        }
+      }
+      /** @description ACCESS_DENIED, DROP_ACCESS_DENIED */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerDropDetailResponse']
+        }
+      }
+      /** @description DROP_NOT_FOUND */
+      404: {
         headers: {
           [name: string]: unknown
         }
@@ -656,8 +938,62 @@ export interface operations {
       }
     }
     responses: {
-      /** @description OK */
+      /** @description 수정 성공 */
       200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropDraftResponse']
+        }
+      }
+      /** @description INVALID_REQUEST, VALIDATION_FAILED */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropDraftResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropDraftResponse']
+        }
+      }
+      /** @description ACCESS_DENIED, DROP_ACCESS_DENIED */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropDraftResponse']
+        }
+      }
+      /** @description DROP_NOT_FOUND */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropDraftResponse']
+        }
+      }
+      /** @description DROP_NOT_EDITABLE */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropDraftResponse']
+        }
+      }
+      /** @description INVALID_SCHEDULE, INVALID_OPTION_COMBINATION */
+      422: {
         headers: {
           [name: string]: unknown
         }
@@ -678,8 +1014,44 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description OK */
+      /** @description 조회 성공 */
       200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerDropWishCountResponse']
+        }
+      }
+      /** @description INVALID_REQUEST */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerDropWishCountResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerDropWishCountResponse']
+        }
+      }
+      /** @description ACCESS_DENIED, DROP_ACCESS_DENIED */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerDropWishCountResponse']
+        }
+      }
+      /** @description DROP_NOT_FOUND */
+      404: {
         headers: {
           [name: string]: unknown
         }
@@ -700,8 +1072,44 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description OK */
+      /** @description 조회 성공 */
       200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerDropStockResponse']
+        }
+      }
+      /** @description INVALID_REQUEST */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerDropStockResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerDropStockResponse']
+        }
+      }
+      /** @description ACCESS_DENIED, DROP_ACCESS_DENIED */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerDropStockResponse']
+        }
+      }
+      /** @description DROP_NOT_FOUND */
+      404: {
         headers: {
           [name: string]: unknown
         }
@@ -728,8 +1136,17 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description OK */
+      /** @description 조회 성공 */
       200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePageResponsePublicDropListResponse']
+        }
+      }
+      /** @description INVALID_REQUEST */
+      400: {
         headers: {
           [name: string]: unknown
         }
@@ -750,8 +1167,26 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description OK */
+      /** @description 조회 성공 */
       200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePublicDropDetailResponse']
+        }
+      }
+      /** @description INVALID_REQUEST */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePublicDropDetailResponse']
+        }
+      }
+      /** @description DROP_NOT_FOUND */
+      404: {
         headers: {
           [name: string]: unknown
         }
@@ -772,8 +1207,26 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description OK */
+      /** @description 조회 성공 */
       200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePublicDropStockResponse']
+        }
+      }
+      /** @description INVALID_REQUEST */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePublicDropStockResponse']
+        }
+      }
+      /** @description DROP_NOT_FOUND */
+      404: {
         headers: {
           [name: string]: unknown
         }

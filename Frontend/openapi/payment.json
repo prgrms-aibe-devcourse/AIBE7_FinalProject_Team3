@@ -10,10 +10,22 @@
       "description": "Generated server url"
     }
   ],
+  "tags": [
+    {
+      "name": "결제",
+      "description": "토스페이먼츠 테스트 환경 Mock 결제 승인"
+    },
+    {
+      "name": "주문 취소",
+      "description": "구매자의 주문 취소와 결제 취소·재고 반환"
+    }
+  ],
   "paths": {
     "/api/v1/orders/{orderId}/payments": {
       "post": {
-        "tags": ["payment-controller"],
+        "tags": ["결제"],
+        "summary": "Mock 결제 요청",
+        "description": "결제창에서 받은 paymentKey로 토스페이먼츠 테스트 결제를 승인한다. 실제 결제는 일어나지 않는다. Idempotency-Key(UUID) 헤더가 필요하다. 승인 결과는 200의 status(SUCCEEDED·FAILED·UNKNOWN·PENDING)로 구분하며, UNKNOWN이면 같은 키와 본문으로 다시 보내 결과를 확인한다",
         "operationId": "pay",
         "parameters": [
           {
@@ -45,7 +57,67 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "결제 시도 결과 반환",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePaymentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST, INVALID_IDEMPOTENCY_KEY, VALIDATION_FAILED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePaymentResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED, INVALID_TOKEN",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePaymentResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED (CSRF 토큰 누락)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePaymentResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (UUID 형식 오류), ORDER_NOT_FOUND",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePaymentResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "DUPLICATE_IDEMPOTENCY_KEY, PAYMENT_ALREADY_PROCESSED, INVALID_STATE_TRANSITION",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePaymentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "PAYMENT_AMOUNT_MISMATCH, PAYMENT_EXPIRED",
             "content": {
               "*/*": {
                 "schema": {
@@ -59,7 +131,9 @@
     },
     "/api/v1/orders/{orderId}/cancel": {
       "post": {
-        "tags": ["order-cancel-controller"],
+        "tags": ["주문 취소"],
+        "summary": "주문 취소",
+        "description": "PAYMENT_PENDING·PAID·PREPARING 주문을 취소한다. 결제한 주문은 토스페이먼츠 테스트 결제를 취소한다. Idempotency-Key(UUID) 헤더가 필요하다. 결제 취소 결과를 확인 중이면 200과 refundStatus: UNKNOWN으로 응답한다",
         "operationId": "cancel",
         "parameters": [
           {
@@ -91,7 +165,67 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "취소 완료 또는 결제 취소 결과 확인 중",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOrderCancelResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST, INVALID_IDEMPOTENCY_KEY, VALIDATION_FAILED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOrderCancelResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED, INVALID_TOKEN",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOrderCancelResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED (CSRF 토큰 누락)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOrderCancelResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (UUID 형식 오류), ORDER_NOT_FOUND",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOrderCancelResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "DUPLICATE_IDEMPOTENCY_KEY, ORDER_NOT_CANCELABLE, ORDER_STATUS_CONFLICT",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOrderCancelResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "PAYMENT_CANCEL_FAILED",
             "content": {
               "*/*": {
                 "schema": {

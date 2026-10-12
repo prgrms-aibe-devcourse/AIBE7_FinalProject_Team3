@@ -13,6 +13,10 @@ export interface paths {
     }
     get?: never
     put?: never
+    /**
+     * Mock 결제 요청
+     * @description 결제창에서 받은 paymentKey로 토스페이먼츠 테스트 결제를 승인한다. 실제 결제는 일어나지 않는다. Idempotency-Key(UUID) 헤더가 필요하다. 승인 결과는 200의 status(SUCCEEDED·FAILED·UNKNOWN·PENDING)로 구분하며, UNKNOWN이면 같은 키와 본문으로 다시 보내 결과를 확인한다
+     */
     post: operations['pay']
     delete?: never
     options?: never
@@ -29,6 +33,10 @@ export interface paths {
     }
     get?: never
     put?: never
+    /**
+     * 주문 취소
+     * @description PAYMENT_PENDING·PAID·PREPARING 주문을 취소한다. 결제한 주문은 토스페이먼츠 테스트 결제를 취소한다. Idempotency-Key(UUID) 헤더가 필요하다. 결제 취소 결과를 확인 중이면 200과 refundStatus: UNKNOWN으로 응답한다
+     */
     post: operations['cancel']
     delete?: never
     options?: never
@@ -121,8 +129,62 @@ export interface operations {
       }
     }
     responses: {
-      /** @description OK */
+      /** @description 결제 시도 결과 반환 */
       200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePaymentResponse']
+        }
+      }
+      /** @description INVALID_REQUEST, INVALID_IDEMPOTENCY_KEY, VALIDATION_FAILED */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePaymentResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePaymentResponse']
+        }
+      }
+      /** @description ACCESS_DENIED (CSRF 토큰 누락) */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePaymentResponse']
+        }
+      }
+      /** @description RESOURCE_NOT_FOUND (UUID 형식 오류), ORDER_NOT_FOUND */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePaymentResponse']
+        }
+      }
+      /** @description DUPLICATE_IDEMPOTENCY_KEY, PAYMENT_ALREADY_PROCESSED, INVALID_STATE_TRANSITION */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePaymentResponse']
+        }
+      }
+      /** @description PAYMENT_AMOUNT_MISMATCH, PAYMENT_EXPIRED */
+      422: {
         headers: {
           [name: string]: unknown
         }
@@ -149,8 +211,62 @@ export interface operations {
       }
     }
     responses: {
-      /** @description OK */
+      /** @description 취소 완료 또는 결제 취소 결과 확인 중 */
       200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOrderCancelResponse']
+        }
+      }
+      /** @description INVALID_REQUEST, INVALID_IDEMPOTENCY_KEY, VALIDATION_FAILED */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOrderCancelResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOrderCancelResponse']
+        }
+      }
+      /** @description ACCESS_DENIED (CSRF 토큰 누락) */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOrderCancelResponse']
+        }
+      }
+      /** @description RESOURCE_NOT_FOUND (UUID 형식 오류), ORDER_NOT_FOUND */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOrderCancelResponse']
+        }
+      }
+      /** @description DUPLICATE_IDEMPOTENCY_KEY, ORDER_NOT_CANCELABLE, ORDER_STATUS_CONFLICT */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOrderCancelResponse']
+        }
+      }
+      /** @description PAYMENT_CANCEL_FAILED */
+      502: {
         headers: {
           [name: string]: unknown
         }

@@ -10,10 +10,18 @@
       "description": "Generated server url"
     }
   ],
+  "tags": [
+    {
+      "name": "판매자 대시보드",
+      "description": "본인 DROP의 운영 현황·통계 조회. 403 ACCESS_DENIED는 SELLER 권한 없음"
+    }
+  ],
   "paths": {
     "/api/v1/seller/dashboard/upcoming-drops": {
       "get": {
-        "tags": ["seller-dashboard-controller"],
+        "tags": ["판매자 대시보드"],
+        "summary": "임박 DROP 조회",
+        "description": "판매 시작(START, WISH 기준) 또는 종료(END, GRAB 기준)가 임박한 DROP을 임박 순으로 반환한다. withinMinutes는 60 또는 1440만 허용한다",
         "operationId": "findUpcomingDrops",
         "parameters": [
           {
@@ -39,7 +47,37 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "조회 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListUpcomingDropResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListUpcomingDropResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED, INVALID_TOKEN",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListUpcomingDropResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED",
             "content": {
               "*/*": {
                 "schema": {
@@ -53,7 +91,9 @@
     },
     "/api/v1/seller/dashboard/summary": {
       "get": {
-        "tags": ["seller-dashboard-controller"],
+        "tags": ["판매자 대시보드"],
+        "summary": "대시보드 요약 조회",
+        "description": "DROP·주문·결제·재고 상태별 건수를 반환한다. from·to 기간은 주문·결제 건수에만 적용하며 from이 to보다 뒤면 400이다",
         "operationId": "findSummary",
         "parameters": [
           {
@@ -77,7 +117,37 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "조회 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSellerDashboardSummaryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSellerDashboardSummaryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED, INVALID_TOKEN",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSellerDashboardSummaryResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED",
             "content": {
               "*/*": {
                 "schema": {
@@ -91,7 +161,9 @@
     },
     "/api/v1/seller/dashboard/drops": {
       "get": {
-        "tags": ["seller-dashboard-controller"],
+        "tags": ["판매자 대시보드"],
+        "summary": "DROP별 통계 조회",
+        "description": "DROP별 WISH·주문·판매·재고 통계를 최근 생성순으로 반환한다. 집계 기준은 SELLER.md 2.2 참고",
         "operationId": "findDropStats",
         "parameters": [
           {
@@ -126,7 +198,37 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "조회 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseDropStatsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseDropStatsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED, INVALID_TOKEN",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseDropStatsResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED",
             "content": {
               "*/*": {
                 "schema": {

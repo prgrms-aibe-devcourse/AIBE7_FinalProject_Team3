@@ -13,10 +13,18 @@ export interface paths {
     }
     get?: never
     put?: never
+    /**
+     * 배송 정보 등록 및 발송 처리
+     * @description 택배사·송장번호를 등록하고 PREPARING 주문을 SHIPPED로 바꾼다. Idempotency-Key(UUID) 헤더가 필요하다
+     */
     post: operations['registerShipment']
     delete?: never
     options?: never
     head?: never
+    /**
+     * 송장 정보 수정
+     * @description SHIPPED 주문의 택배사·송장번호만 고친다. 상태는 바뀌지 않는다
+     */
     patch: operations['updateShipment']
     trace?: never
   }
@@ -29,6 +37,10 @@ export interface paths {
     }
     get?: never
     put?: never
+    /**
+     * 배송 준비 처리
+     * @description PAID 주문을 PREPARING으로 바꾼다. 소비자 취소로 결제 취소를 진행·확인 중이면 거부한다
+     */
     post: operations['prepareShipment']
     delete?: never
     options?: never
@@ -43,8 +55,16 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * 내 주문 목록 조회
+     * @description 본인 주문을 최신순으로 반환한다. 주문 상태로 거를 수 있다
+     */
     get: operations['findMyOrders']
     put?: never
+    /**
+     * 주문 생성
+     * @description 옵션별 재고를 확보하고 PAYMENT_PENDING 주문을 만든다. Idempotency-Key(UUID) 헤더가 필요하다. 가격은 서버 값으로 계산한다
+     */
     post: operations['create']
     delete?: never
     options?: never
@@ -59,6 +79,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * 판매자 주문 목록 조회
+     * @description 본인 DROP의 주문만 반환한다. dropId·orderStatus·paymentStatus를 함께 주면 모두 만족하는 주문만 반환한다
+     */
     get: operations['listOrders']
     put?: never
     post?: never
@@ -75,6 +99,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * 판매자 주문 상세 조회
+     * @description 본인 DROP의 주문만 조회할 수 있다
+     */
     get: operations['findOrder']
     put?: never
     post?: never
@@ -91,6 +119,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * 내 주문 상세 조회
+     * @description 주문·결제·배송 정보를 반환한다. 다른 사용자의 주문은 없는 주문과 같이 ORDER_NOT_FOUND로 응답한다
+     */
     get: operations['findMyOrder']
     put?: never
     post?: never
@@ -367,8 +399,53 @@ export interface operations {
       }
     }
     responses: {
-      /** @description OK */
+      /** @description 발송 처리 성공 */
       200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOrderStatusResponse']
+        }
+      }
+      /** @description INVALID_REQUEST, INVALID_IDEMPOTENCY_KEY, VALIDATION_FAILED */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOrderStatusResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOrderStatusResponse']
+        }
+      }
+      /** @description ACCESS_DENIED, ORDER_ACCESS_DENIED */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOrderStatusResponse']
+        }
+      }
+      /** @description RESOURCE_NOT_FOUND (UUID 형식 오류), ORDER_NOT_FOUND */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOrderStatusResponse']
+        }
+      }
+      /** @description DUPLICATE_IDEMPOTENCY_KEY, ORDER_STATUS_CONFLICT, PAYMENT_CANCELLATION_UNKNOWN */
+      409: {
         headers: {
           [name: string]: unknown
         }
@@ -393,8 +470,53 @@ export interface operations {
       }
     }
     responses: {
-      /** @description OK */
+      /** @description 수정 성공 */
       200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseShipmentUpdateResponse']
+        }
+      }
+      /** @description INVALID_REQUEST, VALIDATION_FAILED */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseShipmentUpdateResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseShipmentUpdateResponse']
+        }
+      }
+      /** @description ACCESS_DENIED, ORDER_ACCESS_DENIED */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseShipmentUpdateResponse']
+        }
+      }
+      /** @description RESOURCE_NOT_FOUND (UUID 형식 오류), ORDER_NOT_FOUND */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseShipmentUpdateResponse']
+        }
+      }
+      /** @description ORDER_STATUS_CONFLICT */
+      409: {
         headers: {
           [name: string]: unknown
         }
@@ -415,8 +537,44 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description OK */
+      /** @description 전환 성공 */
       200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOrderStatusResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOrderStatusResponse']
+        }
+      }
+      /** @description ACCESS_DENIED, ORDER_ACCESS_DENIED */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOrderStatusResponse']
+        }
+      }
+      /** @description RESOURCE_NOT_FOUND (UUID 형식 오류), ORDER_NOT_FOUND */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOrderStatusResponse']
+        }
+      }
+      /** @description INVALID_STATE_TRANSITION, PAYMENT_CANCELLATION_UNKNOWN */
+      409: {
         headers: {
           [name: string]: unknown
         }
@@ -446,8 +604,26 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description OK */
+      /** @description 조회 성공 */
       200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePageResponseMyOrderListResponse']
+        }
+      }
+      /** @description INVALID_REQUEST */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePageResponseMyOrderListResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
         headers: {
           [name: string]: unknown
         }
@@ -472,8 +648,62 @@ export interface operations {
       }
     }
     responses: {
-      /** @description OK */
-      200: {
+      /** @description 주문 생성 성공 */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOrderCreateResponse']
+        }
+      }
+      /** @description INVALID_REQUEST, INVALID_IDEMPOTENCY_KEY, VALIDATION_FAILED */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOrderCreateResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOrderCreateResponse']
+        }
+      }
+      /** @description ACCESS_DENIED (CSRF 토큰 누락) */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOrderCreateResponse']
+        }
+      }
+      /** @description OPTION_NOT_FOUND */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOrderCreateResponse']
+        }
+      }
+      /** @description DROP_NOT_ON_SALE, SALE_NOT_STARTED, SALE_ENDED, DUPLICATE_IDEMPOTENCY_KEY */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOrderCreateResponse']
+        }
+      }
+      /** @description INSUFFICIENT_STOCK */
+      422: {
         headers: {
           [name: string]: unknown
         }
@@ -506,8 +736,44 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description OK */
+      /** @description 조회 성공 */
       200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePageResponseSellerOrderListResponse']
+        }
+      }
+      /** @description INVALID_REQUEST */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePageResponseSellerOrderListResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePageResponseSellerOrderListResponse']
+        }
+      }
+      /** @description ACCESS_DENIED (다른 판매자의 dropId 포함) */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePageResponseSellerOrderListResponse']
+        }
+      }
+      /** @description RESOURCE_NOT_FOUND (없는 dropId) */
+      404: {
         headers: {
           [name: string]: unknown
         }
@@ -528,8 +794,35 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description OK */
+      /** @description 조회 성공 */
       200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerOrderDetailResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerOrderDetailResponse']
+        }
+      }
+      /** @description ACCESS_DENIED, ORDER_ACCESS_DENIED */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerOrderDetailResponse']
+        }
+      }
+      /** @description RESOURCE_NOT_FOUND (UUID 형식 오류), ORDER_NOT_FOUND */
+      404: {
         headers: {
           [name: string]: unknown
         }
@@ -550,8 +843,26 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description OK */
+      /** @description 조회 성공 */
       200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseMyOrderDetailResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseMyOrderDetailResponse']
+        }
+      }
+      /** @description RESOURCE_NOT_FOUND (UUID 형식 오류), ORDER_NOT_FOUND */
+      404: {
         headers: {
           [name: string]: unknown
         }

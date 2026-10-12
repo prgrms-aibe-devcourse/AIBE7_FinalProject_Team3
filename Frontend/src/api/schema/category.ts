@@ -11,6 +11,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * 카테고리 목록 조회
+     * @description 활성 카테고리만 반환한다. 로그인 없이 호출한다
+     */
     get: operations['listCategories']
     put?: never
     post?: never
@@ -53,7 +57,7 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description OK */
+      /** @description 조회 성공 */
       200: {
         headers: {
           [name: string]: unknown

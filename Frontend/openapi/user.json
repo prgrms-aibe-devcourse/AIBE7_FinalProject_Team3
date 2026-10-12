@@ -12,11 +12,89 @@
   ],
   "tags": [
     {
+      "name": "CSRF",
+      "description": "상태 변경 요청에 쓸 CSRF 토큰 발급"
+    },
+    {
+      "name": "회원가입",
+      "description": "이메일 인증을 마친 LOCAL 회원가입"
+    },
+    {
       "name": "이메일 인증",
       "description": "LOCAL 회원가입용 이메일 인증 코드 요청·확인"
     }
   ],
   "paths": {
+    "/api/v1/auth/signup": {
+      "post": {
+        "tags": ["회원가입"],
+        "summary": "회원가입 완료",
+        "description": "email_signup_token 쿠키의 인증된 이메일로 가입한다. 성공하면 쿠키를 만료시킨다",
+        "operationId": "signup",
+        "parameters": [
+          {
+            "name": "email_signup_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "가입 성공, Set-Cookie로 가입 토큰 만료",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSignupResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST, VALIDATION_FAILED, INVALID_PASSWORD, INVALID_NICKNAME",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSignupResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "EMAIL_SIGNUP_CONTEXT_INVALID",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSignupResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "DUPLICATE_EMAIL, DUPLICATE_NICKNAME",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSignupResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/email-verification": {
       "post": {
         "tags": ["이메일 인증"],
@@ -77,10 +155,86 @@
           }
         }
       }
+    },
+    "/api/v1/auth/csrf": {
+      "get": {
+        "tags": ["CSRF"],
+        "summary": "CSRF 토큰 발급",
+        "description": "XSRF-TOKEN 쿠키를 발급한다. POST·PUT·PATCH·DELETE 요청 전에 먼저 호출한다(Swagger UI의 Try it out 포함)",
+        "operationId": "issueCsrfToken",
+        "parameters": [
+          {
+            "name": "csrfToken",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/CsrfToken"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "발급 완료, Set-Cookie로 XSRF-TOKEN 전달"
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "SignupRequest": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nickname": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["nickname", "password"]
+      },
+      "ApiResponseSignupResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SignupResponse"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "SignupResponse": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string"
+          },
+          "nickname": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "EmailVerificationRequest": {
         "type": "object",
         "properties": {
@@ -104,6 +258,20 @@
           }
         },
         "required": ["code", "email"]
+      },
+      "CsrfToken": {
+        "type": "object",
+        "properties": {
+          "parameterName": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          },
+          "headerName": {
+            "type": "string"
+          }
+        }
       }
     }
   }
