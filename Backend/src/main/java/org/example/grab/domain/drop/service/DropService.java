@@ -22,12 +22,14 @@ import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.domain.drop.repository.DropImageRepository;
 import org.example.grab.domain.drop.repository.DropRepository;
 import org.example.grab.domain.category.service.CategoryService;
+import org.example.grab.domain.drop.event.DropCanceledEvent;
 import org.example.grab.domain.wish.service.WishQueryService;
 import org.example.grab.global.common.ErrorResponse;
 import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
 import org.example.grab.global.storage.ImageStorage;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -61,6 +63,7 @@ public class DropService {
     private final CategoryService categoryService;
     private final WishQueryService wishQueryService;
     private final ImageStorage imageStorage;
+    private final ApplicationEventPublisher eventPublisher;
 
     /** 새 DRAFT를 만들고 요청 값을 반영해 저장한다. */
     @Transactional
@@ -99,11 +102,14 @@ public class DropService {
      * 판매자가 공개한 WISH를 취소한다(GR-18).
      * 조회 → 소유권 순서로 검증한 뒤 DROP 행 잠금을 획득하고, 잠금 이후에 now를 생성해 취소 가능 여부를 판정한다.
      * 잠금 대기 중에 판매가 시작되면 취소가 거부되어야 하므로 잠금 전 시각으로 판정하지 않는다.
+     * 취소 성공 후 이벤트를 발행한다. 같은 트랜잭션 안에서 발행하므로 커밋 전에는 수신 측(GR-70 메일 알림)이
+     * 동작하지 않고, 검증 실패로 메서드가 예외를 던지면 이벤트 자체가 발행되지 않는다.
      */
     @Transactional
     public Drop cancel(Long sellerId, Long dropId, String reason) {
         Drop drop = findOwnedDropForUpdate(sellerId, dropId);
         drop.cancel(reason, OffsetDateTime.now(ZoneOffset.UTC));
+        eventPublisher.publishEvent(new DropCanceledEvent(dropId));
         return drop;
     }
 

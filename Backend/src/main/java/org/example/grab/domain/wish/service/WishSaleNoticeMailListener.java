@@ -1,6 +1,7 @@
 package org.example.grab.domain.wish.service;
 
 import lombok.extern.slf4j.Slf4j;
+import org.example.grab.domain.drop.event.DropCanceledEvent;
 import org.example.grab.domain.drop.event.DropGrabStartedEvent;
 import org.example.grab.domain.drop.event.DropSaleStartingSoonEvent;
 import org.example.grab.domain.mail.dto.EmailMessage;
@@ -18,8 +19,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * WISH한 DROP의 판매 시작이 임박하거나 시작되면 활성 WISH 사용자에게 메일을 보낸다(GR-69).
- * 두 알림은 문구만 다르고 수신자 조회·본문 작성·발송 경로를 공유한다.
+ * WISH한 DROP의 판매 시작이 임박하거나 시작되면, 또는 판매자가 취소하면 활성 WISH 사용자에게 메일을 보낸다(GR-69, GR-70).
+ * 세 알림은 문구(와 취소 알림만 링크 대상)만 다르고 수신자 조회·본문 작성·발송 경로를 공유한다.
  * 수신자 조회와 본문 작성은 WISH 도메인에 두고, 발송은 AsyncEmailDispatcher에만 맡긴다.
  * 덕분에 DROP·주문 서비스에 메일 구현이 들어가지 않고, SMTP 구현이 바뀌어도 호출하는 쪽은 그대로다.
  */
@@ -28,6 +29,8 @@ import java.util.List;
 public class WishSaleNoticeMailListener {
 
     private static final String DETAIL_PATH_FORMAT = "/drops/%d";
+    // 취소된 DROP은 상세로 보낼 수 없으므로(GR-70), 취소 알림은 목록으로 안내한다
+    private static final String LIST_PATH = "/drops";
 
     // 메시지당 BCC 수신자 상한. Gmail SMTP 기준 100명이고 Brevo 상한은 공개되지 않아 보수적으로 맞춘다
     private static final int MAX_BCC_PER_MAIL = 100;
@@ -86,24 +89,36 @@ public class WishSaleNoticeMailListener {
                 "판매 임박",
                 "WISH한 DROP의 판매가 " + DropSaleStartingSoonEvent.LEAD.toMinutes()
                         + "분 뒤 시작됩니다. 한정 수량이라 조기 품절될 수 있습니다.",
-                "상품 보러 가기"),
+                "상품 보러 가기",
+                false),
 
         STARTED(
                 "[GRAB] %s 판매가 시작됐습니다",
                 "판매 시작",
                 "WISH한 DROP의 판매가 방금 시작됐습니다. 한정 수량이라 조기 품절될 수 있습니다.",
-                "지금 구매하러 가기");
+                "지금 구매하러 가기",
+                false),
+
+        // 취소 사유(cancel_reason)는 판매자 자유 입력이라 수신자에게 그대로 노출하지 않는다(GR-70)
+        CANCELED(
+                "[GRAB] %s 판매가 취소됐습니다",
+                "판매 취소",
+                "WISH하신 DROP의 판매자가 판매 시작 전에 취소했습니다. 이 DROP은 다시 열리지 않습니다.",
+                "다른 DROP 보러 가기",
+                true);
 
         private final String subjectFormat;
         private final String badge;
         private final String lead;
         private final String cta;
+        private final boolean linkToListPage;
 
-        Notice(String subjectFormat, String badge, String lead, String cta) {
+        Notice(String subjectFormat, String badge, String lead, String cta, boolean linkToListPage) {
             this.subjectFormat = subjectFormat;
             this.badge = badge;
             this.lead = lead;
             this.cta = cta;
+            this.linkToListPage = linkToListPage;
         }
     }
 
@@ -130,6 +145,11 @@ public class WishSaleNoticeMailListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onDropGrabStarted(DropGrabStartedEvent event) {
         dispatch(event.dropIds(), Notice.STARTED);
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onDropCanceled(DropCanceledEvent event) {
+        dispatch(List.of(event.dropId()), Notice.CANCELED);
     }
 
     /*
@@ -182,7 +202,7 @@ public class WishSaleNoticeMailListener {
 
     private EmailMessage toMessage(WishMailRecipientProjection drop, List<String> bcc, Notice notice) {
         String dropName = drop.getDropName();
-        String link = webBaseUrl + DETAIL_PATH_FORMAT.formatted(drop.getDropId());
+        String link = webBaseUrl + (notice.linkToListPage ? LIST_PATH : DETAIL_PATH_FORMAT.formatted(drop.getDropId()));
         // DROP 이름은 판매자가 입력한 값이라 HTML 본문에 넣기 전에 이스케이프한다
         String htmlBody = HTML_TEMPLATE.formatted(
                 notice.badge, HtmlUtils.htmlEscape(dropName), notice.lead, link, notice.cta,

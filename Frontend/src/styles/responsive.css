@@ -212,6 +212,18 @@
     grid-template-columns: 1fr;
     padding: 20px;
   }
+  .drop-image-layout {
+    grid-template-columns: 1fr;
+  }
+  .drop-image-item {
+    grid-template-columns: 86px minmax(0, 1fr);
+  }
+  .drop-image-item img {
+    width: 86px;
+  }
+  .form-actions {
+    flex-wrap: wrap;
+  }
   .form-title-row {
     align-items: stretch;
     flex-direction: column;

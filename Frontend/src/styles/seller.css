@@ -589,3 +589,70 @@
   gap: 10px;
   margin-top: 4px;
 }
+.drop-image-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.drop-image-card {
+  grid-template-columns: 48px minmax(0, 1fr);
+}
+.form-image-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.drop-image-picker {
+  display: grid;
+  gap: 8px;
+}
+.drop-image-picker input {
+  max-width: 100%;
+}
+.drop-image-demo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.drop-image-demo input {
+  min-height: auto;
+}
+.drop-image-list {
+  display: grid;
+  gap: 14px;
+}
+.drop-image-item {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.drop-image-item img {
+  width: 110px;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.drop-image-fields {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.drop-image-fields label {
+  display: grid;
+  gap: 5px;
+}
+.drop-image-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.drop-image-actions .secondary-button {
+  min-height: 34px;
+  padding: 6px 10px;
+}

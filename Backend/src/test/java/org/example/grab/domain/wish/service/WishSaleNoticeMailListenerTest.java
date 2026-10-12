@@ -1,5 +1,6 @@
 package org.example.grab.domain.wish.service;
 
+import org.example.grab.domain.drop.event.DropCanceledEvent;
 import org.example.grab.domain.drop.event.DropGrabStartedEvent;
 import org.example.grab.domain.drop.event.DropSaleStartingSoonEvent;
 import org.example.grab.domain.mail.dto.EmailMessage;
@@ -97,6 +98,28 @@ class WishSaleNoticeMailListenerTest {
         assertThat(message.textBody()).contains("판매가 곧 시작됩니다", "상품 보러 가기");
         // 판매 시작 알림과 같은 레이아웃·링크를 쓴다
         assertThat(message.htmlBody()).contains("href=\"https://grab.example.com/drops/3\"");
+    }
+
+    @Test
+    @DisplayName("취소 이벤트는 취소 문구·목록 링크가 들어간 메일을 만들고 취소 사유는 넣지 않는다")
+    void buildsCanceledMessage() {
+        // given
+        when(wishRepository.findSaleStartMailRecipients(List.of(5L)))
+                .thenReturn(List.of(recipient(5L, "한정판 스니커즈", RECIPIENT)));
+
+        // when
+        listener.onDropCanceled(new DropCanceledEvent(5L));
+
+        // then
+        ArgumentCaptor<List<EmailMessage>> captor = ArgumentCaptor.captor();
+        verify(emailDispatcher).dispatchAll(captor.capture());
+        EmailMessage message = captor.getValue().get(0);
+        assertThat(message.subject()).isEqualTo("[GRAB] 한정판 스니커즈 판매가 취소됐습니다");
+        assertThat(message.htmlBody()).contains("판매 취소", "다시 열리지 않습니다");
+        // 상세 페이지가 더는 유효하지 않으므로 목록 링크를 쓴다
+        assertThat(message.htmlBody()).contains("href=\"https://grab.example.com/drops\"")
+                .doesNotContain("https://grab.example.com/drops/5");
+        assertThat(message.textBody()).contains("https://grab.example.com/drops");
     }
 
     @Test

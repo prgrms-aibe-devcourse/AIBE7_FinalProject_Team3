@@ -82,7 +82,11 @@ export default function MyPage({
             <p>{account.email}</p>
             <small>
               {account.provider} 계정 ·{' '}
-              {account.role === 'SELLER' ? '승인된 판매자' : '일반 회원'}
+              {account.role === 'ADMIN'
+                ? '운영자'
+                : account.role === 'SELLER'
+                  ? '승인된 판매자'
+                  : '일반 회원'}
             </small>
           </div>
           <button
@@ -141,7 +145,11 @@ export default function MyPage({
               ? 'LOCAL 계정의 비밀번호 변경과 프로필 이미지 관리는 API 연동 시 제공됩니다.'
               : '소셜 계정에는 비밀번호 변경이 제공되지 않습니다.'}
           </p>
-          {account.role === 'SELLER' ? (
+          {account.role === 'ADMIN' ? (
+            <Link className="secondary-button" to="/admin/seller-applications">
+              판매자 신청 심사 ↗
+            </Link>
+          ) : account.role === 'SELLER' ? (
             <Link className="secondary-button" to="/seller">
               판매자 작업 공간 ↗
             </Link>
@@ -241,13 +249,12 @@ export default function MyPage({
           <select
             value={account.role}
             onChange={(event) =>
-              switchAccount(
-                event.target.value === 'SELLER' ? 'SELLER' : 'MEMBER',
-              )
+              switchAccount(event.target.value as MockAccount['role'])
             }
           >
             <option value="MEMBER">일반 회원 예시</option>
             <option value="SELLER">승인 판매자 예시</option>
+            <option value="ADMIN">운영자 예시</option>
           </select>
         </label>
         <small>계정 유형 전환과 목록은 이 화면의 Mock 데모입니다.</small>
