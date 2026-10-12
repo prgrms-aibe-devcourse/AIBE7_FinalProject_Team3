@@ -10,6 +10,7 @@ import {
   newSellerApplication,
   reviewSellerApplication,
 } from './features/seller/mock/mockSellerApplications'
+import type { SellerDraft } from './features/seller/mock/mockSellerDrafts'
 import CheckoutPage from './pages/Checkout/CheckoutPage'
 import DropDetailPage from './pages/DropDetail/DropDetailPage'
 import DropListPage from './pages/DropList/DropListPage'
@@ -39,6 +40,9 @@ export default function App() {
   const { orders, buyerOrders, addOrder, updateBuyerOrder } = useOrders()
   const [sellerApplications, setSellerApplications] = useState(
     demoSellerApplications,
+  )
+  const [sellerDrafts, setSellerDrafts] = useState<Record<string, SellerDraft>>(
+    {},
   )
 
   const shared: SharedProps = {
@@ -154,7 +158,33 @@ export default function App() {
           />
           <Route
             path="/seller/drops/new"
-            element={<SellerDropFormPage notify={notify} />}
+            element={
+              <SellerDropFormPage
+                drafts={sellerDrafts}
+                onSave={(draft) =>
+                  setSellerDrafts((current) => ({
+                    ...current,
+                    [draft.id]: draft,
+                  }))
+                }
+                notify={notify}
+              />
+            }
+          />
+          <Route
+            path="/seller/drops/:dropId/edit"
+            element={
+              <SellerDropFormPage
+                drafts={sellerDrafts}
+                onSave={(draft) =>
+                  setSellerDrafts((current) => ({
+                    ...current,
+                    [draft.id]: draft,
+                  }))
+                }
+                notify={notify}
+              />
+            }
           />
           <Route
             path="/seller/drops/:dropId"

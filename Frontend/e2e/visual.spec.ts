@@ -36,6 +36,30 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
     await shot(page, 'my')
   })
 
+  test('seller-apply', async ({ page }) => {
+    await page.goto('/#/seller/apply')
+    await page.getByLabel('이메일').fill('grab@example.com')
+    await page.getByLabel('비밀번호').fill('password1234')
+    await page.getByRole('button', { name: '로그인', exact: true }).click()
+    await expect(page.getByRole('status')).toBeEmpty()
+    await shot(page, 'seller-apply')
+  })
+
+  test('admin-seller-applications', async ({ page }) => {
+    await page.goto('/#/admin/seller-applications')
+    await page.getByLabel('이메일').fill('grab@example.com')
+    await page.getByLabel('비밀번호').fill('password1234')
+    await page.getByLabel('LOCAL 결과 예시').selectOption('admin')
+    await page.getByRole('button', { name: '로그인', exact: true }).click()
+    await expect(page.getByRole('status')).toBeEmpty()
+    await shot(page, 'admin-seller-applications')
+  })
+
+  test('seller-drop-form', async ({ page }) => {
+    await page.goto('/#/seller/drops/new')
+    await shot(page, 'seller-drop-form')
+  })
+
   test('checkout', async ({ page }) => {
     await page.goto('/#/checkout/demo-pending')
     await page.getByLabel('이메일').fill('grab@example.com')

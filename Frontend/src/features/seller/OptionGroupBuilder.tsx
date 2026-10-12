@@ -1,21 +1,17 @@
-import { useMemo, useState } from 'react'
+import { useMemo, type Dispatch, type SetStateAction } from 'react'
 import { optionCombinations, selectionLabel } from '../drop/logic/option'
 import type { OptionGroup } from '../../types/drop'
+import type { DraftGroup } from './mock/mockSellerDrafts'
 
-type DraftGroup = OptionGroup & { rawValues: string }
-
-export default function OptionGroupBuilder() {
-  const [groups, setGroups] = useState<DraftGroup[]>([
-    {
-      id: 'group-1',
-      name: '소재',
-      rawValues: '코튼, 린넨',
-      values: [
-        { id: 'value-1', label: '코튼' },
-        { id: 'value-2', label: '린넨' },
-      ],
-    },
-  ])
+export default function OptionGroupBuilder({
+  groups,
+  setGroups,
+  values,
+}: {
+  groups: DraftGroup[]
+  setGroups: Dispatch<SetStateAction<DraftGroup[]>>
+  values: Record<string, string>
+}) {
   const parsedGroups = useMemo<OptionGroup[]>(
     () => groups.filter((group) => group.name.trim() && group.values.length),
     [groups],
@@ -129,15 +125,26 @@ export default function OptionGroupBuilder() {
               가격
               <input
                 required
+                name={`sku:${JSON.stringify(combination)}:price`}
                 type="number"
                 min="0"
                 step="100"
-                defaultValue="29000"
+                defaultValue={
+                  values[`sku:${JSON.stringify(combination)}:price`] ?? '29000'
+                }
               />
             </label>
             <label>
               재고
-              <input required type="number" min="0" defaultValue="10" />
+              <input
+                required
+                name={`sku:${JSON.stringify(combination)}:stock`}
+                type="number"
+                min="0"
+                defaultValue={
+                  values[`sku:${JSON.stringify(combination)}:stock`] ?? '10'
+                }
+              />
             </label>
           </div>
         ))}

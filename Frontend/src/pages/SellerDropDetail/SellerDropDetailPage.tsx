@@ -68,7 +68,10 @@ export default function SellerDropDetailPage() {
           </span>
           {drop.status === 'DRAFT' && (
             <>
-              <Link className="secondary-button" to="/seller/drops/new">
+              <Link
+                className="secondary-button"
+                to={`/seller/drops/${drop.id}/edit`}
+              >
                 수정
               </Link>
               <button className="primary-button" type="button">
