@@ -76,8 +76,11 @@ public class JwtProvider {
             throw new IllegalArgumentException("roles는 비어 있을 수 없습니다.");
         }
         // JWT의 iat·exp는 초 단위라, 돌려주는 만료 시각이 exp Claim과 같도록 초 미만을 버린다
-        Instant issuedAt = clock.instant().truncatedTo(ChronoUnit.SECONDS);
+        Instant now = clock.instant();
+        Instant issuedAt = now.truncatedTo(ChronoUnit.SECONDS);
         Instant expiresAt = issuedAt.plus(properties.ttl());
+        // 쿠키 Max-Age. 내린 iat 대신 실제 시각부터 재므로 ttl보다 최대 1초 짧고, 쿠키 Max-Age(초 단위)도 초 미만을 버려 exp를 넘지 않는다
+        Duration maxAge = Duration.between(now, expiresAt);
 
         String token = Jwts.builder()
                 .subject(publicId.toString()) // 사용자 식별 정보
@@ -93,7 +96,7 @@ public class JwtProvider {
                 // 생략하면 키 길이에 따라 HS384·HS512가 선택될 수 있으므로 검증과 같은 HS256을 명시한다
                 .signWith(key, Jwts.SIG.HS256) // 서명 생성
                 .compact();
-        return new IssuedAccessToken(token, expiresAt);
+        return new IssuedAccessToken(token, expiresAt, maxAge);
     }
 
     /*

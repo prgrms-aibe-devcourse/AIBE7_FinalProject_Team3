@@ -80,6 +80,18 @@ class JwtProviderTest {
     }
 
     @Test
+    @DisplayName("maxAge는 실제 발급 시각부터 exp까지 남은 시간이라 ttl보다 짧고 exp를 넘지 않는다")
+    // 쿠키 Max-Age로 쓴다(GR-34). 06:00:00.789 → 06:15:00이므로 14분 59.211초, 쿠키에는 초 미만을 버린 899초가 들어간다
+    void returnsMaxAgeUntilExpiration() {
+        // when
+        IssuedAccessToken issued = jwtProvider.issue(PUBLIC_ID, Set.of(AuthRole.USER));
+
+        // then
+        assertThat(issued.maxAge()).isEqualTo(Duration.ofMinutes(15).minusMillis(789));
+        assertThat(NOW.plus(issued.maxAge())).isEqualTo(issued.expiresAt());
+    }
+
+    @Test
     @DisplayName("jti는 발급할 때마다 다르다")
     void generatesDifferentJtiEachTime() {
         // when
