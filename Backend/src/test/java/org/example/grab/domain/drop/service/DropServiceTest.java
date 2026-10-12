@@ -1,5 +1,6 @@
 package org.example.grab.domain.drop.service;
 
+import org.example.grab.domain.drop.dto.PublicDropSort;
 import org.example.grab.domain.drop.dto.request.DropDraftRequest;
 import org.example.grab.domain.drop.dto.request.DropImageRequest;
 import org.example.grab.domain.drop.dto.request.OptionGroupRequest;
@@ -91,6 +92,25 @@ class DropServiceTest {
     void setUp() {
         dropService = new DropService(
                 dropRepository, dropImageRepository, categoryService, wishQueryService, imageStorage);
+    }
+
+    @Test
+    @DisplayName("인기 정렬과 맞지 않는 status는 저장소를 조회하지 않고 INVALID_REQUEST로 거부한다")
+    void findPublicDrops_rejectsMismatchedPopularitySort() {
+        // given
+        PublicDropSort wishSort = PublicDropSort.parse("wishCount,desc");
+        PublicDropSort grabSort = PublicDropSort.parse("soldQuantity,desc");
+
+        // when & then
+        assertThatThrownBy(() -> dropService.findPublicDrops(null, null, null, null, wishSort, 0, 20))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(CommonErrorCode.INVALID_REQUEST);
+        assertThatThrownBy(() -> dropService.findPublicDrops(DropStatus.WISH, null, null, null, grabSort, 0, 20))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(CommonErrorCode.INVALID_REQUEST);
+        verifyNoInteractions(dropRepository);
     }
 
     @Test

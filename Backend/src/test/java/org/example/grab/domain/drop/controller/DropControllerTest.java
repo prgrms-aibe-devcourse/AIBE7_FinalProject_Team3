@@ -1,5 +1,6 @@
 package org.example.grab.domain.drop.controller;
 
+import org.example.grab.domain.drop.dto.PublicDropSort;
 import org.example.grab.domain.drop.dto.response.PublicDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.PublicDropListResponse;
 import org.example.grab.domain.drop.dto.response.PublicDropStockResponse;
@@ -27,6 +28,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -109,6 +111,47 @@ class DropControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
         verifyNoInteractions(dropService);
+    }
+
+    @Test
+    @DisplayName("인기 정렬의 오름차순·status 생략·다른 상태 조합은 400 INVALID_REQUEST")
+    void rejectsInvalidPopularitySortCombination() throws Exception {
+        mockMvc.perform(get("/api/v1/drops").param("status", "WISH").param("sort", "wishCount,asc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        mockMvc.perform(get("/api/v1/drops").param("sort", "wishCount,desc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        mockMvc.perform(get("/api/v1/drops").param("status", "GRAB").param("sort", "wishCount,desc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        mockMvc.perform(get("/api/v1/drops").param("status", "WISH").param("sort", "soldQuantity,desc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        mockMvc.perform(get("/api/v1/drops").param("status", "ENDED").param("sort", "soldQuantity,desc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        verifyNoInteractions(dropService);
+    }
+
+    @Test
+    @DisplayName("지정된 상태와 함께 보낸 인기 정렬은 서비스로 넘긴다")
+    void passesPopularitySortToService() throws Exception {
+        // given
+        given(dropService.findPublicDrops(any(), any(), any(), any(), any(), eq(0), eq(8)))
+                .willReturn(new PageResponse<>(List.of(), 0, 8, 0, 0, false));
+
+        // when & then
+        mockMvc.perform(get("/api/v1/drops").param("status", "WISH")
+                        .param("sort", "wishCount,desc").param("size", "8"))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/drops").param("status", "GRAB")
+                        .param("sort", "soldQuantity,desc").param("size", "8"))
+                .andExpect(status().isOk());
+        verify(dropService).findPublicDrops(eq(DropStatus.WISH), any(), any(), any(),
+                eq(PublicDropSort.parse("wishCount,desc")), eq(0), eq(8));
+        verify(dropService).findPublicDrops(eq(DropStatus.GRAB), any(), any(), any(),
+                eq(PublicDropSort.parse("soldQuantity,desc")), eq(0), eq(8));
     }
 
     @Test

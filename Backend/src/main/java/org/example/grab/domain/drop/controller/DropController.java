@@ -30,6 +30,7 @@ public class DropController {
     /*
      * 공개 DROP 목록. page/size와 sort는 서비스 호출 전에 검증해 잘못된 요청이면 서비스를 부르지 않는다.
      * DRAFT·CANCELED는 공개 목록에 넣을 수 없으므로 컨트롤러에서 먼저 거부한다(서비스도 한 번 더 막는다).
+     * 인기 정렬/상태 조합도 같은 이유로 여기서 먼저 거부한다.
      */
     @Operation(summary = "공개 DROP 목록 조회",
             description = "WISH·GRAB·ENDED DROP을 상태·카테고리·상품명·품절 여부로 거른다. 정렬·조합 규칙은 DROP.md 1.2 참고")
@@ -51,6 +52,7 @@ public class DropController {
             throw new BusinessException(CommonErrorCode.INVALID_REQUEST);
         }
         PublicDropSort publicSort = PublicDropSort.parse(sort);
+        publicSort.requireCompatibleWith(status);
         return ApiResponse.success(dropService.findPublicDrops(
                 status, categoryId, keyword, soldOut, publicSort, page, size));
     }
