@@ -1295,6 +1295,122 @@ main {
   cursor: not-allowed;
   opacity: 0.5;
 }
+
+.buyer-intro {
+  margin: -22px 0 28px;
+  color: var(--muted);
+}
+.buyer-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(290px, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.buyer-stack {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+}
+.buyer-panel {
+  padding: 26px;
+}
+.buyer-panel h2 {
+  margin: 0 0 18px;
+  font-size: 20px;
+}
+.buyer-note,
+.buyer-panel small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.buyer-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.buyer-fields label,
+.buyer-result-choice {
+  display: grid;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.buyer-fields label:nth-child(n + 4) {
+  grid-column: 1 / -1;
+}
+.buyer-fields input,
+.buyer-result-choice select {
+  min-width: 0;
+  min-height: 44px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+.buyer-item {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+}
+.buyer-item img {
+  width: 78px;
+  height: 78px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+.buyer-item p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.buyer-item strong {
+  font-size: 13px;
+}
+.buyer-amounts {
+  display: grid;
+  gap: 14px;
+  margin: 0 0 20px;
+}
+.buyer-amounts div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+.buyer-amounts dt {
+  color: var(--muted);
+}
+.buyer-amounts dd {
+  margin: 0;
+  font-weight: 700;
+}
+.buyer-amounts .buyer-total {
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  font-weight: 800;
+}
+.buyer-amounts .buyer-total dt {
+  color: var(--ink);
+}
+.buyer-deadline {
+  padding: 12px;
+  background: var(--soft);
+  font-size: 12px;
+}
+.buyer-result-choice {
+  margin: 18px 0;
+}
+.buyer-summary .primary-button {
+  margin-bottom: 12px;
+}
+.buyer-result {
+  margin-top: 24px;
+}
+.buyer-result p {
+  margin: 0 0 18px;
+  line-height: 1.6;
+}
 .auth-form h2 {
   margin: 0 0 12px;
   font-size: 30px;
@@ -2092,6 +2208,9 @@ footer small {
   .auth-page {
     grid-template-columns: 1fr;
   }
+  .buyer-layout {
+    grid-template-columns: 1fr;
+  }
   .order-panel {
     grid-row: 1;
   }
@@ -2224,6 +2343,16 @@ footer small {
   }
   .compact-item {
     grid-template-columns: 56px 1fr;
+  }
+  .buyer-panel {
+    padding: 20px;
+  }
+  .buyer-fields,
+  .buyer-item {
+    grid-template-columns: 1fr;
+  }
+  .buyer-item strong {
+    justify-self: start;
   }
   .account-panel {
     padding: 20px;

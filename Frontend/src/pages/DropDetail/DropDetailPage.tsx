@@ -53,15 +53,16 @@ export default function DropDetailPage({
       navigate('/login', { state: { from: location.pathname } })
       return
     }
+    const id = generateOrderId()
     addOrder({
-      id: generateOrderId(),
+      id,
       drop,
       optionLabel,
       quantity,
       total: selectedSku.price * quantity + drop.shippingFee,
     })
-    notify('데모 주문을 MY에 담았어요. 실제 주문·결제는 진행되지 않습니다.')
-    navigate('/my')
+    notify('Mock 주문을 만들었어요. 배송지와 결제 결과를 확인해주세요.')
+    navigate(`/checkout/${id}`)
   }
 
   return (

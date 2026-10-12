@@ -117,6 +117,19 @@ test('MY: 가로 넘침 없이 핵심 버튼에 닿는다', async ({ page }) => 
   await expectNoHorizontalOverflow(page)
 })
 
+test('결제: 가로 넘침 없이 배송지와 결제 버튼에 닿는다', async ({ page }) => {
+  await page.goto('/#/checkout/demo-pending')
+  await page.getByLabel('이메일').fill('grab@example.com')
+  await page.getByLabel('비밀번호').fill('password1234')
+  await page.getByRole('button', { name: '로그인', exact: true }).click()
+  await expectReachable(page, page.getByLabel('받는 분'))
+  await expectReachable(
+    page,
+    page.getByRole('button', { name: 'Mock 결제 결과 보기' }),
+  )
+  await expectNoHorizontalOverflow(page)
+})
+
 // 입력란별 outline 재정의가 전역 :focus-visible 표시를 가리지 않는다
 test('키보드 포커스가 입력란에 보인다', async ({ page }) => {
   const expectFocusRing = async (focus: Locator, ring: Locator = focus) => {
@@ -138,6 +151,12 @@ test('키보드 포커스가 입력란에 보인다', async ({ page }) => {
 
   await page.goto('/#/signup')
   await expectFocusRing(page.getByLabel('이메일 주소'))
+
+  await page.goto('/#/checkout/demo-pending')
+  await page.getByLabel('이메일').fill('grab@example.com')
+  await page.getByLabel('비밀번호').fill('password1234')
+  await page.getByRole('button', { name: '로그인', exact: true }).click()
+  await expectFocusRing(page.getByLabel('받는 분'))
 
   await page.goto('/#/seller/drops/new')
   await expectFocusRing(page.getByLabel('상품명'))

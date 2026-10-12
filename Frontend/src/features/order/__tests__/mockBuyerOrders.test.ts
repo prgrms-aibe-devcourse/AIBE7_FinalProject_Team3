@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { canCancel, canPay, demoBuyerOrders } from '../mockBuyerOrders'
+import {
+  canCancel,
+  canPay,
+  demoBuyerOrders,
+  withPaymentExample,
+} from '../mockBuyerOrders'
 
 const scenario = (id: string) =>
   demoBuyerOrders.find((order) => order.id === id)!
@@ -26,5 +31,24 @@ describe('구매자 주문 Mock 상태', () => {
     expect(canCancel(scenario('demo-delivered'))).toBe(false)
     expect(canCancel(scenario('demo-canceled'))).toBe(false)
     expect(canCancel(scenario('demo-expired'))).toBe(false)
+  })
+
+  it('데모 결제 성공만 주문을 PAID로 표시하고 결과 불명은 재결제를 막는다', () => {
+    const pending = scenario('demo-pending')
+    const paid = withPaymentExample(
+      pending,
+      'SUCCEEDED',
+      pending.shippingAddress,
+    )
+    const unknown = withPaymentExample(
+      pending,
+      'UNKNOWN',
+      pending.shippingAddress,
+    )
+    expect(paid.status).toBe('PAID')
+    expect(paid.paymentExpiresAt).toBeNull()
+    expect(unknown.status).toBe('PAYMENT_PENDING')
+    expect(unknown.reconciliationStatus).toBe('REQUIRED')
+    expect(canPay(unknown)).toBe(false)
   })
 })

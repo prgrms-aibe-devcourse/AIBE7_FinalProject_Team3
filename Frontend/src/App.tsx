@@ -5,6 +5,7 @@ import Header from './components/Header/Header'
 import useAuth from './features/auth/useAuth'
 import useOrders from './features/order/useOrders'
 import useWish from './features/wish/useWish'
+import CheckoutPage from './pages/Checkout/CheckoutPage'
 import DropDetailPage from './pages/DropDetail/DropDetailPage'
 import DropListPage from './pages/DropList/DropListPage'
 import HomePage from './pages/Home/HomePage'
@@ -27,7 +28,7 @@ export default function App() {
   }
   const { account, authenticated, login, logout } = useAuth()
   const { wishes, toggleWish } = useWish(authenticated, notify)
-  const { orders, addOrder } = useOrders()
+  const { orders, buyerOrders, addOrder, updateBuyerOrder } = useOrders()
 
   const shared: SharedProps = {
     authenticated,
@@ -55,6 +56,17 @@ export default function App() {
           <Route
             path="/drops/:dropId"
             element={<DropDetailPage {...shared} />}
+          />
+          <Route
+            path="/checkout/:orderId"
+            element={
+              <CheckoutPage
+                authenticated={authenticated}
+                buyerOrders={buyerOrders}
+                updateBuyerOrder={updateBuyerOrder}
+                notify={notify}
+              />
+            }
           />
           <Route
             path="/my"

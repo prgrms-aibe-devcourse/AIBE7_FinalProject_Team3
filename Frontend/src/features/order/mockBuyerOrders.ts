@@ -215,3 +215,23 @@ export function canCancel(order: BuyerOrder) {
     order.refundStatus !== 'UNKNOWN'
   )
 }
+
+export type PaymentDemoResult =
+  'SUCCEEDED' | 'FAILED' | 'PENDING' | 'UNKNOWN' | 'REQUIRED'
+
+export function withPaymentExample(
+  order: BuyerOrder,
+  result: PaymentDemoResult,
+  shippingAddress: BuyerOrder['shippingAddress'],
+): BuyerOrder {
+  if (!canPay(order)) return order
+  return {
+    ...order,
+    shippingAddress,
+    status: result === 'SUCCEEDED' ? 'PAID' : 'PAYMENT_PENDING',
+    paymentStatus: result === 'REQUIRED' ? 'SUCCEEDED' : result,
+    reconciliationStatus:
+      result === 'UNKNOWN' || result === 'REQUIRED' ? 'REQUIRED' : 'NONE',
+    paymentExpiresAt: result === 'SUCCEEDED' ? null : order.paymentExpiresAt,
+  }
+}
