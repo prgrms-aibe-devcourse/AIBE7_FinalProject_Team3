@@ -4,6 +4,30 @@ const card = (page: import('@playwright/test').Page, name: string) =>
   page.getByRole('article').filter({ hasText: name })
 
 test.describe('상품 탐색', () => {
+  test('상세 갤러리는 키보드로 전환하고 한 장·이미지 실패를 처리한다', async ({
+    page,
+  }) => {
+    await page.route('**/photo-1577937927133-66ef06acdf18*', (route) =>
+      route.abort(),
+    )
+    await page.goto('/#/drops/102')
+    const second = page.getByRole('button', { name: /2번 이미지:/ })
+    await expect(second).toBeVisible()
+    await second.focus()
+    await page.keyboard.press('Enter')
+    await expect(second).toHaveAttribute('aria-pressed', 'true')
+    await expect(
+      page.locator('.detail-media').getByRole('img', { name: /이미지 없음/ }),
+    ).toBeVisible()
+
+    await page.goto('/#/drops/101')
+    await expect(page.locator('.detail-thumbnails')).toHaveCount(0)
+    await expect(page.locator('.detail-media img')).toHaveAttribute(
+      'alt',
+      '매일을 담는 캔버스 토트 대표 이미지',
+    )
+  })
+
   test('WISH 목록에서 상세로 이동한다', async ({ page }) => {
     await page.goto('/#/wish')
     await page

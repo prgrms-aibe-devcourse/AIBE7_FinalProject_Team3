@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import logo from '../../assets/images/grab-symbol.png'
+import DropGallery from '../../features/drop/DropGallery'
 import { drops } from '../../features/drop/mock/mockDrops'
 import { findMatchingSku, selectionLabel } from '../../features/drop/option'
 import { minPrice, stock } from '../../features/drop/selectors'
@@ -63,12 +64,7 @@ export default function DropDetailPage({
         <span>{drop.category}</span>
       </div>
       <section className="detail-layout">
-        <div className="detail-media">
-          <img src={drop.image} alt={drop.name} />
-          <span className={`badge ${drop.status === 'WISH' ? 'lime' : ''}`}>
-            {drop.status}
-          </span>
-        </div>
+        <DropGallery key={drop.id} drop={drop} />
         <div className="detail-summary">
           <div className="detail-status">
             <b>
