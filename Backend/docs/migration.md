@@ -181,12 +181,7 @@ docker compose exec -T postgres psql -U grab -d grab -c "SELECT email, nickname,
 - `role`은 `USER`, `status`는 `ACTIVE`, `provider`는 `LOCAL`이다.
 - `hash_prefix`는 `$argon2id$v=19$m=19456,t=2,p=1$`이고, 원문 비밀번호는 어디에도 저장되지 않는다.
 
-시험 데이터와 쿠키 파일 정리:
-
-```powershell
-docker compose exec -T postgres psql -U grab -d grab -c "DELETE FROM users WHERE email LIKE 'signup-test%';"
-Remove-Item signup-cookie.txt
-```
+가입한 회원은 7절 로그인 확인에 그대로 쓴다. 시험 데이터 정리는 7.4에서 한다.
 
 ### 6.5 프론트엔드 CORS 설정
 
@@ -202,7 +197,74 @@ Compose는 값이 없거나 비어 있으면 `http://localhost:5173`을 사용�
 
 운영에서 프론트와 `/api`를 같은 출처로 서비스하면 CORS 허용 목록을 통한 교차 출처 접근이 필요 없다. 서브도메인 또는 다른 사이트로 분리하면 CSRF 쿠키 접근 범위와 `SameSite` 정책도 함께 검토해야 하므로 Origin 추가만으로 연동이 완료되지는 않는다.
 
-## 7. 종료 및 초기화
+## 7. 로그인 확인
+
+6절에서 가입한 회원(`signup-test@example.com` / `Password123!`)으로 LOCAL 로그인(MEMBER_AUTH 1.3)과 인증 쿠키, Refresh Token 저장을 확인한다. 6절과 같은 PowerShell 세션에서 `signup-cookie.txt`와 `$csrfToken`을 이어서 쓴다. 새 세션이면 6.1의 CSRF 쿠키 발급부터 다시 실행한다.
+
+### 7.1 로그인
+
+```powershell
+$login = 'http://localhost:8080/api/v1/auth/login'
+
+# 401 INVALID_CREDENTIALS: 틀린 비밀번호와 없는 이메일은 같은 응답이고 인증 쿠키가 발급되지 않는다
+'{"email":"signup-test@example.com","password":"Wrong123!"}' | curl.exe -s -w "`n%{http_code}`n" -b signup-cookie.txt $login `
+  -H "X-XSRF-TOKEN: $csrfToken" -H "Content-Type: application/json" --data-binary '@-'
+'{"email":"nobody@example.com","password":"Password123!"}' | curl.exe -s -w "`n%{http_code}`n" -b signup-cookie.txt $login `
+  -H "X-XSRF-TOKEN: $csrfToken" -H "Content-Type: application/json" --data-binary '@-'
+
+# 200: 이메일은 대소문자·앞뒤 공백을 정규화한다. 응답 data.user에 userId·email·nickname·roles, Set-Cookie로 두 인증 쿠키
+'{"email":" Signup-Test@Example.com ","password":"Password123!"}' | curl.exe -s -i -b signup-cookie.txt -c signup-cookie.txt $login `
+  -H "X-XSRF-TOKEN: $csrfToken" -H "Content-Type: application/json" --data-binary '@-'
+```
+
+200 응답의 `Set-Cookie`를 확인한다. 토큰은 응답 본문에 없다.
+
+| 쿠키 | 속성 |
+| --- | --- |
+| `access_token` | `Path=/api; Max-Age=899`(또는 900, JWT `exp`까지 남은 초); `Secure; HttpOnly; SameSite=Lax` |
+| `refresh_token` | `Path=/api/v1/auth; Max-Age=1209600`(14일); `Secure; HttpOnly; SameSite=Lax` |
+
+로그인은 `XSRF-TOKEN`을 새로 발급하지 않으므로 로그인 전에 받은 `$csrfToken`을 계속 쓴다. 쿠키 파일에는 인증 토큰이 저장되므로 공유하거나 커밋하지 않는다.
+
+### 7.2 보호 API 호출
+
+```powershell
+# 200: 쿠키 파일의 access_token(Path=/api)으로 인증된다
+curl.exe -s -w "`n%{http_code}`n" -b signup-cookie.txt http://localhost:8080/api/v1/users/me/wishes
+
+# 401 AUTHENTICATION_REQUIRED: 쿠키 없이 호출
+curl.exe -s -w "`n%{http_code}`n" http://localhost:8080/api/v1/users/me/wishes
+```
+
+### 7.3 Refresh Token 저장 확인
+
+```powershell
+# 키는 원문이 아니라 SHA-256 해시다. 로그인할 때마다 하나씩 생긴다
+docker compose exec -T redis redis-cli --scan --pattern 'auth:refresh-token:*'
+
+# 위에서 나온 키 하나의 TTL(초, 14일 = 1209600 이하)과 값(userId·sessionId·sessionExpiresAt = 로그인 시각 + 30일)
+$key = (docker compose exec -T redis redis-cli --scan --pattern 'auth:refresh-token:*' | Select-Object -First 1)
+docker compose exec -T redis redis-cli TTL $key
+docker compose exec -T redis redis-cli GET $key
+```
+
+비활성 계정은 비밀번호가 맞으면 403 `ACCOUNT_DISABLED`, 틀리면 401 `INVALID_CREDENTIALS`다. 확인하려면 상태를 바꾼 뒤 7.1의 200 요청을 다시 보낸다.
+
+```powershell
+docker compose exec -T postgres psql -U grab -d grab -c "UPDATE users SET status = 'SUSPENDED' WHERE email = 'signup-test@example.com';"
+```
+
+### 7.4 정리
+
+시험 데이터, Refresh Token, 쿠키 파일을 정리한다.
+
+```powershell
+docker compose exec -T postgres psql -U grab -d grab -c "DELETE FROM users WHERE email LIKE 'signup-test%';"
+docker compose exec -T redis redis-cli --scan --pattern 'auth:refresh-token:*' | ForEach-Object { docker compose exec -T redis redis-cli DEL $_ }
+Remove-Item signup-cookie.txt
+```
+
+## 8. 종료 및 초기화
 
 컨테이너 종료:
 

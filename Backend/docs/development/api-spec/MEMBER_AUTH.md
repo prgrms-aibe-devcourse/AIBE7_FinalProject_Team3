@@ -232,6 +232,7 @@ POST /api/v1/auth/login
 ```
 
 - **인증**: 불필요
+- **CSRF**: `X-XSRF-TOKEN` 헤더 필요
 
 **요청:**
 
@@ -244,7 +245,7 @@ POST /api/v1/auth/login
 
 요청 이메일은 1.2절과 동일한 규칙으로 정규화한 뒤 회원을 조회한다.
 
-**응답:**
+**응답:** `200 OK`
 
 ```http
 Set-Cookie: access_token=<jwt>; HttpOnly; Secure; SameSite=Lax; Path=/api; Max-Age=<access-ttl>
@@ -267,7 +268,29 @@ Access Token과 Refresh Token은 응답 본문에 포함하지 않는다. Access
 }
 ```
 
+- `roles`는 Access Token의 권한과 같은 값이다(COMMON 2.1). 활성 회원은 모두 `USER`를 가지며, `ADMIN`·승인된 판매자(`SELLER`)는 추가 권한으로 함께 담긴다.
+- 로그인은 `XSRF-TOKEN`을 새로 발급하지 않는다. 로그인 전에 받은 CSRF 토큰을 그대로 사용한다.
+
+**검증 규칙:**
+- `email`, `password`는 필수다. 필수값이 없으면 `VALIDATION_FAILED`로 거부하고, 없는 항목 전부를 `fieldErrors`로 반환한다.
+  - `email`: 키 누락, `null`, 빈 문자열, 앞뒤 공백 제거 후 빈 문자열인 경우
+  - `password`: 키 누락, `null`, 빈 문자열인 경우. 비밀번호는 trim하거나 가공하지 않는다.
+- 이메일 형식과 비밀번호 규칙(1.2.3)은 로그인에서 검사하지 않는다. 규칙이 바뀌어도 기존 회원이 로그인할 수 있어야 하며, 규칙에 맞지 않는 값은 일치하는 회원이 없어 `INVALID_CREDENTIALS`가 된다.
+- 요청 본문이 없거나 JSON 형식이 잘못되면 `INVALID_REQUEST`로 거부한다.
+
+**판정 순서:**
+1. 정규화한 이메일로 회원을 조회한다.
+2. 회원이 없거나 `LOCAL` 회원이 아니면(소셜 회원은 비밀번호가 없다) `INVALID_CREDENTIALS`로 거부한다.
+3. 비밀번호가 일치하지 않으면 계정 상태와 관계없이 `INVALID_CREDENTIALS`로 거부한다.
+4. 비밀번호가 일치해도 계정 상태가 `ACTIVE`가 아니면(`SUSPENDED`, `WITHDRAWN`) `ACCOUNT_DISABLED`로 거부한다.
+
+- 2·3의 응답은 같으며, 서버는 회원이 없는 경우에도 비밀번호 해시 검증을 수행해 응답 시간으로 계정 존재 여부가 드러나지 않게 한다.
+- 계정 상태는 비밀번호를 아는 사용자에게만 드러난다.
+- 실패 응답에는 인증 쿠키를 발급하지 않고 Refresh Token을 저장하지 않는다.
+
 **오류 코드:**
+- `INVALID_REQUEST`
+- `VALIDATION_FAILED`
 - `INVALID_CREDENTIALS`
 - `ACCOUNT_DISABLED`
 

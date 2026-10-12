@@ -13,7 +13,13 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 @TestConfiguration(proxyBeanMethods = false)
 public class TestcontainersConfiguration {
 
-    private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:18");
+    /*
+        Spring은 설정이 다른 테스트 컨텍스트를 닫지 않고 캐시하며, 컨텍스트마다 Hikari 풀이 연결 10개를 유휴 상태로도 유지한다.
+        클래스 전용 Redis 컨테이너(@DynamicPropertySource) 등으로 컨텍스트가 늘면 기본 max_connections(100)를 넘어
+        "too many clients already"로 기동에 실패하므로 한도를 올린다(GR-34). 테스트 전용 컨테이너라 운영 설정과 무관하다.
+     */
+    private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:18")
+            .withCommand("postgres", "-c", "max_connections=300");
 
     static {
         POSTGRES.start();
