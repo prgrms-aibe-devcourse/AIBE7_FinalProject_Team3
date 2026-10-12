@@ -10,6 +10,8 @@
 | 자동 테스트 | GreenMail | 테스트 중 메모리에서 실행하는 SMTP 서버 |
 | 시연·운영 (MVP) | Gmail SMTP | 팀 전용 Gmail 계정과 앱 비밀번호로 발송 |
 
+발송 경로는 치명도에 따라 둘로 나뉜다. **이메일 인증 코드**는 위 표의 서버로 보내고, **WISH 판매 알림(GR-69)** 은 별도 발송처를 쓴다([2.1절](#21-알림-전용-발송처)). 알림이 대량으로 나가도 인증 코드의 일일 한도를 먹지 않게 하기 위함이다.
+
 설정 파일은 `src/main/resources/application-mail.yml`이다. `application.yml`이 `spring.config.import`로 항상 불러오므로 `mail` 프로필을 따로 켜지 않는다.
 
 ## 2. 환경변수
@@ -24,11 +26,29 @@
 | `MAIL_STARTTLS` | `spring.mail.properties.mail.smtp.starttls.enable`, `.required` | `false` | STARTTLS 사용 및 강제 여부 |
 | `MAIL_FROM` | `grab.mail.from` | `no-reply@grab.local` | 메일에 표시되는 발신 주소 |
 | `GRAB_MAIL_PROVIDER` | `grab.mail.provider` | `smtp` | 발송 구현체 선택 |
+| `WEB_BASE_URL` | `grab.web.base-url` | `http://localhost:5173` | 메일 본문 링크가 가리키는 프런트엔드 주소 |
 
 - 기본값은 로컬 Mailpit 기준이다. 로컬에서는 환경변수를 설정하지 않아도 된다.
 - `MAIL_STARTTLS`는 `starttls.enable`과 `starttls.required`를 함께 바꾼다. 켜면 서버가 STARTTLS를 제공하지 않을 때 평문으로 로그인하지 않고 발송이 실패한다.
 - `grab.mail.provider`는 `EmailSender` 구현체를 고른다. 현재 구현은 `smtp`뿐이므로 모든 환경에서 기본값을 쓴다. 설정 파일에 고정값으로 두며, 바꿀 때는 `GRAB_MAIL_PROVIDER` 환경변수로 덮어쓴다. SES API처럼 다른 발송 방식을 추가하면 이 값으로 전환한다.
 - `MAIL_USERNAME`은 SMTP 로그인 계정이고 `MAIL_FROM`은 메일에 표시되는 주소다. 서버에 따라 두 값이 다를 수 있다(예: SES SMTP).
+
+### 2.1 알림 전용 발송처
+
+위 `MAIL_*`는 **이메일 인증 코드**가 쓴다. WISH 판매 알림(GR-69)은 아래 발송처를 따로 쓴다. 계정을 나누는 이유는 알림이 대량이라 인증 코드의 일일 한도를 먹으면 **회원가입이 막히기 때문**이다. 알림은 못 가도 서비스가 멈추지 않지만 인증 코드는 그렇지 않다.
+
+| 환경변수 | 기본값 | 설명 |
+| --- | --- | --- |
+| `BREVO_SMTP_HOST` | 빈 값 | 채울 값은 `smtp-relay.brevo.com` |
+| `BREVO_SMTP_PORT` | `587` | 빈 값으로 두면 숫자 바인딩이 실패해 기동되지 않는다 |
+| `BREVO_SMTP_USERNAME` / `BREVO_SMTP_PASSWORD` | 빈 값 | 대시보드 > SMTP & API > SMTP의 Login과 SMTP key |
+| `BREVO_MAIL_FROM` | 빈 값 | Brevo에 등록·검증한 발신 주소 |
+
+- **`BREVO_SMTP_HOST`가 비면 발송처가 등록되지 않는다.** 그러면 알림도 `MAIL_*` 설정(로컬에서는 Mailpit)으로 나가므로, 로컬 개발에는 아무것도 설정할 필요가 없다. 기동 로그에 어느 쪽을 쓰는지 남는다.
+- 설정은 `application-mail.yml`의 `grab.mail.notice`에 둔다. 발송처를 바꿀 때는 이 값만 갈아끼우면 되고, SMTP 발송 구현(`SmtpEmailSender`)은 그대로 쓴다.
+- **일일 한도(Brevo 무료 300통/일)는 코드로 세지 않는다.** 넘기면 Brevo가 재시도 큐에 넣었다가 다음 날 보내므로, 판매가 끝난 뒤 알림이 도착할 수 있다. 한도가 실제로 문제가 되면 발송처를 늘리는 쪽이 먼저다.
+- 알림은 수신자당 2통이다(판매 임박 + 판매 시작). 300통 기준 **하루 150명분**이다.
+- 발신 도메인을 인증하지 않으면 Brevo가 발신 주소를 자기 도메인(`@brevosend.com`)으로 바꿔 보낸다. 무료 이메일 도메인(`@gmail.com` 등)은 소유를 증명할 수 없어 인증 대상이 아니다.
 
 다음 값은 환경과 관계없이 고정한다.
 
@@ -135,8 +155,8 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8025/api/v1/send `
 
 | 타입 | 위치 | 용도 |
 | --- | --- | --- |
-| `AsyncEmailDispatcher` | `domain/mail/service` | 서비스 코드의 기본 발송 진입점. 메일 전용 스레드 풀에 넘기고 바로 반환한다 |
-| `EmailSender` | `domain/mail/service` | 메일 한 통을 동기로 보낸다. 실패하면 `EmailSendException`을 던진다 |
+| `AsyncEmailDispatcher` | `domain/mail/service` | 서비스 코드의 기본 발송 진입점. 메일 전용 스레드 풀에 넘기고 바로 반환한다(한 통은 `dispatch()`, 여러 통은 `dispatchAll()`) |
+| `EmailSender` | `domain/mail/service` | 메일을 동기로 보낸다(`send()` 한 통, `sendAll()` 여러 통). 실패하면 `EmailSendException`을 던진다 |
 | `EmailMessage` | `domain/mail/dto` | 받는 사람, 제목, HTML 본문, 텍스트 본문. 네 값 모두 필수다 |
 | `EmailSendException` | `domain/mail/error` | 발송 실패. `BusinessException`이 아니므로 HTTP 오류 응답으로 바꾸지 않는다 |
 
@@ -150,6 +170,26 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8025/api/v1/send `
 asyncEmailDispatcher.dispatch(new EmailMessage(email, subject, htmlBody, textBody));
 ~~~
 
+한 번의 알림으로 여러 사람에게 보낼 때는 `dispatchAll()`로 목록을 한 번에 넘긴다(GR-69 판매 시작 알림).
+
+~~~java
+asyncEmailDispatcher.dispatchAll(messages); // List<EmailMessage>
+~~~
+
+- 수신자 수만큼 `dispatch()`를 호출하면 대기열 용량(40)을 넘는 분량이 거부돼 그 수신자만 메일을 받지 못한다. `dispatchAll()`은 목록 전체를 한 작업으로 묶어 큐 슬롯을 하나만 쓴다.
+- 묶음 안의 한 통이 실패해도 나머지는 계속 발송하고, 실패가 있으면 마지막에 `EmailSendException`을 한 번 던진다(`EmailSender.sendAll()` 계약).
+- `dispatchAll()`은 `sendAll()`을 호출하므로 SMTP 연결을 한 번만 열어 목록 전체를 보낸다. 통마다 `dispatch()`를 부르면 접속·STARTTLS·인증을 수신자 수만큼 반복해, 연결 비용이 큰 서버에서는 그 반복이 전체 발송 시간의 대부분을 차지한다.
+- 본문이 같은 수신자가 여럿이면 `EmailMessage.toBcc()`로 한 통에 묶는다. 수신자는 BCC에 담겨 서로의 주소를 보지 못한다.
+- **받는 사람 칸에 실제 주소를 넣지 않는다.** SMTP는 To와 BCC를 모두 수신자로 쓰므로, 표시를 채우려고 발신 주소를 넣으면 그 주소도 수신자가 된다. 사본이 한 통 더 가고, 발송처의 일일 한도를 메일마다 1통씩 더 쓰며, BCC 100명 묶음이 실제로는 101명이 돼 메시지당 수신자 상한을 넘긴다. 구현체가 `undisclosed-recipients:;`(실제 주소가 없는 그룹 구문)로 표시만 채운다.
+
+~~~java
+asyncEmailDispatcher.dispatchAll(List.of(EmailMessage.toBcc(recipients, subject, htmlBody, textBody)));
+~~~
+
+- 묶으면 수신자당 `MAIL FROM`·`RCPT`·`DATA`·본문을 반복하는 대신 `RCPT` 한 번으로 끝난다. Brevo 실측 기준 통당 0.643초가 수신자당 0.134초가 됐다.
+- 메시지당 BCC 수신자 상한은 100명으로 보고 나눈다(Gmail SMTP 기준, Brevo 상한은 비공개). 호출하는 쪽이 나눠서 넘긴다.
+- BCC를 쓰면 **`mail.smtp.sendpartial=true`가 필요하다.** JavaMail 기본값(false)이면 주소 하나가 거부될 때 그 묶음의 수신자 전원에게 발송되지 않는다. 두 발송기 모두 켜 두었다.
+- BCC는 실패 단위가 묶음 크기만큼 커지고, 바운스 추적과 수신자별 링크 개인화가 어렵다. 개인화가 필요한 메일은 묶지 말고 통마다 만든다.
 - `EmailSender.send()`를 요청 처리 중에 직접 호출하지 않는다. SMTP가 느리면 요청 스레드가 타임아웃(최대 5초씩)만큼 붙잡힌다.
 - `EmailSender`는 발송 결과를 바로 알아야 하는 경우(관리 기능, 테스트 등)에만 쓴다.
 - 메일 전용 스레드 풀(`MailAsyncConfig.MAIL_TASK_EXECUTOR`)은 메일 발송에만 쓴다. 다른 비동기 작업은 기본 executor를 쓴다.
@@ -165,7 +205,7 @@ asyncEmailDispatcher.dispatch(new EmailMessage(email, subject, htmlBody, textBod
 | 상황 | `dispatch()` | `EmailSender.send()` |
 | --- | --- | --- |
 | 정상 발송 | 반환 후 메일 스레드에서 발송 | 발송 후 반환 |
-| 메일 풀 대기열 초과(실행 4·대기 40 초과) | 발송하지 않고 `WARN` 로그 | 해당 없음 |
+| 메일 풀 대기열 초과(실행 4·대기 40 초과) | 발송하지 않고 `WARN` 로그 (`dispatchAll()`은 묶음 전체를 버리고 건수만 남긴다) | 해당 없음 |
 | SMTP 연결·인증·응답 실패, 타임아웃(각 5초) | 예외를 던지지 않고 `WARN` 로그 | `EmailSendException` |
 | 그 밖의 예상하지 못한 오류 | 예외를 던지지 않고 `ERROR` 로그 | 예외 그대로 |
 
@@ -181,6 +221,8 @@ asyncEmailDispatcher.dispatch(new EmailMessage(email, subject, htmlBody, textBod
 - HTML 본문과 텍스트 본문을 모두 채운다. HTML을 표시하지 못하는 메일 프로그램은 텍스트 본문을 보여 준다.
 - 본문 작성(템플릿)은 호출하는 쪽에서 한다. 발송 구현체는 완성된 메일 한 통을 보내기만 한다.
 - 받는 주소는 정규화한 이메일(앞뒤 공백 제거, 소문자)을 쓴다.
+- 본문에 넣는 사용자 입력값(DROP 이름 등)은 `HtmlUtils.htmlEscape`로 이스케이프한다. 텍스트 본문은 마크업으로 해석되지 않으므로 원문을 쓴다.
+- 본문 링크는 `grab.web.base-url`에 경로를 붙여 만든다. 메일 클라이언트는 외부 CSS·웹폰트를 불러오지 않고 flex·grid 지원도 고르지 않으므로, 레이아웃은 `<table>`로 짜고 스타일은 인라인으로 둔다. 예시는 `WishSaleNoticeMailListener`에 있다.
 
 ### 6.5 설정과 기동
 

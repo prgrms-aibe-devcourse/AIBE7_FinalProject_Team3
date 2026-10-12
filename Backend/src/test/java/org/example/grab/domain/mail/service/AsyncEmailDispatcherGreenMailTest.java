@@ -3,6 +3,7 @@ package org.example.grab.domain.mail.service;
 import com.icegreen.greenmail.junit5.GreenMailExtension;
 import com.icegreen.greenmail.util.ServerSetupTest;
 import org.example.grab.domain.mail.config.MailAsyncConfig;
+import org.example.grab.domain.mail.config.NoticeMailConfig;
 import org.example.grab.domain.mail.dto.EmailMessage;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,9 +18,12 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.List;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.Mockito.mock;
 
 /*
     실제 메일 전용 스레드 풀(MailAsyncConfig)과 SMTP 구현체로 비동기 발송을 확인한다.
@@ -43,7 +47,7 @@ class AsyncEmailDispatcherGreenMailTest {
             // given
             AsyncEmailDispatcher dispatcher = context.getBean(AsyncEmailDispatcher.class);
             ThreadPoolTaskExecutor mailExecutor =
-                    context.getBean(MailAsyncConfig.MAIL_TASK_EXECUTOR, ThreadPoolTaskExecutor.class);
+                    context.getBean(MailAsyncConfig.AUTH_MAIL_TASK_EXECUTOR, ThreadPoolTaskExecutor.class);
 
             // when
             dispatcher.dispatch(MESSAGE);
@@ -74,6 +78,30 @@ class AsyncEmailDispatcherGreenMailTest {
         });
     }
 
+    @Test
+    @DisplayName("수신자가 메일 큐 용량을 넘어도 묶음 발송은 한 통도 누락하지 않는다")
+    // 통당 작업으로 넘기면 큐 용량(40)을 넘는 분량이 거부돼 조용히 사라지므로(GR-69) 전부 도착하는지 확인하는 테스트
+    void deliversBatchLargerThanQueueCapacity() {
+        contextRunner().run(context -> {
+            // given: 큐 용량보다 많은 수신자
+            AsyncEmailDispatcher dispatcher = context.getBean(AsyncEmailDispatcher.class);
+            List<EmailMessage> messages = IntStream.range(0, 50)
+                    .mapToObj(index -> new EmailMessage(
+                            "buyer" + index + "@example.com",
+                            "[GRAB] 한정판 스니커즈 판매가 시작됐습니다",
+                            "<p>판매 시작</p>",
+                            "판매 시작"))
+                    .toList();
+
+            // when
+            dispatcher.dispatchAll(messages);
+
+            // then
+            assertThat(greenMail.waitForIncomingEmail(Duration.ofSeconds(30).toMillis(), messages.size())).isTrue();
+            assertThat(greenMail.getReceivedMessages()).hasSize(messages.size());
+        });
+    }
+
     private static long awaitCompletedTasks(ThreadPoolTaskExecutor executor, long expected) throws InterruptedException {
         long deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos();
         while (executor.getThreadPoolExecutor().getCompletedTaskCount() < expected && System.nanoTime() < deadline) {
@@ -100,7 +128,9 @@ class AsyncEmailDispatcherGreenMailTest {
     private static ApplicationContextRunner contextRunner() {
         return new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(MailSenderAutoConfiguration.class))
-                .withUserConfiguration(MailAsyncConfig.class, SmtpEmailSender.class, AsyncEmailDispatcher.class)
+                // 알림 발송처(grab.mail.notice.providers)를 설정하지 않아 라우터는 비고, 발송은 기본 SMTP 발송기로 나간다
+                .withUserConfiguration(MailAsyncConfig.class, NoticeMailConfig.class,
+                        SmtpEmailSender.class, AsyncEmailDispatcher.class)
                 .withPropertyValues(
                         "spring.mail.host=127.0.0.1",
                         "spring.mail.port=" + greenMail.getSmtp().getPort(),

@@ -5,6 +5,7 @@ import com.icegreen.greenmail.junit5.GreenMailExtension;
 import com.icegreen.greenmail.util.ServerSetupTest;
 import jakarta.mail.AuthenticationFailedException;
 import org.example.grab.domain.mail.config.MailAsyncConfig;
+import org.example.grab.domain.mail.config.NoticeMailConfig;
 import org.example.grab.domain.mail.dto.EmailMessage;
 import org.example.grab.domain.mail.error.EmailSendException;
 import org.junit.jupiter.api.DisplayName;
@@ -23,6 +24,7 @@ import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
+import static org.mockito.Mockito.mock;
 
 /*
     SMTP 서버가 응답을 돌려주는 실패(인증 실패)에서 예외·로그에 SMTP 비밀번호와 메일 내용이 남지 않는지 확인한다(NFR-011).
@@ -102,7 +104,9 @@ class MailSensitiveDataGreenMailTest {
     private static ApplicationContextRunner contextRunner(String password) {
         return new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(MailSenderAutoConfiguration.class))
-                .withUserConfiguration(MailAsyncConfig.class, SmtpEmailSender.class, AsyncEmailDispatcher.class)
+                // 알림 발송처를 설정하지 않아 라우터는 비고, 발송은 기본 SMTP 발송기로 나간다
+                .withUserConfiguration(MailAsyncConfig.class, NoticeMailConfig.class,
+                        SmtpEmailSender.class, AsyncEmailDispatcher.class)
                 .withPropertyValues(
                         "spring.mail.host=127.0.0.1",
                         "spring.mail.port=" + greenMail.getSmtp().getPort(),

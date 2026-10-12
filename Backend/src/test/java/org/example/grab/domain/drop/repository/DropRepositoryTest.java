@@ -65,6 +65,8 @@ class DropRepositoryTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    private static final String PRESALE = "PRESALE_10M";
+
     private Long sellerId;
     private Long categoryId;
     private Long buyerId;
@@ -334,12 +336,12 @@ class DropRepositoryTest {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
         // when
-        int updated = dropRepository.startGrabBatch(now, 500);
+        List<Long> startedIds = dropRepository.startGrabBatch(now, 500);
         entityManager.flush();
         entityManager.clear();
 
         // then
-        assertThat(updated).isEqualTo(1);
+        assertThat(startedIds).containsExactly(started);
         Map<String, Object> row = dropRow(started);
         assertThat(row.get("status")).isEqualTo("GRAB");
         assertThat(row.get("grab_started_at")).isNotNull();
@@ -350,19 +352,19 @@ class DropRepositoryTest {
     }
 
     @Test
-    @DisplayName("같은 시작 배치를 두 번 실행하면 두 번째 반환 건수는 0이다")
+    @DisplayName("같은 시작 배치를 두 번 실행하면 두 번째는 전환 대상이 없다")
     void startGrabBatchIsIdempotent() {
         // given
         insertDrop(DropStatus.WISH, -1, 1);
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
         // when
-        int first = dropRepository.startGrabBatch(now, 500);
-        int second = dropRepository.startGrabBatch(now, 500);
+        List<Long> first = dropRepository.startGrabBatch(now, 500);
+        List<Long> second = dropRepository.startGrabBatch(now, 500);
 
         // then
-        assertThat(first).isEqualTo(1);
-        assertThat(second).isZero();
+        assertThat(first).hasSize(1);
+        assertThat(second).isEmpty();
     }
 
     @Test
@@ -375,12 +377,12 @@ class DropRepositoryTest {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
         // when
-        int updated = dropRepository.startGrabBatch(now, 2);
+        List<Long> startedIds = dropRepository.startGrabBatch(now, 2);
         entityManager.flush();
         entityManager.clear();
 
         // then
-        assertThat(updated).isEqualTo(2);
+        assertThat(startedIds).containsExactly(first, second);
         assertThat(dropRow(first).get("status")).isEqualTo("GRAB");
         assertThat(dropRow(second).get("status")).isEqualTo("GRAB");
         assertThat(dropRow(third).get("status")).isEqualTo("WISH");
@@ -424,6 +426,96 @@ class DropRepositoryTest {
         // then
         assertThat(first).isEqualTo(1);
         assertThat(second).isZero();
+    }
+
+    @Test
+    @DisplayName("임박 알림 배치가 아직 시작하지 않고 10분 안에 시작하는 WISH만 선점한다")
+    void claimNoticeBatchSelectsDropsStartingWithinLead() {
+        // given
+        Long startsSoon = insertDropStartingInMinutes(5);
+        Long startsLater = insertDropStartingInMinutes(30);
+        Long alreadyStarted = insertDrop(DropStatus.WISH, -1, 1);
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+        // when
+        List<Long> claimed = dropRepository.claimNoticeBatch(PRESALE, now, now.plusMinutes(10), 500);
+
+        // then
+        assertThat(claimed).containsExactly(startsSoon);
+        assertThat(noticeCount(startsSoon)).isEqualTo(1);
+        assertThat(noticeCount(startsLater)).isZero();
+        assertThat(noticeCount(alreadyStarted)).isZero();
+    }
+
+    @Test
+    @DisplayName("같은 임박 알림 배치를 두 번 실행하면 두 번째는 선점 대상이 없고 기록도 늘지 않는다")
+    // 상태가 바뀌지 않는 알림이라 유니크 제약만이 중복 발송을 막는다(GR-69). 그 보증을 확인하는 테스트
+    void claimNoticeBatchIsIdempotent() {
+        // given
+        Long startsSoon = insertDropStartingInMinutes(5);
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+        // when
+        List<Long> first = dropRepository.claimNoticeBatch(PRESALE, now, now.plusMinutes(10), 500);
+        List<Long> second = dropRepository.claimNoticeBatch(PRESALE, now, now.plusMinutes(10), 500);
+
+        // then
+        assertThat(first).containsExactly(startsSoon);
+        assertThat(second).isEmpty();
+        assertThat(noticeCount(startsSoon)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("임박 알림 배치가 batchSize만큼만 선점하고 시작이 빠른 순으로 집는다")
+    void claimNoticeBatchLimitsBatchSize() {
+        // given
+        Long first = insertDropStartingInMinutes(1);
+        Long second = insertDropStartingInMinutes(2);
+        insertDropStartingInMinutes(3);
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+        // when
+        List<Long> claimed = dropRepository.claimNoticeBatch(PRESALE, now, now.plusMinutes(10), 2);
+
+        // then
+        assertThat(claimed).containsExactlyInAnyOrder(first, second);
+    }
+
+    @Test
+    @DisplayName("이미 선점된 DROP이 batchSize를 채워도 아직 선점되지 않은 DROP을 집는다")
+    /*
+     * LIMIT이 ON CONFLICT보다 먼저 적용되므로, 후보를 거르지 않으면 batchSize만큼의 기선점 DROP이
+     * 매 주기 앞자리를 차지해 그 뒤 DROP은 영영 선점되지 않는다. 배치 반복도 0건을 받고 멈춘다(GR-69).
+     */
+    void claimNoticeBatchSkipsAlreadyClaimedDrops() {
+        // given: 먼저 선점된 DROP 2건과, 그보다 늦게 시작하는 아직 선점되지 않은 DROP 1건
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        insertDropStartingInMinutes(1);
+        insertDropStartingInMinutes(2);
+        dropRepository.claimNoticeBatch(PRESALE, now, now.plusMinutes(10), 2);
+        Long notClaimed = insertDropStartingInMinutes(3);
+
+        // when: 앞의 2건이 batchSize를 채우는 크기로 다시 실행한다
+        List<Long> claimed = dropRepository.claimNoticeBatch(PRESALE, now, now.plusMinutes(10), 2);
+
+        // then: 기선점 DROP은 후보에서 빠지고 남은 DROP이 집힌다
+        assertThat(claimed).containsExactly(notClaimed);
+    }
+
+    private int noticeCount(Long dropId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM drop_notifications WHERE drop_id = ? AND type = ?",
+                Integer.class, dropId, PRESALE);
+    }
+
+    private Long insertDropStartingInMinutes(long minutes) {
+        return jdbcTemplate.queryForObject(
+                "INSERT INTO drops (seller_id, category_id, status, name, description, shipping_fee, shipping_notice,"
+                        + " sale_starts_at, sale_ends_at, published_at)"
+                        + " VALUES (?, ?, 'WISH', ?, '설명', 3000, '안내',"
+                        + " CURRENT_TIMESTAMP + (? || ' minutes')::interval,"
+                        + " CURRENT_TIMESTAMP + INTERVAL '3 hours', CURRENT_TIMESTAMP) RETURNING id",
+                Long.class, sellerId, categoryId, "임박-" + UUID.randomUUID(), minutes);
     }
 
     private Long insertDrop(DropStatus status, long startHoursFromNow, long endHoursFromNow) {
