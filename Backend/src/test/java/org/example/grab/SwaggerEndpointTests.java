@@ -39,6 +39,7 @@ class SwaggerEndpointTests {
             "order,/api/v1/orders",
             "payment,/api/v1/orders/{orderId}/payments",
             "user,/api/v1/auth/email-verification",
+            "user,/api/v1/auth/csrf",
             "wish,/api/v1/drops/{dropId}/wish"
     })
     void exposesDomainApiDocs(String group, String path) throws Exception {

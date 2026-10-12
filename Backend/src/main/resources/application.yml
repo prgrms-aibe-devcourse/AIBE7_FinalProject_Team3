@@ -109,7 +109,9 @@ springdoc:
     - group: payment
       packages-to-scan: org.example.grab.domain.payment
     - group: user
-      packages-to-scan: org.example.grab.domain.user
+      packages-to-scan:
+        - org.example.grab.domain.user
+        - org.example.grab.domain.auth
     - group: wish
       packages-to-scan: org.example.grab.domain.wish
 
