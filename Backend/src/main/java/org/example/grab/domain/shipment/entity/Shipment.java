@@ -2,6 +2,8 @@ package org.example.grab.domain.shipment.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -50,6 +52,14 @@ public class Shipment extends BaseEntity {
     @Column(name = "delivered_at")
     private OffsetDateTime deliveredAt;
 
+    // SHIPPED 이후 세부 배송 단계 Mock 진행(GR-86). 송장 등록 시점(COLLECTED)부터 시작한다.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "delivery_stage", nullable = false, length = 20)
+    private DeliveryStage deliveryStage;
+
+    @Column(name = "stage_updated_at", nullable = false)
+    private OffsetDateTime stageUpdatedAt;
+
     private Shipment(
             Order order, String carrierCode, String trackingNumber,
             String idempotencyKey, String requestHash, OffsetDateTime shippedAt) {
@@ -59,6 +69,8 @@ public class Shipment extends BaseEntity {
         this.idempotencyKey = Objects.requireNonNull(idempotencyKey);
         this.requestHash = Objects.requireNonNull(requestHash);
         this.shippedAt = Objects.requireNonNull(shippedAt);
+        this.deliveryStage = DeliveryStage.COLLECTED;
+        this.stageUpdatedAt = shippedAt;
     }
 
     public static Shipment register(
