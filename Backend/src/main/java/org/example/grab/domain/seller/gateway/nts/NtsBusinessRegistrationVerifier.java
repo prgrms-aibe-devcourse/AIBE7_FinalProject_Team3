@@ -7,6 +7,7 @@ import org.springframework.http.MediaType;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.util.List;
 import java.util.Map;
@@ -50,8 +51,16 @@ public class NtsBusinessRegistrationVerifier implements BusinessRegistrationVeri
                     .body(NtsBusinessStatusResponse.class);
             return toStatus(response);
         } catch (RestClientException e) {
-            // 타임아웃·연결 실패·4xx/5xx·응답 해석 실패. 실패로 단정하지 않고 검증을 생략하게 UNAVAILABLE로 돌려준다.
-            log.warn("국세청 사업자등록 상태조회 실패: cause={}", e.getClass().getSimpleName());
+            // 타임아웃·연결 실패·4xx/5xx·응답 해석 실패. SELLER-005에 따라 원인과 무관하게 예외를 던지지 않고
+            // 검증을 생략하게 UNAVAILABLE로 돌려준다(신청자가 우리 쪽 설정 오류의 피해를 보면 안 됨).
+            // 다만 4xx(서비스키 오류 등 우리 쪽 설정 문제 가능성)는 조용히 묻히지 않도록 error로 남긴다.
+            if (e instanceof RestClientResponseException responseException
+                    && responseException.getStatusCode().is4xxClientError()) {
+                log.error("국세청 사업자등록 상태조회 4xx 응답. 서비스키·요청 형식을 확인해야 함: status={}",
+                        responseException.getStatusCode().value());
+            } else {
+                log.warn("국세청 사업자등록 상태조회 실패: cause={}", e.getClass().getSimpleName());
+            }
             return BusinessRegistrationStatus.UNAVAILABLE;
         }
     }

@@ -103,6 +103,16 @@ class NtsBusinessRegistrationVerifierTest {
     }
 
     @Test
+    @DisplayName("4xx 응답도 예외를 던지지 않고 UNAVAILABLE을 돌려준다(SELLER-005: 신청자가 설정 오류의 피해를 보면 안 됨)")
+    void returnsUnavailableOn4xxWithoutPropagating() {
+        NtsBusinessRegistrationVerifier verifier = new NtsBusinessRegistrationVerifier(builder, SERVICE_KEY);
+        server.expect(requestTo(STATUS_URI)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+
+        assertThat(verifier.verify(BRN)).isEqualTo(BusinessRegistrationStatus.UNAVAILABLE);
+        server.verify();
+    }
+
+    @Test
     @DisplayName("서비스키에 +가 있으면 공백이 아니라 %2B로 인코딩해 요청한다")
     void encodesPlusInServiceKey() {
         // given
