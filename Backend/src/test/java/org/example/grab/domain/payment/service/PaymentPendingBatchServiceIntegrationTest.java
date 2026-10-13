@@ -178,6 +178,26 @@ class PaymentPendingBatchServiceIntegrationTest {
     }
 
     @Test
+    @DisplayName("배치 시작 때는 결제 가능했어도 PG 조회 중 마감이 지나면 승인을 다시 요청하지 않는다")
+    void rechecksPayableRightBeforeReconfirm() {
+        // given: 배치 시작 시각(now)에는 마감 전이지만, PG 조회가 끝나는 사이 마감이 지난다
+        Order order = fixture.createOrder();
+        unknownPayment(order, now.minusMinutes(2));
+        given(paymentGateway.lookup("payment-" + order.getId())).willAnswer(invocation -> {
+            moveOrderDeadline(order, OffsetDateTime.now(ZoneOffset.UTC).minusSeconds(1));
+            return PaymentGatewayResult.awaitingConfirmation("IN_PROGRESS");
+        });
+
+        // when
+        batchService.cleanUpInProgress(now);
+
+        // then
+        verify(paymentGateway, never()).confirm(any());
+        assertThat(fixture.payments(order)).singleElement()
+                .satisfies(payment -> assertThat(payment.get("status")).isEqualTo("UNKNOWN"));
+    }
+
+    @Test
     @DisplayName("여러 인스턴스가 동시에 선점해도 같은 결제를 두 번 고르지 않는다")
     void concurrentClaimsAreDisjoint() throws Exception {
         // given

@@ -97,8 +97,8 @@ class PaymentPendingBatchServiceTest {
                     .willReturn(List.of(1L, 2L));
             PaymentPreparation.Resolve first = target(1L);
             PaymentPreparation.Resolve second = target(2L);
-            given(transactionService.findReconciliationTarget(1L, NOW)).willReturn(Optional.of(first));
-            given(transactionService.findReconciliationTarget(2L, NOW)).willReturn(Optional.of(second));
+            given(transactionService.findReconciliationTarget(1L)).willReturn(Optional.of(first));
+            given(transactionService.findReconciliationTarget(2L)).willReturn(Optional.of(second));
             given(paymentService.reconcile(first)).willReturn(payment(PaymentStatus.FAILED));
             given(paymentService.reconcile(second)).willReturn(payment(PaymentStatus.UNKNOWN));
 
@@ -116,8 +116,8 @@ class PaymentPendingBatchServiceTest {
             given(transactionService.claimInProgress(NOW, PaymentPendingBatchService.CLEANUP_BATCH_SIZE))
                     .willReturn(List.of(1L, 2L));
             PaymentPreparation.Resolve second = target(2L);
-            given(transactionService.findReconciliationTarget(1L, NOW)).willThrow(new RuntimeException("일시적 DB 오류"));
-            given(transactionService.findReconciliationTarget(2L, NOW)).willReturn(Optional.of(second));
+            given(transactionService.findReconciliationTarget(1L)).willThrow(new RuntimeException("일시적 DB 오류"));
+            given(transactionService.findReconciliationTarget(2L)).willReturn(Optional.of(second));
             given(paymentService.reconcile(second)).willReturn(payment(PaymentStatus.FAILED));
 
             // when
@@ -133,7 +133,7 @@ class PaymentPendingBatchServiceTest {
             // given
             given(transactionService.claimInProgress(NOW, PaymentPendingBatchService.CLEANUP_BATCH_SIZE))
                     .willReturn(List.of(1L));
-            given(transactionService.findReconciliationTarget(1L, NOW)).willReturn(Optional.empty());
+            given(transactionService.findReconciliationTarget(1L)).willReturn(Optional.empty());
 
             // when
             int settled = batchService.cleanUpInProgress(NOW);
@@ -155,7 +155,7 @@ class PaymentPendingBatchServiceTest {
 
             // then
             assertThat(settled).isZero();
-            then(transactionService).should(never()).findReconciliationTarget(any(), any());
+            then(transactionService).should(never()).findReconciliationTarget(any());
         }
     }
 
@@ -225,7 +225,7 @@ class PaymentPendingBatchServiceTest {
 
     private static PaymentPreparation.Resolve target(Long paymentId) {
         return new PaymentPreparation.Resolve(paymentId,
-                new PaymentConfirmCommand("payment-" + paymentId, "ORD-1", 33000, "server-key-" + paymentId), true);
+                new PaymentConfirmCommand("payment-" + paymentId, "ORD-1", 33000, "server-key-" + paymentId));
     }
 
     private static Payment payment(PaymentStatus status) {

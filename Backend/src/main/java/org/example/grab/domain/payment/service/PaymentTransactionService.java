@@ -81,10 +81,9 @@ public class PaymentTransactionService {
                 throw new BusinessException(CommonErrorCode.DUPLICATE_IDEMPOTENCY_KEY);
             }
             // 조회는 주문 상태·마감과 관계없이 한다. 마감 뒤에 승인된 결제도 보정 대상으로 드러나야 한다.
-            // 승인 재요청은 새로 청구하는 동작이므로 아직 결제할 수 있는 주문에만 허용한다.
+            // 승인 재요청은 아직 결제할 수 있는 주문에만 허용하며, 조회 뒤 재요청 직전에 판단한다(isPayable).
             if (payment.isInProgress() && isResolvable(payment, now)) {
-                return new PaymentPreparation.ResolveReplay(
-                        payment.getId(), confirmCommand(payment, order), order, order.isPayable(now));
+                return new PaymentPreparation.ResolveReplay(payment.getId(), confirmCommand(payment, order), order);
             }
             return new PaymentPreparation.Replay(payment, order);
         }
@@ -101,7 +100,7 @@ public class PaymentTransactionService {
                     .filter(payment -> isResolvable(payment, now))
                     .findFirst()
                     .map(payment -> (PaymentPreparation) new PaymentPreparation.Resolve(
-                            payment.getId(), confirmCommand(payment, order), true))
+                            payment.getId(), confirmCommand(payment, order)))
                     .orElseThrow(() -> new BusinessException(PaymentErrorCode.PAYMENT_ALREADY_PROCESSED));
         }
         if (paymentRepository.existsByProviderAndProviderPaymentId(PROVIDER, request.paymentKey())) {
@@ -205,18 +204,27 @@ public class PaymentTransactionService {
 
     /**
      * 선점한 결제를 정리하는 데 필요한 값을 읽는다. 잠그지 않는다. 그사이 다른 요청이 결과를 확정했으면 비어 있다.
-     * 승인 재요청 여부는 사용자 재전송(ResolveReplay)과 같은 PayableOrder.isPayable로 정한다.
      */
     @Transactional(readOnly = true)
-    public Optional<PaymentPreparation.Resolve> findReconciliationTarget(Long paymentId, OffsetDateTime now) {
+    public Optional<PaymentPreparation.Resolve> findReconciliationTarget(Long paymentId) {
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new IllegalStateException("결제 시도가 없습니다: " + paymentId));
         if (!payment.isInProgress()) {
             return Optional.empty();
         }
         PayableOrder order = orderPaymentService.findForPaymentReconciliation(payment.getOrderId());
-        return Optional.of(new PaymentPreparation.Resolve(
-                payment.getId(), confirmCommand(payment, order), order.isPayable(now)));
+        return Optional.of(new PaymentPreparation.Resolve(payment.getId(), confirmCommand(payment, order)));
+    }
+
+    /**
+     * 승인 재요청 직전에 결제의 주문이 아직 결제 가능한지 판단한다(PAYMENT_PENDING이고 마감 전). 잠그지 않는다.
+     * 판단 뒤 PG 승인 중에 마감이 지나도 결과 반영(applyResult)이 주문을 잠그고 다시 확인해 보정 대상으로 남긴다.
+     */
+    @Transactional(readOnly = true)
+    public boolean isPayable(Long paymentId, OffsetDateTime now) {
+        Long orderId = paymentRepository.findOrderIdById(paymentId)
+                .orElseThrow(() -> new IllegalStateException("결제 시도가 없습니다: " + paymentId));
+        return orderPaymentService.findForPaymentReconciliation(orderId).isPayable(now);
     }
 
     private void validatePayable(PayableOrder order, PaymentRequest request, OffsetDateTime now) {

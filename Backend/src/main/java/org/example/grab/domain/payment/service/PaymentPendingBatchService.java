@@ -76,7 +76,7 @@ public class PaymentPendingBatchService {
     // 실패한 결제는 updated_at이 선점 시각으로 바뀌어 있으므로 60초 뒤 다시 선점된다.
     private CleanupOutcome cleanUpOne(Long paymentId, OffsetDateTime now) {
         try {
-            Optional<PaymentPreparation.Resolve> target = transactionService.findReconciliationTarget(paymentId, now);
+            Optional<PaymentPreparation.Resolve> target = transactionService.findReconciliationTarget(paymentId);
             if (target.isEmpty()) {
                 // 선점한 뒤 사용자 요청 등이 먼저 결과를 확정했다.
                 return CleanupOutcome.SETTLED;

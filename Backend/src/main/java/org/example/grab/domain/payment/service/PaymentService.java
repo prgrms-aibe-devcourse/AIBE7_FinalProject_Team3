@@ -69,16 +69,15 @@ public class PaymentService {
             }
             if (preparation instanceof PaymentPreparation.ResolveReplay replay) {
                 // 정리해도 결과를 모르면 UNKNOWN을 그대로 돌려준다. 재전송이므로 409로 거부하지 않는다.
-                Payment payment = resolve(replay.paymentId(), replay.command(), replay.confirmable());
+                Payment payment = resolve(replay.paymentId(), replay.command());
                 return PaymentResponse.of(payment, replay.order());
             }
             if (preparation instanceof PaymentPreparation.Ready ready) {
                 Payment payment = confirm(ready.paymentId(), ready.command());
                 return PaymentResponse.of(payment, ready.order());
             }
-            // 새 결제 요청은 prepare에서 결제 가능한 주문임을 확인했으므로 confirmable이 true다.
             PaymentPreparation.Resolve resolve = (PaymentPreparation.Resolve) preparation;
-            resolve(resolve.paymentId(), resolve.command(), resolve.confirmable());
+            resolve(resolve.paymentId(), resolve.command());
         }
         throw new BusinessException(PaymentErrorCode.PAYMENT_ALREADY_PROCESSED);
     }
@@ -113,7 +112,7 @@ public class PaymentService {
      * 남기는 결제 이벤트의 경로만 RECONCILIATION으로 한다. 트랜잭션 밖에서 호출해야 한다.
      */
     Payment reconcile(PaymentPreparation.Resolve target) {
-        return resolve(target.paymentId(), target.command(), target.confirmable(), PaymentEventSource.RECONCILIATION);
+        return resolve(target.paymentId(), target.command(), PaymentEventSource.RECONCILIATION);
     }
 
     // 승인 결과가 불명이면 바로 조회해 확정을 시도한다. 조회로도 모르면 UNKNOWN으로 남긴다.
@@ -136,16 +135,17 @@ public class PaymentService {
         이전 결제를 조회로 정리한다. PG가 승인 요청을 받지 않은 상태라면(연결 실패, 승인 요청 전 서버 중단)
         조회만으로는 PG가 인증을 만료시킬 때까지 결과를 알 수 없으므로, 같은 서버 멱등 키로 승인을 다시 요청한다.
         먼저 보낸 승인이 PG에 닿았다면 PG는 같은 키의 최초 결과를 돌려주므로 중복 승인되지 않는다.
-        결제할 수 없는 주문(confirmable=false)은 승인을 다시 요청하지 않고 UNKNOWN으로 남긴다. PG가 인증을 만료시킨다.
+        승인 재요청은 새로 청구하는 동작이므로, 조회를 마친 직후 현재 시각과 최신 주문 상태로 결제 가능한지 다시 판단한다.
+        요청을 받은 시각이나 배치 시작 시각으로 미리 판단하면 조회·대기 중 마감이 지나도 승인을 요청해 보정 대상이 생긴다.
+        결제할 수 없는 주문은 승인을 다시 요청하지 않고 UNKNOWN으로 남긴다. PG가 인증을 만료시킨다.
      */
-    private Payment resolve(Long paymentId, PaymentConfirmCommand command, boolean confirmable) {
-        return resolve(paymentId, command, confirmable, PaymentEventSource.API);
+    private Payment resolve(Long paymentId, PaymentConfirmCommand command) {
+        return resolve(paymentId, command, PaymentEventSource.API);
     }
 
-    private Payment resolve(
-            Long paymentId, PaymentConfirmCommand command, boolean confirmable, PaymentEventSource source) {
+    private Payment resolve(Long paymentId, PaymentConfirmCommand command, PaymentEventSource source) {
         PaymentGatewayResult lookup = paymentGateway.lookup(command.paymentKey());
-        if (confirmable && lookup.awaitingConfirmation()) {
+        if (lookup.awaitingConfirmation() && transactionService.isPayable(paymentId, now())) {
             return confirm(paymentId, command, lookup, source);
         }
         return transactionService.applyResult(paymentId, null, null, lookup, now(), source);
