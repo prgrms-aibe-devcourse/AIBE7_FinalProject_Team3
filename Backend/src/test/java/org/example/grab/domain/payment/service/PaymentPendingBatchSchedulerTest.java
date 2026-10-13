@@ -19,36 +19,36 @@ import java.time.ZoneOffset;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
 
 @ExtendWith(MockitoExtension.class)
 class PaymentPendingBatchSchedulerTest {
 
     @Mock
-    private PaymentExpiryService paymentExpiryService;
+    private PaymentPendingBatchService paymentPendingBatchService;
 
     @InjectMocks
     private PaymentPendingBatchScheduler scheduler;
 
     @Test
-    @DisplayName("UTC 현재 시각을 만들어 만료 서비스에 전달한다")
-    void passesUtcNowToExpiry() {
+    @DisplayName("UTC 현재 시각을 만들어 결제 대기 배치에 전달한다")
+    void passesUtcNowToBatch() {
         // when
         scheduler.run();
 
         // then
         ArgumentCaptor<OffsetDateTime> captor = ArgumentCaptor.forClass(OffsetDateTime.class);
-        then(paymentExpiryService).should().expire(captor.capture());
+        then(paymentPendingBatchService).should().run(captor.capture());
         assertThat(captor.getValue().getOffset()).isEqualTo(ZoneOffset.UTC);
     }
 
     @Test
-    @DisplayName("만료 중 예외가 나도 밖으로 전파하지 않아 다음 실행이 이어진다")
+    @DisplayName("배치에서 예외가 나도 밖으로 전파하지 않아 다음 실행이 이어진다")
     void swallowsException() {
         // given
-        given(paymentExpiryService.expire(any())).willThrow(new RuntimeException("일시적 DB 오류"));
+        willThrow(new RuntimeException("일시적 오류")).given(paymentPendingBatchService).run(any());
 
         // when & then
         assertThatCode(scheduler::run).doesNotThrowAnyException();
@@ -77,8 +77,8 @@ class PaymentPendingBatchSchedulerTest {
     static class SchedulerTestConfig {
 
         @Bean
-        PaymentExpiryService paymentExpiryService() {
-            return mock(PaymentExpiryService.class);
+        PaymentPendingBatchService paymentPendingBatchService() {
+            return mock(PaymentPendingBatchService.class);
         }
     }
 }

@@ -10,13 +10,19 @@ export default function Header({ authenticated }: { authenticated: boolean }) {
       <Link className="header-brand" to="/" aria-label="GRAB 홈">
         <img className="header-wordmark" src={wordmark} alt="GRAB" />
       </Link>
-      <nav aria-label="주요 메뉴">
+      <nav
+        aria-label="주요 메뉴"
+        className={sellerMode ? 'seller-nav' : undefined}
+      >
         {sellerMode ? (
           <>
             <NavLink end to="/seller">
-              DROP STUDIO
+              종합
             </NavLink>
-            <NavLink to="/seller/orders">주문 관리</NavLink>
+            <NavLink to="/seller/drops">DROP 관리</NavLink>
+            <NavLink to="/seller/orders">주문·배송</NavLink>
+            <NavLink to="/seller/inventory">재고</NavLink>
+            <NavLink to="/seller/sales">실적</NavLink>
           </>
         ) : (
           <>

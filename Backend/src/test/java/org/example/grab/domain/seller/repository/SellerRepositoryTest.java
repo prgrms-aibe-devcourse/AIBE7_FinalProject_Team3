@@ -87,7 +87,7 @@ class SellerRepositoryTest {
     void persistsSellerEntityAsPending() {
         // given
         Long userId = insertUser();
-        Seller seller = Seller.apply(userId, "브랜드", "contact@example.com", null,
+        Seller seller = Seller.apply(userId, "브랜드", "contact@example.com", "1234567890", null,
                 OffsetDateTime.parse("2026-10-01T00:00:00Z"));
 
         // when
@@ -99,8 +99,53 @@ class SellerRepositoryTest {
         Seller found = entityManager.find(Seller.class, seller.getId());
         assertThat(found.getUuid()).isEqualTo(seller.getUuid());
         assertThat(found.getStatus()).isEqualTo(SellerStatus.PENDING);
+        assertThat(found.getBusinessRegistrationNumber()).isEqualTo("1234567890");
         assertThat(found.getCreatedAt()).isNotNull();
         assertThat(findApprovedId(publicIdOf(userId))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("회원당 신청은 하나뿐이라 findByUserId로 상태와 무관하게 조회된다")
+    void findsByUserIdRegardlessOfStatus() {
+        // given
+        Long userId = insertUser();
+        insertPendingSeller(userId);
+
+        // when, then
+        assertThat(sellerRepository.findByUserId(userId)).isPresent();
+        assertThat(sellerRepository.findByUserId(999_999L)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("사업자등록번호로 기존 신청을 찾을 수 있다")
+    void findsByBusinessRegistrationNumber() {
+        // given
+        Long userId = insertUser();
+        insertPendingSeller(userId);
+
+        // when, then
+        assertThat(sellerRepository.findByBusinessRegistrationNumber(businessRegistrationNumberOf(userId)))
+                .isPresent();
+        assertThat(sellerRepository.findByBusinessRegistrationNumber("9999999999")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("상태로 신청 목록을 페이지 조회할 수 있다")
+    void findsByStatusPaged() {
+        // given
+        Long reviewerId = insertUser();
+        Long pendingUserId = insertUser();
+        insertPendingSeller(pendingUserId);
+        Long approvedUserId = insertUser();
+        insertApprovedSeller(approvedUserId, reviewerId);
+
+        // when
+        var page = sellerRepository.findByStatus(SellerStatus.PENDING,
+                org.springframework.data.domain.PageRequest.of(0, 20));
+
+        // then
+        assertThat(page.getContent()).hasSize(1);
+        assertThat(page.getContent().get(0).getUserId()).isEqualTo(pendingUserId);
     }
 
     private Optional<Long> findApprovedId(UUID userPublicId) {
@@ -122,8 +167,14 @@ class SellerRepositoryTest {
 
     private void insertPendingSeller(Long userId) {
         jdbcTemplate.update(
-                "INSERT INTO sellers (user_id, brand_name, contact_email) VALUES (?, '브랜드', ?)",
-                userId, "contact-" + userId + "@example.com");
+                "INSERT INTO sellers (user_id, brand_name, contact_email, business_registration_number) "
+                        + "VALUES (?, '브랜드', ?, ?)",
+                userId, "contact-" + userId + "@example.com", businessRegistrationNumberOf(userId));
+    }
+
+    // 사용자별로 겹치지 않는 10자리 더미 사업자등록번호
+    private String businessRegistrationNumberOf(Long userId) {
+        return String.format("%010d", userId);
     }
 
     // ck_sellers_review: 심사가 끝난 상태는 reviewed_by·reviewed_at이 필요하다

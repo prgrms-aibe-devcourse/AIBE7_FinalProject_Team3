@@ -81,10 +81,9 @@ public class PaymentTransactionService {
                 throw new BusinessException(CommonErrorCode.DUPLICATE_IDEMPOTENCY_KEY);
             }
             // 조회는 주문 상태·마감과 관계없이 한다. 마감 뒤에 승인된 결제도 보정 대상으로 드러나야 한다.
-            // 승인 재요청은 새로 청구하는 동작이므로 아직 결제할 수 있는 주문에만 허용한다.
+            // 승인 재요청은 아직 결제할 수 있는 주문에만 허용하며, 조회 뒤 재요청 직전에 판단한다(isPayable).
             if (payment.isInProgress() && isResolvable(payment, now)) {
-                return new PaymentPreparation.ResolveReplay(
-                        payment.getId(), confirmCommand(payment, order), order, order.isPayable(now));
+                return new PaymentPreparation.ResolveReplay(payment.getId(), confirmCommand(payment, order), order);
             }
             return new PaymentPreparation.Replay(payment, order);
         }
@@ -148,6 +147,21 @@ public class PaymentTransactionService {
             PaymentGatewayResult lookupResult,
             OffsetDateTime now
     ) {
+        return applyResult(paymentId, priorLookup, confirmResult, lookupResult, now, PaymentEventSource.API);
+    }
+
+    /**
+     * 결과를 반영하고, 남기는 결제 이벤트의 경로를 지정한다. 진행 중 결제 정리 배치는 RECONCILIATION을 쓴다.
+     */
+    @Transactional
+    public Payment applyResult(
+            Long paymentId,
+            PaymentGatewayResult priorLookup,
+            PaymentGatewayResult confirmResult,
+            PaymentGatewayResult lookupResult,
+            OffsetDateTime now,
+            PaymentEventSource source
+    ) {
         Long orderId = paymentRepository.findOrderIdById(paymentId)
                 .orElseThrow(() -> new IllegalStateException("결제 시도가 없습니다: " + paymentId));
         PayableOrder order = orderPaymentService.lockForPaymentResult(orderId);
@@ -160,7 +174,7 @@ public class PaymentTransactionService {
         PaymentGatewayResult decisive = lookupResult != null ? lookupResult : confirmResult;
         PaymentEventResult processing = apply(payment, order, decisive, now);
         if (priorLookup != null) {
-            record(payment, "lookup:" + UUID.randomUUID(), PaymentEventType.LOOKUP, priorLookup,
+            record(payment, source, "lookup:" + UUID.randomUUID(), PaymentEventType.LOOKUP, priorLookup,
                     PaymentEventResult.RECONCILIATION_REQUIRED);
         }
         if (confirmResult != null) {
@@ -171,12 +185,46 @@ public class PaymentTransactionService {
             String confirmEventKey = paymentEventRepository.existsByPaymentIdAndEventKey(payment.getId(), CONFIRM_EVENT_KEY)
                     ? "confirm-retry:" + UUID.randomUUID()
                     : CONFIRM_EVENT_KEY;
-            record(payment, confirmEventKey, PaymentEventType.CONFIRM, confirmResult, confirmProcessing);
+            record(payment, source, confirmEventKey, PaymentEventType.CONFIRM, confirmResult, confirmProcessing);
         }
         if (lookupResult != null) {
-            record(payment, "lookup:" + UUID.randomUUID(), PaymentEventType.LOOKUP, lookupResult, processing);
+            record(payment, source, "lookup:" + UUID.randomUUID(), PaymentEventType.LOOKUP, lookupResult, processing);
         }
         return payment;
+    }
+
+    /**
+     * 진행 중 결제 정리 배치의 대상을 최대 limit건 선점한다(ERD.md 3.2). 대상은 updated_at이 STALE_PENDING_AFTER 이상 지난
+     * PENDING·UNKNOWN 결제다. 선점한 결제의 updated_at은 now가 되어, 결과가 그대로면 같은 시간이 지난 뒤 다시 대상이 된다.
+     */
+    @Transactional
+    public List<Long> claimInProgress(OffsetDateTime now, int limit) {
+        return paymentRepository.claimInProgressForReconciliation(now.minus(STALE_PENDING_AFTER), now, limit);
+    }
+
+    /**
+     * 선점한 결제를 정리하는 데 필요한 값을 읽는다. 잠그지 않는다. 그사이 다른 요청이 결과를 확정했으면 비어 있다.
+     */
+    @Transactional(readOnly = true)
+    public Optional<PaymentPreparation.Resolve> findReconciliationTarget(Long paymentId) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new IllegalStateException("결제 시도가 없습니다: " + paymentId));
+        if (!payment.isInProgress()) {
+            return Optional.empty();
+        }
+        PayableOrder order = orderPaymentService.findForPaymentReconciliation(payment.getOrderId());
+        return Optional.of(new PaymentPreparation.Resolve(payment.getId(), confirmCommand(payment, order)));
+    }
+
+    /**
+     * 승인 재요청 직전에 결제의 주문이 아직 결제 가능한지 판단한다(PAYMENT_PENDING이고 마감 전). 잠그지 않는다.
+     * 판단 뒤 PG 승인 중에 마감이 지나도 결과 반영(applyResult)이 주문을 잠그고 다시 확인해 보정 대상으로 남긴다.
+     */
+    @Transactional(readOnly = true)
+    public boolean isPayable(Long paymentId, OffsetDateTime now) {
+        Long orderId = paymentRepository.findOrderIdById(paymentId)
+                .orElseThrow(() -> new IllegalStateException("결제 시도가 없습니다: " + paymentId));
+        return orderPaymentService.findForPaymentReconciliation(orderId).isPayable(now);
     }
 
     private void validatePayable(PayableOrder order, PaymentRequest request, OffsetDateTime now) {
@@ -247,13 +295,14 @@ public class PaymentTransactionService {
     // 이벤트 키는 호출하는 쪽이 정한다. 조회는 매번 새 키를 쓰고, 승인은 applyResult가 기존 기록을 보고 키를 고른다.
     private void record(
             Payment payment,
+            PaymentEventSource source,
             String eventKey,
             PaymentEventType type,
             PaymentGatewayResult result,
             PaymentEventResult processing
     ) {
         paymentEventRepository.save(PaymentEvent.record(
-                payment.getId(), eventKey, type, PaymentEventSource.API, processing,
+                payment.getId(), eventKey, type, source, processing,
                 payload(result), result.approvedAt()));
     }
 

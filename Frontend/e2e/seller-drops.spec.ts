@@ -52,7 +52,10 @@ test('조회 실패·빈 결과를 구분하고 DRAFT 저장 후 목록에 표�
   await page.getByLabel('상품명').fill('새 Mock DROP')
   await page.getByRole('button', { name: '임시 저장' }).click()
   await page.getByRole('link', { name: '← DROP STUDIO' }).click()
-  await page.getByRole('link', { name: '전체 관리 ↗' }).click()
+  await page
+    .getByRole('navigation', { name: '주요 메뉴' })
+    .getByRole('link', { name: 'DROP 관리' })
+    .click()
   await page.getByRole('button', { name: 'DRAFT' }).click()
   await expect(page.getByRole('link', { name: '새 Mock DROP' })).toBeVisible()
 })

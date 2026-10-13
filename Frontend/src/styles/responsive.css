@@ -59,6 +59,14 @@
   .site-header nav a {
     font-size: 13px;
   }
+  .site-header .seller-nav {
+    gap: 20px;
+    overflow-x: auto;
+  }
+  .site-header .seller-nav a {
+    flex: none;
+    white-space: nowrap;
+  }
   .mode-button {
     min-height: 36px;
     padding: 0 10px;

@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -33,4 +34,36 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Payment p where p.id = :id")
     Optional<Payment> findByIdForUpdate(@Param("id") Long id);
+
+    /*
+        진행 중 결제 정리 배치의 대상을 한 문장으로 선점한다(ERD.md 3.2, idx_payments_in_progress).
+        다른 인스턴스가 잠근 행은 건너뛰고, updated_at을 now로 바꿔 다른 인스턴스와 다음 주기가 60초 동안 다시 고르지 않게 한다.
+        UPDATE ... RETURNING이라 결과를 읽어야 하므로 @Modifying 없이 조회로 실행한다. 호출하는 쪽의 트랜잭션이 필요하다.
+     */
+    @Query(value = """
+            WITH claimed AS (
+                SELECT id FROM payments 
+                WHERE status IN ('PENDING', 'UNKNOWN') -- 결과를 아직 확정하지 못한 결제만 선택한다.
+                -- 최근 변경된 결제는 제외한다.
+                -- 호출부가 now - 60초를 전달하므로,
+                -- 마지막 변경 후 60초 이상 지난 결제가 대상이다.
+                  AND updated_at <= :staleBefore
+                -- 오래 변경되지 않은 결제부터 선택한다.
+                -- 시간이 같으면 ID로 순서를 정한다.
+                ORDER BY updated_at, id
+                LIMIT :limit
+                FOR UPDATE SKIP LOCKED
+            )
+            -- 위에서 선택한 결제의 마지막 변경 시각을 갱신.
+            UPDATE payments p
+            SET updated_at = :now
+            FROM claimed
+            WHERE p.id = claimed.id
+            -- 실제 갱신한 결제의 ID를 반환.
+            RETURNING p.id
+            """, nativeQuery = true)
+    List<Long> claimInProgressForReconciliation(
+            @Param("staleBefore") OffsetDateTime staleBefore,
+            @Param("now") OffsetDateTime now,
+            @Param("limit") int limit);
 }

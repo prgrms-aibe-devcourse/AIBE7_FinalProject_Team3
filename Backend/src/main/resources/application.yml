@@ -27,6 +27,13 @@ spring:
       connect-timeout: 2s
       timeout: 2s
 
+  # @Scheduled 작업(DROP 상태 전환·결제 대기 배치·배송 단계 진행)이 서로를 기다리지 않도록 스레드를 작업 수보다 넉넉히 둔다.
+  # 기본값 1이면 결제 대기 배치의 PG 지연이 DROP 판매 시작 전환까지 늦춘다(TECHSTACK.md 1장 Scheduling).
+  task:
+    scheduling:
+      pool:
+        size: 4
+
   flyway:
     enabled: true
     locations: classpath:db/migration
