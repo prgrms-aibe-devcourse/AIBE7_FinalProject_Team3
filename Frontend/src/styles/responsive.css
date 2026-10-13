@@ -143,19 +143,24 @@
     grid-row: 1;
   }
   .auth-copy {
-    min-height: 280px;
-    padding: 34px;
+    min-height: 230px;
+    padding: 30px 28px;
   }
   .auth-copy h1 {
-    font-size: 40px;
-    letter-spacing: -2px;
+    font-size: 32px;
+    letter-spacing: -1.5px;
   }
   .auth-copy img {
-    width: 150px;
-    height: 150px;
+    right: 12px;
+    bottom: 24px;
+    width: 80px;
+    height: 80px;
+  }
+  .auth-copy > p:not(.eyebrow) {
+    padding-right: 70px;
   }
   .auth-form {
-    padding: 34px;
+    padding: 28px;
   }
   .stats-grid {
     grid-template-columns: 1fr 1fr;
