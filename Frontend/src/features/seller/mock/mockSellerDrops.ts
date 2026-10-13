@@ -19,6 +19,7 @@ export type SellerMockDrop = {
   shippingNotice: string
   optionGroups: OptionGroup[]
   skus: Sku[]
+  soldStock?: number
 }
 
 const ownerEmail = 'grab@example.com'
@@ -40,6 +41,7 @@ export const demoSellerDrops: SellerMockDrop[] = [
     shippingNotice: '',
     optionGroups: [],
     skus: [],
+    soldStock: drop.soldStock,
   })),
 ].sort((a, b) => Number(b.id) - Number(a.id))
 

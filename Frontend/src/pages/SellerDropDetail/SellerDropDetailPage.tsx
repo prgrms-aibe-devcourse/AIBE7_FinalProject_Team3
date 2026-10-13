@@ -11,12 +11,16 @@ import type { MockAccount } from '../../features/auth/mock/mockAuth'
 import { endedDrops } from '../../features/drop/mock/mockEndedDrops'
 import { sellerOrders } from '../../features/order/mock/mockSellerOrders'
 import {
+  inventoryTotals,
+  optionLabel,
+  stockBreakdown,
+} from '../../features/seller/logic/inventory'
+import {
   otherSellerDrop,
   readSellerDropQuery,
   transitionSellerDrop,
   type SellerMockDrop,
 } from '../../features/seller/mock/mockSellerDrops'
-import type { Sku } from '../../types/drop'
 import { dateLabel } from '../../utils/date'
 import { won } from '../../utils/price'
 
@@ -27,27 +31,6 @@ type Props = {
   onChange: (drops: SellerMockDrop[]) => void
   notify: (message: string) => void
 }
-
-const breakdown = (sku: Sku) => {
-  const reserved = sku.reserved ?? 0
-  const sold = sku.sold ?? 0
-  return {
-    available: sku.stock,
-    reserved,
-    sold,
-    total: sku.stock + reserved + sold,
-  }
-}
-
-const optionLabel = (drop: SellerMockDrop, sku: Sku) =>
-  drop.optionGroups
-    .map(
-      (group) =>
-        group.values.find((value) => value.id === sku.selections[group.id])
-          ?.label,
-    )
-    .filter(Boolean)
-    .join(' / ') || '기본 옵션'
 
 export default function SellerDropDetailPage({
   account,
@@ -136,17 +119,7 @@ export default function SellerDropDetailPage({
   const salesAmount =
     sales?.salesAmount ??
     orders.reduce((sum, order) => sum + order.totalAmount, 0)
-  const totals = drop.skus.reduce(
-    (sum, sku) => {
-      const item = breakdown(sku)
-      return {
-        available: sum.available + item.available,
-        reserved: sum.reserved + item.reserved,
-        sold: sum.sold + item.sold,
-      }
-    },
-    { available: 0, reserved: 0, sold: 0 },
-  )
+  const totals = inventoryTotals(drop)
 
   const transition = (action: 'PUBLISH' | 'CANCEL') => {
     if (action === 'CANCEL' && (!reason.trim() || reason.length > 500)) {
@@ -407,7 +380,7 @@ export default function SellerDropDetailPage({
                     </thead>
                     <tbody>
                       {drop.skus.map((sku) => {
-                        const item = breakdown(sku)
+                        const item = stockBreakdown(sku)
                         return (
                           <tr key={sku.id}>
                             <td>{optionLabel(drop, sku)}</td>
