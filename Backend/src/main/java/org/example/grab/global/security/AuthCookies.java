@@ -29,7 +29,7 @@ public final class AuthCookies {
         return issue(ACCESS_TOKEN_NAME, ACCESS_TOKEN_PATH, token, maxAge);
     }
 
-    // maxAge는 RefreshTokenRepository.save가 돌려준 Redis 저장 TTL이다. 쿠키와 서버 세션이 같은 시각에 만료된다
+    // maxAge는 RefreshTokenRepository.save·rotate가 돌려준 Redis 저장 TTL이다. 쿠키와 서버 세션이 같은 시각에 만료된다
     public static ResponseCookie refreshToken(String token, Duration maxAge) {
         return issue(REFRESH_TOKEN_NAME, REFRESH_TOKEN_PATH, token, maxAge);
     }

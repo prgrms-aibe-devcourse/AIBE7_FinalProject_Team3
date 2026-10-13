@@ -185,9 +185,10 @@ class SecurityFilterChainTests {
         mockMvc.perform(get(UNMAPPED_PROTECTED_PATH).cookie(new Cookie("access_token", expired)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
-        // 재발급 경로는 아직 permitAll이 아니라(GR-34 등에서 연다) 익명 요청으로 인가 단계에서 막힌다.
+        // 재발급은 GR-35에서 permitAll이 되어 서비스가 refresh_token 쿠키 없음으로 INVALID_TOKEN을 낸다.
+        // 필터만 확인하도록 permitAll이 아닌 /api/v1/auth/** 경로를 쓴다. 익명 요청이라 인가 단계에서 막히고,
         // 토큰 검증 실패(INVALID_TOKEN)가 아니라 인증 없음(AUTHENTICATION_REQUIRED)이면 필터를 건너뛴 것이다
-        mockMvc.perform(post("/api/v1/auth/refresh").with(csrf()).cookie(new Cookie("access_token", expired)))
+        mockMvc.perform(post("/api/v1/auth/unmapped").with(csrf()).cookie(new Cookie("access_token", expired)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("AUTHENTICATION_REQUIRED"));
     }

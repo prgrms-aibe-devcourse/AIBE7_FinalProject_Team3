@@ -30,6 +30,7 @@ import org.springframework.data.redis.RedisConnectionFailureException;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -80,6 +81,11 @@ class TokenRefreshServiceTest {
         given(authRoleCalculator.calculate(PUBLIC_ID, UserRole.USER)).willReturn(ROLES);
         given(jwtProvider.issue(PUBLIC_ID, ROLES)).willReturn(ACCESS_TOKEN);
         given(refreshTokenGenerator.generate()).willReturn(NEW_TOKEN);
+    }
+
+    // 테스트 출력에는 다른 스레드(Redis 클라이언트 등)의 로그도 섞이므로 이 서비스의 거부 로그 줄만 본다
+    private static List<String> rejectionLines(CapturedOutput output) {
+        return output.getAll().lines().filter(line -> line.contains("토큰 재발급 거부")).toList();
     }
 
     private static void assertInvalidToken(Runnable call) {
@@ -137,7 +143,8 @@ class TokenRefreshServiceTest {
         // when & then
         assertInvalidToken(() -> service.refresh(rawToken));
         verifyNoInteractions(refreshTokenRepository, activeUserLookupService, jwtProvider);
-        assertThat(output).contains("INFO").contains("reason=missing_cookie");
+        assertThat(rejectionLines(output)).singleElement()
+                .satisfies(line -> assertThat(line).contains(" INFO ", "reason=missing_cookie"));
     }
 
     @Test
@@ -166,8 +173,8 @@ class TokenRefreshServiceTest {
         // when & then
         assertInvalidToken(() -> service.refresh(OLD_TOKEN));
         verifyNoInteractions(jwtProvider);
-        assertThat(output).contains("INFO").contains("reason=reuse_within_grace").contains(SESSION_ID.toString())
-                .doesNotContain("WARN");
+        assertThat(rejectionLines(output)).singleElement()
+                .satisfies(line -> assertThat(line).contains(" INFO ", "reason=reuse_within_grace", SESSION_ID.toString()));
     }
 
     // M00-07: 세션을 폐기한 탈취 의심만 WARN이다
@@ -182,7 +189,8 @@ class TokenRefreshServiceTest {
         // when & then
         assertInvalidToken(() -> service.refresh(OLD_TOKEN));
         verifyNoInteractions(jwtProvider);
-        assertThat(output).contains("WARN").contains("reason=reuse_detected").contains(SESSION_ID.toString());
+        assertThat(rejectionLines(output)).singleElement()
+                .satisfies(line -> assertThat(line).contains(" WARN ", "reason=reuse_detected", SESSION_ID.toString()));
     }
 
     // M00-04: 로그인 후 정지·탈퇴한 회원은 재발급할 수 없고, 남은 세션도 지운다
