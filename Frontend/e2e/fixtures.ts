@@ -42,4 +42,4 @@ export async function loginSeller(page: Page) {
   await page.getByLabel('계정 유형 예시').selectOption('SELLER')
 }
 
-export const toast = (page: Page) => page.getByRole('status')
+export const toast = (page: Page) => page.locator('.toast')
