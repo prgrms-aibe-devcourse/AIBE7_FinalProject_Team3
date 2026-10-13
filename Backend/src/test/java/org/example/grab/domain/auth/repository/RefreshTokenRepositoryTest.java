@@ -1,6 +1,7 @@
 package org.example.grab.domain.auth.repository;
 
 import org.example.grab.domain.auth.support.RefreshTokenHasher;
+import org.example.grab.domain.auth.support.RefreshTokenProperties;
 import org.example.grab.domain.auth.support.RefreshTokenTtlCalculator;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
@@ -65,7 +66,8 @@ class RefreshTokenRepositoryTest {
     @BeforeEach
     void setUp() {
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        repository = new RefreshTokenRepository(redisTemplate, objectMapper, ttlCalculator);
+        repository = new RefreshTokenRepository(redisTemplate, objectMapper, ttlCalculator,
+                new RefreshTokenProperties(Duration.ofDays(14), Duration.ofDays(30), Duration.ofSeconds(10)));
     }
 
     @Test

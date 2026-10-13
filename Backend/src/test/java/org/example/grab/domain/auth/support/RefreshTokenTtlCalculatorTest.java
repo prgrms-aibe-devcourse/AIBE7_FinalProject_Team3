@@ -23,7 +23,7 @@ class RefreshTokenTtlCalculatorTest {
     private static final Instant NOW = Instant.parse("2026-10-02T06:00:00Z");
 
     private final RefreshTokenTtlCalculator calculator = new RefreshTokenTtlCalculator(
-            new RefreshTokenProperties(IDLE_TTL, ABSOLUTE_TTL), Clock.fixed(NOW, ZoneOffset.UTC));
+            new RefreshTokenProperties(IDLE_TTL, ABSOLUTE_TTL, Duration.ofSeconds(10)), Clock.fixed(NOW, ZoneOffset.UTC));
 
     @Test
     @DisplayName("새 세션의 절대 만료는 지금부터 30일 뒤이고 TTL은 14일이다")

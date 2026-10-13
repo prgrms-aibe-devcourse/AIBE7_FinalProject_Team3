@@ -14,16 +14,31 @@ class RefreshTokenPropertiesTest {
 
     private static final Duration IDLE = Duration.ofDays(14);
     private static final Duration ABSOLUTE = Duration.ofDays(30);
+    private static final Duration GRACE = Duration.ofSeconds(10);
 
     @Test
     @DisplayName("올바른 값이면 그대로 담는다")
     void holdsValidValues() {
         // when
-        RefreshTokenProperties properties = new RefreshTokenProperties(IDLE, ABSOLUTE);
+        RefreshTokenProperties properties = new RefreshTokenProperties(IDLE, ABSOLUTE, GRACE);
 
         // then
         assertThat(properties.idleTtl()).isEqualTo(IDLE);
         assertThat(properties.absoluteTtl()).isEqualTo(ABSOLUTE);
+        assertThat(properties.reuseGrace()).isEqualTo(GRACE);
+    }
+
+    // GR-35 M00-03: 0은 유예 없음으로 허용한다
+    @Test
+    @DisplayName("reuse-grace가 없거나 음수이면 거부하고 0은 허용한다")
+    void validatesReuseGrace() {
+        assertThatThrownBy(() -> new RefreshTokenProperties(IDLE, ABSOLUTE, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("reuse-grace");
+        assertThatThrownBy(() -> new RefreshTokenProperties(IDLE, ABSOLUTE, Duration.ofSeconds(-1)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("reuse-grace");
+        assertThat(new RefreshTokenProperties(IDLE, ABSOLUTE, Duration.ZERO).reuseGrace()).isZero();
     }
 
     @Test
@@ -52,7 +67,7 @@ class RefreshTokenPropertiesTest {
     @Test
     @DisplayName("두 값이 같으면 비활동 만료 없는 고정 기간으로 허용한다")
     void allowsEqualValues() {
-        RefreshTokenProperties properties = new RefreshTokenProperties(ABSOLUTE, ABSOLUTE);
+        RefreshTokenProperties properties = new RefreshTokenProperties(ABSOLUTE, ABSOLUTE, GRACE);
 
         assertThat(properties.idleTtl()).isEqualTo(properties.absoluteTtl());
     }
@@ -61,21 +76,23 @@ class RefreshTokenPropertiesTest {
             .withUserConfiguration(RefreshTokenConfig.class);
 
     @Test
-    @DisplayName("grab.auth.refresh-token 설정을 일 단위 표기(14d·30d)로 바인딩한다")
+    @DisplayName("grab.auth.refresh-token 설정을 일·초 단위 표기(14d·30d·10s)로 바인딩한다")
     void bindsFromProperties() {
         contextRunner
                 .withPropertyValues(
                         "grab.auth.refresh-token.idle-ttl=14d",
-                        "grab.auth.refresh-token.absolute-ttl=30d")
+                        "grab.auth.refresh-token.absolute-ttl=30d",
+                        "grab.auth.refresh-token.reuse-grace=10s")
                 .run(context -> {
                     RefreshTokenProperties properties = context.getBean(RefreshTokenProperties.class);
                     assertThat(properties.idleTtl()).isEqualTo(IDLE);
                     assertThat(properties.absoluteTtl()).isEqualTo(ABSOLUTE);
+                    assertThat(properties.reuseGrace()).isEqualTo(GRACE);
                 });
     }
 
     @Test
-    @DisplayName("설정이 없거나 idle-ttl이 더 길면 컨텍스트가 뜨지 않는다")
+    @DisplayName("설정이 없거나 idle-ttl이 더 길거나 reuse-grace가 없으면 컨텍스트가 뜨지 않는다")
     void failsToStartWithInvalidProperties() {
         contextRunner
                 .run(context -> assertThat(context).hasFailed());
@@ -85,12 +102,18 @@ class RefreshTokenPropertiesTest {
         contextRunner
                 .withPropertyValues(
                         "grab.auth.refresh-token.idle-ttl=30d",
-                        "grab.auth.refresh-token.absolute-ttl=14d")
+                        "grab.auth.refresh-token.absolute-ttl=14d",
+                        "grab.auth.refresh-token.reuse-grace=10s")
+                .run(context -> assertThat(context).hasFailed());
+        contextRunner
+                .withPropertyValues(
+                        "grab.auth.refresh-token.idle-ttl=14d",
+                        "grab.auth.refresh-token.absolute-ttl=30d")
                 .run(context -> assertThat(context).hasFailed());
     }
 
     private static void assertRejected(Duration idleTtl, Duration absoluteTtl, String name) {
-        assertThatThrownBy(() -> new RefreshTokenProperties(idleTtl, absoluteTtl))
+        assertThatThrownBy(() -> new RefreshTokenProperties(idleTtl, absoluteTtl, GRACE))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining(name);
     }
