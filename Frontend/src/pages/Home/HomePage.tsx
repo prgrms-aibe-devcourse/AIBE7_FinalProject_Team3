@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import heroBackground from '../../assets/images/hero-background.png'
 import EmptyState from '../../components/EmptyState/EmptyState'
 import PopularRail from '../../features/drop/components/PopularRail'
 import {
@@ -22,7 +23,12 @@ function HomeSection({
   return (
     <section className="home-section">
       <div className="catalog-heading">
-        <h2>{section.title}</h2>
+        <div>
+          <p className="eyebrow">
+            {section.status === 'GRAB' ? 'AVAILABLE NOW' : 'WORTH THE WAIT'}
+          </p>
+          <h2>{section.title}</h2>
+        </div>
         <div className="home-section-actions">
           <span className="home-note">예시 데이터</span>
           <Link className="text-link" to={section.to}>
@@ -75,12 +81,12 @@ export default function HomePage({ wishes, toggleWish, notify }: SharedProps) {
 
   return (
     <>
-      <section className="intro">
-        <div>
-          <p className="eyebrow">SELLER DROPS. CONSUMER GRABS.</p>
-          <h1>발견한 취향을 놓치지 않도록.</h1>
-          <p>한정 판매를 준비하는 브랜드와 지금 만날 수 있는 상품.</p>
-        </div>
+      <section className="home-intro">
+        <img
+          className="home-brand-image"
+          src={heroBackground}
+          alt="GRAB — Grab what you want. 판매자의 DROP이 당신의 GRAB으로."
+        />
       </section>
 
       {homeSections.map((section) => (

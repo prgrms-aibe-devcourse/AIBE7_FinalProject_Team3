@@ -7,6 +7,10 @@
 }
 .seller-drops-heading h1 {
   margin: 8px 0;
+  font-size: clamp(28px, 3.4vw, 44px);
+  line-height: 1.25;
+  letter-spacing: -1.5px;
+  overflow-wrap: anywhere;
 }
 .seller-drops-heading p:last-child,
 .seller-drops-note {
@@ -17,7 +21,8 @@
   align-items: end;
   justify-content: space-between;
   gap: 20px;
-  padding: 20px 22px;
+  padding: 24px;
+  background: var(--soft);
   border-bottom: 1px solid var(--line);
 }
 .seller-drops-demo {
@@ -29,7 +34,7 @@
 .seller-drops-demo select {
   padding: 9px 11px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 4px;
   background: #fff;
 }
 .seller-drops-row {
@@ -39,14 +44,14 @@
     minmax(145px, 0.8fr) auto;
   align-items: center;
   gap: 16px;
-  padding: 16px 22px;
+  padding: 22px 24px;
   border-bottom: 1px solid var(--line);
 }
 .seller-drops-row img,
 .seller-drops-placeholder {
   width: 74px;
   height: 66px;
-  border-radius: 8px;
+  border-radius: 4px;
   object-fit: cover;
 }
 .seller-drops-placeholder {
@@ -110,7 +115,7 @@
   gap: 8px;
 }
 .seller-drops-actions .secondary-button {
-  min-height: 34px;
+  min-height: 40px;
   padding: 6px 10px;
   font-size: 11px;
 }
@@ -126,10 +131,10 @@
   font-size: 11px;
 }
 .seller-drops-actions input {
-  min-height: 34px;
+  min-height: 40px;
   padding: 6px 9px;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: 4px;
 }
 .seller-drops-actions small {
   color: var(--muted);
@@ -146,6 +151,7 @@
   display: grid;
   gap: 14px;
   margin-bottom: 20px;
+  padding: 24px;
 }
 .seller-drop-review h2 {
   margin: 0;
@@ -167,7 +173,7 @@
   min-height: 85px;
   padding: 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 4px;
 }
 .seller-drop-review p {
   margin: 0;
@@ -190,7 +196,7 @@
   max-height: 300px;
   aspect-ratio: 16 / 9;
   object-fit: cover;
-  border-radius: 10px;
+  border-radius: 4px;
 }
 .seller-drop-image-empty {
   display: grid;
@@ -201,6 +207,9 @@
 }
 .seller-drop-product p {
   line-height: 1.6;
+}
+.seller-drop-product {
+  padding: 24px;
 }
 .seller-drop-product dl {
   display: grid;
@@ -225,6 +234,7 @@
 }
 .seller-drop-related {
   margin-top: 20px;
+  padding: 24px;
 }
 .seller-drop-related h2 {
   margin-top: 0;
@@ -292,4 +302,21 @@
     width: 100%;
     justify-content: space-between;
   }
+}
+
+.seller-drops-row:hover {
+  background: #fafbf7;
+}
+.seller-drop-related {
+  border-top: 3px solid var(--ink);
+}
+.seller-drop-detail-page .panel-heading {
+  background: var(--soft);
+}
+.seller-drop-detail-page .option-stock th,
+.seller-drop-detail-page .option-stock td {
+  padding: 16px 10px;
+}
+.seller-drop-product dd {
+  overflow-wrap: anywhere;
 }

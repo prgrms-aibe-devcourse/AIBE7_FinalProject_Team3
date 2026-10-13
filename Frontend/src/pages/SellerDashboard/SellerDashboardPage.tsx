@@ -150,7 +150,7 @@ export default function SellerDashboardPage({
   const maxSales = Math.max(1, ...endedDrops.map((drop) => drop.salesAmount))
 
   return (
-    <section className="page-section seller-page">
+    <section className="page-section seller-page seller-dashboard-page">
       <div className="seller-title">
         <div>
           <p className="eyebrow">CREATOR WORKSPACE</p>
@@ -174,7 +174,7 @@ export default function SellerDashboardPage({
         </button>
       </div>
       <div className="stats-grid">
-        <Link to="/seller/orders">
+        <Link to="/seller/orders?orderStatus=PAID">
           <span>발송 대기</span>
           <strong>
             {summary.pendingShipment}

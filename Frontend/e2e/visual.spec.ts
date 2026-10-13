@@ -3,10 +3,11 @@ import { installCatalogScenario } from './mock/catalog'
 import { installHomeScenario } from './mock/home'
 
 // 기준 이미지는 CI와 같은 Playwright Docker 이미지에서만 만든다(npm run e2e:docker).
-// 판매자 대시보드는 디자인 개선 예정이라 기준에서 제외한다.
+// 판매자 종합은 외형을 검증하며 목록 분리 등 구조 정합은 후속 Mock 작업이다.
 test.describe('화면 기준', { tag: '@visual' }, () => {
   const shot = async (page: Page, name: string) => {
     await page.evaluate(() => document.fonts.ready)
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }))
     await expect(page).toHaveScreenshot(`${name}.png`, { fullPage: true })
   }
 
@@ -18,6 +19,7 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
     ['login', '/#/login'],
     ['signup', '/#/signup'],
     ['seller-orders', '/#/seller/orders'],
+    ['seller-dashboard', '/#/seller'],
     ['not-found', '/#/missing'],
   ]) {
     test(name, async ({ page }) => {

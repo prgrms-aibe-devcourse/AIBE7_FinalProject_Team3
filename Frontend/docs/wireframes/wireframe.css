@@ -1,9 +1,9 @@
 :root {
   --lime: #bdff28;
-  --ink: #1b1e17;
-  --muted: #74786d;
-  --line: #e5e8df;
-  --soft: #f5f7f1;
+  --ink: #191b17;
+  --muted: #64685e;
+  --line: #dedfd8;
+  --soft: #f1f2eb;
 }
 
 * {
@@ -11,6 +11,7 @@
 }
 body {
   margin: 0;
+  background: #fafaf7;
   min-width: 320px;
   color: var(--ink);
   font:
@@ -304,4 +305,18 @@ p {
   .section-head {
     align-items: flex-start;
   }
+}
+
+.home-brand-image {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.panel,
+.card,
+.metric,
+.control,
+.chip,
+.field {
+  border-radius: 4px;
 }

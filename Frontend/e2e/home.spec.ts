@@ -7,9 +7,6 @@ test.describe('소비자 메인', () => {
     await page.goto('/')
 
     await expect(
-      page.getByRole('heading', { name: '발견한 취향을 놓치지 않도록.' }),
-    ).toBeVisible()
-    await expect(
       page.getByRole('group', { name: '지금 인기 GRAB' }),
     ).toBeVisible()
     await expect(
