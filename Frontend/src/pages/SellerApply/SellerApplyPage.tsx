@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation } from 'react-router-dom'
+import symbol from '../../assets/images/grab-symbol.png'
 import EmptyState from '../../components/EmptyState/EmptyState'
 import type { MockAccount } from '../../features/auth/mock/mockAuth'
 import type {
@@ -88,6 +89,7 @@ export default function SellerApplyPage({
     <section className="page-section seller-application-page">
       <div className="seller-apply-layout">
         <div className="seller-apply-intro">
+          <img className="seller-apply-symbol" src={symbol} alt="" />
           <p className="eyebrow">BECOME A SELLER</p>
           <h1>나만의 DROP을 열어보세요</h1>
           <p>신청 후 운영자 승인을 받으면 판매자 기능을 사용할 수 있습니다.</p>
