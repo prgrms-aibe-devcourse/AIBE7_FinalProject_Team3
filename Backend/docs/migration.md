@@ -239,8 +239,9 @@ curl.exe -s -w "`n%{http_code}`n" http://localhost:8080/api/v1/users/me/wishes
 ### 7.3 Refresh Token 저장 확인
 
 ```powershell
-# 키는 원문이 아니라 SHA-256 해시다. 로그인할 때마다 하나씩 생긴다
+# 키는 원문이 아니라 SHA-256 해시다. 로그인할 때마다 토큰 키와 세션 키(auth:refresh-session:{sessionId} → 토큰 해시)가 하나씩 생긴다
 docker compose exec -T redis redis-cli --scan --pattern 'auth:refresh-token:*'
+docker compose exec -T redis redis-cli --scan --pattern 'auth:refresh-session:*'
 
 # 위에서 나온 키 하나의 TTL(초, 14일 = 1209600 이하)과 값(userId·sessionId·sessionExpiresAt = 로그인 시각 + 30일)
 $key = (docker compose exec -T redis redis-cli --scan --pattern 'auth:refresh-token:*' | Select-Object -First 1)
@@ -254,13 +255,60 @@ docker compose exec -T redis redis-cli GET $key
 docker compose exec -T postgres psql -U grab -d grab -c "UPDATE users SET status = 'SUSPENDED' WHERE email = 'signup-test@example.com';"
 ```
 
-### 7.4 정리
+### 7.4 토큰 재발급
 
-시험 데이터, Refresh Token, 쿠키 파일을 정리한다.
+토큰 재발급(MEMBER_AUTH 1.7)과 Refresh Token Rotation을 확인한다. 7.3에서 계정을 정지했다면 먼저 되돌린다.
+
+```powershell
+docker compose exec -T postgres psql -U grab -d grab -c "UPDATE users SET status = 'ACTIVE' WHERE email = 'signup-test@example.com';"
+```
+
+```powershell
+$refresh = 'http://localhost:8080/api/v1/auth/refresh'
+
+# 재사용 확인에 쓸 현재 refresh_token 값(쿠키 파일의 마지막 열)
+$oldRefresh = (Select-String -Path signup-cookie.txt -Pattern "refresh_token\t(\S+)").Matches[0].Groups[1].Value
+
+# 204: 본문 없이 Set-Cookie로 새 access_token·refresh_token을 받는다. 쿠키 파일도 새 값으로 바뀐다
+curl.exe -s -i -X POST -b signup-cookie.txt -c signup-cookie.txt $refresh -H "X-XSRF-TOKEN: $csrfToken"
+
+# 401 INVALID_TOKEN: 교체된 옛 refresh_token 재사용. 교체 후 10초 안이면 세션은 유지된다
+curl.exe -s -w "`n%{http_code}`n" -X POST $refresh -H "Cookie: XSRF-TOKEN=$csrfToken; refresh_token=$oldRefresh" `
+  -H "X-XSRF-TOKEN: $csrfToken"
+
+# 204: 세션이 유지됐으므로 새 refresh_token(쿠키 파일)으로 다시 재발급된다
+curl.exe -s -w "`n%{http_code}`n" -X POST -b signup-cookie.txt -c signup-cookie.txt $refresh -H "X-XSRF-TOKEN: $csrfToken"
+
+# 401 INVALID_TOKEN: refresh_token 쿠키 없음 / 403 ACCESS_DENIED: CSRF 헤더 없음
+curl.exe -s -w "`n%{http_code}`n" -X POST $refresh -H "Cookie: XSRF-TOKEN=$csrfToken" -H "X-XSRF-TOKEN: $csrfToken"
+curl.exe -s -w "`n%{http_code}`n" -X POST -b signup-cookie.txt $refresh
+```
+
+재발급 응답의 두 쿠키는 로그인과 이름·Path·속성이 같아 브라우저의 기존 쿠키를 덮어쓴다. `refresh_token`의 Max-Age는 로그인 후 30일(절대 만료)을 넘지 않는 범위에서 14일로 다시 시작한다.
+
+Redis에서 교체 결과를 확인한다.
+
+```powershell
+# 세션 키는 로그인 때와 같은 sessionId로 남고, 값이 최신 토큰의 해시로 바뀐다
+$sessionKey = (docker compose exec -T redis redis-cli --scan --pattern 'auth:refresh-session:*' | Select-Object -First 1)
+docker compose exec -T redis redis-cli GET $sessionKey
+
+# 교체된 토큰마다 사용됨 표식이 남는다(sessionId·rotatedAt, TTL은 새 토큰과 같음)
+$usedKey = (docker compose exec -T redis redis-cli --scan --pattern 'auth:refresh-token-used:*' | Select-Object -First 1)
+docker compose exec -T redis redis-cli HGETALL $usedKey
+```
+
+10초가 지난 뒤 `$oldRefresh`로 다시 요청하면 탈취로 보고 세션을 폐기한다. 이후에는 쿠키 파일의 최신 `refresh_token`도 401이므로 7.1의 로그인을 다시 해야 한다. 서버 로그에 `reason=reuse_detected`가 WARN으로 남는다.
+
+### 7.5 정리
+
+시험 데이터, Refresh Token 관련 키, 쿠키 파일을 정리한다.
 
 ```powershell
 docker compose exec -T postgres psql -U grab -d grab -c "DELETE FROM users WHERE email LIKE 'signup-test%';"
-docker compose exec -T redis redis-cli --scan --pattern 'auth:refresh-token:*' | ForEach-Object { docker compose exec -T redis redis-cli DEL $_ }
+'auth:refresh-token:*', 'auth:refresh-session:*', 'auth:refresh-token-used:*' | ForEach-Object {
+  docker compose exec -T redis redis-cli --scan --pattern $_ | ForEach-Object { docker compose exec -T redis redis-cli DEL $_ }
+}
 Remove-Item signup-cookie.txt
 ```
 

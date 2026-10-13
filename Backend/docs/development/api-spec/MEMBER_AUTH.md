@@ -416,24 +416,30 @@ POST /api/v1/auth/refresh
 ```
 
 - **인증**: `refresh_token` HttpOnly 쿠키
+- **CSRF**: `X-XSRF-TOKEN` 헤더 필요
 
 **요청:**
 
 요청 본문 없음
 
-유효한 Refresh Token은 한 번 사용한 뒤 폐기하고 새 토큰으로 교체한다.
+**응답:** `204 No Content`
 
 ```http
 Set-Cookie: access_token=<new-jwt>; HttpOnly; Secure; SameSite=Lax; Path=/api; Max-Age=<access-ttl>
 Set-Cookie: refresh_token=<new-token>; HttpOnly; Secure; SameSite=Lax; Path=/api/v1/auth; Max-Age=<refresh-ttl>
 ```
 
-**응답:** `204 No Content`
+- 유효한 Refresh Token은 한 번만 사용할 수 있다. 성공하면 새 Access Token과 Refresh Token으로 교체하고 사용한 Refresh Token은 폐기한다. 두 토큰은 응답 본문에 포함하지 않는다.
+- 새 Refresh Token은 로그인 때 시작한 세션을 이어받는다. 재발급할 때마다 비활동 만료는 다시 시작되지만 로그인 시점 기준의 절대 만료는 늘어나지 않는다. `refresh-ttl`은 둘 중 먼저 오는 시각까지 남은 초이며, 절대 만료가 지난 세션은 재발급하지 않는다.
+- 재발급할 때 회원 상태와 권한을 다시 확인한다. 계정이 `ACTIVE`가 아니면 거부하고 그 세션의 Refresh Token을 폐기한다. 판매자 승인·취소는 새 Access Token의 권한에 반영된다.
+- 같은 Refresh Token으로 동시에 요청하면 하나만 성공하고 나머지는 `INVALID_TOKEN`이다.
+- 이미 교체된 Refresh Token이 다시 사용되면 탈취로 보고 그 세션의 Refresh Token을 폐기한다. 단, 교체 직후 짧은 유예 시간(서버 설정, 기본 10초) 안의 재사용은 여러 탭의 동시 재발급으로 보고 세션을 유지한 채 요청만 거부한다.
+- 재발급은 `XSRF-TOKEN`을 새로 발급하지 않는다.
 
 **오류 코드:**
 - `INVALID_TOKEN`
 
-Redis는 만료된 키를 삭제하므로 만료·로그아웃·교체·위조를 구분할 수 없다. 재발급 실패는 사유와 관계없이 `INVALID_TOKEN`으로 응답한다.
+Redis는 만료된 키를 삭제하므로 만료·로그아웃·교체·위조를 구분할 수 없다. 재발급 실패는 사유와 관계없이 `INVALID_TOKEN`으로 응답한다. Redis 장애 등 서버 오류는 `INTERNAL_SERVER_ERROR`(500)이며 인증 실패가 아니므로 클라이언트는 로그아웃하지 않는다(COMMON 3절).
 
 ### 1.8 로그아웃
 
