@@ -46,6 +46,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -53,6 +54,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -185,7 +187,7 @@ class DropServiceTest {
     void createDraft_rejectsUnknownValueKey() {
         // given
         DropDraftRequest request = new DropDraftRequest(
-                null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
                 List.of(new OptionGroupRequest("material", "소재", 0,
                         List.of(new OptionValueRequest("cotton", "코튼", 0)))),
                 List.of(new OptionRequest(
@@ -203,7 +205,7 @@ class DropServiceTest {
     void createDraft_rejectsSameGroupTwice() {
         // given
         DropDraftRequest request = new DropDraftRequest(
-                null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
                 List.of(new OptionGroupRequest("material", "소재", 0,
                         List.of(new OptionValueRequest("cotton", "코튼", 0),
                                 new OptionValueRequest("linen", "린넨", 1)))),
@@ -334,7 +336,7 @@ class DropServiceTest {
     void createDraft_rejectsGroupsWithoutOptions() {
         // given
         DropDraftRequest request = new DropDraftRequest(
-                null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
                 List.of(new OptionGroupRequest("material", "소재", 0,
                         List.of(new OptionValueRequest("cotton", "코튼", 0)))),
                 null);
@@ -351,7 +353,7 @@ class DropServiceTest {
     void createDraft_rejectsOptionsWithoutGroups() {
         // given
         DropDraftRequest request = new DropDraftRequest(
-                null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
                 null,
                 List.of(new OptionRequest(
                         List.of(new SelectionRequest("material", "cotton")), 1000L, 5, true, 0)));
@@ -371,7 +373,7 @@ class DropServiceTest {
         ReflectionTestUtils.setField(drop, "status", DropStatus.WISH);
         given(dropRepository.findByIdForUpdate(10L)).willReturn(Optional.of(drop));
         DropDraftRequest request = new DropDraftRequest(
-                null, null, null, 999L, null, null, null, null, null);
+                null, null, null, null, 999L, null, null, null, null, null);
 
         // when & then
         assertThatThrownBy(() -> dropService.updateDraft(1L, 10L, request))
@@ -387,7 +389,7 @@ class DropServiceTest {
         // given
         given(categoryService.isActive(999L)).willReturn(false);
         DropDraftRequest request = new DropDraftRequest(
-                null, null, null, 999L, null, null, null, null, null);
+                null, null, null, null, 999L, null, null, null, null, null);
 
         // when & then
         assertThatThrownBy(() -> dropService.createDraft(1L, request))
@@ -802,16 +804,16 @@ class DropServiceTest {
                 List.of(new SelectionRequest("material", "linen"), new SelectionRequest("length", "long")),
                 139000L, 5, false, 1);
 
-        return new DropDraftRequest("상품", "설명", List.of(image(UUID.randomUUID())), 1L, null, null,
+        return new DropDraftRequest("상품", "설명", List.of(image(UUID.randomUUID())), null, 1L, null, null,
                 new ShippingRequest(3000L, "안내"), List.of(material, length), List.of(first, second));
     }
 
     private DropDraftRequest emptyRequest() {
-        return new DropDraftRequest(null, null, null, null, null, null, null, null, null);
+        return new DropDraftRequest(null, null, null, null, null, null, null, null, null, null);
     }
 
     private static DropImageRequest image(UUID imageId) {
-        return new DropImageRequest(imageId, IMAGE_URL_PREFIX + "images/" + imageId + ".jpg");
+        return new DropImageRequest(imageId, IMAGE_URL_PREFIX + "images/" + imageId + ".jpg", null);
     }
 
     @Test
@@ -820,7 +822,7 @@ class DropServiceTest {
         // given
         UUID imageId = UUID.randomUUID();
         DropDraftRequest request = new DropDraftRequest(
-                null, null, List.of(new DropImageRequest(imageId, "https://evil.example.com/other.jpg")),
+                null, null, List.of(new DropImageRequest(imageId, "https://evil.example.com/other.jpg", null)), null,
                 null, null, null, null, null, null);
 
         // when & then
@@ -839,7 +841,7 @@ class DropServiceTest {
         // given
         UUID imageId = UUID.randomUUID();
         DropDraftRequest request = new DropDraftRequest(
-                null, null, List.of(image(imageId), image(imageId)),
+                null, null, List.of(image(imageId), image(imageId)), null,
                 null, null, null, null, null, null);
 
         // when & then
@@ -857,7 +859,7 @@ class DropServiceTest {
         // given
         UUID imageId = UUID.randomUUID();
         DropDraftRequest request = new DropDraftRequest(
-                null, null, List.of(image(imageId)), null, null, null, null, null, null);
+                null, null, List.of(image(imageId)), null, null, null, null, null, null, null);
         given(dropImageRepository.findUuidsUsedByOtherDrop(Set.of(imageId), null)).willReturn(Set.of(imageId));
 
         // when & then
@@ -879,7 +881,7 @@ class DropServiceTest {
         given(dropRepository.findByIdForUpdate(10L)).willReturn(Optional.of(drop));
         UUID imageId = UUID.randomUUID();
         DropDraftRequest request = new DropDraftRequest(
-                null, null, List.of(image(imageId)), null, null, null, null, null, null);
+                null, null, List.of(image(imageId)), null, null, null, null, null, null, null);
         given(dropImageRepository.findUuidsUsedByOtherDrop(eq(Set.of(imageId)), anyLong())).willReturn(Set.of());
 
         // when
@@ -896,7 +898,7 @@ class DropServiceTest {
         UUID firstImageId = UUID.randomUUID();
         UUID secondImageId = UUID.randomUUID();
         DropDraftRequest request = new DropDraftRequest(
-                null, null, List.of(image(firstImageId), image(secondImageId)),
+                null, null, List.of(image(firstImageId), image(secondImageId)), null,
                 null, null, null, null, null, null);
 
         // when
@@ -921,5 +923,136 @@ class DropServiceTest {
         // then
         assertThat(drop.getImages()).hasSize(1);
         verifyNoInteractions(dropImageRepository);
+    }
+
+    @Test
+    @DisplayName("GALLERY 5개·DETAIL 15개까지는 허용하고 넘으면 images·detailImages 필드로 거부한다")
+    void createDraft_limitsImageCountPerType() {
+        // given
+        DropDraftRequest atLimit = new DropDraftRequest(
+                null, null, images(5), images(15), null, null, null, null, null, null);
+        DropDraftRequest overLimit = new DropDraftRequest(
+                null, null, images(6), images(16), null, null, null, null, null, null);
+
+        // when & then
+        dropService.createDraft(1L, atLimit);
+        assertThatThrownBy(() -> dropService.createDraft(1L, overLimit))
+                .isInstanceOfSatisfying(BusinessException.class, e -> {
+                    assertThat(e.getErrorCode()).isEqualTo(CommonErrorCode.VALIDATION_FAILED);
+                    assertThat(e.getFieldErrors()).extracting(ErrorResponse.FieldError::field)
+                            .containsExactly("images", "detailImages");
+                });
+    }
+
+    @Test
+    @DisplayName("두 용도 배열에 같은 imageId가 있으면 뒤 배열 원소를 중복으로 거부한다")
+    void createDraft_rejectsImageIdDuplicatedAcrossTypes() {
+        // given
+        UUID imageId = UUID.randomUUID();
+        DropDraftRequest request = new DropDraftRequest(
+                null, null, List.of(image(imageId)), List.of(image(imageId)), null, null, null, null, null, null);
+
+        // when & then
+        assertThatThrownBy(() -> dropService.createDraft(1L, request))
+                .isInstanceOfSatisfying(BusinessException.class, e ->
+                        assertThat(e.getFieldErrors()).extracting(ErrorResponse.FieldError::field)
+                                .containsExactly("detailImages[0].imageId"));
+    }
+
+    @Test
+    @DisplayName("수정하지 않는(null) 용도에 남는 imageId를 다른 용도 배열에 보내면 중복으로 거부하고 이미지를 바꾸지 않는다")
+    void updateDraft_rejectsImageIdKeptInOtherType() {
+        // given: GALLERY에 있는 이미지를 detailImages만 보내 옮기려 한다
+        Drop drop = editableDrop();
+        UUID imageId = UUID.randomUUID();
+        drop.addImage(DropImage.create(drop, imageId, "g.jpg", DropImageType.GALLERY, 0, "갤러리"));
+        DropDraftRequest request = new DropDraftRequest(
+                null, null, null, List.of(image(imageId)), null, null, null, null, null, null);
+
+        // when & then
+        assertThatThrownBy(() -> dropService.updateDraft(1L, 10L, request))
+                .isInstanceOfSatisfying(BusinessException.class, e ->
+                        assertThat(e.getFieldErrors()).extracting(ErrorResponse.FieldError::field)
+                                .containsExactly("detailImages[0].imageId"));
+        assertThat(drop.getGalleryImages()).extracting(DropImage::getUuid).containsExactly(imageId);
+        assertThat(drop.getDetailImages()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("개수는 최종 상태로 세므로 이관된 GALLERY가 5개를 넘으면 DETAIL만 수정해도 images로 거부한다")
+    void updateDraft_countsKeptImagesInFinalState() {
+        // given: 이관 전 합계 10장 규칙으로 저장된 GALLERY 6장
+        Drop drop = editableDrop();
+        for (int index = 0; index < 6; index++) {
+            drop.addImage(DropImage.create(drop, UUID.randomUUID(), "g" + index + ".jpg", DropImageType.GALLERY, index, ""));
+        }
+        DropDraftRequest request = new DropDraftRequest(
+                null, null, null, images(1), null, null, null, null, null, null);
+
+        // when & then
+        assertThatThrownBy(() -> dropService.updateDraft(1L, 10L, request))
+                .isInstanceOfSatisfying(BusinessException.class, e ->
+                        assertThat(e.getFieldErrors()).extracting(ErrorResponse.FieldError::field)
+                                .containsExactly("images"));
+    }
+
+    @Test
+    @DisplayName("한 용도만 보내면 그 용도만 교체하고 다른 용도는 유지한다")
+    void updateDraft_replacesOnlyRequestedType() {
+        // given
+        Drop drop = editableDrop();
+        UUID galleryId = UUID.randomUUID();
+        drop.addImage(DropImage.create(drop, galleryId, "g.jpg", DropImageType.GALLERY, 0, "갤러리"));
+        drop.addImage(DropImage.create(drop, UUID.randomUUID(), "old-d.jpg", DropImageType.DETAIL, 0, "상세"));
+        UUID newDetailId = UUID.randomUUID();
+        DropDraftRequest request = new DropDraftRequest(
+                null, null, null, List.of(image(newDetailId)), null, null, null, null, null, null);
+
+        // when
+        dropService.updateDraft(1L, 10L, request);
+
+        // then
+        assertThat(drop.getGalleryImages()).extracting(DropImage::getUuid).containsExactly(galleryId);
+        assertThat(drop.getDetailImages()).extracting(DropImage::getUuid).containsExactly(newDetailId);
+    }
+
+    @Test
+    @DisplayName("altText가 없으면 기존 이미지는 저장된 설명(용도를 옮겨도 유지), 새 이미지는 상품명을 쓰고 빈 문자열은 그대로 둔다")
+    void updateDraft_resolvesAltText() {
+        // given: GALLERY의 기존 이미지를 DETAIL로 옮기고 새 이미지 두 장을 GALLERY에 넣는다
+        Drop drop = editableDrop();
+        drop.updateDraft("상품명", null, null, null, null, null, null);
+        UUID movedId = UUID.randomUUID();
+        drop.addImage(DropImage.create(drop, movedId, "moved.jpg", DropImageType.GALLERY, 0, "저장된 설명"));
+        UUID newId = UUID.randomUUID();
+        UUID decorativeId = UUID.randomUUID();
+        DropImageRequest decorative = new DropImageRequest(
+                decorativeId, IMAGE_URL_PREFIX + "images/" + decorativeId + ".jpg", "");
+        DropDraftRequest request = new DropDraftRequest(
+                null, null, List.of(image(newId), decorative), List.of(image(movedId)),
+                null, null, null, null, null, null);
+
+        // when
+        dropService.updateDraft(1L, 10L, request);
+
+        // then
+        assertThat(drop.getGalleryImages()).extracting(DropImage::getAltText).containsExactly("상품명", "");
+        assertThat(drop.getDetailImages()).extracting(DropImage::getUuid, DropImage::getAltText)
+                .containsExactly(tuple(movedId, "저장된 설명"));
+    }
+
+    private Drop editableDrop() {
+        Drop drop = Drop.createDraft(1L);
+        ReflectionTestUtils.setField(drop, "id", 10L);
+        given(dropRepository.findByIdForUpdate(10L)).willReturn(Optional.of(drop));
+        return drop;
+    }
+
+    private static List<DropImageRequest> images(int count) {
+        List<DropImageRequest> images = new ArrayList<>();
+        for (int index = 0; index < count; index++) {
+            images.add(image(UUID.randomUUID()));
+        }
+        return images;
     }
 }

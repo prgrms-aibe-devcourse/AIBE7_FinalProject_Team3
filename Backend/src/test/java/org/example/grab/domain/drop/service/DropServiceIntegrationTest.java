@@ -1,6 +1,7 @@
 package org.example.grab.domain.drop.service;
 
 import jakarta.persistence.EntityManager;
+import org.example.grab.global.common.ErrorResponse;
 import org.example.grab.global.config.JpaConfig;
 import org.example.grab.domain.drop.dto.request.DropDraftRequest;
 import org.example.grab.domain.drop.dto.request.DropImageRequest;
@@ -47,6 +48,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -141,7 +143,7 @@ class DropServiceIntegrationTest {
 
         // when
         dropService.updateDraft(sellerId, saved.getId(),
-                new DropDraftRequest("수정된 이름", null, null, null, null, null, null, null, null));
+                new DropDraftRequest("수정된 이름", null, null, null, null, null, null, null, null, null));
         entityManager.flush();
         entityManager.clear();
 
@@ -158,12 +160,12 @@ class DropServiceIntegrationTest {
         OffsetDateTime start = OffsetDateTime.now().plusDays(1);
         OffsetDateTime end = start.plusHours(2);
         Drop saved =         dropService.createDraft(sellerId,
-                new DropDraftRequest(null, null, null, null, start, end, null, null, null));
+                new DropDraftRequest(null, null, null, null, null, start, end, null, null, null));
         entityManager.flush();
 
         // when & then
         assertThatThrownBy(() -> dropService.updateDraft(sellerId, saved.getId(),
-                new DropDraftRequest(null, null, null, null, end.plusHours(1), null, null, null, null)))
+                new DropDraftRequest(null, null, null, null, null, end.plusHours(1), null, null, null, null)))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(DropErrorCode.INVALID_SCHEDULE);
@@ -184,7 +186,7 @@ class DropServiceIntegrationTest {
         DropImageRequest c = image(UUID.randomUUID());
         DropImageRequest d = image(UUID.randomUUID());
         DropDraftRequest update = new DropDraftRequest(null, null,
-                List.of(c, d), null, null, null, null, List.of(color), List.of(option));
+                List.of(c, d), null, null, null, null, null, List.of(color), List.of(option));
 
         // when
         dropService.updateDraft(sellerId, saved.getId(), update);
@@ -201,12 +203,86 @@ class DropServiceIntegrationTest {
     }
 
     @Test
+    @DisplayName("GALLERY 이미지를 DETAIL로 옮겨도 제약 위반 없이 public_id·대체 설명이 유지된다")
+    void updateDraft_movesImageBetweenTypes() {
+        // given: GALLERY 두 장(a, b)을 저장한다
+        UUID aId = UUID.randomUUID();
+        DropImageRequest a = new DropImageRequest(aId, IMAGE_URL_PREFIX + aId + ".jpg", "a 설명");
+        DropImageRequest b = image(UUID.randomUUID());
+        Drop saved = dropService.createDraft(sellerId, imagesRequest(List.of(a, b), null));
+        entityManager.flush();
+        entityManager.clear();
+
+        // when: b만 GALLERY에 남기고 a를 DETAIL로 옮긴다(altText 생략)
+        dropService.updateDraft(sellerId, saved.getId(),
+                imagesRequest(List.of(b), List.of(image(a.imageId()))));
+        entityManager.flush();
+        entityManager.clear();
+
+        // then
+        Drop found = dropRepository.findById(saved.getId()).orElseThrow();
+        assertThat(found.getGalleryImages()).extracting(DropImage::getUuid, DropImage::getSortOrder)
+                .containsExactly(tuple(b.imageId(), 0));
+        assertThat(found.getDetailImages()).extracting(DropImage::getUuid, DropImage::getSortOrder, DropImage::getAltText)
+                .containsExactly(tuple(a.imageId(), 0, "a 설명"));
+    }
+
+    @Test
+    @DisplayName("빈 배열은 그 용도만 삭제하고, 구버전처럼 images만 보내면 DETAIL은 유지된다")
+    void updateDraft_emptyArrayDeletesOnlyThatType() {
+        // given
+        DropImageRequest gallery = image(UUID.randomUUID());
+        DropImageRequest detail = image(UUID.randomUUID());
+        Drop saved = dropService.createDraft(sellerId, imagesRequest(List.of(gallery), List.of(detail)));
+        entityManager.flush();
+        entityManager.clear();
+
+        // when: 구버전 요청(images만)으로 GALLERY를 교체한다
+        DropImageRequest newGallery = image(UUID.randomUUID());
+        dropService.updateDraft(sellerId, saved.getId(), imagesRequest(List.of(newGallery), null));
+        entityManager.flush();
+        entityManager.clear();
+
+        // then
+        Drop afterLegacy = dropRepository.findById(saved.getId()).orElseThrow();
+        assertThat(afterLegacy.getGalleryImages()).extracting(DropImage::getUuid).containsExactly(newGallery.imageId());
+        assertThat(afterLegacy.getDetailImages()).extracting(DropImage::getUuid).containsExactly(detail.imageId());
+
+        // when: DETAIL만 빈 배열로 지운다
+        dropService.updateDraft(sellerId, saved.getId(), imagesRequest(null, List.of()));
+        entityManager.flush();
+        entityManager.clear();
+
+        // then
+        Drop afterClear = dropRepository.findById(saved.getId()).orElseThrow();
+        assertThat(afterClear.getGalleryImages()).extracting(DropImage::getUuid).containsExactly(newGallery.imageId());
+        assertThat(afterClear.getDetailImages()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("다른 DROP이 쓰는 imageId를 detailImages에 보내면 detailImages[i] 필드로 거부한다")
+    void updateDraft_rejectsDetailImageUsedByOtherDrop() {
+        // given
+        DropImageRequest shared = image(UUID.randomUUID());
+        dropService.createDraft(sellerId, imagesRequest(List.of(shared), null));
+        Drop other = dropService.createDraft(sellerId, emptyRequest());
+        entityManager.flush();
+
+        // when & then
+        assertThatThrownBy(() -> dropService.updateDraft(sellerId, other.getId(),
+                imagesRequest(null, List.of(shared))))
+                .isInstanceOfSatisfying(BusinessException.class, e ->
+                        assertThat(e.getFieldErrors()).extracting(ErrorResponse.FieldError::field)
+                                .containsExactly("detailImages[0].imageId"));
+    }
+
+    @Test
     @DisplayName("DB에서 다시 읽은 DRAFT를 공개하면 WISH와 publishedAt이 저장된다")
     void publish_persistsWish() {
         // given: 영속성 컨텍스트를 비워 LAZY 로딩된 옵션 구조로 검증이 동작하는지 확인한다.
         OffsetDateTime start = OffsetDateTime.now().plusDays(1);
         DropDraftRequest full = fullRequest();
-        DropDraftRequest request = new DropDraftRequest(full.name(), full.description(), full.images(),
+        DropDraftRequest request = new DropDraftRequest(full.name(), full.description(), full.images(), null,
                 full.categoryId(), start, start.plusDays(1), new ShippingRequest(3000L, "안내"),
                 full.optionGroups(), full.options());
         Long dropId =         dropService.createDraft(sellerId, request).getId();
@@ -229,7 +305,7 @@ class DropServiceIntegrationTest {
     void createDraft_rejectsMissingCategory() {
         // given
         DropDraftRequest request = new DropDraftRequest(
-                null, null, null, categoryId + 10_000, null, null, null, null, null);
+                null, null, null, null, categoryId + 10_000, null, null, null, null, null);
 
         // when & then
         assertThatThrownBy(() -> dropService.createDraft(sellerId, request))
@@ -243,7 +319,7 @@ class DropServiceIntegrationTest {
         // given
         OffsetDateTime start = OffsetDateTime.now().plusDays(1);
         DropDraftRequest full = fullRequest();
-        DropDraftRequest request = new DropDraftRequest(full.name(), full.description(), full.images(),
+        DropDraftRequest request = new DropDraftRequest(full.name(), full.description(), full.images(), null,
                 categoryId, start, start.plusDays(1), new ShippingRequest(3000L, "안내"),
                 full.optionGroups(), full.options());
         Long dropId = dropService.createDraft(sellerId, request).getId();
@@ -267,7 +343,7 @@ class DropServiceIntegrationTest {
         // given
         OffsetDateTime start = OffsetDateTime.now().plusDays(1);
         DropDraftRequest full = fullRequest();
-        DropDraftRequest request = new DropDraftRequest(full.name(), full.description(), full.images(),
+        DropDraftRequest request = new DropDraftRequest(full.name(), full.description(), full.images(), null,
                 categoryId, start, start.plusDays(1), new ShippingRequest(3000L, "안내"),
                 full.optionGroups(), full.options());
         Long dropId = dropService.createDraft(sellerId, request).getId();
@@ -527,15 +603,19 @@ class DropServiceIntegrationTest {
                 139000L, 5, false, 1);
 
         return new DropDraftRequest("상품", "설명",
-                List.of(image(UUID.randomUUID()), image(UUID.randomUUID())),
+                List.of(image(UUID.randomUUID()), image(UUID.randomUUID())), null,
                 categoryId, null, null, null, List.of(material, length), List.of(first, second));
     }
 
+    private DropDraftRequest imagesRequest(List<DropImageRequest> images, List<DropImageRequest> detailImages) {
+        return new DropDraftRequest("상품", null, images, detailImages, null, null, null, null, null, null);
+    }
+
     private static DropImageRequest image(UUID imageId) {
-        return new DropImageRequest(imageId, IMAGE_URL_PREFIX + imageId + ".jpg");
+        return new DropImageRequest(imageId, IMAGE_URL_PREFIX + imageId + ".jpg", null);
     }
 
     private DropDraftRequest emptyRequest() {
-        return new DropDraftRequest(null, null, null, null, null, null, null, null, null);
+        return new DropDraftRequest(null, null, null, null, null, null, null, null, null, null);
     }
 }

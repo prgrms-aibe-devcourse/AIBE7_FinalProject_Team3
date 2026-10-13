@@ -278,7 +278,7 @@ class DropStockQueryIntegrationTest {
         OffsetDateTime start = OffsetDateTime.now().plusDays(1);
         UUID imageId = UUID.randomUUID();
         return new DropDraftRequest(
-                "상품", "설명", List.of(new DropImageRequest(imageId, IMAGE_URL_PREFIX + imageId + ".jpg")),
+                "상품", "설명", List.of(new DropImageRequest(imageId, IMAGE_URL_PREFIX + imageId + ".jpg", null)), null,
                 categoryId, start, start.plusHours(2),
                 new ShippingRequest(3000L, "출고 안내"),
                 List.of(

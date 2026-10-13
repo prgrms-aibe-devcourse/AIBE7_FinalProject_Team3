@@ -169,9 +169,10 @@ public class Drop extends BaseEntity {
         }
     }
 
-    public void clearImages() {
+    // 용도별로 교체하므로(DROP.md 2.4) 지정한 용도의 이미지만 비우고 다른 용도는 남긴다.
+    public void clearImages(DropImageType imageType) {
         ensureEditable();
-        images.clear();
+        images.removeIf(image -> image.getImageType() == imageType);
     }
 
     public void clearOptionGroups() {

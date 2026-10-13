@@ -33,7 +33,7 @@ class DropDraftRequestTest {
     @DisplayName("모든 필드가 null이어도 임시 저장 요청은 유효하다")
     void allowsEmptyDraft() {
         // given
-        DropDraftRequest request = new DropDraftRequest(null, null, null, null, null, null, null, null, null);
+        DropDraftRequest request = new DropDraftRequest(null, null, null, null, null, null, null, null, null, null);
 
         // when & then
         assertThat(validator.validate(request)).isEmpty();
@@ -44,7 +44,7 @@ class DropDraftRequestTest {
     void rejectsBlankGroupKeyAndName() {
         // given
         OptionGroupRequest group = new OptionGroupRequest("", "", null, List.of());
-        DropDraftRequest request = new DropDraftRequest(null, null, null, null, null, null, null, List.of(group), null);
+        DropDraftRequest request = new DropDraftRequest(null, null, null, null, null, null, null, null, List.of(group), null);
 
         // when & then
         assertThat(validator.validate(request)).isNotEmpty();
@@ -55,7 +55,7 @@ class DropDraftRequestTest {
     void rejectsMissingOptionPriceAndQuantity() {
         // given
         OptionRequest option = new OptionRequest(List.of(), null, null, true, 0);
-        DropDraftRequest request = new DropDraftRequest(null, null, null, null, null, null, null, null, List.of(option));
+        DropDraftRequest request = new DropDraftRequest(null, null, null, null, null, null, null, null, null, List.of(option));
 
         // when & then
         assertThat(validator.validate(request)).isNotEmpty();
@@ -67,12 +67,12 @@ class DropDraftRequestTest {
         // imageUrl 501자
         String longUrl = "x".repeat(501);
         DropDraftRequest longUrlRequest = new DropDraftRequest(null, null,
-                List.of(new DropImageRequest(UUID.randomUUID(), longUrl)), null, null, null, null, null, null);
+                List.of(new DropImageRequest(UUID.randomUUID(), longUrl, null)), null, null, null, null, null, null, null);
         assertThat(validator.validate(longUrlRequest)).isNotEmpty();
 
         // imageId null
         DropDraftRequest nullIdRequest = new DropDraftRequest(null, null,
-                List.of(new DropImageRequest(null, "https://example.com/a.jpg")), null, null, null, null, null, null);
+                List.of(new DropImageRequest(null, "https://example.com/a.jpg", null)), null, null, null, null, null, null, null);
         assertThat(validator.validate(nullIdRequest)).isNotEmpty();
     }
 
@@ -81,22 +81,29 @@ class DropDraftRequestTest {
     void rejectsNullImageElement() {
         // given
         DropDraftRequest request = new DropDraftRequest(
-                null, null, singleNullElement(), null, null, null, null, null, null);
+                null, null, singleNullElement(), null, null, null, null, null, null, null);
 
         // when & then
         assertThat(validator.validate(request)).isNotEmpty();
     }
 
     @Test
-    @DisplayName("상품 이미지는 10개를 초과하면 검증에 실패한다")
-    void rejectsMoreThanTenImages() {
+    @DisplayName("대체 설명은 300자까지 허용하고 빈 문자열·null도 허용하며, detailImages 원소도 같은 규칙으로 검증한다")
+    void validatesAltTextLength() {
         // given
-        DropImageRequest image = new DropImageRequest(UUID.randomUUID(), "https://example.com/a.jpg");
-        DropDraftRequest request = new DropDraftRequest(
-                null, null, java.util.Collections.nCopies(11, image), null, null, null, null, null, null);
+        UUID imageId = UUID.randomUUID();
+        String url = "https://example.com/a.jpg";
+        DropDraftRequest valid = new DropDraftRequest(null, null,
+                List.of(new DropImageRequest(imageId, url, "가".repeat(300)), new DropImageRequest(imageId, url, "")),
+                List.of(new DropImageRequest(imageId, url, null)), null, null, null, null, null, null);
+        DropDraftRequest tooLong = new DropDraftRequest(null, null, null,
+                List.of(new DropImageRequest(imageId, url, "가".repeat(301))), null, null, null, null, null, null);
 
         // when & then
-        assertThat(validator.validate(request)).isNotEmpty();
+        assertThat(validator.validate(valid)).isEmpty();
+        assertThat(validator.validate(tooLong))
+                .extracting(violation -> violation.getPropertyPath().toString())
+                .containsExactly("detailImages[0].altText");
     }
 
     @Test
@@ -104,23 +111,23 @@ class DropDraftRequestTest {
     void rejectsNullElementsInNestedArrays() {
         // optionGroups: [null]
         assertThat(validator.validate(new DropDraftRequest(
-                null, null, null, null, null, null, null, singleNullElement(), null)))
+                null, null, null, null, null, null, null, null, singleNullElement(), null)))
                 .isNotEmpty();
         // options: [null]
         assertThat(validator.validate(new DropDraftRequest(
-                null, null, null, null, null, null, null, null, singleNullElement())))
+                null, null, null, null, null, null, null, null, null, singleNullElement())))
                 .isNotEmpty();
         // values: [null]
         OptionGroupRequest groupWithNullValueElement = new OptionGroupRequest(
                 "material", "소재", 0, java.util.Collections.singletonList(null));
         assertThat(validator.validate(new DropDraftRequest(
-                null, null, null, null, null, null, null, List.of(groupWithNullValueElement), null)))
+                null, null, null, null, null, null, null, null, List.of(groupWithNullValueElement), null)))
                 .isNotEmpty();
         // selections: [null]
         OptionRequest optionWithNullSelection = new OptionRequest(
                 java.util.Collections.singletonList(null), 1000L, 5, true, 0);
         assertThat(validator.validate(new DropDraftRequest(
-                null, null, null, null, null, null, null, null, List.of(optionWithNullSelection))))
+                null, null, null, null, null, null, null, null, null, List.of(optionWithNullSelection))))
                 .isNotEmpty();
     }
 
@@ -139,7 +146,7 @@ class DropDraftRequestTest {
         SelectionRequest selection = new SelectionRequest("material", "cotton");
         OptionRequest option = new OptionRequest(List.of(selection), 129000L, 10, true, 0);
         DropDraftRequest request = new DropDraftRequest(
-                "상품", "설명", List.of(new DropImageRequest(UUID.randomUUID(), "https://example.com/a.jpg")),
+                "상품", "설명", List.of(new DropImageRequest(UUID.randomUUID(), "https://example.com/a.jpg", null)), null,
                 1L, null, null, new ShippingRequest(3000L, "안내"), List.of(group), List.of(option));
 
         // when & then

@@ -195,13 +195,13 @@ class DropDraftPublishConcurrencyIntegrationTest {
                 List.of(new SelectionRequest("color", "black")), 5000L, 5, true, 0);
         UUID imageId = UUID.randomUUID();
         return new DropDraftRequest("상품", "설명",
-                List.of(new DropImageRequest(imageId, IMAGE_URL_PREFIX + imageId + ".jpg")), categoryId,
+                List.of(new DropImageRequest(imageId, IMAGE_URL_PREFIX + imageId + ".jpg", null)), null, categoryId,
                 java.time.OffsetDateTime.now().plusDays(1), java.time.OffsetDateTime.now().plusDays(2),
                 new ShippingRequest(3000L, "안내"), List.of(group), List.of(option));
     }
 
     private DropDraftRequest nameOnlyRequest(String name) {
-        return new DropDraftRequest(name, null, null, null, null, null, null, null, null);
+        return new DropDraftRequest(name, null, null, null, null, null, null, null, null, null);
     }
 
     private DropStatus statusOf(Long dropId) {

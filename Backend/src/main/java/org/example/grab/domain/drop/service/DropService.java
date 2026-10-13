@@ -39,8 +39,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -58,6 +60,8 @@ public class DropService {
     private static final int KEYWORD_MAX_LENGTH = 100;
     private static final String IMAGE_OBJECT_KEY_PREFIX = "images/";
     private static final List<String> IMAGE_EXTENSIONS = List.of("jpg", "png", "webp");
+    private static final int MAX_GALLERY_IMAGES = 5;
+    private static final int MAX_DETAIL_IMAGES = 15;
 
     private final DropRepository dropRepository;
     private final DropImageRepository dropImageRepository;
@@ -279,7 +283,10 @@ public class DropService {
         validateCategory(request.categoryId());
 
         // 그룹만 또는 옵션만 오면 기존 SKU가 조용히 삭제되므로, 옵션 구조는 둘 다 오거나 둘 다 없어야 한다.
-        boolean replaceImages = request.images() != null;
+        // 이미지는 용도별로 누락/null=유지, []=그 용도만 삭제, 배열=그 용도 전체 교체다(DROP.md 2.1·2.4).
+        boolean replaceGallery = request.images() != null;
+        boolean replaceDetail = request.detailImages() != null;
+        boolean replaceImages = replaceGallery || replaceDetail;
         boolean hasOptionGroups = request.optionGroups() != null;
         boolean hasOptions = request.options() != null;
         if (hasOptionGroups != hasOptions) {
@@ -291,7 +298,7 @@ public class DropService {
         }
         // 자식 컬렉션을 비우기 전에 imageId·imageUrl 관계와 다른 DROP 사용 여부를 먼저 검증한다.
         if (replaceImages) {
-            validateImages(request.images(), drop.getId());
+            validateImages(drop, request.images(), request.detailImages());
         }
         // 자식 컬렉션에는 sort_order 등 unique 제약이 있어, 삽입이 삭제보다 먼저 실행되면 충돌한다.
         // 컬렉션을 비우고 flush로 삭제를 먼저 확정한 뒤 새 자식을 추가한다(맵이 값·그룹을 참조하므로 옵션 → 그룹 순서).
@@ -301,13 +308,24 @@ public class DropService {
             drop.clearOptionGroups();
             dropRepository.flush();
         }
+        // 같은 DROP의 기존 이미지는 altText가 없으면 저장된 설명을 유지하므로(용도를 옮긴 경우 포함) 비우기 전에 읽어 둔다.
+        Map<UUID, String> savedAltTexts = new HashMap<>();
         if (replaceImages) {
-            drop.clearImages();
+            drop.getImages().forEach(image -> savedAltTexts.put(image.getUuid(), image.getAltText()));
+            if (replaceGallery) {
+                drop.clearImages(DropImageType.GALLERY);
+            }
+            if (replaceDetail) {
+                drop.clearImages(DropImageType.DETAIL);
+            }
             dropRepository.flush();
         }
 
-        if (replaceImages) {
-            toImages(drop, request.images()).forEach(drop::addImage);
+        if (replaceGallery) {
+            toImages(drop, request.images(), DropImageType.GALLERY, savedAltTexts).forEach(drop::addImage);
+        }
+        if (replaceDetail) {
+            toImages(drop, request.detailImages(), DropImageType.DETAIL, savedAltTexts).forEach(drop::addImage);
         }
         if (replaceOptions) {
             DropOptionAssembler.apply(drop, request.optionGroups(), request.options());
@@ -323,14 +341,21 @@ public class DropService {
         }
     }
 
-    // 이미지 정렬 순서는 요청 배열의 인덱스를 그대로 쓰고, alt_text는 정책 확정 전까지 상품명을 기본값으로 둔다.
-    private List<DropImage> toImages(Drop drop, List<DropImageRequest> images) {
-        String altText = drop.getName() != null ? drop.getName() : "";
+    /*
+        정렬 순서는 용도 안의 요청 배열 인덱스를 그대로 쓴다.
+        altText가 누락/null이면 같은 DROP의 기존 이미지는 저장된 설명을, 새 이미지는 상품명(없으면 빈 문자열)을 쓴다.
+        빈 문자열은 장식 이미지를 뜻하는 값이므로 그대로 저장한다.
+     */
+    private List<DropImage> toImages(Drop drop, List<DropImageRequest> images, DropImageType imageType,
+                                     Map<UUID, String> savedAltTexts) {
+        String defaultAltText = drop.getName() != null ? drop.getName() : "";
         List<DropImage> result = new ArrayList<>();
         for (int index = 0; index < images.size(); index++) {
             DropImageRequest image = images.get(index);
-            result.add(DropImage.create(
-                    drop, image.imageId(), image.imageUrl(), DropImageType.GALLERY, index, altText));
+            String altText = image.altText() != null
+                    ? image.altText()
+                    : savedAltTexts.getOrDefault(image.imageId(), defaultAltText);
+            result.add(DropImage.create(drop, image.imageId(), image.imageUrl(), imageType, index, altText));
         }
         return result;
     }
@@ -338,33 +363,73 @@ public class DropService {
     /*
         imageUrl을 그대로 믿지 않고 발급한 imageId와의 관계로 검증한다(GR-51 2-3).
         다른 사이트 URL이나 다른 이미지의 URL을 붙이는 것을 막고, 같은 요청·다른 DROP의 imageId 재사용도 거부한다.
+        개수·중복은 요청 적용 후의 최종 상태로 본다(DROP.md 2.1). 보내지 않은(null) 용도는 기존 이미지가 그대로 남으므로
+        그 개수를 세고, 남는 imageId를 다른 용도 배열에 보내면 같은 이미지가 두 번 남게 되어 중복으로 거부한다.
      */
-    private void validateImages(List<DropImageRequest> images, Long dropId) {
+    private void validateImages(Drop drop, List<DropImageRequest> gallery, List<DropImageRequest> detail) {
         List<ErrorResponse.FieldError> fieldErrors = new ArrayList<>();
+        List<DropImage> keptGallery = gallery == null ? drop.getGalleryImages() : List.of();
+        List<DropImage> keptDetail = detail == null ? drop.getDetailImages() : List.of();
+        if ((gallery != null ? gallery.size() : keptGallery.size()) > MAX_GALLERY_IMAGES) {
+            fieldErrors.add(new ErrorResponse.FieldError(
+                    "images", "GALLERY 이미지는 최대 " + MAX_GALLERY_IMAGES + "개입니다."));
+        }
+        if ((detail != null ? detail.size() : keptDetail.size()) > MAX_DETAIL_IMAGES) {
+            fieldErrors.add(new ErrorResponse.FieldError(
+                    "detailImages", "DETAIL 이미지는 최대 " + MAX_DETAIL_IMAGES + "개입니다."));
+        }
+
+        Set<UUID> keptImageIds = new HashSet<>();
+        keptGallery.forEach(image -> keptImageIds.add(image.getUuid()));
+        keptDetail.forEach(image -> keptImageIds.add(image.getUuid()));
         Set<UUID> requestedImageIds = new HashSet<>();
-        images.forEach(image -> requestedImageIds.add(image.imageId()));
+        if (gallery != null) {
+            gallery.forEach(image -> requestedImageIds.add(image.imageId()));
+        }
+        if (detail != null) {
+            detail.forEach(image -> requestedImageIds.add(image.imageId()));
+        }
         Set<UUID> usedByOtherDrop = requestedImageIds.isEmpty()
                 ? Set.of()
-                : dropImageRepository.findUuidsUsedByOtherDrop(requestedImageIds, dropId);
+                : dropImageRepository.findUuidsUsedByOtherDrop(requestedImageIds, drop.getId());
+
         Set<UUID> seenImageIds = new HashSet<>();
+        if (gallery != null) {
+            validateImageElements("images", gallery, keptImageIds, seenImageIds, usedByOtherDrop, fieldErrors);
+        }
+        if (detail != null) {
+            validateImageElements("detailImages", detail, keptImageIds, seenImageIds, usedByOtherDrop, fieldErrors);
+        }
+        if (!fieldErrors.isEmpty()) {
+            throw new BusinessException(CommonErrorCode.VALIDATION_FAILED, fieldErrors);
+        }
+    }
+
+    // seenImageIds는 두 용도 배열이 함께 쓰므로 GALLERY에 이미 나온 imageId가 DETAIL에 다시 오면 중복이다.
+    private void validateImageElements(String field, List<DropImageRequest> images, Set<UUID> keptImageIds,
+                                       Set<UUID> seenImageIds, Set<UUID> usedByOtherDrop,
+                                       List<ErrorResponse.FieldError> fieldErrors) {
         for (int index = 0; index < images.size(); index++) {
             DropImageRequest image = images.get(index);
+            String path = field + "[" + index + "]";
+            if (keptImageIds.contains(image.imageId())) {
+                fieldErrors.add(new ErrorResponse.FieldError(
+                        path + ".imageId", "수정하지 않는 다른 용도에 이미 있는 imageId입니다."));
+                continue;
+            }
             if (!seenImageIds.add(image.imageId())) {
                 fieldErrors.add(new ErrorResponse.FieldError(
-                        "images[" + index + "].imageId", "같은 요청에서 imageId가 중복됩니다."));
+                        path + ".imageId", "같은 요청에서 imageId가 중복됩니다."));
                 continue;
             }
             if (!isExpectedImageUrl(image.imageId(), image.imageUrl())) {
                 fieldErrors.add(new ErrorResponse.FieldError(
-                        "images[" + index + "].imageUrl", "imageId와 일치하는 공개 이미지 URL이 아닙니다."));
+                        path + ".imageUrl", "imageId와 일치하는 공개 이미지 URL이 아닙니다."));
             }
             if (usedByOtherDrop.contains(image.imageId())) {
                 fieldErrors.add(new ErrorResponse.FieldError(
-                        "images[" + index + "].imageId", "다른 DROP이 이미 사용 중인 imageId입니다."));
+                        path + ".imageId", "다른 DROP이 이미 사용 중인 imageId입니다."));
             }
-        }
-        if (!fieldErrors.isEmpty()) {
-            throw new BusinessException(CommonErrorCode.VALIDATION_FAILED, fieldErrors);
         }
     }
 

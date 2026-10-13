@@ -81,7 +81,7 @@ class DropTest {
                     .as("updateDraft status=%s", status)
                     .isInstanceOf(BusinessException.class)
                     .extracting("errorCode").isEqualTo(DropErrorCode.DROP_NOT_EDITABLE);
-            assertThatThrownBy(drop::clearImages)
+            assertThatThrownBy(() -> drop.clearImages(DropImageType.GALLERY))
                     .as("clearImages status=%s", status)
                     .isInstanceOf(BusinessException.class)
                     .extracting("errorCode").isEqualTo(DropErrorCode.DROP_NOT_EDITABLE);
@@ -160,18 +160,20 @@ class DropTest {
     }
 
     @Test
-    @DisplayName("clearImages는 기존 이미지를 모두 제거한다")
+    @DisplayName("clearImages는 지정한 용도의 이미지만 제거하고 다른 용도는 남긴다")
     void clearImages() {
         // given
         Drop drop = Drop.createDraft(SELLER_ID);
         drop.addImage(DropImage.create(drop, UUID.randomUUID(), "a.jpg", DropImageType.GALLERY, 0, "a"));
         drop.addImage(DropImage.create(drop, UUID.randomUUID(), "b.jpg", DropImageType.GALLERY, 1, "b"));
+        drop.addImage(DropImage.create(drop, UUID.randomUUID(), "d.jpg", DropImageType.DETAIL, 0, "d"));
 
         // when
-        drop.clearImages();
+        drop.clearImages(DropImageType.GALLERY);
 
         // then
-        assertThat(drop.getImages()).isEmpty();
+        assertThat(drop.getGalleryImages()).isEmpty();
+        assertThat(drop.getDetailImages()).extracting(DropImage::getImageUrl).containsExactly("d.jpg");
     }
 
     @Test

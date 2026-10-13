@@ -302,7 +302,7 @@ class PublicDropDetailIntegrationTest {
         OffsetDateTime start = OffsetDateTime.now().plusDays(1);
         UUID imageId = UUID.randomUUID();
         DropDraftRequest request = new DropDraftRequest(
-                "상품", "설명", List.of(new DropImageRequest(imageId, IMAGE_URL_PREFIX + imageId + ".jpg")),
+                "상품", "설명", List.of(new DropImageRequest(imageId, IMAGE_URL_PREFIX + imageId + ".jpg", null)), null,
                 categoryId, start, start.plusHours(2),
                 new ShippingRequest(3000L, "출고 안내"),
                 List.of(
@@ -327,7 +327,7 @@ class PublicDropDetailIntegrationTest {
     }
 
     private DropDraftRequest emptyRequest() {
-        return new DropDraftRequest(null, null, null, null, null, null, null, null, null);
+        return new DropDraftRequest(null, null, null, null, null, null, null, null, null, null);
     }
 
     private Long insertSeller() {
