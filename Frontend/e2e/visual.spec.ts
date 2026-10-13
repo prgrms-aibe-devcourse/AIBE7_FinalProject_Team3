@@ -79,6 +79,18 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
     await shot(page, 'seller-drop-detail')
   })
 
+  test('seller-inventory', async ({ page }) => {
+    await loginSeller(page)
+    await page.evaluate(() => {
+      window.location.hash = '#/seller/inventory?status=GRAB&page=0&dropId=201'
+    })
+    await expect(
+      page.getByRole('region', { name: '선택 상품 옵션별 재고' }),
+    ).toContainText('와이드 / 롱')
+    await expect(page.getByRole('status')).toBeEmpty()
+    await shot(page, 'seller-inventory')
+  })
+
   test('checkout', async ({ page }) => {
     await page.goto('/#/checkout/demo-pending')
     await page.getByLabel('이메일').fill('grab@example.com')
