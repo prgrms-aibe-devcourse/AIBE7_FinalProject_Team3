@@ -22,8 +22,9 @@ sealed interface PaymentPreparation {
     record Ready(Long paymentId, PaymentConfirmCommand command, PayableOrder order) implements PaymentPreparation {
     }
 
-    // 결과가 확정되지 않은 이전 결제가 새 결제를 막고 있어, PG 조회로 먼저 정리해야 한다.
+    // 결과가 확정되지 않은 이전 결제를 PG 조회로 정리해야 한다. 새 결제를 막고 있는 결제와, 진행 중 결제 정리 배치가 선점한 결제에 쓴다.
     // command는 이전 결제의 승인 요청 그대로다. 승인 요청이 PG에 닿지 않았으면 같은 서버 멱등 키로 다시 보낸다.
-    record Resolve(Long paymentId, PaymentConfirmCommand command) implements PaymentPreparation {
+    // confirmable이 false면(결제할 수 없는 주문) 조회만 하고 승인은 다시 요청하지 않는다.
+    record Resolve(Long paymentId, PaymentConfirmCommand command, boolean confirmable) implements PaymentPreparation {
     }
 }

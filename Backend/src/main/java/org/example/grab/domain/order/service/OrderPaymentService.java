@@ -153,6 +153,7 @@ public class OrderPaymentService {
     /**
      * 진행 중 결제 정리 배치가 승인 재요청 여부를 정할 때 주문을 읽는다(ERD.md 3.2). 잠그지 않는다.
      * 읽은 뒤 주문이 바뀌어도 결과 반영(lockForPaymentResult)이 주문을 잠그고 다시 판정한다.
+     * 최종 상태 변경을 위한 확정 정보가 아니라, 승인 재요청 여부를 판단하기 위한 조회 시점의 정보
      */
     @Transactional(propagation = Propagation.MANDATORY, readOnly = true)
     public PayableOrder findForPaymentReconciliation(Long orderId) {

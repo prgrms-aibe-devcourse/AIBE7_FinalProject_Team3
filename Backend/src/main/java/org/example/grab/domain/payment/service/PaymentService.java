@@ -76,9 +76,9 @@ public class PaymentService {
                 Payment payment = confirm(ready.paymentId(), ready.command());
                 return PaymentResponse.of(payment, ready.order());
             }
-            // 새 결제 요청은 prepare에서 결제 가능한 주문임을 확인했으므로 승인 재요청을 허용한다.
+            // 새 결제 요청은 prepare에서 결제 가능한 주문임을 확인했으므로 confirmable이 true다.
             PaymentPreparation.Resolve resolve = (PaymentPreparation.Resolve) preparation;
-            resolve(resolve.paymentId(), resolve.command(), true);
+            resolve(resolve.paymentId(), resolve.command(), resolve.confirmable());
         }
         throw new BusinessException(PaymentErrorCode.PAYMENT_ALREADY_PROCESSED);
     }
@@ -112,7 +112,7 @@ public class PaymentService {
      * 진행 중 결제 정리 배치가 선점한 결제를 정리한다(ERD.md 3.2). 사용자 요청의 정리와 같은 규칙을 쓰고,
      * 남기는 결제 이벤트의 경로만 RECONCILIATION으로 한다. 트랜잭션 밖에서 호출해야 한다.
      */
-    Payment reconcile(ReconciliationTarget target) {
+    Payment reconcile(PaymentPreparation.Resolve target) {
         return resolve(target.paymentId(), target.command(), target.confirmable(), PaymentEventSource.RECONCILIATION);
     }
 

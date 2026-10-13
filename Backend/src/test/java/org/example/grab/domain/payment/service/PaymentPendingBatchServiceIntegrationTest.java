@@ -43,13 +43,16 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-// 진행 중 결제 정리 배치(ERD.md 3.2)가 대상을 선점하고 PG 조회로 확정하는지 실제 DB로 확인한다.
+// 결제 대기 배치(ERD.md 3.2)의 진행 중 결제 정리와 결제 대기 만료를 실제 DB로 확인한다. 서비스 트랜잭션이 실제로 커밋된다.
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
-class PaymentInProgressCleanupIntegrationTest {
+class PaymentPendingBatchServiceIntegrationTest {
+
+    // 만료 테스트는 다른 테스트 데이터와 섞이지 않도록 과거 시각에 마감되는 주문만 다룬다.
+    private static final OffsetDateTime EXPIRY_BASE = OffsetDateTime.of(2001, 2, 3, 0, 0, 0, 0, ZoneOffset.UTC);
 
     @Autowired
-    private PaymentInProgressCleanupService cleanupService;
+    private PaymentPendingBatchService batchService;
 
     @Autowired
     private PaymentTransactionService transactionService;
@@ -83,6 +86,8 @@ class PaymentInProgressCleanupIntegrationTest {
         fixture.cleanup();
     }
 
+    // ===== 진행 중 결제 정리 =====
+
     @Test
     @DisplayName("60초 넘게 바뀌지 않은 PENDING·UNKNOWN 결제만 선점하고 updated_at을 바꿔, 바로 다시 선점하지 않는다")
     void claimsOnlyStaleInProgressPayments() {
@@ -115,7 +120,7 @@ class PaymentInProgressCleanupIntegrationTest {
                 "DONE", order.getOrderNumber(), PaymentTestFixture.TOTAL_AMOUNT, now.minusMinutes(1)));
 
         // when
-        cleanupService.cleanUp(now);
+        batchService.cleanUpInProgress(now);
 
         // then
         assertThat(fixture.payments(order)).singleElement()
@@ -137,7 +142,7 @@ class PaymentInProgressCleanupIntegrationTest {
                 "DONE", order.getOrderNumber(), PaymentTestFixture.TOTAL_AMOUNT, now));
 
         // when
-        cleanupService.cleanUp(now);
+        batchService.cleanUpInProgress(now);
 
         // then
         ArgumentCaptor<PaymentConfirmCommand> command = ArgumentCaptor.forClass(PaymentConfirmCommand.class);
@@ -158,14 +163,12 @@ class PaymentInProgressCleanupIntegrationTest {
         // given
         Order order = fixture.createOrder();
         unknownPayment(order, now.minusMinutes(2));
-        // 마감은 생성 시각보다 뒤여야 하므로(ck_orders_payment_expiry) 생성 시각도 함께 과거로 돌린다.
-        jdbcTemplate.update("UPDATE orders SET created_at = ?, payment_expires_at = ? WHERE id = ?",
-                now.minusMinutes(20), now.minusSeconds(1), order.getId());
+        moveOrderDeadline(order, now.minusSeconds(1));
         given(paymentGateway.lookup("payment-" + order.getId()))
                 .willReturn(PaymentGatewayResult.awaitingConfirmation("IN_PROGRESS"));
 
         // when
-        int settled = cleanupService.cleanUp(now);
+        int settled = batchService.cleanUpInProgress(now);
 
         // then
         verify(paymentGateway, never()).confirm(any());
@@ -208,12 +211,45 @@ class PaymentInProgressCleanupIntegrationTest {
         }
     }
 
+    // ===== 결제 대기 만료 =====
+
+    @Test
+    @DisplayName("마감이 지난 결제 대기 주문만 만료해 선점 재고를 돌려주고, 다시 실행하면 아무것도 바꾸지 않는다")
+    void expiresDueOrdersOnce() {
+        // given: 마감이 지난 주문 두 건, 마감 전 주문 한 건, 결제된 주문 한 건
+        Order first = fixture.createOrder();
+        Order second = fixture.createOrder();
+        Order notDue = fixture.createOrder();
+        Order paid = fixture.createOrder();
+        moveOrderDeadline(first, EXPIRY_BASE.plusMinutes(1));
+        moveOrderDeadline(second, EXPIRY_BASE.plusMinutes(2));
+        moveOrderDeadline(notDue, EXPIRY_BASE.plusMinutes(10));
+        moveOrderDeadline(paid, EXPIRY_BASE.plusMinutes(1));
+        jdbcTemplate.update("UPDATE orders SET status = 'PAID', paid_at = payment_expires_at WHERE id = ?",
+                paid.getId());
+        OffsetDateTime expiryNow = EXPIRY_BASE.plusMinutes(5);
+
+        // when
+        int firstRun = batchService.expireDue(expiryNow);
+        int secondRun = batchService.expireDue(expiryNow.plusSeconds(10));
+
+        // then
+        assertThat(firstRun).isEqualTo(2);
+        assertThat(secondRun).isZero();
+        assertThat(fixture.orderStatus(first)).isEqualTo(OrderStatus.EXPIRED);
+        assertThat(fixture.orderStatus(second)).isEqualTo(OrderStatus.EXPIRED);
+        assertThat(fixture.orderStatus(notDue)).isEqualTo(OrderStatus.PAYMENT_PENDING);
+        assertThat(fixture.orderStatus(paid)).isEqualTo(OrderStatus.PAID);
+        // 네 건이 같은 수량씩 선점했고 만료된 두 건만 돌려받았다
+        assertThat(fixture.quantities()).containsEntry("reserved_quantity", 2 * PaymentTestFixture.QUANTITY);
+    }
+
     private Long pendingPayment(Order order, OffsetDateTime updatedAt) {
         PaymentPreparation.Ready ready = (PaymentPreparation.Ready) transactionService.prepare(
                 fixture.buyerId(), order.getUuid(), IdempotencyKey.from(UUID.randomUUID().toString()),
                 RequestHash.from("d".repeat(64)),
                 new PaymentRequest("payment-" + order.getId(), PaymentTestFixture.TOTAL_AMOUNT), now.minusMinutes(5));
-        setTimes(ready.paymentId(), updatedAt);
+        setPaymentTimes(ready.paymentId(), updatedAt);
         return ready.paymentId();
     }
 
@@ -221,7 +257,7 @@ class PaymentInProgressCleanupIntegrationTest {
         Long paymentId = pendingPayment(order, updatedAt);
         PaymentGatewayResult unknown = PaymentGatewayResult.unknown(null, null, "결제 승인 응답을 확인하지 못했습니다.");
         transactionService.applyResult(paymentId, unknown, unknown, now.minusMinutes(5));
-        setTimes(paymentId, updatedAt);
+        setPaymentTimes(paymentId, updatedAt);
         return paymentId;
     }
 
@@ -229,14 +265,20 @@ class PaymentInProgressCleanupIntegrationTest {
         Long paymentId = pendingPayment(order, updatedAt);
         transactionService.applyResult(paymentId,
                 PaymentGatewayResult.notApproved("ABORTED", "REJECT_CARD_PAYMENT", "거절"), null, now.minusMinutes(5));
-        setTimes(paymentId, updatedAt);
+        setPaymentTimes(paymentId, updatedAt);
         return paymentId;
     }
 
     // 생성·변경 시각을 과거로 돌려 정리 대상이 되게 한다. 생성 시각은 10분 경고에 걸리지 않게 변경 시각과 같게 둔다.
-    private void setTimes(Long paymentId, OffsetDateTime updatedAt) {
+    private void setPaymentTimes(Long paymentId, OffsetDateTime updatedAt) {
         jdbcTemplate.update("UPDATE payments SET created_at = ?, updated_at = ? WHERE id = ?",
                 updatedAt, updatedAt, paymentId);
+    }
+
+    // 마감은 생성 시각보다 뒤여야 하므로(ck_orders_payment_expiry) 생성 시각도 함께 옮긴다.
+    private void moveOrderDeadline(Order order, OffsetDateTime paymentExpiresAt) {
+        jdbcTemplate.update("UPDATE orders SET created_at = ?, payment_expires_at = ? WHERE id = ?",
+                paymentExpiresAt.minusMinutes(20), paymentExpiresAt, order.getId());
     }
 
     private OffsetDateTime updatedAt(Long paymentId) {

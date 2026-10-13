@@ -4,7 +4,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -20,55 +19,36 @@ import java.time.ZoneOffset;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
-import static org.mockito.Mockito.inOrder;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
 
 @ExtendWith(MockitoExtension.class)
 class PaymentPendingBatchSchedulerTest {
 
     @Mock
-    private PaymentInProgressCleanupService paymentInProgressCleanupService;
-
-    @Mock
-    private PaymentExpiryService paymentExpiryService;
+    private PaymentPendingBatchService paymentPendingBatchService;
 
     @InjectMocks
     private PaymentPendingBatchScheduler scheduler;
 
     @Test
-    @DisplayName("진행 중 결제 정리를 만료보다 먼저 실행하고, 두 작업에 같은 UTC 현재 시각을 전달한다")
-    void cleansUpBeforeExpiryWithSameUtcNow() {
+    @DisplayName("UTC 현재 시각을 만들어 결제 대기 배치에 전달한다")
+    void passesUtcNowToBatch() {
         // when
         scheduler.run();
 
         // then
-        ArgumentCaptor<OffsetDateTime> cleanUpNow = ArgumentCaptor.forClass(OffsetDateTime.class);
-        ArgumentCaptor<OffsetDateTime> expiryNow = ArgumentCaptor.forClass(OffsetDateTime.class);
-        InOrder order = inOrder(paymentInProgressCleanupService, paymentExpiryService);
-        order.verify(paymentInProgressCleanupService).cleanUp(cleanUpNow.capture());
-        order.verify(paymentExpiryService).expire(expiryNow.capture());
-        assertThat(cleanUpNow.getValue().getOffset()).isEqualTo(ZoneOffset.UTC);
-        assertThat(expiryNow.getValue()).isEqualTo(cleanUpNow.getValue());
+        ArgumentCaptor<OffsetDateTime> captor = ArgumentCaptor.forClass(OffsetDateTime.class);
+        then(paymentPendingBatchService).should().run(captor.capture());
+        assertThat(captor.getValue().getOffset()).isEqualTo(ZoneOffset.UTC);
     }
 
     @Test
-    @DisplayName("진행 중 결제 정리에서 예외가 나도 만료는 실행한다")
-    void expiresEvenIfCleanUpFails() {
-        // given
-        given(paymentInProgressCleanupService.cleanUp(any())).willThrow(new RuntimeException("일시적 DB 오류"));
-
-        // when & then
-        assertThatCode(scheduler::run).doesNotThrowAnyException();
-        then(paymentExpiryService).should().expire(any());
-    }
-
-    @Test
-    @DisplayName("만료 중 예외가 나도 밖으로 전파하지 않아 다음 실행이 이어진다")
+    @DisplayName("배치에서 예외가 나도 밖으로 전파하지 않아 다음 실행이 이어진다")
     void swallowsException() {
         // given
-        given(paymentExpiryService.expire(any())).willThrow(new RuntimeException("일시적 DB 오류"));
+        willThrow(new RuntimeException("일시적 오류")).given(paymentPendingBatchService).run(any());
 
         // when & then
         assertThatCode(scheduler::run).doesNotThrowAnyException();
@@ -97,13 +77,8 @@ class PaymentPendingBatchSchedulerTest {
     static class SchedulerTestConfig {
 
         @Bean
-        PaymentInProgressCleanupService paymentInProgressCleanupService() {
-            return mock(PaymentInProgressCleanupService.class);
-        }
-
-        @Bean
-        PaymentExpiryService paymentExpiryService() {
-            return mock(PaymentExpiryService.class);
+        PaymentPendingBatchService paymentPendingBatchService() {
+            return mock(PaymentPendingBatchService.class);
         }
     }
 }

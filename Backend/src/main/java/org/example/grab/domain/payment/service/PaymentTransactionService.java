@@ -101,7 +101,7 @@ public class PaymentTransactionService {
                     .filter(payment -> isResolvable(payment, now))
                     .findFirst()
                     .map(payment -> (PaymentPreparation) new PaymentPreparation.Resolve(
-                            payment.getId(), confirmCommand(payment, order)))
+                            payment.getId(), confirmCommand(payment, order), true))
                     .orElseThrow(() -> new BusinessException(PaymentErrorCode.PAYMENT_ALREADY_PROCESSED));
         }
         if (paymentRepository.existsByProviderAndProviderPaymentId(PROVIDER, request.paymentKey())) {
@@ -208,16 +208,15 @@ public class PaymentTransactionService {
      * 승인 재요청 여부는 사용자 재전송(ResolveReplay)과 같은 PayableOrder.isPayable로 정한다.
      */
     @Transactional(readOnly = true)
-    public Optional<ReconciliationTarget> findReconciliationTarget(Long paymentId, OffsetDateTime now) {
+    public Optional<PaymentPreparation.Resolve> findReconciliationTarget(Long paymentId, OffsetDateTime now) {
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new IllegalStateException("결제 시도가 없습니다: " + paymentId));
         if (!payment.isInProgress()) {
             return Optional.empty();
         }
         PayableOrder order = orderPaymentService.findForPaymentReconciliation(payment.getOrderId());
-        return Optional.of(new ReconciliationTarget(
-                payment.getId(), confirmCommand(payment, order), order.isPayable(now),
-                payment.getStatus(), payment.getCreatedAt()));
+        return Optional.of(new PaymentPreparation.Resolve(
+                payment.getId(), confirmCommand(payment, order), order.isPayable(now)));
     }
 
     private void validatePayable(PayableOrder order, PaymentRequest request, OffsetDateTime now) {

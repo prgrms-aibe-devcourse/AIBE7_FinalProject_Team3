@@ -42,17 +42,24 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
      */
     @Query(value = """
             WITH claimed AS (
-                SELECT id FROM payments
-                WHERE status IN ('PENDING', 'UNKNOWN')
+                SELECT id FROM payments 
+                WHERE status IN ('PENDING', 'UNKNOWN') -- 결과를 아직 확정하지 못한 결제만 선택한다.
+                -- 최근 변경된 결제는 제외한다.
+                -- 호출부가 now - 60초를 전달하므로,
+                -- 마지막 변경 후 60초 이상 지난 결제가 대상이다.
                   AND updated_at <= :staleBefore
+                -- 오래 변경되지 않은 결제부터 선택한다.
+                -- 시간이 같으면 ID로 순서를 정한다.
                 ORDER BY updated_at, id
                 LIMIT :limit
                 FOR UPDATE SKIP LOCKED
             )
+            -- 위에서 선택한 결제의 마지막 변경 시각을 갱신.
             UPDATE payments p
             SET updated_at = :now
             FROM claimed
             WHERE p.id = claimed.id
+            -- 실제 갱신한 결제의 ID를 반환.
             RETURNING p.id
             """, nativeQuery = true)
     List<Long> claimInProgressForReconciliation(
