@@ -82,7 +82,6 @@ export default function HomePage({ wishes, toggleWish, notify }: SharedProps) {
   return (
     <>
       <section className="home-intro">
-        <h1>발견한 취향을 놓치지 않도록.</h1>
         <img
           className="home-brand-image"
           src={heroBackground}

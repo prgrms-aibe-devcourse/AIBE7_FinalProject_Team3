@@ -307,12 +307,6 @@ p {
   }
 }
 
-.home-intro h2 {
-  margin: 0 0 16px;
-  font-size: clamp(20px, 2vw, 24px);
-  font-weight: 500;
-  line-height: 1.5;
-}
 .home-brand-image {
   display: block;
   width: 100%;

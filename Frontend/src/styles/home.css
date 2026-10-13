@@ -1,10 +1,3 @@
-.home-intro h1 {
-  margin: 0 0 16px;
-  font-size: clamp(20px, 2vw, 24px);
-  font-weight: 500;
-  line-height: 1.5;
-  letter-spacing: -0.6px;
-}
 .home-brand-image {
   width: 100%;
   height: auto;
