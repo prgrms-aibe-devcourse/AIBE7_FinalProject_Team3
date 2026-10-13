@@ -73,7 +73,7 @@ class DropTest {
         // given
         for (DropStatus status : List.of(DropStatus.GRAB, DropStatus.ENDED)) {
             Drop drop = dropWith(status, OffsetDateTime.now(), OffsetDateTime.now().plusHours(1));
-            drop.addImage(DropImage.create(drop, UUID.randomUUID(), "https://example.com/a.jpg", 0, "상품"));
+            drop.addImage(DropImage.create(drop, UUID.randomUUID(), "https://example.com/a.jpg", DropImageType.GALLERY, 0, "상품"));
             addOption(drop, 1000L, 5, true);
 
             // when & then: 핵심 판매 조건 변경과 자식 초기화가 모두 막힌다
@@ -149,8 +149,8 @@ class DropTest {
     void clearImages() {
         // given
         Drop drop = Drop.createDraft(SELLER_ID);
-        drop.addImage(DropImage.create(drop, UUID.randomUUID(), "a.jpg", 0, "a"));
-        drop.addImage(DropImage.create(drop, UUID.randomUUID(), "b.jpg", 1, "b"));
+        drop.addImage(DropImage.create(drop, UUID.randomUUID(), "a.jpg", DropImageType.GALLERY, 0, "a"));
+        drop.addImage(DropImage.create(drop, UUID.randomUUID(), "b.jpg", DropImageType.GALLERY, 1, "b"));
 
         // when
         drop.clearImages();

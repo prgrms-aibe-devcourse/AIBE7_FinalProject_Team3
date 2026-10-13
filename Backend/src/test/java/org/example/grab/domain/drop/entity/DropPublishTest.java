@@ -187,7 +187,7 @@ class DropPublishTest {
     private Drop readyDrop() {
         Drop drop = Drop.createDraft(1L);
         drop.updateDraft("상품", "설명", 1L, 3000L, "안내", NOW.plusDays(1), NOW.plusDays(2));
-        drop.addImage(DropImage.create(drop, UUID.randomUUID(), "https://example.com/a.jpg", 0, "상품"));
+        drop.addImage(DropImage.create(drop, UUID.randomUUID(), "https://example.com/a.jpg", DropImageType.GALLERY, 0, "상품"));
         return drop;
     }
 

@@ -19,6 +19,7 @@ import org.example.grab.domain.wish.WishNotice;
 import org.example.grab.domain.wish.service.WishQueryService;
 import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.domain.drop.entity.DropImage;
+import org.example.grab.domain.drop.entity.DropImageType;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.entity.option.DropOption;
 import org.example.grab.domain.drop.entity.option.DropOptionGroup;
@@ -418,7 +419,7 @@ class DropServiceTest {
         Drop drop = Drop.createDraft(1L);
         drop.updateDraft("상품", "설명", 1L, 3000L, "안내",
                 OffsetDateTime.now().plusDays(1), OffsetDateTime.now().plusDays(2));
-        drop.addImage(DropImage.create(drop, UUID.randomUUID(), "https://example.com/a.jpg", 0, "상품"));
+        drop.addImage(DropImage.create(drop, UUID.randomUUID(), "https://example.com/a.jpg", DropImageType.GALLERY, 0, "상품"));
         drop.addOption(DropOption.create(drop, 1000L, 5, 0));
         given(dropRepository.findByIdForUpdate(10L)).willReturn(Optional.of(drop));
         given(categoryService.isActive(1L)).willReturn(false);
@@ -911,7 +912,7 @@ class DropServiceTest {
         // given
         Drop drop = Drop.createDraft(1L);
         ReflectionTestUtils.setField(drop, "id", 10L);
-        drop.addImage(DropImage.create(drop, UUID.randomUUID(), "old.jpg", 0, "상품"));
+        drop.addImage(DropImage.create(drop, UUID.randomUUID(), "old.jpg", DropImageType.GALLERY, 0, "상품"));
         given(dropRepository.findByIdForUpdate(10L)).willReturn(Optional.of(drop));
 
         // when

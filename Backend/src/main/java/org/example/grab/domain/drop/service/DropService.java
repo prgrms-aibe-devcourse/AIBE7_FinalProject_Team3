@@ -17,6 +17,7 @@ import org.example.grab.domain.drop.dto.response.SellerDropListResponse;
 import org.example.grab.domain.drop.dto.response.SellerDropWishCountResponse;
 import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.domain.drop.entity.DropImage;
+import org.example.grab.domain.drop.entity.DropImageType;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.domain.drop.repository.DropImageRepository;
@@ -328,7 +329,8 @@ public class DropService {
         List<DropImage> result = new ArrayList<>();
         for (int index = 0; index < images.size(); index++) {
             DropImageRequest image = images.get(index);
-            result.add(DropImage.create(drop, image.imageId(), image.imageUrl(), index, altText));
+            result.add(DropImage.create(
+                    drop, image.imageId(), image.imageUrl(), DropImageType.GALLERY, index, altText));
         }
         return result;
     }
