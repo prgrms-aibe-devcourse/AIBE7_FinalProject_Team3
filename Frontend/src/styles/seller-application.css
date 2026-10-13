@@ -94,6 +94,7 @@
   justify-content: space-between;
   gap: 20px;
   margin-bottom: 24px;
+  padding: 24px;
 }
 .seller-review-controls label,
 .seller-review-actions label {
@@ -108,17 +109,18 @@
   min-width: 0;
   padding: 11px 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 4px;
   background: #fff;
 }
 .seller-review-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-  gap: 24px;
+  gap: 28px;
 }
 .seller-review-list,
 .seller-review-detail {
   min-width: 0;
+  padding: 24px;
 }
 .seller-review-list h2,
 .seller-review-detail h2 {
@@ -136,7 +138,7 @@
   width: 100%;
   padding: 16px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 4px;
   background: #fff;
   color: var(--ink);
   text-align: left;
@@ -145,6 +147,7 @@
 .seller-review-item[aria-pressed='true'] {
   border-color: var(--ink);
   background: var(--soft);
+  box-shadow: inset 3px 0 var(--ink);
 }
 .seller-review-item small,
 .seller-review-detail small,
@@ -201,6 +204,14 @@
   height: 110px;
   object-fit: contain;
 }
+.seller-review-detail {
+  border-top: 3px solid var(--ink);
+}
+.seller-review-item small,
+.seller-review-detail > strong,
+.seller-application-status {
+  overflow-wrap: anywhere;
+}
 @media (max-width: 720px) {
   .seller-apply-intro {
     min-height: 280px;
@@ -209,5 +220,10 @@
   .seller-apply-symbol {
     width: 84px;
     height: 84px;
+  }
+  .seller-review-controls,
+  .seller-review-list,
+  .seller-review-detail {
+    padding: 20px;
   }
 }
