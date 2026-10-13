@@ -60,7 +60,8 @@ public class DropController {
     }
 
     // 공개 DROP 상세. 비로그인 조회이며 DRAFT는 서비스가 DROP_NOT_FOUND로 숨긴다.
-    @Operation(summary = "공개 DROP 상세 조회", description = "옵션, 판매 일정, 배송 정보를 함께 반환한다. DRAFT는 없는 DROP으로 처리한다")
+    @Operation(summary = "공개 DROP 상세 조회", description = "옵션, 판매 일정, 배송 정보를 함께 반환한다. 이미지는 galleryImages·detailImages로 나누고 "
+                    + "imageUrls는 GALLERY URL만 담는다. DRAFT는 없는 DROP으로 처리한다")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "INVALID_REQUEST")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "DROP_NOT_FOUND")

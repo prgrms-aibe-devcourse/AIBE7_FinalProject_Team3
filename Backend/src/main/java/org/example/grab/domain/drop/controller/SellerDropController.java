@@ -43,7 +43,8 @@ public class SellerDropController {
     private final CurrentSellerIdProvider currentSellerIdProvider;
 
     @Operation(summary = "DROP 임시 저장",
-            description = "DRAFT로 저장하며 일부 항목이 비어 있어도 된다. 이미지·옵션 규칙은 DROP.md 2.1 참고")
+            description = "DRAFT로 저장하며 일부 항목이 비어 있어도 된다. images는 GALLERY(최대 5개), "
+                    + "detailImages는 DETAIL(최대 15개)이다. 이미지·옵션 규칙은 DROP.md 2.1 참고")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "저장 성공")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "INVALID_REQUEST, VALIDATION_FAILED")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "AUTHENTICATION_REQUIRED, INVALID_TOKEN")
@@ -59,7 +60,8 @@ public class SellerDropController {
     }
 
     @Operation(summary = "DRAFT DROP 수정",
-            description = "보낸 필드만 바꾼다. DRAFT 상태에서만 수정할 수 있다. 누락·빈 배열의 의미는 DROP.md 2.4 참고")
+            description = "보낸 필드만 바꾼다. DRAFT 상태에서만 수정할 수 있다. images·detailImages는 용도별로 "
+                    + "누락/null=유지, []=삭제, 배열=교체다. 자세한 규칙은 DROP.md 2.4 참고")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "수정 성공")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "INVALID_REQUEST, VALIDATION_FAILED")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "AUTHENTICATION_REQUIRED, INVALID_TOKEN")
@@ -77,7 +79,8 @@ public class SellerDropController {
     }
 
     @Operation(summary = "DROP 공개",
-            description = "DRAFT를 WISH로 바꾼다. 공개 전에 필수 항목·일정·옵션을 모두 검증하고 위반 항목은 fieldErrors로 알려준다")
+            description = "DRAFT를 WISH로 바꾼다. 공개 전에 필수 항목(GALLERY 이미지 1개 이상 포함)·일정·옵션을 모두 검증하고 "
+                    + "위반 항목은 fieldErrors로 알려준다")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "공개 성공")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "INVALID_REQUEST, VALIDATION_FAILED")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "AUTHENTICATION_REQUIRED, INVALID_TOKEN")
@@ -125,7 +128,7 @@ public class SellerDropController {
         return ApiResponse.success(dropService.findSellerDrops(sellerId, status, page, size));
     }
 
-    @Operation(summary = "판매자 DROP 상세 조회", description = "DRAFT를 포함해 본인 DROP의 상세를 반환한다")
+    @Operation(summary = "판매자 DROP 상세 조회", description = "DRAFT를 포함해 본인 DROP의 상세를 반환한다. 이미지는 images(GALLERY)와 detailImages(DETAIL)로 나눈다")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "INVALID_REQUEST")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "AUTHENTICATION_REQUIRED, INVALID_TOKEN")
