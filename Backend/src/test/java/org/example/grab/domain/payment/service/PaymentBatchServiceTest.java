@@ -39,7 +39,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
-class PaymentPendingBatchServiceTest {
+class PaymentBatchServiceTest {
 
     private static final OffsetDateTime NOW = OffsetDateTime.of(2026, 10, 13, 12, 0, 0, 0, ZoneOffset.UTC);
 
@@ -53,12 +53,12 @@ class PaymentPendingBatchServiceTest {
     private OrderPaymentService orderPaymentService;
 
     private StepClock clock;
-    private PaymentPendingBatchService batchService;
+    private PaymentBatchService batchService;
 
     @BeforeEach
     void setUp() {
         clock = new StepClock(NOW.toInstant());
-        batchService = new PaymentPendingBatchService(transactionService, paymentService, orderPaymentService, clock);
+        batchService = new PaymentBatchService(transactionService, paymentService, orderPaymentService, clock);
     }
 
     @Nested
@@ -73,9 +73,9 @@ class PaymentPendingBatchServiceTest {
 
             // then
             InOrder order = inOrder(transactionService, orderPaymentService);
-            order.verify(transactionService).claimInProgress(NOW, PaymentPendingBatchService.CLEANUP_BATCH_SIZE);
+            order.verify(transactionService).claimInProgress(NOW, PaymentBatchService.CLEANUP_BATCH_SIZE);
             order.verify(orderPaymentService)
-                    .findPaymentExpiryCandidates(NOW, null, PaymentPendingBatchService.EXPIRY_BATCH_SIZE);
+                    .findPaymentExpiryCandidates(NOW, null, PaymentBatchService.EXPIRY_BATCH_SIZE);
         }
 
         @Test
@@ -90,7 +90,7 @@ class PaymentPendingBatchServiceTest {
             // when & then
             assertThatCode(() -> batchService.run(NOW)).doesNotThrowAnyException();
             then(orderPaymentService).should()
-                    .findPaymentExpiryCandidates(NOW, null, PaymentPendingBatchService.EXPIRY_BATCH_SIZE);
+                    .findPaymentExpiryCandidates(NOW, null, PaymentBatchService.EXPIRY_BATCH_SIZE);
         }
     }
 
@@ -102,7 +102,7 @@ class PaymentPendingBatchServiceTest {
         @DisplayName("주기당 상한만큼 선점하고, 진행 중이 아닌 상태로 확정한 결제 수를 돌려준다")
         void claimsAndCountsSettled() {
             // given: 1번은 실패로 확정되고, 2번은 조회로도 결과를 몰라 UNKNOWN으로 남는다
-            given(transactionService.claimInProgress(NOW, PaymentPendingBatchService.CLEANUP_BATCH_SIZE))
+            given(transactionService.claimInProgress(NOW, PaymentBatchService.CLEANUP_BATCH_SIZE))
                     .willReturn(List.of(1L, 2L));
             PaymentPreparation.Resolve first = target(1L);
             PaymentPreparation.Resolve second = target(2L);
@@ -122,7 +122,7 @@ class PaymentPendingBatchServiceTest {
         @DisplayName("한 결제의 정리가 실패해도 나머지 결제를 계속 정리한다")
         void isolatesFailurePerPayment() {
             // given
-            given(transactionService.claimInProgress(NOW, PaymentPendingBatchService.CLEANUP_BATCH_SIZE))
+            given(transactionService.claimInProgress(NOW, PaymentBatchService.CLEANUP_BATCH_SIZE))
                     .willReturn(List.of(1L, 2L));
             PaymentPreparation.Resolve second = target(2L);
             given(transactionService.findReconciliationTarget(1L)).willThrow(new RuntimeException("일시적 DB 오류"));
@@ -140,12 +140,12 @@ class PaymentPendingBatchServiceTest {
         @DisplayName("시간 예산을 넘기면 남은 선점 결제는 처리하지 않고 넘긴다")
         void defersRemainingPaymentsAfterTimeBudget() {
             // given: 첫 결제의 PG 처리가 예산보다 오래 걸린다
-            given(transactionService.claimInProgress(NOW, PaymentPendingBatchService.CLEANUP_BATCH_SIZE))
+            given(transactionService.claimInProgress(NOW, PaymentBatchService.CLEANUP_BATCH_SIZE))
                     .willReturn(List.of(1L, 2L, 3L));
             PaymentPreparation.Resolve first = target(1L);
             given(transactionService.findReconciliationTarget(1L)).willReturn(Optional.of(first));
             given(paymentService.reconcile(first)).willAnswer(invocation -> {
-                clock.advance(PaymentPendingBatchService.CLEANUP_TIME_BUDGET.plusSeconds(1));
+                clock.advance(PaymentBatchService.CLEANUP_TIME_BUDGET.plusSeconds(1));
                 return payment(PaymentStatus.UNKNOWN);
             });
 
@@ -161,7 +161,7 @@ class PaymentPendingBatchServiceTest {
         @DisplayName("선점한 뒤 다른 요청이 먼저 결과를 확정했으면 PG를 호출하지 않는다")
         void skipsAlreadySettledPayment() {
             // given
-            given(transactionService.claimInProgress(NOW, PaymentPendingBatchService.CLEANUP_BATCH_SIZE))
+            given(transactionService.claimInProgress(NOW, PaymentBatchService.CLEANUP_BATCH_SIZE))
                     .willReturn(List.of(1L));
             given(transactionService.findReconciliationTarget(1L)).willReturn(Optional.empty());
 
@@ -177,7 +177,7 @@ class PaymentPendingBatchServiceTest {
         @DisplayName("선점한 결제가 없으면 정리를 호출하지 않는다")
         void doesNothingWithoutClaims() {
             // given
-            given(transactionService.claimInProgress(NOW, PaymentPendingBatchService.CLEANUP_BATCH_SIZE))
+            given(transactionService.claimInProgress(NOW, PaymentBatchService.CLEANUP_BATCH_SIZE))
                     .willReturn(List.of());
 
             // when
@@ -197,7 +197,7 @@ class PaymentPendingBatchServiceTest {
         @DisplayName("페이지가 가득 차면 마지막 후보를 커서로 다음 페이지를 같은 now로 읽고, 덜 차면 멈춘다")
         void readsPagesWithSameNow() {
             // given: 첫 페이지는 EXPIRY_BATCH_SIZE건, 둘째 페이지는 1건
-            int pageSize = PaymentPendingBatchService.EXPIRY_BATCH_SIZE;
+            int pageSize = PaymentBatchService.EXPIRY_BATCH_SIZE;
             List<PaymentExpiryCandidate> firstPage = candidates(1, pageSize);
             PaymentExpiryCandidate last = firstPage.get(firstPage.size() - 1);
             List<PaymentExpiryCandidate> secondPage = candidates(pageSize + 1, 1);
@@ -220,7 +220,7 @@ class PaymentPendingBatchServiceTest {
         void isolatesFailurePerOrder() {
             // given
             given(orderPaymentService.findPaymentExpiryCandidates(
-                    any(), isNull(), eq(PaymentPendingBatchService.EXPIRY_BATCH_SIZE)))
+                    any(), isNull(), eq(PaymentBatchService.EXPIRY_BATCH_SIZE)))
                     .willReturn(candidates(1, 4));
             given(orderPaymentService.expireIfDueSkippingLocked(1L, NOW))
                     .willThrow(new RuntimeException("일시적 DB 오류"));
@@ -241,7 +241,7 @@ class PaymentPendingBatchServiceTest {
         void doesNothingWithoutCandidates() {
             // given
             given(orderPaymentService.findPaymentExpiryCandidates(
-                    any(), isNull(), eq(PaymentPendingBatchService.EXPIRY_BATCH_SIZE)))
+                    any(), isNull(), eq(PaymentBatchService.EXPIRY_BATCH_SIZE)))
                     .willReturn(List.of());
 
             // when

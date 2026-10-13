@@ -43,16 +43,16 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-// 결제 대기 배치(ERD.md 3.2)의 진행 중 결제 정리와 결제 대기 만료를 실제 DB로 확인한다. 서비스 트랜잭션이 실제로 커밋된다.
+// 결제 배치(ERD.md 3.2)의 진행 중 결제 정리와 결제 대기 만료를 실제 DB로 확인한다. 서비스 트랜잭션이 실제로 커밋된다.
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
-class PaymentPendingBatchServiceIntegrationTest {
+class PaymentBatchServiceIntegrationTest {
 
     // 만료 테스트는 다른 테스트 데이터와 섞이지 않도록 과거 시각에 마감되는 주문만 다룬다.
     private static final OffsetDateTime EXPIRY_BASE = OffsetDateTime.of(2001, 2, 3, 0, 0, 0, 0, ZoneOffset.UTC);
 
     @Autowired
-    private PaymentPendingBatchService batchService;
+    private PaymentBatchService batchService;
 
     @Autowired
     private PaymentTransactionService transactionService;

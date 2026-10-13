@@ -17,13 +17,13 @@ import java.util.List;
 import java.util.Optional;
 
 /*
-    결제 대기 배치의 한 주기(GR-65, ERD.md 3.2). 진행 중 결제 정리 → 결제 대기 만료 순서로 실행한다.
+    결제 배치의 한 주기(GR-65, ERD.md 3.2). 진행 중 결제 정리 → 결제 대기 만료 순서로 실행한다.
     이 클래스는 트랜잭션을 열지 않는다. 건별 처리는 다른 서비스의 별도 트랜잭션에서 하고, PG 호출은 그 사이 트랜잭션 밖에서 한다.
     한 건의 실패가 나머지 건을 막지 않도록 건 단위로 예외를 격리하고, 한 단계의 실패가 다음 단계를 막지 않도록 단계도 격리한다.
  */
 @Slf4j
 @Service
-public class PaymentPendingBatchService {
+public class PaymentBatchService {
 
     // 진행 중 결제 정리: 주기당 선점 건수 상한. 남은 대상은 다음 주기에 처리한다.
     static final int CLEANUP_BATCH_SIZE = 50;
@@ -41,7 +41,7 @@ public class PaymentPendingBatchService {
     private final Clock clock; // 정리 시간 예산의 경과 시간을 잰다
 
     @Autowired
-    public PaymentPendingBatchService(
+    public PaymentBatchService(
             PaymentTransactionService transactionService,
             PaymentService paymentService,
             OrderPaymentService orderPaymentService
@@ -49,7 +49,7 @@ public class PaymentPendingBatchService {
         this(transactionService, paymentService, orderPaymentService, Clock.systemUTC());
     }
 
-    PaymentPendingBatchService(
+    PaymentBatchService(
             PaymentTransactionService transactionService,
             PaymentService paymentService,
             OrderPaymentService orderPaymentService,
