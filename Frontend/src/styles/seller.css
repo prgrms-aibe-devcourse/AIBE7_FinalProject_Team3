@@ -763,6 +763,10 @@
 .seller-dashboard-page .dashboard-drop-grid {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
+.seller-dashboard-page .dashboard-sales-entry {
+  margin: -10px 0 24px;
+  text-align: right;
+}
 .seller-dashboard-page .dashboard-current-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }

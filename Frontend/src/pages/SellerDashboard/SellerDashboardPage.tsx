@@ -111,6 +111,11 @@ export default function SellerDashboardPage({
           </Link>
         ))}
       </section>
+      <p className="dashboard-sales-entry">
+        <Link className="text-link" to="/seller/sales?status=ENDED&page=0">
+          판매 완료 DROP 실적 보기 ↗
+        </Link>
+      </p>
 
       <section
         aria-label="현재 재고와 처리할 일"
