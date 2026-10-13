@@ -11,6 +11,7 @@ services:
       DB_USERNAME: grab
       DB_PASSWORD: ${DB_PASSWORD:-grab}
       TOSS_SECRET_KEY: ${TOSS_SECRET_KEY:-}
+      DATA_GO_KR_SERVICE_KEY: ${DATA_GO_KR_SERVICE_KEY:-}
       # 기본값을 두지 않는다. .env에 없으면 빈 값이 전달되어 backend가 기동에 실패한다
       JWT_SECRET: ${JWT_SECRET}
       # JWT_SECRET과 같이 기본값을 두지 않는다. .env에 없으면 이메일 인증 HMAC 키를 쓰는 시점에 기동에 실패한다

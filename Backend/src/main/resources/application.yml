@@ -62,6 +62,10 @@ grab:
   # 토스페이먼츠 테스트 환경(TECHSTACK.md 4.4). 시크릿 키는 환경변수로만 주입한다.
   toss:
     secret-key: ${TOSS_SECRET_KEY:}
+  # 국세청 사업자등록 상태조회(GR-90, SELLER-005). 서비스키가 없으면 검증을 생략하고 PENDING 접수로 넘어간다.
+  nts:
+    business-registration:
+      service-key: ${DATA_GO_KR_SERVICE_KEY:}
   # Supabase Storage(GR-51). Secret Key는 RLS를 우회하므로 서버에서만 쓰고 저장소·이미지·로그·응답에 남기지 않는다.
   # 기본값을 빈 값으로 두어 키가 없어도 기동·테스트는 되고, 발급 호출 시점에만 실패한다.
   storage:
