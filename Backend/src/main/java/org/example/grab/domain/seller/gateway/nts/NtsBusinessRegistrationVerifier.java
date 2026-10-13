@@ -39,8 +39,11 @@ public class NtsBusinessRegistrationVerifier implements BusinessRegistrationVeri
             return BusinessRegistrationStatus.UNAVAILABLE;
         }
         try {
+            // serviceKey를 URI 템플릿 변수로 넘겨 build()가 확장한다. queryParam에 문자열을 그대로 넣으면
+            // '+'가 쿼리에서 유효한 문자로 취급돼 %2B로 인코딩되지 않고, 이를 공백으로 해석하는 서버에서 키가 깨진다.
             NtsBusinessStatusResponse response = restClient.post()
-                    .uri(uriBuilder -> uriBuilder.path(STATUS_PATH).queryParam("serviceKey", serviceKey).build())
+                    .uri(uriBuilder -> uriBuilder.path(STATUS_PATH).queryParam("serviceKey", "{serviceKey}")
+                            .build(serviceKey))
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of("b_no", List.of(businessRegistrationNumber)))
                     .retrieve()

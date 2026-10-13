@@ -103,6 +103,20 @@ class NtsBusinessRegistrationVerifierTest {
     }
 
     @Test
+    @DisplayName("서비스키에 +가 있으면 공백이 아니라 %2B로 인코딩해 요청한다")
+    void encodesPlusInServiceKey() {
+        // given
+        String serviceKeyWithPlus = "abc+def";
+        NtsBusinessRegistrationVerifier verifier = new NtsBusinessRegistrationVerifier(builder, serviceKeyWithPlus);
+        server.expect(requestTo(BASE_URL + "/api/nts-businessman/v1/status?serviceKey=abc%2Bdef"))
+                .andRespond(withSuccess(statusResponse("01"), MediaType.APPLICATION_JSON));
+
+        // when, then
+        assertThat(verifier.verify(BRN)).isEqualTo(BusinessRegistrationStatus.ACTIVE);
+        server.verify();
+    }
+
+    @Test
     @DisplayName("서비스키가 없으면 조회를 시도하지 않고 UNAVAILABLE을 돌려준다")
     void returnsUnavailableWhenNotConfigured() {
         NtsBusinessRegistrationVerifier verifier = new NtsBusinessRegistrationVerifier(builder, "");
