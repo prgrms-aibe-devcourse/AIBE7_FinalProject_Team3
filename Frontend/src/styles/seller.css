@@ -712,6 +712,46 @@
   border-bottom: 1px solid var(--line);
 }
 
+.seller-dashboard-page .seller-title {
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--line);
+}
+.seller-dashboard-page .stats-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 28px;
+}
+.seller-dashboard-page .stats-grid > * {
+  border-radius: 6px;
+  background: #fff;
+  padding: 26px;
+}
+.seller-dashboard-page .stats-grid > a {
+  border-top: 3px solid var(--ink);
+}
+.seller-dashboard-page .stats-grid > button[aria-pressed='true'] {
+  background: var(--lime);
+}
+.seller-dashboard-page .stats-grid strong {
+  font-size: 44px;
+  font-variant-numeric: tabular-nums;
+}
+.seller-dashboard-page .stats-grid small {
+  color: var(--muted);
+}
+.seller-dashboard-page .panel-heading {
+  padding: 24px;
+  background: var(--soft);
+}
+@media (max-width: 720px) {
+  .seller-dashboard-page .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .seller-dashboard-page .stats-grid > * {
+    min-height: 130px;
+    padding: 20px;
+  }
+}
 .seller-orders-page .seller-order-filters {
   padding: 24px;
 }
