@@ -62,11 +62,11 @@
   color: #9a9d94;
 }
 .stats-grid > .warning {
-  border-color: #c0392b;
+  border-top: 3px solid var(--danger);
 }
 .stats-grid > .warning span,
 .stats-grid > .warning strong {
-  color: #c0392b;
+  color: var(--danger);
 }
 .period-picker {
   display: flex;
@@ -776,6 +776,9 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
   margin-bottom: 18px;
+}
+.seller-dashboard-page .dashboard-upcoming-grid > .panel + .panel {
+  margin-top: 0;
 }
 .dashboard-upcoming-list article {
   display: flex;
