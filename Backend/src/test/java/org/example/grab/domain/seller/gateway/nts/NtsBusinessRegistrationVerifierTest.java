@@ -103,6 +103,43 @@ class NtsBusinessRegistrationVerifierTest {
     }
 
     @Test
+    @DisplayName("data의 첫 항목이 null이면 예외 없이 UNAVAILABLE을 돌려준다")
+    void returnsUnavailableWhenFirstItemIsNull() {
+        NtsBusinessRegistrationVerifier verifier = new NtsBusinessRegistrationVerifier(builder, SERVICE_KEY);
+        server.expect(requestTo(STATUS_URI))
+                .andRespond(withStatus(HttpStatus.OK)
+                        .body("{\"status_code\":\"OK\",\"data\":[null]}")
+                        .contentType(MediaType.APPLICATION_JSON));
+
+        assertThat(verifier.verify(BRN)).isEqualTo(BusinessRegistrationStatus.UNAVAILABLE);
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("01·02·03·빈 값이 아닌 알 수 없는 상태 코드는 INACTIVE로 단정하지 않고 UNAVAILABLE을 돌려준다")
+    void returnsUnavailableForUnknownStatusCode() {
+        NtsBusinessRegistrationVerifier verifier = new NtsBusinessRegistrationVerifier(builder, SERVICE_KEY);
+        server.expect(requestTo(STATUS_URI))
+                .andRespond(withSuccess(statusResponse("99"), MediaType.APPLICATION_JSON));
+
+        assertThat(verifier.verify(BRN)).isEqualTo(BusinessRegistrationStatus.UNAVAILABLE);
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("상태 코드 필드가 아예 없으면(null) INACTIVE로 단정하지 않고 UNAVAILABLE을 돌려준다")
+    void returnsUnavailableWhenStatusCodeFieldMissing() {
+        NtsBusinessRegistrationVerifier verifier = new NtsBusinessRegistrationVerifier(builder, SERVICE_KEY);
+        server.expect(requestTo(STATUS_URI))
+                .andRespond(withStatus(HttpStatus.OK)
+                        .body("{\"status_code\":\"OK\",\"data\":[{\"b_no\":\"" + BRN + "\"}]}")
+                        .contentType(MediaType.APPLICATION_JSON));
+
+        assertThat(verifier.verify(BRN)).isEqualTo(BusinessRegistrationStatus.UNAVAILABLE);
+        server.verify();
+    }
+
+    @Test
     @DisplayName("4xx 응답도 예외를 던지지 않고 UNAVAILABLE을 돌려준다(SELLER-005: 신청자가 설정 오류의 피해를 보면 안 됨)")
     void returnsUnavailableOn4xxWithoutPropagating() {
         NtsBusinessRegistrationVerifier verifier = new NtsBusinessRegistrationVerifier(builder, SERVICE_KEY);

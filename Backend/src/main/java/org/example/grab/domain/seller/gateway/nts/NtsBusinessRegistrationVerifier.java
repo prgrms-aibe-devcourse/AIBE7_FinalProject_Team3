@@ -11,6 +11,7 @@ import org.springframework.web.client.RestClientResponseException;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /*
     국세청 사업자등록 상태조회(공공데이터포털, 진위확인 API 아님) 연동(GR-90, SELLER-005).
@@ -21,6 +22,10 @@ import java.util.Map;
 public class NtsBusinessRegistrationVerifier implements BusinessRegistrationVerifier {
 
     private static final String STATUS_PATH = "/api/nts-businessman/v1/status";
+
+    // b_stt_cd: 02 휴업자, 03 폐업자, 빈 값은 등록되지 않은 사업자등록번호. 이 외의 값은 응답 형식이 바뀌었거나
+    // 이상 코드일 가능성이 있어 INACTIVE로 단정하지 않고 UNAVAILABLE로 돌려 신청자가 불이익을 보지 않게 한다.
+    private static final Set<String> KNOWN_INACTIVE_CODES = Set.of("02", "03", "");
 
     private final RestClient restClient;
     private final String serviceKey;
@@ -72,10 +77,19 @@ public class NtsBusinessRegistrationVerifier implements BusinessRegistrationVeri
             return BusinessRegistrationStatus.UNAVAILABLE;
         }
         NtsBusinessStatusResponse.Item item = response.data().get(0);
-        if (NtsBusinessStatusResponse.Item.ACTIVE_CODE.equals(item.statusCode())) {
+        if (item == null) {
+            log.warn("국세청 사업자등록 상태조회 응답의 첫 항목이 비어 있음");
+            return BusinessRegistrationStatus.UNAVAILABLE;
+        }
+        String statusCode = item.statusCode();
+        if (NtsBusinessStatusResponse.Item.ACTIVE_CODE.equals(statusCode)) {
             return BusinessRegistrationStatus.ACTIVE;
         }
-        log.info("계속사업자가 아닌 사업자등록번호 신청 시도: statusCode={}", item.statusCode());
-        return BusinessRegistrationStatus.INACTIVE;
+        if (statusCode != null && KNOWN_INACTIVE_CODES.contains(statusCode)) {
+            log.info("계속사업자가 아닌 사업자등록번호 신청 시도: statusCode={}", statusCode);
+            return BusinessRegistrationStatus.INACTIVE;
+        }
+        log.warn("국세청 사업자등록 상태조회 응답에 알 수 없는 상태 코드: statusCode={}", statusCode);
+        return BusinessRegistrationStatus.UNAVAILABLE;
     }
 }
