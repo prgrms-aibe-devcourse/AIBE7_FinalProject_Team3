@@ -174,7 +174,7 @@ export default function SellerDashboardPage({
         </button>
       </div>
       <div className="stats-grid">
-        <Link to="/seller/orders">
+        <Link to="/seller/orders?orderStatus=PAID">
           <span>발송 대기</span>
           <strong>
             {summary.pendingShipment}
