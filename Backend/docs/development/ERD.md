@@ -63,6 +63,7 @@ Access Token은 짧은 수명의 JWT로 발급해 서버에 저장하지 않고 
 | `user_id` | BIGINT | O | FK users, UQ |
 | `brand_name` | VARCHAR(100) | O | 브랜드명 |
 | `contact_email` | VARCHAR(254) | O | 판매자 연락 이메일 |
+| `business_registration_number` | VARCHAR(10) | O | UQ, 사업자등록번호(하이픈 제거 10자리 숫자) |
 | `description` | TEXT | X | 브랜드 소개 |
 | `status` | VARCHAR(20) | O | `PENDING`, `APPROVED`, `REJECTED` |
 | `submitted_at` | TIMESTAMPTZ | O | 신청 시각 |
@@ -71,6 +72,14 @@ Access Token은 짧은 수명의 JWT로 발급해 서버에 저장하지 않고 
 | `rejection_reason` | TEXT | X | 반려 시 필수 |
 
 MVP에서는 판매자 신청과 프로필을 한 테이블에서 관리한다. 신청 이력 보존이 필요해지면 `seller_applications`를 별도 분리한다.
+
+반려(`REJECTED`) 후 재신청은 새 행을 만들지 않고 기존 행을 갱신한다(`uq_sellers_user` 유지). 같은 사용자가 `PENDING`·`APPROVED` 상태일 때 다시 신청하면 거부한다.
+
+`business_registration_number`는 국세청 사업자등록정보 **상태조회 API**(진위확인 API 아님, 대표자성명·개업일자는 받지 않는다)로 1차 검증한다.
+
+- 조회 결과가 `계속사업자`가 아니면(휴업자·폐업자) 신청 자체를 거부한다.
+- 외부 API 장애·타임아웃 시에는 신청을 막지 않는다. 검증을 생략한 채 `PENDING`으로 접수하고, 운영자가 승인 전 수동으로 사업자 상태를 확인한다.
+- 같은 사업자등록번호로 복수 계정이 신청하는 것은 `uq_sellers_user`가 아니라 이 UQ로 막는다.
 
 ### 1.2 DROP 및 옵션
 

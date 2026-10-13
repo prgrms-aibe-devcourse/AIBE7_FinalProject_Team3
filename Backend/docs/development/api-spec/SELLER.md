@@ -16,9 +16,14 @@ POST /api/v1/seller-applications
 {
   "brandName": "길동상점",
   "contactEmail": "seller@example.com",
+  "businessRegistrationNumber": "1234567890",
   "description": "한정판 상품 판매점"
 }
 ```
+
+- `businessRegistrationNumber`: 하이픈 없는 10자리 숫자. 국세청 사업자등록 상태조회로 검증하며, 계속사업자가 아니면(휴업자·폐업자) `422 BUSINESS_NOT_ACTIVE`로 거부한다. 조회 실패·타임아웃이면 검증을 생략하고 `PENDING`으로 접수한다.
+- 이미 `PENDING` 또는 `APPROVED` 상태의 신청이 있으면 `409 SELLER_APPLICATION_ALREADY_EXISTS`로 거부한다. `REJECTED` 상태에서 다시 호출하면 기존 레코드를 갱신해 재신청으로 처리한다(신청 시각·심사 정보 초기화).
+- 다른 계정이 같은 `businessRegistrationNumber`로 이미 신청했으면 `409 DUPLICATE_BUSINESS_REGISTRATION_NUMBER`로 거부한다.
 
 **응답:** `201 Created`
 
@@ -51,6 +56,7 @@ GET /api/v1/seller-applications/me
     "applicationId": "9c8b7a65-4321-4fed-9876-1a2b3c4d5e6f",
     "brandName": "길동상점",
     "contactEmail": "seller@example.com",
+    "businessRegistrationNumber": "1234567890",
     "description": "한정판 상품 판매점",
     "status": "PENDING",
     "appliedAt": "2026-09-18T14:00:00+09:00"
@@ -78,6 +84,7 @@ GET /api/v1/admin/seller-applications?status=PENDING&page=0&size=20
         "userId": "6f1a2b3c-4d5e-4f70-8192-a3b4c5d6e7f8",
         "brandName": "길동상점",
         "contactEmail": "seller@example.com",
+        "businessRegistrationNumber": "1234567890",
         "status": "PENDING",
         "appliedAt": "2026-09-18T14:00:00+09:00"
       }
