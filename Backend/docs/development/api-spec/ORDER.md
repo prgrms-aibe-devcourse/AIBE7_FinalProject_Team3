@@ -211,7 +211,7 @@ POST /api/v1/orders/{orderId}/cancel
 | 결제 후 주문 취소, 결제 취소 성공 | `CANCELED` | `SUCCEEDED` | 취소 시각 |
 | 결제 후 주문 취소, 결제 취소 결과 확인 중 | `PAID` 또는 `PREPARING` (변경 없음) | `UNKNOWN` | `null` |
 
-- `refundStatus`가 `UNKNOWN`이면 클라이언트는 같은 `Idempotency-Key`와 같은 본문으로 재전송해 결과를 확인합니다. 취소 확인 중에는 판매자가 배송 준비·발송 처리를 할 수 없습니다.
+- `refundStatus`가 `UNKNOWN`이면 클라이언트는 같은 `Idempotency-Key`와 같은 본문으로 재전송해 결과를 확인합니다. 재전송하지 않아도 서버가 약 1분 간격으로 결제 취소를 다시 요청해 확정합니다(ERD.md 3.3 결제 취소 재요청 배치). 취소 확인 중에는 판매자가 배송 준비·발송 처리를 할 수 없습니다.
 
 **처리 규칙:**
 - 본인 주문만 취소할 수 있다. 다른 사용자의 주문은 존재 여부를 숨기고 `ORDER_NOT_FOUND`로 응답한다(1.3과 같음).

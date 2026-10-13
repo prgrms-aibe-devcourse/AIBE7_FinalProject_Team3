@@ -394,7 +394,7 @@ UQ(`order_id`, `option_id`)를 둔다. `drop_id`를 포함한 복합 FK로 다�
 | `completed_at` | TIMESTAMPTZ | X | 처리 완료 시각 |
 | `failure_code` | VARCHAR(100) | X | 실패 코드 |
 | `attempt_count` | INT | O | 통신 재시도 횟수 |
-| `next_retry_at` | TIMESTAMPTZ | X | 재조회·재시도 시각 |
+| `next_retry_at` | TIMESTAMPTZ | X | 취소 재요청 배치가 다시 요청할 시각, 진행 중(`REQUESTED`·`UNKNOWN`)일 때만 값이 있음 |
 
 ### 1.6 배송
 
@@ -514,7 +514,12 @@ COMMITTED → RELEASED
 - 재조회 횟수에는 상한을 두지 않는다. 승인 여부를 확인하기 전에는 실패로 단정하지 않는다. 생성 후 10분이 지나도 `UNKNOWN`인 결제는 정리할 때마다 경고 로그를 남긴다.
 - 사용자 결제 요청이나 다른 인스턴스가 같은 결제를 함께 조회·승인 재요청해도, 결과 반영은 잠금과 재확인으로 한 번만 일어나고 승인 재요청은 같은 서버 멱등 키라 PG에서 중복 승인되지 않는다.
 - 배치가 남기는 결제 이벤트의 `source`는 `RECONCILIATION`이다.
-- 실행 주기는 10초(`fixedDelay`)이고 `grab.payment-pending-batch.enabled`로 끌 수 있다.
+
+결제 배치 한 주기:
+
+- 진행 중 결제 정리 → 결제 대기 만료 → 결제 취소 재요청(3.3, GR-87) 순서로 실행한다. 앞 단계가 실패해도 다음 단계를 실행한다.
+- PG를 호출하는 정리와 취소 재요청은 단계마다 시간 예산 5초를 따로 둔다. 취소 재요청을 만료 뒤에 두어 PG 지연이 재고 반환을 늦추지 않게 한다.
+- 실행 주기는 10초(`fixedDelay`)이고 `grab.payment-batch.enabled`로 끌 수 있다.
 
 ### 3.3 주문 취소
 
@@ -525,13 +530,13 @@ COMMITTED → RELEASED
 - 주문 `CANCELED`(`canceled_at`), 예약 `HELD → RELEASED`(`ORDER_CANCELED`, `AVAILABLE`), reserved 감소
 - 결제 마감이 지났지만 아직 만료 처리 전인 주문도 취소로 처리한다. 결과(재고 반환)는 만료와 같다.
 - 승인 응답을 기다리는 결제(`PENDING`)가 있으면 거부한다. 곧 결과가 나오므로 잠시 뒤 다시 요청한다.
-- 결과 불명 결제(`UNKNOWN`)는 취소를 막지 않는다. 이후 승인이 확인되면 결제 대기가 아닌 주문의 승인으로 보고 결제 `SUCCEEDED`, 보정 `REQUIRED`로 기록하며, 환불은 보정 작업(GR-65)이 한다.
+- 결과 불명 결제(`UNKNOWN`)는 취소를 막지 않는다. 이후 승인이 확인되면 결제 대기가 아닌 주문의 승인으로 보고 결제 `SUCCEEDED`, 보정 `REQUIRED`로 기록하며, 환불은 보정 환불(GR-88)이 한다.
 
 결제 후 취소(`PAID`, `PREPARING`)는 3.2와 같이 PG 호출 중에 DB 트랜잭션과 잠금을 유지하지 않는다.
 
 ```text
 [트랜잭션 1]
-주문 잠금 → 검증 → payment_cancellations REQUESTED 생성(서버 멱등 키), 주문에 취소 요청 키 기록
+주문 잠금 → 검증 → payment_cancellations REQUESTED 생성(서버 멱등 키, next_retry_at = now + 1분), 주문에 취소 요청 키 기록
         ↓
 [트랜잭션 없음]
 PG 결제 취소 API 호출 (취소 기록의 서버 멱등 키)
@@ -542,8 +547,22 @@ PG 결제 취소 API 호출 (취소 기록의 서버 멱등 키)
 
 - 취소 성공: 결제 `CANCELED`(`canceled_at`), 취소 기록 `SUCCEEDED`(`completed_at`, `provider_cancel_id`), 주문 `CANCELED`(`canceled_at`), 예약 `COMMITTED → RELEASED`(`ORDER_CANCELED`, `AVAILABLE`), sold 감소. 모두 같은 트랜잭션에서 반영한다.
 - 취소 거절(PG가 취소하지 않았음이 확실): 취소 기록 `FAILED`(`completed_at`, `failure_code`). 주문·결제·재고는 바꾸지 않고, 주문의 취소 요청 키를 비워 새 취소 요청을 허용한다.
-- 결과 불명(타임아웃·응답 유실·PG 5xx·처리 중 응답): 취소 기록 `UNKNOWN`(`attempt_count`, `next_retry_at`). 주문은 바꾸지 않는다. PG는 같은 멱등 키의 재요청에 최초 결과를 돌려주므로, 같은 취소 키의 재전송이나 정리 작업(GR-65)이 같은 서버 멱등 키로 취소를 다시 요청해 확정한다.
+- 결과 불명(타임아웃·응답 유실·PG 5xx·처리 중 응답): 취소 기록 `UNKNOWN`(`attempt_count`, `next_retry_at = now + 1분`). 주문은 바꾸지 않는다. PG는 같은 멱등 키의 재요청에 최초 결과를 돌려주므로, 같은 취소 키의 재전송이나 결제 취소 재요청 배치(GR-87)가 같은 서버 멱등 키로 취소를 다시 요청해 확정한다.
 - 취소 기록이 `REQUESTED`·`UNKNOWN`인 동안에는 배송 준비와 발송 처리를 거부한다. 주문 행 잠금으로 직렬화되므로, 취소를 시작한 주문이 배송되거나 배송을 시작한 주문이 취소되지 않는다.
+
+결제 취소 재요청 배치(GR-87):
+
+- 사용자가 재전송하지 않아도 진행 중인 소비자 취소를 같은 서버 멱등 키로 다시 요청해 확정한다. 3.2의 결제 배치 한 주기에서 만료 다음 단계로 실행한다.
+- 대상은 `purpose = ORDER_CANCEL`, `status IN (REQUESTED, UNKNOWN)`, `next_retry_at <= now`인 취소 기록이다. `REQUESTED`는 기록한 뒤 PG 호출 전에 서버가 멈춘 경우, `UNKNOWN`은 PG 결과를 모르는 경우다.
+- `REQUESTED`도 생성할 때 `next_retry_at = now + 1분`을 넣는다. PG 응답을 기다리는 사용자 요청(PG 호출 최대 약 30초)과 겹치지 않게 하고, 두 상태를 같은 조건과 인덱스로 고른다.
+- 대상은 한 문장으로 선점한다. `FOR UPDATE SKIP LOCKED`로 `next_retry_at`이 이른 순서로 최대 50건을 잠그고 `next_retry_at = now + 1분`으로 바꾼다. 다른 인스턴스와 다음 주기는 1분 동안 같은 취소를 다시 고르지 않는다.
+- PG 취소는 트랜잭션 밖에서 하고, 결과는 사용자 취소 요청과 같은 반영(주문 → 결제 → 취소 기록 잠금, 취소가 아직 진행 중인지 재확인)을 쓴다. 성공·거절·결과 불명의 처리는 위와 같다. 거절이면 주문은 그대로 결제 완료 상태로 남고, 사용자가 같은 키로 재전송하면 `PAYMENT_CANCEL_FAILED`를 받는다.
+- 주기당 50건과 시간 예산 5초로 제한한다. 예산을 넘기면 남은 선점 취소는 처리하지 않는다. 선점 때 `next_retry_at`이 바뀌었으므로 1분 뒤 다시 대상이 된다.
+- 재요청 횟수에는 상한을 두지 않는다. 취소 여부를 확인하기 전에는 거절로 단정하지 않는다. 생성 후 10분이 지나도 진행 중인 취소는 재요청할 때마다 경고 로그를 남긴다.
+- 토스 멱등 키는 첫 요청 후 15일간 유효하다. 그 뒤의 재요청은 새 취소 요청으로 처리되지만, 이미 취소된 결제는 `ALREADY_CANCELED_PAYMENT`를 받고 결제 조회로 전액 취소를 확인해 성공으로 반영하므로 이중 환불되지 않는다.
+- 사용자 재전송이나 다른 인스턴스가 같은 취소를 함께 요청해도 결과 반영은 잠금과 재확인으로 한 번만 일어나고, 같은 서버 멱등 키라 PG에서 중복 취소되지 않는다.
+- 보정 환불(`LATE_APPROVAL_COMPENSATION`)은 주문을 바꾸지 않는 다른 반영이 필요해 대상에서 제외한다(GR-88).
+- 취소는 결제 이벤트에 기록하지 않는다. 시도 횟수와 결과는 취소 기록(`attempt_count`, `failure_code`, `completed_at`)에 남는다.
 
 이미 반환된 예약에는 다시 수량을 더하지 않는다. 주문 상태를 잠근 뒤 다시 확인하므로 같은 주문의 취소·만료·결제 확정 중 한 경로만 재고를 바꾼다.
 
@@ -568,7 +587,7 @@ PK와 UQ에서 자동 생성되는 인덱스는 중복 생성하지 않는다.
 | `payments` | (`order_id`, `created_at`, `id`) | 결제 시도 이력 |
 | `payments` | (`reconciliation_status`, `updated_at`, `id`) | 결제 보정 작업 |
 | `payments` | `idx_payments_in_progress` (`updated_at`, `id`) `WHERE status IN ('PENDING', 'UNKNOWN')` | 진행 중 결제 정리 배치(`updated_at`이 60초 지난 진행 중 결제 선점) |
-| `payment_cancellations` | (`status`, `next_retry_at`, `id`) | 취소 재시도 |
+| `payment_cancellations` | `idx_payment_cancellations_retry` (`status`, `next_retry_at`, `id`) | 결제 취소 재요청 배치(`REQUESTED`·`UNKNOWN` AND `next_retry_at <= now` 선점) |
 
 인덱스는 실제 조회 쿼리와 실행 계획을 확인한 후 조정한다.
 
