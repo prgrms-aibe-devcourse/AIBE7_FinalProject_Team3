@@ -153,7 +153,7 @@ export default function SellerOrdersPage({
   }
 
   return (
-    <section className="page-section seller-page">
+    <section className="page-section seller-page seller-orders-page">
       <div className="seller-title">
         <div>
           <p className="eyebrow">ORDER DESK</p>
@@ -258,7 +258,9 @@ export default function SellerOrdersPage({
         </div>
       </section>
       <section className="panel">
-        <h2>주문 목록</h2>
+        <div className="panel-heading">
+          <h2>주문 목록</h2>
+        </div>
         {!result ? (
           <EmptyState
             title="조회 조건이 올바르지 않아요."

@@ -706,3 +706,35 @@
   min-height: 34px;
   padding: 6px 10px;
 }
+
+.seller-orders-page .seller-title {
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--line);
+}
+
+.seller-orders-page .seller-order-filters {
+  padding: 24px;
+}
+.seller-orders-page .order-row {
+  padding: 24px;
+}
+.seller-orders-page .order-main {
+  gap: 9px;
+}
+.seller-orders-page .order-main strong {
+  font-size: 14px;
+}
+.seller-orders-page .order-toggle {
+  min-height: 44px;
+}
+.seller-orders-page .order-detail,
+.seller-orders-page .shipment-form {
+  border-radius: 4px;
+  padding: 20px;
+}
+@media (max-width: 720px) {
+  .seller-orders-page .seller-order-filters,
+  .seller-orders-page .order-row {
+    padding: 18px;
+  }
+}
