@@ -24,6 +24,10 @@ public class ShipmentProgressService {
     public ShipmentProgressService(
             ShipmentProgressBatchService batchService,
             @Value("${grab.mock-delivery.stage-interval-minutes:2}") int stageIntervalMinutes) {
+        if (stageIntervalMinutes <= 0) {
+            throw new IllegalArgumentException(
+                    "grab.mock-delivery.stage-interval-minutes는 양수여야 합니다: " + stageIntervalMinutes);
+        }
         this.batchService = batchService;
         this.stageIntervalMinutes = stageIntervalMinutes;
     }

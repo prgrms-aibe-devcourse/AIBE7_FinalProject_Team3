@@ -47,6 +47,8 @@ public interface ShipmentRepository extends JpaRepository<Shipment, Long> {
     /*
      * 마지막 단계(OUT_FOR_DELIVERY)에서 간격이 더 지난 대상의 주문 ID를 잠가 확보한다.
      * 실제 DELIVERED 전환(orders.status)은 OrderRepository.markDelivered가 같은 트랜잭션에서 수행한다.
+     * MockDeliveryService.completeDelivery가 order -> shipment 순으로 잠그므로,
+     * 교착 상태를 막기 위해 여기서도 order 행(FOR UPDATE OF o)을 먼저 잠근다.
      */
     @Query(value = """
             SELECT s.order_id FROM shipments s
@@ -56,7 +58,7 @@ public interface ShipmentRepository extends JpaRepository<Shipment, Long> {
               AND s.stage_updated_at <= :cutoff
             ORDER BY s.stage_updated_at, s.id
             LIMIT :batchSize
-            FOR UPDATE OF s SKIP LOCKED
+            FOR UPDATE OF o SKIP LOCKED
             """, nativeQuery = true)
     List<Long> lockDeliveryCompletionTargets(
             @Param("cutoff") OffsetDateTime cutoff, @Param("batchSize") int batchSize);
