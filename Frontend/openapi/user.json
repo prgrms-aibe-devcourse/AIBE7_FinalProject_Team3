@@ -16,6 +16,10 @@
       "description": "상태 변경 요청에 쓸 CSRF 토큰 발급"
     },
     {
+      "name": "로그인",
+      "description": "LOCAL 이메일·비밀번호 로그인"
+    },
+    {
       "name": "회원가입",
       "description": "이메일 인증을 마친 LOCAL 회원가입"
     },
@@ -88,6 +92,66 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseSignupResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": ["로그인"],
+        "summary": "로그인",
+        "description": "이메일·비밀번호로 로그인한다. Access·Refresh Token은 HttpOnly 쿠키로만 전달한다",
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "로그인 성공, Set-Cookie로 access_token·refresh_token 전달",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseLoginResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST, VALIDATION_FAILED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseLoginResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "INVALID_CREDENTIALS",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseLoginResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCOUNT_DISABLED, ACCESS_DENIED(CSRF 토큰 없음·불일치)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseLoginResponse"
                 }
               }
             }
@@ -222,6 +286,63 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "minLength": 1
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["email", "password"]
+      },
+      "ApiResponseLoginResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/LoginResponse"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/UserInfo"
+          }
+        }
+      },
+      "UserInfo": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string"
+          },
+          "nickname": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },

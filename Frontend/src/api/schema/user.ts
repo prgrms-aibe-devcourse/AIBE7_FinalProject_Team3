@@ -24,6 +24,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/auth/login': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * 로그인
+     * @description 이메일·비밀번호로 로그인한다. Access·Refresh Token은 HttpOnly 쿠키로만 전달한다
+     */
+    post: operations['login']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/auth/email-verification': {
     parameters: {
       query?: never
@@ -106,6 +126,25 @@ export interface components {
       /** Format: date-time */
       createdAt?: string
     }
+    LoginRequest: {
+      email: string
+      password: string
+    }
+    ApiResponseLoginResponse: {
+      success?: boolean
+      data?: components['schemas']['LoginResponse']
+      message?: string
+    }
+    LoginResponse: {
+      user?: components['schemas']['UserInfo']
+    }
+    UserInfo: {
+      /** Format: uuid */
+      userId?: string
+      email?: string
+      nickname?: string
+      roles?: string[]
+    }
     EmailVerificationRequest: {
       email: string
     }
@@ -171,6 +210,57 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['ApiResponseSignupResponse']
+        }
+      }
+    }
+  }
+  login: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['LoginRequest']
+      }
+    }
+    responses: {
+      /** @description 로그인 성공, Set-Cookie로 access_token·refresh_token 전달 */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseLoginResponse']
+        }
+      }
+      /** @description INVALID_REQUEST, VALIDATION_FAILED */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseLoginResponse']
+        }
+      }
+      /** @description INVALID_CREDENTIALS */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseLoginResponse']
+        }
+      }
+      /** @description ACCOUNT_DISABLED, ACCESS_DENIED(CSRF 토큰 없음·불일치) */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseLoginResponse']
         }
       }
     }

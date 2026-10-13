@@ -39,7 +39,7 @@ export interface paths {
     put?: never
     /**
      * DROP 임시 저장
-     * @description DRAFT로 저장하며 일부 항목이 비어 있어도 된다. 이미지·옵션 규칙은 DROP.md 2.1 참고
+     * @description DRAFT로 저장하며 일부 항목이 비어 있어도 된다. images는 GALLERY(최대 5개), detailImages는 DETAIL(최대 15개)이다. 이미지·옵션 규칙은 DROP.md 2.1 참고
      */
     post: operations['createDraft']
     delete?: never
@@ -59,7 +59,7 @@ export interface paths {
     put?: never
     /**
      * DROP 공개
-     * @description DRAFT를 WISH로 바꾼다. 공개 전에 필수 항목·일정·옵션을 모두 검증하고 위반 항목은 fieldErrors로 알려준다
+     * @description DRAFT를 WISH로 바꾼다. 공개 전에 필수 항목(GALLERY 이미지 1개 이상 포함)·일정·옵션을 모두 검증하고 위반 항목은 fieldErrors로 알려준다
      */
     post: operations['publish']
     delete?: never
@@ -97,7 +97,7 @@ export interface paths {
     }
     /**
      * 판매자 DROP 상세 조회
-     * @description DRAFT를 포함해 본인 DROP의 상세를 반환한다
+     * @description DRAFT를 포함해 본인 DROP의 상세를 반환한다. 이미지는 images(GALLERY)와 detailImages(DETAIL)로 나눈다
      */
     get: operations['findDrop']
     put?: never
@@ -107,7 +107,7 @@ export interface paths {
     head?: never
     /**
      * DRAFT DROP 수정
-     * @description 보낸 필드만 바꾼다. DRAFT 상태에서만 수정할 수 있다. 누락·빈 배열의 의미는 DROP.md 2.4 참고
+     * @description 보낸 필드만 바꾼다. DRAFT 상태에서만 수정할 수 있다. images·detailImages는 용도별로 누락/null=유지, []=삭제, 배열=교체다. 자세한 규칙은 DROP.md 2.4 참고
      */
     patch: operations['updateDraft']
     trace?: never
@@ -181,7 +181,7 @@ export interface paths {
     }
     /**
      * 공개 DROP 상세 조회
-     * @description 옵션, 판매 일정, 배송 정보를 함께 반환한다. DRAFT는 없는 DROP으로 처리한다
+     * @description 옵션, 판매 일정, 배송 정보를 함께 반환한다. 이미지는 galleryImages·detailImages로 나누고 imageUrls는 GALLERY URL만 담는다. DRAFT는 없는 DROP으로 처리한다
      */
     get: operations['getDrop']
     put?: never
@@ -239,6 +239,7 @@ export interface components {
       name?: string
       description?: string
       images?: components['schemas']['DropImageRequest'][]
+      detailImages?: components['schemas']['DropImageRequest'][]
       /** Format: int64 */
       categoryId?: number
       /** Format: date-time */
@@ -253,6 +254,7 @@ export interface components {
       /** Format: uuid */
       imageId: string
       imageUrl: string
+      altText?: string
     }
     OptionGroupRequest: {
       key: string
@@ -385,6 +387,7 @@ export interface components {
       /** Format: uuid */
       imageId?: string
       imageUrl?: string
+      altText?: string
     }
     Option: {
       /** Format: int64 */
@@ -408,6 +411,7 @@ export interface components {
       name?: string
       description?: string
       images?: components['schemas']['Image'][]
+      detailImages?: components['schemas']['Image'][]
       /** Format: int64 */
       minPrice?: number
       /** Format: int64 */
@@ -506,6 +510,8 @@ export interface components {
       name?: string
       description?: string
       imageUrls?: string[]
+      galleryImages?: components['schemas']['Image'][]
+      detailImages?: components['schemas']['Image'][]
       /** Format: int64 */
       minPrice?: number
       category?: components['schemas']['DropCategoryResponse']
