@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.UUID;
 
 /*
     Refresh Token 원문을 해시하고 Redis 키를 만든다(GR-33 M00-02, M00-03).
@@ -14,12 +15,21 @@ public final class RefreshTokenHasher {
 
     private static final String HASH_ALGORITHM = "SHA-256";
     private static final String KEY_PREFIX = "auth:refresh-token:";
+    private static final String SESSION_KEY_PREFIX = "auth:refresh-session:";
 
     private RefreshTokenHasher() {
     }
 
     public static String toKey(String rawToken) {
         return KEY_PREFIX + hash(rawToken);
+    }
+
+    // 세션의 현재 토큰 해시를 담는 키(GR-35 M00-02). Refresh 키 규칙을 한 곳에 두기 위해 여기에 둔다
+    public static String toSessionKey(UUID sessionId) {
+        if (sessionId == null) {
+            throw new IllegalArgumentException("세션 ID는 필수입니다.");
+        }
+        return SESSION_KEY_PREFIX + sessionId;
     }
 
     public static String hash(String rawToken) {

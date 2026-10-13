@@ -6,6 +6,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.util.UUID;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -48,6 +50,19 @@ class RefreshTokenHasherTest {
         // then
         assertThat(key).isEqualTo("auth:refresh-token:" + RefreshTokenHasher.hash(rawToken));
         assertThat(key).doesNotContain(rawToken);
+    }
+
+    @Test
+    @DisplayName("세션 키는 auth:refresh-session: 뒤에 세션 ID를 붙인 값이고, 세션 ID가 없으면 예외가 발생한다")
+    void buildsSessionKey() {
+        // given
+        UUID sessionId = UUID.fromString("3f2a9c1e-5b7d-4e8a-9c0f-1a2b3c4d5e6f");
+
+        // when & then
+        assertThat(RefreshTokenHasher.toSessionKey(sessionId))
+                .isEqualTo("auth:refresh-session:3f2a9c1e-5b7d-4e8a-9c0f-1a2b3c4d5e6f");
+        assertThatThrownBy(() -> RefreshTokenHasher.toSessionKey(null))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @ParameterizedTest

@@ -257,6 +257,10 @@ class LoginApiIntegrationTest {
         assertThat(session.userId()).isEqualTo(user.get("id"));
         assertThat(session.sessionExpiresAt())
                 .isBetween(before.plus(Duration.ofDays(30)), after.plus(Duration.ofDays(30)));
+
+        // GR-35 M00-02: 세션 키가 로그인 토큰의 해시를 가리킨다
+        assertThat(redisTemplate.opsForValue().get(RefreshTokenHasher.toSessionKey(session.sessionId())))
+                .isEqualTo(RefreshTokenHasher.hash(refreshToken));
     }
 
     @Test
