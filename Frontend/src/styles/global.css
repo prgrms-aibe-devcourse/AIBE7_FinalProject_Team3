@@ -2,11 +2,13 @@
 
 @import './base.css';
 @import './catalog.css';
+@import './home.css';
 @import './drop-detail.css';
 @import './account.css';
 @import './auth.css';
 @import './buyer-order.css';
 @import './seller-application.css';
 @import './seller.css';
+@import './seller-drops.css';
 @import './shell.css';
 @import './responsive.css';

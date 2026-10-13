@@ -6,6 +6,7 @@ type Shipment = { carrier: string; trackingNumber: string }
 type Props = {
   initial: Shipment
   submitLabel: string
+  disabled?: boolean
   // 검증을 통과한 값만 앞뒤 공백을 지워 넘긴다
   onSubmit: (shipment: Shipment) => void
   onCancel: () => void
@@ -14,6 +15,7 @@ type Props = {
 export default function ShipmentForm({
   initial,
   submitLabel,
+  disabled = false,
   onSubmit,
   onCancel,
 }: Props) {
@@ -37,6 +39,7 @@ export default function ShipmentForm({
         택배사
         <input
           value={carrier}
+          disabled={disabled}
           maxLength={50}
           placeholder="CJ대한통운"
           onChange={(event) => setCarrier(event.target.value)}
@@ -46,16 +49,22 @@ export default function ShipmentForm({
         송장번호
         <input
           value={trackingNumber}
+          disabled={disabled}
           maxLength={100}
           placeholder="123456789012"
           onChange={(event) => setTrackingNumber(event.target.value)}
         />
       </label>
       <div className="shipment-actions">
-        <button className="primary-button" type="submit">
+        <button className="primary-button" type="submit" disabled={disabled}>
           {submitLabel}
         </button>
-        <button className="text-link" type="button" onClick={onCancel}>
+        <button
+          className="text-link"
+          type="button"
+          onClick={onCancel}
+          disabled={disabled}
+        >
           취소
         </button>
       </div>

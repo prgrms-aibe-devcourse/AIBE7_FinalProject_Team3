@@ -150,7 +150,7 @@ export default function SellerDashboardPage({
   const maxSales = Math.max(1, ...endedDrops.map((drop) => drop.salesAmount))
 
   return (
-    <section className="page-section seller-page">
+    <section className="page-section seller-page seller-dashboard-page">
       <div className="seller-title">
         <div>
           <p className="eyebrow">CREATOR WORKSPACE</p>
@@ -174,7 +174,7 @@ export default function SellerDashboardPage({
         </button>
       </div>
       <div className="stats-grid">
-        <Link to="/seller/orders">
+        <Link to="/seller/orders?orderStatus=PAID">
           <span>발송 대기</span>
           <strong>
             {summary.pendingShipment}
@@ -220,8 +220,11 @@ export default function SellerDashboardPage({
                 : `총 ${items.length}개 · 상태와 옵션별 재고를 확인합니다.`}
             </p>
           </div>
-          <Link className="text-link" to="/seller/drops/new">
-            새 상품 ↗
+          <Link
+            className="text-link"
+            to={`/seller/drops?status=${filter === 'UPCOMING' ? 'ALL' : filter}&page=0`}
+          >
+            전체 관리 ↗
           </Link>
         </div>
         <div className="chips drop-tabs">

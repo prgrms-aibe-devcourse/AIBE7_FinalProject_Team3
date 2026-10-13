@@ -17,7 +17,7 @@
 | Build | Gradle Wrapper | 8.14+ 또는 9.x | 로컬과 CI에서 동일한 빌드 도구 버전을 사용한다. |
 | API Docs | SpringDoc OpenAPI / Swagger UI | 3.1.0 | Spring Boot 4 기반 API 명세를 자동 생성하고 프론트엔드와 공유한다. |
 | Monitoring Endpoint | Spring Boot Actuator | Boot 관리 | 상태 확인, 메트릭 노출 및 배포 성공 여부를 검증한다. |
-| Scheduling | Spring `@Scheduled` + PostgreSQL 인덱스 폴링 | Boot 관리 | DROP 상태(WISH→GRAB→ENDED) 자동 전환과 결제 대기 만료. 별도 스케줄러 인프라 없이 기존 DB·인덱스만 사용한다(1.1절, 1.2절). |
+| Scheduling | Spring `@Scheduled` + PostgreSQL 인덱스 폴링 | Boot 관리 | DROP 상태(WISH→GRAB→ENDED) 자동 전환, 결제 대기 만료와 진행 중 결제 정리. 별도 스케줄러 인프라 없이 기존 DB·인덱스만 사용한다(1.1절, 1.2절). |
 
 ### 1.1 DROP 상태 자동 전환 선정 이유 (GR-18)
 
@@ -72,7 +72,8 @@
 운영·고도화 기준:
 
 - 재고 반환은 마감 후 최대 약 10초 늦고, 대상이 많거나 결제가 주문을 잠그고 있으면 더 늦어질 수 있다. 그동안 반환 대기 수량은 가용 재고에 잡히지 않는다.
-- 진행 중인 결제가 있어도 마감이 지나면 만료하므로, 마감 직전 승인은 결제 `SUCCEEDED`, 보정 `REQUIRED`로 남을 수 있다(PAY-004). 진행 중 결제 정리는 GR-65에서 다룬다.
+- 진행 중인 결제가 있어도 마감이 지나면 만료하므로, 마감 직전 승인은 결제 `SUCCEEDED`, 보정 `REQUIRED`로 남을 수 있다(PAY-004). 이를 줄이려고 한 주기에서 진행 중 결제 정리를 만료보다 먼저 실행한다(ERD.md 3.2).
+- 진행 중 결제 정리는 PG를 호출하므로 주기당 50건으로 제한하고, 대상을 `SKIP LOCKED`로 선점하며 `updated_at`을 갱신해 다중 인스턴스가 같은 결제를 함께 조회하는 경우를 줄인다. 정리 대상이 50건을 계속 넘으면 건수 상한이나 주기를 먼저 조정한다.
 - 한 주기의 만료 처리가 10초 안에 끝나지 않거나 후보 조회 지연이 계속 늘면 배치 크기·주기를 먼저 조정한다.
 
 ## 2. Database

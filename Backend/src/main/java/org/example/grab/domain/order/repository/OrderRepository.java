@@ -8,6 +8,7 @@ import org.example.grab.domain.order.dto.SellerOrderListProjection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.repository.query.Param;
@@ -139,4 +140,10 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Optional<Order> findByBuyerIdAndIdempotencyKey(Long buyerId, String idempotencyKey);
 
     long countByBuyerIdAndIdempotencyKey(Long buyerId, String idempotencyKey);
+
+    // 배송 단계 자동 진행의 마지막 단계(GR-86). ShipmentRepository.lockDeliveryCompletionTargets가 잠근 주문만 대상이다.
+    @Modifying
+    @Query(value = "UPDATE orders SET status = 'DELIVERED', updated_at = :now WHERE id IN (:ids)",
+            nativeQuery = true)
+    int markDelivered(@Param("ids") List<Long> ids, @Param("now") OffsetDateTime now);
 }

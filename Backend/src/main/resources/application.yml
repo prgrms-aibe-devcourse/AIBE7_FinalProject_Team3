@@ -42,8 +42,15 @@ grab:
     base-url: ${WEB_BASE_URL:http://localhost:5173}
   mock-delivery:
     enabled: ${GRAB_MOCK_DELIVERY_ENABLED:false}
+    # SHIPPED 이후 배송 단계(집화완료→간선상차→간선하차→배송출발→배송완료) 자동 진행 간격(GR-86)
+    stage-interval-minutes: ${GRAB_MOCK_DELIVERY_STAGE_INTERVAL_MINUTES:2}
+    poll-interval: ${GRAB_MOCK_DELIVERY_POLL_INTERVAL:10s}
   drop-transition:
     enabled: ${GRAB_DROP_TRANSITION_ENABLED:true}
+    fixed-delay: 10s
+  # 결제 대기 배치(GR-65). 끄면 마감이 지난 주문의 재고가 반환되지 않는다.
+  payment-pending-batch:
+    enabled: ${GRAB_PAYMENT_PENDING_BATCH_ENABLED:true}
     fixed-delay: 10s
   # 토스페이먼츠 테스트 환경(TECHSTACK.md 4.4). 시크릿 키는 환경변수로만 주입한다.
   toss:

@@ -10,9 +10,10 @@
   gap: 24px;
   align-items: start;
 }
-.account-panel {
+.panel.account-panel {
   margin-bottom: 24px;
-  padding: 26px;
+  padding: 32px;
+  border-top: 3px solid var(--ink);
 }
 .account-heading,
 .account-footer {
@@ -25,7 +26,8 @@
   margin: 4px 0 16px;
 }
 .account-heading strong {
-  font-size: 20px;
+  font-size: 28px;
+  letter-spacing: -1px;
 }
 .account-heading p:not(.eyebrow) {
   margin: 6px 0;
@@ -43,7 +45,7 @@
   gap: 16px;
   margin-top: 22px;
   padding: 22px;
-  border-radius: 10px;
+  border-radius: 4px;
   background: var(--soft);
 }
 .account-edit label,
@@ -60,7 +62,7 @@
   min-height: 42px;
   padding: 8px 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 4px;
   background: #fff;
 }
 .account-edit .form-error {
@@ -95,7 +97,7 @@
 .panel {
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 4px;
   background: #fff;
 }
 .panel-heading {
@@ -139,7 +141,7 @@
 .compact-item img {
   width: 70px;
   height: 64px;
-  border-radius: 8px;
+  border-radius: 4px;
   object-fit: cover;
 }
 .compact-item div {
@@ -172,7 +174,7 @@
   place-items: center;
   min-height: 260px;
   padding: 34px;
-  border-radius: 14px;
+  border-radius: 4px;
   background: var(--soft);
   text-align: center;
 }
@@ -188,4 +190,13 @@
 .empty-state.page {
   min-height: 55vh;
   gap: 22px;
+}
+
+.my-columns .wish-panel {
+  padding: 0;
+  background: #fff;
+}
+.account-heading p,
+.account-footer p {
+  overflow-wrap: anywhere;
 }

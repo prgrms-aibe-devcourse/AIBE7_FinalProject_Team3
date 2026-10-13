@@ -24,9 +24,76 @@ test('주문 상세를 펼치고 접는다', async ({ page }) => {
 })
 
 test('결제 확인 중인 주문은 배송 준비로 바꿀 수 없다', async ({ page }) => {
+  await page.getByRole('link', { name: '다음' }).click()
   const order = row(page, 'ORD-20260918-000502')
   await expect(order).toContainText('결제 확인 중')
   await expect(order.getByRole('button', { name: '배송 준비' })).toHaveCount(0)
+})
+
+test('상태·결제·DROP 필터와 페이지를 URL에서 복원한다', async ({ page }) => {
+  await page.getByLabel('DROP 필터').selectOption('201')
+  await expect(page).toHaveURL(/dropId=201/)
+  await page.getByRole('button', { name: '배송 준비 1' }).click()
+  await expect(page).toHaveURL(/orderStatus=PREPARING/)
+  await expect(row(page, 'ORD-20260917-000488')).toBeVisible()
+  await page.getByLabel('결제 상태 필터').selectOption('UNKNOWN')
+  await expect(page.getByText('조건에 맞는 주문이 없어요.')).toBeVisible()
+  await page.goBack()
+  await expect(page.getByLabel('결제 상태 필터')).toHaveValue('')
+  await expect(row(page, 'ORD-20260917-000488')).toBeVisible()
+  await page.reload()
+  await expect(page.getByLabel('DROP 필터')).toHaveValue('201')
+  await expect(row(page, 'ORD-20260917-000488')).toBeVisible()
+})
+
+test('대시보드 발송 대기 카드에서 PAID 주문으로 이동한다', async ({ page }) => {
+  await page.goto('/#/seller')
+  await page.getByRole('link', { name: /발송 대기/ }).click()
+  await expect(page).toHaveURL(/seller\/orders\?orderStatus=PAID/)
+  await expect(
+    page.getByRole('button', { name: '결제 완료 3' }),
+  ).toHaveAttribute('aria-pressed', 'true')
+})
+
+test('잘못된 URL 조건은 초기화할 수 있다', async ({ page }) => {
+  await page.goto('/#/seller/orders?orderStatus=INVALID&page=-1')
+  await expect(page.getByText('조회 조건이 올바르지 않아요.')).toBeVisible()
+  await page.getByRole('link', { name: '조건 초기화' }).click()
+  await expect(page).toHaveURL(/#\/seller\/orders$/)
+})
+
+test('페이지와 오류 예시를 구분하고 다시 조회한다', async ({ page }) => {
+  await page.getByRole('link', { name: '다음' }).click()
+  await expect(page).toHaveURL(/page=1/)
+  await expect(row(page, 'ORD-20260918-000502')).toBeVisible()
+  await page.getByLabel('목록 결과 예시').selectOption('ERROR')
+  await expect(page.getByText('주문 목록을 불러오지 못했어요.')).toBeVisible()
+  await page.getByRole('button', { name: '다시 시도' }).click()
+  await expect(row(page, 'ORD-20260918-000502')).toBeVisible()
+  await page.getByLabel('목록 결과 예시').selectOption('FORBIDDEN')
+  await expect(page.getByText('판매자 주문을 볼 권한이 없어요.')).toBeVisible()
+})
+
+test('상세 실패와 배송 상태 충돌에서는 주문을 바꾸지 않는다', async ({
+  page,
+}) => {
+  await page.getByLabel('상세 결과 예시').selectOption('ERROR')
+  const order = row(page, 'ORD-20260918-000500')
+  await order
+    .getByRole('button', { name: 'ORD-20260918-000500 주문 상세' })
+    .click()
+  await expect(order.getByText('주문 상세를 불러오지 못했어요.')).toBeVisible()
+  await order.getByRole('button', { name: '다시 시도' }).click()
+  await expect(order.getByRole('table')).toBeVisible()
+  await page.getByLabel('배송 결과 예시').selectOption('CONFLICT')
+  await order.getByRole('button', { name: '배송 준비' }).click()
+  await expect(order.getByRole('alert')).toContainText(
+    '주문 상태가 바뀌었어요.',
+  )
+  await expect(row(page, 'ORD-20260918-000500')).toBeVisible()
+  await page.getByLabel('배송 결과 예시').selectOption('SUCCESS')
+  await order.getByRole('button', { name: '배송 준비' }).click()
+  await expect(row(page, 'ORD-20260918-000500')).toHaveCount(0)
 })
 
 test('배송 준비 후 송장을 검증하고 발송 처리한다', async ({ page }) => {

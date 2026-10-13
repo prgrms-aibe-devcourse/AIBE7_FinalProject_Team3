@@ -14,7 +14,7 @@
   min-width: 0;
 }
 .buyer-panel {
-  padding: 26px;
+  padding: 30px;
 }
 .buyer-panel h2 {
   margin: 0 0 18px;
@@ -47,7 +47,7 @@
   min-height: 44px;
   padding: 9px 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 4px;
   background: #fff;
 }
 .buyer-item {
@@ -59,7 +59,7 @@
 .buyer-item img {
   width: 78px;
   height: 78px;
-  border-radius: 8px;
+  border-radius: 4px;
   object-fit: cover;
 }
 .buyer-item p {
@@ -88,7 +88,7 @@
   font-weight: 700;
 }
 .buyer-amounts .buyer-total {
-  padding-top: 18px;
+  padding-top: 22px;
   border-top: 1px solid var(--line);
   font-weight: 800;
 }
@@ -116,7 +116,7 @@
 .buyer-status {
   display: inline-block;
   padding: 6px 10px;
-  border-radius: 6px;
+  border-radius: 3px;
   background: var(--lime);
   color: var(--ink);
   font-size: 12px;
@@ -179,7 +179,7 @@
   min-height: 96px;
   padding: 10px 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 4px;
   resize: vertical;
 }
 .buyer-cancel-form .buyer-result-choice {
@@ -197,4 +197,33 @@
 .buyer-back {
   display: inline-block;
   margin-top: 28px;
+}
+
+.buyer-page > h1 {
+  overflow-wrap: anywhere;
+}
+.buyer-intro {
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.buyer-total dd {
+  font-size: 24px;
+  letter-spacing: -0.8px;
+  font-variant-numeric: tabular-nums;
+}
+.buyer-summary {
+  border-top: 3px solid var(--ink);
+}
+.buyer-order-payment {
+  border-top: 3px solid var(--ink);
+}
+.buyer-shipping-info dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+@media (min-width: 981px) {
+  .buyer-summary {
+    position: sticky;
+    top: 112px;
+  }
 }

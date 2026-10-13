@@ -175,7 +175,53 @@
   box-shadow: inset 0 0 0 1px var(--danger);
 }
 .order-tabs {
+  margin-bottom: 14px;
+}
+.seller-order-filters {
   margin-bottom: 18px;
+}
+.seller-order-selects,
+.seller-order-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.seller-order-examples {
+  margin-top: 12px;
+}
+.seller-order-selects label,
+.seller-order-examples label {
+  display: grid;
+  gap: 5px;
+  min-width: 180px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.seller-order-selects select,
+.seller-order-examples select {
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+.seller-order-examples select {
+  background: var(--soft);
+}
+.seller-order-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 18px;
+  font-size: 12px;
+}
+.seller-order-error,
+.seller-order-progress {
+  grid-column: 1 / -1;
+}
+.seller-order-error p {
+  margin: 0 0 8px;
 }
 .order-list {
   display: grid;
@@ -187,6 +233,9 @@
   align-items: center;
   padding: 16px 22px;
   border-bottom: 1px solid var(--line);
+}
+.order-row > * {
+  min-width: 0;
 }
 .order-toggle {
   border: 0;
@@ -470,18 +519,19 @@
 }
 .form-card {
   display: grid;
-  grid-template-columns: 70px 1fr;
+  grid-template-columns: 54px minmax(0, 1fr);
   gap: 10px;
   padding: 28px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 6px;
+  background: #fff;
 }
 .section-number {
   display: grid;
   place-items: center;
   width: 38px;
   height: 38px;
-  border-radius: 50%;
+  border-radius: 4px;
   background: var(--lime);
   font-weight: 800;
   font-size: 12px;
@@ -524,7 +574,7 @@
   gap: 12px;
   align-items: end;
   padding: 15px;
-  border-radius: 10px;
+  border-radius: 4px;
   background: var(--soft);
 }
 .option-group > span {
@@ -543,7 +593,7 @@
 .sku-table {
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 4px;
 }
 .sku-heading {
   display: flex;
@@ -630,13 +680,13 @@
   gap: 14px;
   padding: 12px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 4px;
 }
 .drop-image-item img {
   width: 110px;
   aspect-ratio: 1;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: 4px;
 }
 .drop-image-fields {
   display: grid;
@@ -655,4 +705,76 @@
 .drop-image-actions .secondary-button {
   min-height: 34px;
   padding: 6px 10px;
+}
+
+.seller-orders-page .seller-title {
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--line);
+}
+
+.seller-dashboard-page .seller-title {
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--line);
+}
+.seller-dashboard-page .stats-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 28px;
+}
+.seller-dashboard-page .stats-grid > * {
+  border-radius: 6px;
+  background: #fff;
+  padding: 26px;
+}
+.seller-dashboard-page .stats-grid > a {
+  border-top: 3px solid var(--ink);
+}
+.seller-dashboard-page .stats-grid > button[aria-pressed='true'] {
+  background: var(--lime);
+}
+.seller-dashboard-page .stats-grid strong {
+  font-size: 44px;
+  font-variant-numeric: tabular-nums;
+}
+.seller-dashboard-page .stats-grid small {
+  color: var(--muted);
+}
+.seller-dashboard-page .panel-heading {
+  padding: 24px;
+  background: var(--soft);
+}
+@media (max-width: 720px) {
+  .seller-dashboard-page .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .seller-dashboard-page .stats-grid > * {
+    min-height: 130px;
+    padding: 20px;
+  }
+}
+.seller-orders-page .seller-order-filters {
+  padding: 24px;
+}
+.seller-orders-page .order-row {
+  padding: 24px;
+}
+.seller-orders-page .order-main {
+  gap: 9px;
+}
+.seller-orders-page .order-main strong {
+  font-size: 14px;
+}
+.seller-orders-page .order-toggle {
+  min-height: 44px;
+}
+.seller-orders-page .order-detail,
+.seller-orders-page .shipment-form {
+  border-radius: 4px;
+  padding: 20px;
+}
+@media (max-width: 720px) {
+  .seller-orders-page .seller-order-filters,
+  .seller-orders-page .order-row {
+    padding: 18px;
+  }
 }

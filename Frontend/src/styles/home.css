@@ -1,0 +1,28 @@
+.home-brand-image {
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+}
+.home-section .catalog-heading {
+  align-items: flex-end;
+  margin-bottom: 24px;
+}
+.home-section .catalog-heading h2 {
+  font-size: clamp(23px, 2.3vw, 32px);
+  letter-spacing: -1px;
+}
+.home-section-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+@media (max-width: 600px) {
+  .home-section-actions {
+    gap: 8px;
+  }
+  .home-section .catalog-heading {
+    flex-wrap: nowrap;
+  }
+  .home-section .catalog-heading > div:first-child {
+    flex-shrink: 0;
+  }
+}

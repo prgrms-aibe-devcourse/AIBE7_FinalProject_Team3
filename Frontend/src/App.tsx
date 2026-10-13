@@ -11,6 +11,10 @@ import {
   reviewSellerApplication,
 } from './features/seller/mock/mockSellerApplications'
 import type { SellerDraft } from './features/seller/mock/mockSellerDrafts'
+import {
+  demoSellerDrops,
+  dropFromDraft,
+} from './features/seller/mock/mockSellerDrops'
 import CheckoutPage from './pages/Checkout/CheckoutPage'
 import DropDetailPage from './pages/DropDetail/DropDetailPage'
 import DropListPage from './pages/DropList/DropListPage'
@@ -23,6 +27,7 @@ import NotFoundPage from './pages/NotFound/NotFoundPage'
 import SellerDashboardPage from './pages/SellerDashboard/SellerDashboardPage'
 import SellerDropDetailPage from './pages/SellerDropDetail/SellerDropDetailPage'
 import SellerDropFormPage from './pages/SellerDropForm/SellerDropFormPage'
+import SellerDropsPage from './pages/SellerDrops/SellerDropsPage'
 import SellerOrdersPage from './pages/SellerOrders/SellerOrdersPage'
 import SellerApplyPage from './pages/SellerApply/SellerApplyPage'
 import AdminSellerApplicationsPage from './pages/AdminSellerApplications/AdminSellerApplicationsPage'
@@ -44,6 +49,19 @@ export default function App() {
   const [sellerDrafts, setSellerDrafts] = useState<Record<string, SellerDraft>>(
     {},
   )
+  const [sellerDrops, setSellerDrops] = useState(demoSellerDrops)
+
+  const saveSellerDraft = (draft: SellerDraft) => {
+    setSellerDrafts((current) => ({ ...current, [draft.id]: draft }))
+    setSellerDrops((current) => {
+      const existing = current.find((drop) => drop.id === draft.id)
+      const next = dropFromDraft(
+        draft,
+        existing?.ownerEmail ?? account?.email ?? 'grab@example.com',
+      )
+      return [next, ...current.filter((drop) => drop.id !== draft.id)]
+    })
+  }
 
   const shared: SharedProps = {
     authenticated,
@@ -157,16 +175,26 @@ export default function App() {
             element={<SellerOrdersPage notify={notify} />}
           />
           <Route
+            path="/seller/drops"
+            element={
+              <SellerDropsPage
+                account={account}
+                drops={sellerDrops}
+                ownerEmail={account?.email ?? 'grab@example.com'}
+                onChange={setSellerDrops}
+                notify={notify}
+              />
+            }
+          />
+          <Route
             path="/seller/drops/new"
             element={
               <SellerDropFormPage
                 drafts={sellerDrafts}
-                onSave={(draft) =>
-                  setSellerDrafts((current) => ({
-                    ...current,
-                    [draft.id]: draft,
-                  }))
-                }
+                editableIds={sellerDrops
+                  .filter((drop) => drop.status === 'DRAFT')
+                  .map((drop) => drop.id)}
+                onSave={saveSellerDraft}
                 notify={notify}
               />
             }
@@ -176,19 +204,25 @@ export default function App() {
             element={
               <SellerDropFormPage
                 drafts={sellerDrafts}
-                onSave={(draft) =>
-                  setSellerDrafts((current) => ({
-                    ...current,
-                    [draft.id]: draft,
-                  }))
-                }
+                editableIds={sellerDrops
+                  .filter((drop) => drop.status === 'DRAFT')
+                  .map((drop) => drop.id)}
+                onSave={saveSellerDraft}
                 notify={notify}
               />
             }
           />
           <Route
             path="/seller/drops/:dropId"
-            element={<SellerDropDetailPage />}
+            element={
+              <SellerDropDetailPage
+                account={account}
+                drops={sellerDrops}
+                ownerEmail={account?.email ?? 'grab@example.com'}
+                onChange={setSellerDrops}
+                notify={notify}
+              />
+            }
           />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>

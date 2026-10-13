@@ -1,0 +1,84 @@
+package org.example.grab.domain.payment.service;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
+import org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProcessor;
+
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.mock;
+
+@ExtendWith(MockitoExtension.class)
+class PaymentPendingBatchSchedulerTest {
+
+    @Mock
+    private PaymentExpiryService paymentExpiryService;
+
+    @InjectMocks
+    private PaymentPendingBatchScheduler scheduler;
+
+    @Test
+    @DisplayName("UTC 현재 시각을 만들어 만료 서비스에 전달한다")
+    void passesUtcNowToExpiry() {
+        // when
+        scheduler.run();
+
+        // then
+        ArgumentCaptor<OffsetDateTime> captor = ArgumentCaptor.forClass(OffsetDateTime.class);
+        then(paymentExpiryService).should().expire(captor.capture());
+        assertThat(captor.getValue().getOffset()).isEqualTo(ZoneOffset.UTC);
+    }
+
+    @Test
+    @DisplayName("만료 중 예외가 나도 밖으로 전파하지 않아 다음 실행이 이어진다")
+    void swallowsException() {
+        // given
+        given(paymentExpiryService.expire(any())).willThrow(new RuntimeException("일시적 DB 오류"));
+
+        // when & then
+        assertThatCode(scheduler::run).doesNotThrowAnyException();
+    }
+
+    /*
+        grab.payment-pending-batch.enabled 값에 따라 스케줄러 빈이 등록되는지 검증한다.
+        Gradle test 태스크의 enabled=false 기본값을 여기서만 덮어쓴다.
+     */
+    @Test
+    @DisplayName("속성이 true면 스케줄러 빈이 등록되고, false면 등록되지 않는다")
+    void registersByProperty() {
+        ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+                .withUserConfiguration(SchedulerTestConfig.class)
+                .withBean(ScheduledAnnotationBeanPostProcessor.class);
+
+        contextRunner.withPropertyValues("grab.payment-pending-batch.enabled=true")
+                .run(context -> assertThat(context).hasSingleBean(PaymentPendingBatchScheduler.class));
+        contextRunner.withPropertyValues("grab.payment-pending-batch.enabled=false")
+                .run(context -> assertThat(context).doesNotHaveBean(PaymentPendingBatchScheduler.class));
+    }
+
+    // @Import로 등록하면 클래스의 @ConditionalOnProperty가 평가된다(@Bean 직접 등록은 평가되지 않는다).
+    @Configuration
+    @Import(PaymentPendingBatchScheduler.class)
+    static class SchedulerTestConfig {
+
+        @Bean
+        PaymentExpiryService paymentExpiryService() {
+            return mock(PaymentExpiryService.class);
+        }
+    }
+}

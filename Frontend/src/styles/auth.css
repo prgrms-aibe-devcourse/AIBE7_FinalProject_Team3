@@ -1,9 +1,10 @@
 .auth-page {
   display: grid;
-  grid-template-columns: 1.05fr 0.8fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   min-height: 620px;
   overflow: hidden;
-  border-radius: 18px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
   background: var(--soft);
 }
 .auth-copy {
@@ -12,7 +13,8 @@
   align-items: flex-start;
   justify-content: center;
   flex-direction: column;
-  padding: clamp(38px, 7vw, 90px);
+  padding: clamp(32px, 5vw, 72px);
+  padding-bottom: 240px;
   overflow: hidden;
   background: var(--ink);
   color: #fff;
@@ -20,35 +22,38 @@
 .auth-copy h1 {
   max-width: 570px;
   margin: 0 0 18px;
-  font-size: clamp(40px, 6vw, 72px);
-  line-height: 1.05;
-  letter-spacing: -4px;
+  font-size: clamp(36px, 4.5vw, 60px);
+  line-height: 1.2;
+  letter-spacing: -2.5px;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 .auth-copy > p:not(.eyebrow) {
   max-width: 460px;
   margin: 0;
   color: #c8cbc2;
   line-height: 1.7;
+  word-break: keep-all;
 }
 .auth-copy .eyebrow {
   color: var(--lime);
 }
 .auth-copy img {
   position: absolute;
-  right: -65px;
-  bottom: -75px;
-  width: 280px;
-  height: 280px;
+  right: 30px;
+  bottom: 30px;
+  width: 170px;
+  height: 170px;
   object-fit: contain;
   opacity: 0.9;
-  transform: rotate(-12deg);
+  transform: rotate(-8deg);
 }
 .auth-form {
   display: flex;
   justify-content: center;
   flex-direction: column;
   gap: 17px;
-  padding: clamp(34px, 6vw, 80px);
+  padding: clamp(28px, 4vw, 64px);
   background: #fff;
 }
 .auth-stack {
@@ -69,7 +74,7 @@
   min-height: 42px;
   padding: 8px 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 4px;
   background: #fff;
 }
 .auth-form .demo-select {
@@ -91,13 +96,18 @@
   list-style: none;
 }
 .auth-steps li {
-  padding: 7px 10px;
-  border-radius: 30px;
+  flex: 1;
+  min-width: 80px;
+  border-bottom: 2px solid var(--line);
+  padding: 12px 8px;
+  text-align: center;
+  border-radius: 3px;
   background: var(--soft);
   color: var(--muted);
   font-size: 11px;
 }
 .auth-steps li[aria-current] {
+  border-color: var(--ink);
   background: var(--lime);
   color: var(--ink);
   font-weight: 800;
@@ -122,7 +132,7 @@
   min-height: 48px;
   padding: 10px 13px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 4px;
 }
 .auth-form p {
   margin: 2px 0 0;
@@ -137,8 +147,14 @@
   text-underline-offset: 3px;
 }
 .auth-form small {
-  color: #979a91;
+  color: var(--muted);
   font-size: 10px;
   line-height: 1.6;
   text-align: center;
+}
+
+.auth-heading .eyebrow {
+  margin-bottom: 10px;
+  text-align: left;
+  font-size: 10px;
 }

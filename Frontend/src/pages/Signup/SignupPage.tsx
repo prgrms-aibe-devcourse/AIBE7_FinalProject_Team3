@@ -87,7 +87,7 @@ export default function SignupPage({ onLogin, notify }: Props) {
   }
 
   return (
-    <section className="auth-page">
+    <section className="auth-page signup-page">
       <div className="auth-copy">
         <p className="eyebrow">WELCOME TO GRAB</p>
         <h1>취향을 발견할 준비가 됐나요?</h1>
@@ -96,7 +96,10 @@ export default function SignupPage({ onLogin, notify }: Props) {
       </div>
       <div className="auth-form">
         <div className="auth-stack">
-          <h2>{provider ? `${provider} 첫 가입` : 'LOCAL 회원가입'}</h2>
+          <div className="auth-heading">
+            <p className="eyebrow">START YOUR COLLECTION</p>
+            <h2>{provider ? `${provider} 첫 가입` : 'LOCAL 회원가입'}</h2>
+          </div>
           {!provider && (
             <ol className="auth-steps" aria-label="회원가입 단계">
               <li aria-current={step === 'email' ? 'step' : undefined}>
