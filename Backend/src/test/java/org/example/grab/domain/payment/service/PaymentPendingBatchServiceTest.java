@@ -7,17 +7,20 @@ import org.example.grab.domain.payment.entity.Payment;
 import org.example.grab.domain.payment.entity.PaymentProvider;
 import org.example.grab.domain.payment.entity.PaymentStatus;
 import org.example.grab.domain.payment.gateway.PaymentConfirmCommand;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
@@ -49,8 +52,14 @@ class PaymentPendingBatchServiceTest {
     @Mock
     private OrderPaymentService orderPaymentService;
 
-    @InjectMocks
+    private StepClock clock;
     private PaymentPendingBatchService batchService;
+
+    @BeforeEach
+    void setUp() {
+        clock = new StepClock(NOW.toInstant());
+        batchService = new PaymentPendingBatchService(transactionService, paymentService, orderPaymentService, clock);
+    }
 
     @Nested
     @DisplayName("한 주기")
@@ -125,6 +134,27 @@ class PaymentPendingBatchServiceTest {
 
             // then
             assertThat(settled).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("시간 예산을 넘기면 남은 선점 결제는 처리하지 않고 넘긴다")
+        void defersRemainingPaymentsAfterTimeBudget() {
+            // given: 첫 결제의 PG 처리가 예산보다 오래 걸린다
+            given(transactionService.claimInProgress(NOW, PaymentPendingBatchService.CLEANUP_BATCH_SIZE))
+                    .willReturn(List.of(1L, 2L, 3L));
+            PaymentPreparation.Resolve first = target(1L);
+            given(transactionService.findReconciliationTarget(1L)).willReturn(Optional.of(first));
+            given(paymentService.reconcile(first)).willAnswer(invocation -> {
+                clock.advance(PaymentPendingBatchService.CLEANUP_TIME_BUDGET.plusSeconds(1));
+                return payment(PaymentStatus.UNKNOWN);
+            });
+
+            // when
+            batchService.cleanUpInProgress(NOW);
+
+            // then
+            then(transactionService).should(never()).findReconciliationTarget(2L);
+            then(transactionService).should(never()).findReconciliationTarget(3L);
         }
 
         @Test
@@ -245,5 +275,34 @@ class PaymentPendingBatchServiceTest {
     }
 
     private record Candidate(Long getId, Instant getPaymentExpiresAt) implements PaymentExpiryCandidate {
+    }
+
+    // 시간 예산 검증용 시계. advance로 PG 처리에 걸린 시간을 흉내 낸다.
+    private static final class StepClock extends Clock {
+
+        private Instant instant;
+
+        private StepClock(Instant instant) {
+            this.instant = instant;
+        }
+
+        void advance(Duration duration) {
+            instant = instant.plus(duration);
+        }
+
+        @Override
+        public Instant instant() {
+            return instant;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
     }
 }

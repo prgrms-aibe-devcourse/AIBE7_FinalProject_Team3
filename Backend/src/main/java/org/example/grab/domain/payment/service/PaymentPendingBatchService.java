@@ -1,15 +1,17 @@
 package org.example.grab.domain.payment.service;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.grab.domain.order.dto.PaymentExpiryCandidate;
 import org.example.grab.domain.order.dto.PaymentExpiryResult;
 import org.example.grab.domain.order.service.OrderPaymentService;
 import org.example.grab.domain.payment.entity.Payment;
 import org.example.grab.domain.payment.entity.PaymentStatus;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -21,11 +23,13 @@ import java.util.Optional;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class PaymentPendingBatchService {
 
-    // 진행 중 결제 정리: PG 호출 시간이 같은 주기의 만료를 늦추지 않도록 주기당 건수를 제한한다. 남은 대상은 다음 주기에 처리한다.
+    // 진행 중 결제 정리: 주기당 선점 건수 상한. 남은 대상은 다음 주기에 처리한다.
     static final int CLEANUP_BATCH_SIZE = 50;
+    // 진행 중 결제 정리의 시간 예산. PG가 느리면 건수 상한만으로는 정리가 수십 분 걸려 만료가 늦어진다.
+    // 예산을 넘기면 다음 결제부터는 처리하지 않고 만료로 넘어간다. 이미 시작한 한 건은 끝까지 기다린다.
+    static final Duration CLEANUP_TIME_BUDGET = Duration.ofSeconds(5);
     // 생성(created_at) 후 이만큼 지나도 결과를 모르는 결제는 PG 인증 만료(10분)로도 정리되지 않은 것이라 운영자가 확인하도록 경고한다.
     static final Duration UNKNOWN_WARNING_AFTER = Duration.ofMinutes(10);
     // 결제 대기 만료: 후보를 키셋으로 읽는 페이지 크기
@@ -34,6 +38,28 @@ public class PaymentPendingBatchService {
     private final PaymentTransactionService transactionService; // 정리 대상 선점, 값 조회, 결과 반영을 각각 트랜잭션에서 처리
     private final PaymentService paymentService; // PG 조회 및 승인 재요청 흐름을 처리
     private final OrderPaymentService orderPaymentService; // 만료 후보 조회와 주문별 만료를 처리
+    private final Clock clock; // 정리 시간 예산의 경과 시간을 잰다
+
+    @Autowired
+    public PaymentPendingBatchService(
+            PaymentTransactionService transactionService,
+            PaymentService paymentService,
+            OrderPaymentService orderPaymentService
+    ) {
+        this(transactionService, paymentService, orderPaymentService, Clock.systemUTC());
+    }
+
+    PaymentPendingBatchService(
+            PaymentTransactionService transactionService,
+            PaymentService paymentService,
+            OrderPaymentService orderPaymentService,
+            Clock clock
+    ) {
+        this.transactionService = transactionService;
+        this.paymentService = paymentService;
+        this.orderPaymentService = orderPaymentService;
+        this.clock = clock;
+    }
 
     /**
      * 한 주기를 실행한다. 정리를 만료보다 먼저 해, 마감 전에 승인된 결제를 먼저 주문 PAID로 반영한다.
@@ -54,21 +80,34 @@ public class PaymentPendingBatchService {
 
     // ===== 진행 중 결제 정리 =====
 
-    /** 오래된 진행 중 결제(PENDING·UNKNOWN)를 선점해 PG 조회로 정리한다. 진행 중이 아닌 상태로 확정한 결제 수를 반환한다. */
+    /**
+     * 오래된 진행 중 결제(PENDING·UNKNOWN)를 선점해 PG 조회로 정리한다. 진행 중이 아닌 상태로 확정한 결제 수를 반환한다.
+     * 시간 예산을 넘기면 남은 선점 결제는 처리하지 않는다. 선점 때 updated_at이 바뀌었으므로 60초 뒤 다시 선점된다.
+     */
     int cleanUpInProgress(OffsetDateTime now) {
+        Instant deadline = clock.instant().plus(CLEANUP_TIME_BUDGET);
         List<Long> paymentIds = transactionService.claimInProgress(now, CLEANUP_BATCH_SIZE);
         int settled = 0;
         int unsettled = 0;
         int failed = 0;
-        for (Long paymentId : paymentIds) {
-            switch (cleanUpOne(paymentId, now)) {
+        int deferred = 0;
+        for (int i = 0; i < paymentIds.size(); i++) {
+            if (clock.instant().isAfter(deadline)) {
+                deferred = paymentIds.size() - i; // 시간 예산을 넘겨 다음으로 넘긴 건수
+                break;
+            }
+            switch (cleanUpOne(paymentIds.get(i), now)) {
                 case SETTLED -> settled++; // 진행 중 상태가 아닌 것으로 확인된 건수
                 case UNSETTLED -> unsettled++; // 처리 후에도 진행 중 상태인 건수
                 case FAILED -> failed++; // 처리 중 예외가 발생한 건수
             }
         }
+        if (deferred > 0) {
+            log.warn("진행 중 결제 정리가 시간 예산({}초)을 넘겨 {}건을 다음으로 넘김. PG 지연을 확인하세요.",
+                    CLEANUP_TIME_BUDGET.toSeconds(), deferred);
+        }
         if (!paymentIds.isEmpty()) {
-            log.info("진행 중 결제 정리: 확정 {}건, 미확정 {}건, 실패 {}건", settled, unsettled, failed);
+            log.info("진행 중 결제 정리: 확정 {}건, 미확정 {}건, 실패 {}건, 넘김 {}건", settled, unsettled, failed, deferred);
         }
         return settled;
     }
