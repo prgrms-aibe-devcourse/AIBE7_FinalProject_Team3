@@ -134,7 +134,12 @@ export default function App() {
           />
           <Route
             path="/seller"
-            element={<SellerDashboardPage notify={notify} />}
+            element={
+              <SellerDashboardPage
+                drops={sellerDrops}
+                ownerEmail={account?.email ?? 'grab@example.com'}
+              />
+            }
           />
           <Route
             path="/seller/apply"
