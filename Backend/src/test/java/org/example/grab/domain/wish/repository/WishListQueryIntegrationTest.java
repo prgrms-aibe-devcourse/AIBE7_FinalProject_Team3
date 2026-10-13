@@ -16,6 +16,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -104,7 +105,7 @@ class WishListQueryIntegrationTest {
     }
 
     @Test
-    @DisplayName("썸네일은 이미지 sort_order 최솟값, 최저가는 활성 SKU만 반영한다")
+    @DisplayName("썸네일은 GALLERY 이미지 sort_order 최솟값, 최저가는 활성 SKU만 반영한다")
     void calculatesThumbnailAndMinPrice() {
         // given
         Long dropId = insertDrop("상품", "WISH");
@@ -122,6 +123,26 @@ class WishListQueryIntegrationTest {
         // then
         assertThat(projection.getThumbnailUrl()).isEqualTo("https://img/0.jpg");
         assertThat(projection.getMinPrice()).isEqualTo(99000L);
+    }
+
+    @Test
+    @DisplayName("썸네일은 GALLERY만 쓰고 DETAIL만 있으면 null이다")
+    void thumbnailIgnoresDetailImages() {
+        // given
+        Long mixed = insertDrop("혼합", "WISH");
+        Long detailOnly = insertDrop("상세만", "WISH");
+        insertTypedImage(mixed, "https://img/detail.jpg", "DETAIL", 0);
+        insertImage(mixed, "https://img/gallery.jpg", 0);
+        insertTypedImage(detailOnly, "https://img/detail-only.jpg", "DETAIL", 0);
+        insertWish(userId, mixed, true, 1);
+        insertWish(userId, detailOnly, true, 0);
+
+        // when
+        List<WishListProjection> rows = wishRepository.findActiveWishes(userId, PageRequest.of(0, 20)).getContent();
+
+        // then: 최신 등록순이므로 detailOnly, mixed 순서다
+        assertThat(rows).extracting(WishListProjection::getThumbnailUrl)
+                .containsExactly(null, "https://img/gallery.jpg");
     }
 
     @Test
@@ -223,6 +244,15 @@ class WishListQueryIntegrationTest {
                         CASE WHEN ? THEN NULL ELSE CURRENT_TIMESTAMP END)
                 """,
                 wishUserId, dropId, activatedMinutesAgo, active);
+    }
+
+    private void insertTypedImage(Long dropId, String url, String imageType, int sortOrder) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO drop_images (drop_id, image_url, image_type, sort_order, alt_text)
+                VALUES (?, ?, ?, ?, '상품')
+                """,
+                dropId, url, imageType, sortOrder);
     }
 
     private void insertImage(Long dropId, String url, int sortOrder) {

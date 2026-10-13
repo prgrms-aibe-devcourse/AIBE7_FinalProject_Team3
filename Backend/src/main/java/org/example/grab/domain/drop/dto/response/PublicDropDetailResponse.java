@@ -18,6 +18,8 @@ public record PublicDropDetailResponse(
         String name,
         String description,
         List<String> imageUrls,
+        List<Image> galleryImages,
+        List<Image> detailImages,
         Long minPrice,
         DropCategoryResponse category,
         DropStatus status,
@@ -32,6 +34,13 @@ public record PublicDropDetailResponse(
         Actions actions,
         OffsetDateTime serverTime
 ) {
+
+    public record Image(String imageUrl, String altText) {
+
+        static List<Image> listOf(List<DropImage> images) {
+            return images.stream().map(image -> new Image(image.getImageUrl(), image.getAltText())).toList();
+        }
+    }
 
     // 명세 1.3: options에는 판매자 상세와 달리 active 대신 availableStock·soldOut만 노출한다.
     public record Option(Long optionId, List<DropOptionSelectionResponse> selections,
@@ -49,11 +58,15 @@ public record PublicDropDetailResponse(
         List<DropOption> activeOptions = drop.getOptions().stream()
                 .filter(DropOption::isActive)
                 .toList();
+        List<DropImage> galleryImages = drop.getGalleryImages();
         return new PublicDropDetailResponse(
                 drop.getId(),
                 drop.getName(),
                 drop.getDescription(),
-                drop.getImages().stream().map(DropImage::getImageUrl).toList(),
+                // imageUrls는 구버전 소비자 화면 호환용으로 GALLERY URL만 같은 순서로 둔다(명세 1.3).
+                galleryImages.stream().map(DropImage::getImageUrl).toList(),
+                Image.listOf(galleryImages),
+                Image.listOf(drop.getDetailImages()),
                 drop.getMinPrice(),
                 category,
                 drop.getStatus(),

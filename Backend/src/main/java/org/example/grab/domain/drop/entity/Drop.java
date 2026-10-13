@@ -111,6 +111,23 @@ public class Drop extends BaseEntity {
         images.add(image);
     }
 
+    public List<DropImage> getGalleryImages() {
+        return imagesOf(DropImageType.GALLERY);
+    }
+
+    public List<DropImage> getDetailImages() {
+        return imagesOf(DropImageType.DETAIL);
+    }
+
+    // 두 용도가 한 컬렉션에 있고 순서는 용도 안에서만 의미가 있으므로, 용도로 거른 뒤 sortOrder로 다시 정렬한다.
+    // @OrderBy는 DB에서 읽을 때만 적용되므로 같은 트랜잭션에서 추가한 이미지도 순서가 맞도록 직접 정렬한다.
+    private List<DropImage> imagesOf(DropImageType imageType) {
+        return images.stream()
+                .filter(image -> image.getImageType() == imageType)
+                .sorted(Comparator.comparingInt(DropImage::getSortOrder))
+                .toList();
+    }
+
     public void addOptionGroup(DropOptionGroup optionGroup) {
         optionGroups.add(optionGroup);
     }

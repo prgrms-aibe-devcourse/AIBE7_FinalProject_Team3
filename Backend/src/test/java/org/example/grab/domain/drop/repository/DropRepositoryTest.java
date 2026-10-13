@@ -4,6 +4,7 @@ import jakarta.persistence.EntityManager;
 import org.example.grab.global.config.JpaConfig;
 import org.example.grab.domain.drop.dto.PublicDropListProjection;
 import org.example.grab.domain.drop.dto.PublicDropSort;
+import org.example.grab.domain.drop.dto.SellerDropListProjection;
 import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.domain.drop.entity.DropImage;
 import org.example.grab.domain.drop.entity.DropImageType;
@@ -229,6 +230,46 @@ class DropRepositoryTest {
                 .isEqualTo("GALLERY");
         assertThatThrownBy(() -> insertTypedImage(dropId, "BANNER", 1))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("공개 목록 썸네일은 GALLERY의 첫 이미지이고 DETAIL만 있으면 null이다")
+    void publicListThumbnailUsesGalleryOnly() {
+        // given: DETAIL이 GALLERY보다 먼저 저장되고 순서 번호도 같다
+        Long mixed = insertPublishedDrop(DropStatus.WISH, "혼합");
+        Long detailOnly = insertPublishedDrop(DropStatus.WISH, "상세만");
+        insertTypedImage(mixed, "DETAIL", 0);
+        insertImage(mixed, "https://img/gallery-1.jpg", 1);
+        insertImage(mixed, "https://img/gallery-0.jpg", 0);
+        insertTypedImage(detailOnly, "DETAIL", 0);
+
+        // when
+        Page<PublicDropListProjection> page = dropRepository.findPublicDrops(
+                List.of("WISH"), null, null, null, PageRequest.of(0, 20));
+
+        // then
+        assertThat(rowOf(page, mixed).getThumbnailUrl()).isEqualTo("https://img/gallery-0.jpg");
+        assertThat(rowOf(page, detailOnly).getThumbnailUrl()).isNull();
+    }
+
+    @Test
+    @DisplayName("판매자 목록 썸네일은 GALLERY의 첫 이미지이고 DETAIL만 있으면 null이다")
+    void sellerListThumbnailUsesGalleryOnly() {
+        // given
+        Long mixed = insertPublishedDrop(DropStatus.WISH, "혼합");
+        Long detailOnly = insertPublishedDrop(DropStatus.WISH, "상세만");
+        insertTypedImage(mixed, "DETAIL", 0);
+        insertImage(mixed, "https://img/gallery-1.jpg", 1);
+        insertImage(mixed, "https://img/gallery-0.jpg", 0);
+        insertTypedImage(detailOnly, "DETAIL", 0);
+
+        // when
+        List<SellerDropListProjection> rows =
+                dropRepository.findSellerDrops(sellerId, null, PageRequest.of(0, 20)).getContent();
+
+        // then
+        assertThat(sellerRowOf(rows, mixed).getThumbnailUrl()).isEqualTo("https://img/gallery-0.jpg");
+        assertThat(sellerRowOf(rows, detailOnly).getThumbnailUrl()).isNull();
     }
 
     @Test
@@ -1081,6 +1122,10 @@ class DropRepositoryTest {
                 .filter(projection -> projection.getDropId().equals(dropId))
                 .findFirst()
                 .orElseThrow();
+    }
+
+    private SellerDropListProjection sellerRowOf(List<SellerDropListProjection> rows, Long dropId) {
+        return rows.stream().filter(row -> row.getDropId().equals(dropId)).findFirst().orElseThrow();
     }
 
     private List<Long> idsOf(Page<PublicDropListProjection> page) {

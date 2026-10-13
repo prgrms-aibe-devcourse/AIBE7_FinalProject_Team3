@@ -393,7 +393,8 @@ class SellerDropControllerTest {
         given(currentSellerIdProvider.currentSellerId()).willReturn(1L);
         SellerDropDetailResponse detail = new SellerDropDetailResponse(
                 100L, "상품", "설명",
-                List.of(new SellerDropDetailResponse.Image(java.util.UUID.randomUUID(), "https://example.com/a.jpg")),
+                List.of(new SellerDropDetailResponse.Image(java.util.UUID.randomUUID(), "https://example.com/a.jpg", "정면")),
+                List.of(new SellerDropDetailResponse.Image(java.util.UUID.randomUUID(), "https://example.com/d.jpg", "")),
                 10000L, 1L, DropStatus.DRAFT,
                 OffsetDateTime.parse("2026-09-18T07:00:00Z"), OffsetDateTime.parse("2026-09-18T09:00:00Z"),
                 new DropShippingResponse(3000L, "안내"),
@@ -408,6 +409,9 @@ class SellerDropControllerTest {
         mockMvc.perform(get("/api/v1/seller/drops/100"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.dropId").value(100))
+                .andExpect(jsonPath("$.data.images[0].altText").value("정면"))
+                .andExpect(jsonPath("$.data.detailImages[0].imageUrl").value("https://example.com/d.jpg"))
+                .andExpect(jsonPath("$.data.detailImages[0].altText").value(""))
                 .andExpect(jsonPath("$.data.shipping.shippingFee").value(3000))
                 .andExpect(jsonPath("$.data.optionGroups[0].groupId").value(11))
                 .andExpect(jsonPath("$.data.optionGroups[0].values[0].valueId").value(111))

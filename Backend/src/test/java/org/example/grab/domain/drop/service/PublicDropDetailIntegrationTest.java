@@ -11,6 +11,7 @@ import org.example.grab.domain.drop.dto.request.OptionValueRequest;
 import org.example.grab.domain.drop.dto.request.SelectionRequest;
 import org.example.grab.domain.drop.dto.request.ShippingRequest;
 import org.example.grab.domain.drop.dto.response.PublicDropDetailResponse;
+import org.example.grab.domain.drop.dto.response.SellerDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.common.DropOptionGroupResponse;
 import org.example.grab.domain.drop.dto.response.common.DropOptionSelectionResponse;
 import org.example.grab.domain.drop.entity.DropStatus;
@@ -118,6 +119,33 @@ class PublicDropDetailIntegrationTest {
         assertThat(detail.wishNotice()).isEqualTo(WishNotice.MESSAGE);
         assertThat(detail.actions()).isEqualTo(new PublicDropDetailResponse.Actions(true, true, false));
         assertThat(detail.serverTime()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("공개·판매자 상세는 GALLERY와 DETAIL을 나눠 반환하고 imageUrls에는 GALLERY만 담는다")
+    void findDetail_splitsGalleryAndDetailImages() {
+        // given: 공개된 DROP(GALLERY 1장)에 DETAIL 2장을 역순으로 추가한다
+        Long dropId = publishDrop();
+        insertDetailImage(dropId, "https://img/detail-1.jpg", 1, "");
+        insertDetailImage(dropId, "https://img/detail-0.jpg", 0, "소재");
+        String galleryUrl = jdbcTemplate.queryForObject(
+                "SELECT image_url FROM drop_images WHERE drop_id = ? AND image_type = 'GALLERY'", String.class, dropId);
+
+        // when
+        PublicDropDetailResponse publicDetail = dropService.findPublicDrop(dropId);
+        SellerDropDetailResponse sellerDetail = dropService.findSellerDrop(sellerId, dropId);
+
+        // then
+        assertThat(publicDetail.imageUrls()).containsExactly(galleryUrl);
+        assertThat(publicDetail.galleryImages()).containsExactly(new PublicDropDetailResponse.Image(galleryUrl, "상품"));
+        assertThat(publicDetail.detailImages()).containsExactly(
+                new PublicDropDetailResponse.Image("https://img/detail-0.jpg", "소재"),
+                new PublicDropDetailResponse.Image("https://img/detail-1.jpg", ""));
+        assertThat(sellerDetail.images()).extracting(SellerDropDetailResponse.Image::imageUrl).containsExactly(galleryUrl);
+        assertThat(sellerDetail.detailImages()).extracting(SellerDropDetailResponse.Image::imageUrl)
+                .containsExactly("https://img/detail-0.jpg", "https://img/detail-1.jpg");
+        assertThat(sellerDetail.detailImages()).extracting(SellerDropDetailResponse.Image::altText)
+                .containsExactly("소재", "");
     }
 
     @Test
@@ -331,6 +359,15 @@ class PublicDropDetailIntegrationTest {
                 Long.class,
                 "buyer-" + uniqueValue + "@example.com",
                 "구매자-" + uniqueValue);
+    }
+
+    private void insertDetailImage(Long dropId, String imageUrl, int sortOrder, String altText) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO drop_images (drop_id, image_url, image_type, sort_order, alt_text)
+                VALUES (?, ?, 'DETAIL', ?, ?)
+                """,
+                dropId, imageUrl, sortOrder, altText);
     }
 
     private void insertWish(Long userId, Long dropId, boolean canceled) {

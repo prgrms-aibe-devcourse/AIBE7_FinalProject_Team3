@@ -38,12 +38,16 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
      * 그래서 상관 서브쿼리로 각 DROP의 활성 SKU 최저가를 같은 쿼리 안에서 계산해 한 번에 가져온다.
      * 서브쿼리는 활성 SKU가 없으면 MIN 결과가 NULL이 되므로 minPrice는 null이 된다(0이 아님).
      * select 식은 인터페이스 프로젝션(SellerDropListProjection)으로 바로 매핑한다.
+     * 썸네일은 GALLERY 중 순서가 가장 앞선 이미지이고 DETAIL은 쓰지 않는다. GALLERY가 없으면 null이다.
      * status가 null이면 조건을 통과시켜 전체를, 값이 있으면 해당 상태만 조회한다.
      */
     @Query(value = """
             SELECT d.id AS dropId, d.name AS name,
                    (SELECT i.imageUrl FROM DropImage i
-                    WHERE i.drop = d AND i.sortOrder = (SELECT MIN(i2.sortOrder) FROM DropImage i2 WHERE i2.drop = d)) AS thumbnailUrl,
+                    WHERE i.drop = d AND i.imageType = org.example.grab.domain.drop.entity.DropImageType.GALLERY
+                      AND i.sortOrder = (SELECT MIN(i2.sortOrder) FROM DropImage i2
+                                         WHERE i2.drop = d
+                                           AND i2.imageType = org.example.grab.domain.drop.entity.DropImageType.GALLERY)) AS thumbnailUrl,
                    d.status AS status,
                    (SELECT MIN(o.unitPrice) FROM DropOption o WHERE o.drop = d AND o.active = true) AS minPrice,
                    d.createdAt AS createdAt
@@ -66,13 +70,14 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
      * 썸네일(LIMIT 1)·ILIKE ESCAPE·컬럼명 기준 정렬 때문에 네이티브로 작성하고, 목록에 필요한 값
      * (minPrice·soldOut·wishCount·thumbnailUrl)을 한 쿼리 안에서 서브쿼리로 계산해 N+1을 막는다.
      * 활성 WISH 집계(canceled_at IS NULL)는 WishRepository 대신 같은 쿼리 안에서 네이티브로 센다.
+     * 썸네일은 GALLERY 중 순서가 가장 앞선 이미지이고 DETAIL은 쓰지 않는다(DROP.md 1.2).
      * soldOut 판정식은 SELECT와 PUBLIC_DROP_FILTERS 두 곳에 중복되므로 한쪽만 바꾸지 않도록 주의한다.
      */
     String PUBLIC_DROP_SELECT = """
             SELECT d.id AS "dropId", d.name AS "name", d.status AS "status",
                    d.sale_starts_at AS "saleStartsAt", d.sale_ends_at AS "saleEndsAt",
                    c.id AS "categoryId", c.name AS "categoryName",
-                   (SELECT i.image_url FROM drop_images i WHERE i.drop_id = d.id
+                   (SELECT i.image_url FROM drop_images i WHERE i.drop_id = d.id AND i.image_type = 'GALLERY'
                      ORDER BY i.sort_order LIMIT 1) AS "thumbnailUrl",
                    (SELECT MIN(o.unit_price) FROM drop_options o
                      WHERE o.drop_id = d.id AND o.is_active) AS "minPrice",

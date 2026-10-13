@@ -4,6 +4,7 @@ import org.example.grab.domain.drop.dto.response.common.DropOptionGroupResponse;
 import org.example.grab.domain.drop.dto.response.common.DropOptionSelectionResponse;
 import org.example.grab.domain.drop.dto.response.common.DropShippingResponse;
 import org.example.grab.domain.drop.entity.Drop;
+import org.example.grab.domain.drop.entity.DropImage;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.entity.option.DropOption;
 
@@ -16,6 +17,7 @@ public record SellerDropDetailResponse(
         String name,
         String description,
         List<Image> images,
+        List<Image> detailImages,
         Long minPrice,
         Long categoryId,
         DropStatus status,
@@ -26,7 +28,14 @@ public record SellerDropDetailResponse(
         List<Option> options
 ) {
 
-    public record Image(UUID imageId, String imageUrl) {
+    // 수정 화면이 받은 값을 그대로 다시 보낼 수 있도록 요청 원소와 같은 형태로 둔다(명세 2.3).
+    public record Image(UUID imageId, String imageUrl, String altText) {
+
+        static List<Image> listOf(List<DropImage> images) {
+            return images.stream()
+                    .map(image -> new Image(image.getUuid(), image.getImageUrl(), image.getAltText()))
+                    .toList();
+        }
     }
 
     public record Option(Long optionId, List<DropOptionSelectionResponse> selections, Long unitPrice,
@@ -39,9 +48,8 @@ public record SellerDropDetailResponse(
                 drop.getId(),
                 drop.getName(),
                 drop.getDescription(),
-                drop.getImages().stream()
-                        .map(image -> new Image(image.getUuid(), image.getImageUrl()))
-                        .toList(),
+                Image.listOf(drop.getGalleryImages()),
+                Image.listOf(drop.getDetailImages()),
                 drop.getMinPrice(),
                 drop.getCategoryId(),
                 drop.getStatus(),

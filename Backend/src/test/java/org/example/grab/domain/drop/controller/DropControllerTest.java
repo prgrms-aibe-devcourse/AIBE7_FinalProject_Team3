@@ -183,7 +183,10 @@ class DropControllerTest {
     void getDrop() throws Exception {
         // given
         PublicDropDetailResponse response = new PublicDropDetailResponse(
-                100L, "상품", "설명", List.of("https://img/1.jpg"), 129000L,
+                100L, "상품", "설명", List.of("https://img/1.jpg"),
+                List.of(new PublicDropDetailResponse.Image("https://img/1.jpg", "정면")),
+                List.of(new PublicDropDetailResponse.Image("https://img/detail.jpg", "소재")),
+                129000L,
                 new DropCategoryResponse(1L, "패션"),
                 DropStatus.GRAB, false, 7L, "WISH 안내 문구",
                 OffsetDateTime.parse("2026-09-20T01:00:00Z"),
@@ -205,6 +208,10 @@ class DropControllerTest {
                 .andExpect(jsonPath("$.data.name").value("상품"))
                 .andExpect(jsonPath("$.data.description").value("설명"))
                 .andExpect(jsonPath("$.data.imageUrls[0]").value("https://img/1.jpg"))
+                .andExpect(jsonPath("$.data.galleryImages[0].imageUrl").value("https://img/1.jpg"))
+                .andExpect(jsonPath("$.data.galleryImages[0].altText").value("정면"))
+                .andExpect(jsonPath("$.data.detailImages[0].imageUrl").value("https://img/detail.jpg"))
+                .andExpect(jsonPath("$.data.detailImages[0].altText").value("소재"))
                 .andExpect(jsonPath("$.data.minPrice").value(129000))
                 .andExpect(jsonPath("$.data.category.categoryId").value(1))
                 .andExpect(jsonPath("$.data.category.name").value("패션"))

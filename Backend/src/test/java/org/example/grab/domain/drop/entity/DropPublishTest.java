@@ -69,6 +69,25 @@ class DropPublishTest {
     }
 
     @Test
+    @DisplayName("DETAIL 이미지만 있으면 GALLERY가 없으므로 images 누락으로 공개를 거부한다")
+    void publish_rejectsDetailImagesOnly() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        drop.updateDraft("상품", "설명", 1L, 3000L, "안내", NOW.plusDays(1), NOW.plusDays(2));
+        drop.addImage(DropImage.create(drop, UUID.randomUUID(), "https://example.com/d.jpg", DropImageType.DETAIL, 0, "상세"));
+        addOption(drop, 1000L, 5, true);
+
+        // when & then
+        assertThatThrownBy(() -> drop.publish(NOW))
+                .isInstanceOfSatisfying(BusinessException.class, e -> {
+                    assertThat(e.getErrorCode()).isEqualTo(CommonErrorCode.VALIDATION_FAILED);
+                    assertThat(e.getFieldErrors()).extracting(ErrorResponse.FieldError::field)
+                            .containsExactly("images");
+                });
+        assertThat(drop.getStatus()).isEqualTo(DropStatus.DRAFT);
+    }
+
+    @Test
     @DisplayName("필수 항목이 비어 있으면 VALIDATION_FAILED와 누락 항목 전부를 fieldErrors로 알린다")
     void publish_rejectsMissingRequiredFields() {
         // given

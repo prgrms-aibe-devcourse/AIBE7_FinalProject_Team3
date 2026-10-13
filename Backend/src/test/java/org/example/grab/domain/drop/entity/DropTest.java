@@ -145,6 +145,21 @@ class DropTest {
     }
 
     @Test
+    @DisplayName("이미지는 용도별로 나눠 용도 안의 sortOrder 순으로 반환한다")
+    void splitsImagesByTypeInSortOrder() {
+        // given: 추가 순서와 용도를 섞는다
+        Drop drop = Drop.createDraft(SELLER_ID);
+        drop.addImage(DropImage.create(drop, UUID.randomUUID(), "d1.jpg", DropImageType.DETAIL, 1, "d1"));
+        drop.addImage(DropImage.create(drop, UUID.randomUUID(), "g1.jpg", DropImageType.GALLERY, 1, "g1"));
+        drop.addImage(DropImage.create(drop, UUID.randomUUID(), "d0.jpg", DropImageType.DETAIL, 0, "d0"));
+        drop.addImage(DropImage.create(drop, UUID.randomUUID(), "g0.jpg", DropImageType.GALLERY, 0, "g0"));
+
+        // when & then
+        assertThat(drop.getGalleryImages()).extracting(DropImage::getImageUrl).containsExactly("g0.jpg", "g1.jpg");
+        assertThat(drop.getDetailImages()).extracting(DropImage::getImageUrl).containsExactly("d0.jpg", "d1.jpg");
+    }
+
+    @Test
     @DisplayName("clearImages는 기존 이미지를 모두 제거한다")
     void clearImages() {
         // given
