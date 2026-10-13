@@ -3,6 +3,7 @@ package org.example.grab.domain.payment.service;
 import org.example.grab.domain.payment.dto.PaymentRequest;
 import org.example.grab.domain.payment.dto.PaymentResponse;
 import org.example.grab.domain.payment.entity.Payment;
+import org.example.grab.domain.payment.entity.PaymentEventSource;
 import org.example.grab.domain.payment.error.PaymentErrorCode;
 import org.example.grab.domain.payment.gateway.PaymentConfirmCommand;
 import org.example.grab.domain.payment.gateway.PaymentGateway;
@@ -107,19 +108,28 @@ public class PaymentService {
         return false;
     }
 
+    /**
+     * 진행 중 결제 정리 배치가 선점한 결제를 정리한다(ERD.md 3.2). 사용자 요청의 정리와 같은 규칙을 쓰고,
+     * 남기는 결제 이벤트의 경로만 RECONCILIATION으로 한다. 트랜잭션 밖에서 호출해야 한다.
+     */
+    Payment reconcile(ReconciliationTarget target) {
+        return resolve(target.paymentId(), target.command(), target.confirmable(), PaymentEventSource.RECONCILIATION);
+    }
+
     // 승인 결과가 불명이면 바로 조회해 확정을 시도한다. 조회로도 모르면 UNKNOWN으로 남긴다.
     private Payment confirm(Long paymentId, PaymentConfirmCommand command) {
-        return confirm(paymentId, command, null);
+        return confirm(paymentId, command, null, PaymentEventSource.API);
     }
 
     // priorLookup: 이전 결제를 정리하며 승인 재요청을 판단한 조회 응답. 처음 승인하는 결제는 null
-    private Payment confirm(Long paymentId, PaymentConfirmCommand command, PaymentGatewayResult priorLookup) {
+    private Payment confirm(
+            Long paymentId, PaymentConfirmCommand command, PaymentGatewayResult priorLookup, PaymentEventSource source) {
         PaymentGatewayResult confirmResult = paymentGateway.confirm(command);
         PaymentGatewayResult lookupResult = null;
         if (confirmResult.outcome() == PaymentGatewayResult.Outcome.UNKNOWN) {
             lookupResult = paymentGateway.lookup(command.paymentKey());
         }
-        return transactionService.applyResult(paymentId, priorLookup, confirmResult, lookupResult, now());
+        return transactionService.applyResult(paymentId, priorLookup, confirmResult, lookupResult, now(), source);
     }
 
     /*
@@ -129,11 +139,16 @@ public class PaymentService {
         결제할 수 없는 주문(confirmable=false)은 승인을 다시 요청하지 않고 UNKNOWN으로 남긴다. PG가 인증을 만료시킨다.
      */
     private Payment resolve(Long paymentId, PaymentConfirmCommand command, boolean confirmable) {
+        return resolve(paymentId, command, confirmable, PaymentEventSource.API);
+    }
+
+    private Payment resolve(
+            Long paymentId, PaymentConfirmCommand command, boolean confirmable, PaymentEventSource source) {
         PaymentGatewayResult lookup = paymentGateway.lookup(command.paymentKey());
         if (confirmable && lookup.awaitingConfirmation()) {
-            return confirm(paymentId, command, lookup);
+            return confirm(paymentId, command, lookup, source);
         }
-        return transactionService.applyResult(paymentId, null, lookup, now());
+        return transactionService.applyResult(paymentId, null, null, lookup, now(), source);
     }
 
     private OffsetDateTime now() {

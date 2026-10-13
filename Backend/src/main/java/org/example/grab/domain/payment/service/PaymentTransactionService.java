@@ -148,6 +148,21 @@ public class PaymentTransactionService {
             PaymentGatewayResult lookupResult,
             OffsetDateTime now
     ) {
+        return applyResult(paymentId, priorLookup, confirmResult, lookupResult, now, PaymentEventSource.API);
+    }
+
+    /**
+     * 결과를 반영하고, 남기는 결제 이벤트의 경로를 지정한다. 진행 중 결제 정리 배치는 RECONCILIATION을 쓴다.
+     */
+    @Transactional
+    public Payment applyResult(
+            Long paymentId,
+            PaymentGatewayResult priorLookup,
+            PaymentGatewayResult confirmResult,
+            PaymentGatewayResult lookupResult,
+            OffsetDateTime now,
+            PaymentEventSource source
+    ) {
         Long orderId = paymentRepository.findOrderIdById(paymentId)
                 .orElseThrow(() -> new IllegalStateException("결제 시도가 없습니다: " + paymentId));
         PayableOrder order = orderPaymentService.lockForPaymentResult(orderId);
@@ -160,7 +175,7 @@ public class PaymentTransactionService {
         PaymentGatewayResult decisive = lookupResult != null ? lookupResult : confirmResult;
         PaymentEventResult processing = apply(payment, order, decisive, now);
         if (priorLookup != null) {
-            record(payment, "lookup:" + UUID.randomUUID(), PaymentEventType.LOOKUP, priorLookup,
+            record(payment, source, "lookup:" + UUID.randomUUID(), PaymentEventType.LOOKUP, priorLookup,
                     PaymentEventResult.RECONCILIATION_REQUIRED);
         }
         if (confirmResult != null) {
@@ -171,12 +186,38 @@ public class PaymentTransactionService {
             String confirmEventKey = paymentEventRepository.existsByPaymentIdAndEventKey(payment.getId(), CONFIRM_EVENT_KEY)
                     ? "confirm-retry:" + UUID.randomUUID()
                     : CONFIRM_EVENT_KEY;
-            record(payment, confirmEventKey, PaymentEventType.CONFIRM, confirmResult, confirmProcessing);
+            record(payment, source, confirmEventKey, PaymentEventType.CONFIRM, confirmResult, confirmProcessing);
         }
         if (lookupResult != null) {
-            record(payment, "lookup:" + UUID.randomUUID(), PaymentEventType.LOOKUP, lookupResult, processing);
+            record(payment, source, "lookup:" + UUID.randomUUID(), PaymentEventType.LOOKUP, lookupResult, processing);
         }
         return payment;
+    }
+
+    /**
+     * 진행 중 결제 정리 배치의 대상을 최대 limit건 선점한다(ERD.md 3.2). 대상은 updated_at이 STALE_PENDING_AFTER 이상 지난
+     * PENDING·UNKNOWN 결제다. 선점한 결제의 updated_at은 now가 되어, 결과가 그대로면 같은 시간이 지난 뒤 다시 대상이 된다.
+     */
+    @Transactional
+    public List<Long> claimInProgress(OffsetDateTime now, int limit) {
+        return paymentRepository.claimInProgressForReconciliation(now.minus(STALE_PENDING_AFTER), now, limit);
+    }
+
+    /**
+     * 선점한 결제를 정리하는 데 필요한 값을 읽는다. 잠그지 않는다. 그사이 다른 요청이 결과를 확정했으면 비어 있다.
+     * 승인 재요청 여부는 사용자 재전송(ResolveReplay)과 같은 PayableOrder.isPayable로 정한다.
+     */
+    @Transactional(readOnly = true)
+    public Optional<ReconciliationTarget> findReconciliationTarget(Long paymentId, OffsetDateTime now) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new IllegalStateException("결제 시도가 없습니다: " + paymentId));
+        if (!payment.isInProgress()) {
+            return Optional.empty();
+        }
+        PayableOrder order = orderPaymentService.findForPaymentReconciliation(payment.getOrderId());
+        return Optional.of(new ReconciliationTarget(
+                payment.getId(), confirmCommand(payment, order), order.isPayable(now),
+                payment.getStatus(), payment.getCreatedAt()));
     }
 
     private void validatePayable(PayableOrder order, PaymentRequest request, OffsetDateTime now) {
@@ -247,13 +288,14 @@ public class PaymentTransactionService {
     // 이벤트 키는 호출하는 쪽이 정한다. 조회는 매번 새 키를 쓰고, 승인은 applyResult가 기존 기록을 보고 키를 고른다.
     private void record(
             Payment payment,
+            PaymentEventSource source,
             String eventKey,
             PaymentEventType type,
             PaymentGatewayResult result,
             PaymentEventResult processing
     ) {
         paymentEventRepository.save(PaymentEvent.record(
-                payment.getId(), eventKey, type, PaymentEventSource.API, processing,
+                payment.getId(), eventKey, type, source, processing,
                 payload(result), result.approvedAt()));
     }
 

@@ -20,11 +20,21 @@ import java.time.ZoneOffset;
 @ConditionalOnProperty(name = "grab.payment-pending-batch.enabled", havingValue = "true", matchIfMissing = true)
 public class PaymentPendingBatchScheduler {
 
+    private final PaymentInProgressCleanupService paymentInProgressCleanupService;
     private final PaymentExpiryService paymentExpiryService;
 
+    /*
+        진행 중 결제 정리를 만료보다 먼저 한다. 마감 전에 승인된 결제를 먼저 주문 PAID로 반영해,
+        만료된 뒤 결제 SUCCEEDED·보정 REQUIRED로 남는 경우를 줄인다. 정리가 실패해도 만료는 실행한다.
+     */
     @Scheduled(fixedDelayString = "${grab.payment-pending-batch.fixed-delay:10s}")
     public void run() {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        try {
+            paymentInProgressCleanupService.cleanUp(now);
+        } catch (Exception e) {
+            log.error("진행 중 결제 정리 실행 실패", e);
+        }
         try {
             paymentExpiryService.expire(now);
         } catch (Exception e) {

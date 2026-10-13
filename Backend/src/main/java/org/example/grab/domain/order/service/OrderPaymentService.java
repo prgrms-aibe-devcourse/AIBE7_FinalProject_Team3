@@ -151,6 +151,16 @@ public class OrderPaymentService {
     }
 
     /**
+     * 진행 중 결제 정리 배치가 승인 재요청 여부를 정할 때 주문을 읽는다(ERD.md 3.2). 잠그지 않는다.
+     * 읽은 뒤 주문이 바뀌어도 결과 반영(lockForPaymentResult)이 주문을 잠그고 다시 판정한다.
+     */
+    @Transactional(propagation = Propagation.MANDATORY, readOnly = true)
+    public PayableOrder findForPaymentReconciliation(Long orderId) {
+        return PayableOrder.from(orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalStateException("주문이 없습니다: " + orderId)));
+    }
+
+    /**
      * PG 승인 성공을 주문에 반영한다. COMPLETED일 때만 주문 PAID, 예약 COMMITTED, 선점 수량을 판매 수량으로 옮긴다.
      * 결제 상태 기록과 같은 트랜잭션에서 실행돼야 하므로 호출하는 쪽의 트랜잭션을 요구한다.
      *
