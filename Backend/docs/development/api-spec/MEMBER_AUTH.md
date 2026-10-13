@@ -432,7 +432,8 @@ Set-Cookie: refresh_token=<new-token>; HttpOnly; Secure; SameSite=Lax; Path=/api
 
 **오류 코드:**
 - `INVALID_TOKEN`
-- `TOKEN_EXPIRED`
+
+Redis는 만료된 키를 삭제하므로 만료·로그아웃·교체·위조를 구분할 수 없다. 재발급 실패는 사유와 관계없이 `INVALID_TOKEN`으로 응답한다.
 
 ### 1.8 로그아웃
 
