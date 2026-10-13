@@ -135,7 +135,7 @@ MVP에서는 판매자 신청과 프로필을 한 테이블에서 관리한다. 
 | `sort_order` | INT | O | 용도 안에서 0부터 연속, UQ(drop_id, image_type, sort_order) |
 | `alt_text` | VARCHAR(300) | O | 대체 설명 |
 
-DROP 하나에는 두 용도를 합쳐 이미지를 최대 10개까지 등록한다. GALLERY의 첫 이미지(`sort_order = 0`)만 목록 썸네일로 사용하고 DETAIL 이미지는 상세 설명에만 사용한다. 기존 이미지의 URL·`public_id`·순서를 보존한 채 `image_type = GALLERY`로 이관한다. 대체 설명은 빈 문자열을 허용하지만 `NULL`은 허용하지 않는다. 기존 행의 대체 설명도 보존한다.
+DROP 하나에는 GALLERY를 최대 5개, DETAIL을 최대 15개까지 등록한다(합계 최대 20개). 개수는 서비스에서 검증한다. GALLERY의 첫 이미지(`sort_order = 0`)만 목록 썸네일로 사용하고 DETAIL 이미지는 상세 설명에만 사용한다. 기존 이미지의 URL·`public_id`·순서를 보존한 채 `image_type = GALLERY`로 이관한다. 대체 설명은 빈 문자열을 허용하지만 `NULL`은 허용하지 않는다. 기존 행의 대체 설명도 보존한다.
 
 #### `drop_option_groups`
 

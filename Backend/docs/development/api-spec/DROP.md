@@ -309,14 +309,15 @@ POST /api/v1/seller/drops
 >
 > `images`는 기존 계약과 같은 GALLERY 배열, `detailImages`는 선택적인 DETAIL 배열입니다. 원소는 이미지 업로드 URL 발급(IMAGE_UPLOAD.md 1.1)에서 받은 `{ imageId, imageUrl }`에 선택적인 `altText`를 더한 객체입니다. 구버전 요청의 `images`만 보내는 방식은 계속 허용합니다.
 > - 생성에서 누락/null은 빈 용도 배열입니다. DRAFT 수정에서 각 필드의 누락/null은 해당 용도를 유지하고, `[]`는 해당 용도만 전부 삭제하며, 비어 있지 않은 배열은 해당 용도 전체를 순서대로 교체합니다. 한 용도만 수정해도 다른 용도는 유지됩니다.
-> - 상품 이미지는 두 용도를 합쳐 최대 10개입니다. 공개 시 GALLERY가 최소 한 장 필요하고 DETAIL은 선택입니다.
+> - 상품 이미지는 GALLERY 최대 5개, DETAIL 최대 15개입니다. 공개 시 GALLERY가 최소 한 장 필요하고 DETAIL은 선택입니다.
+> - 개수·중복 검증은 요청 적용 후의 최종 상태로 합니다. DRAFT 수정에서 누락/null로 유지되는 다른 용도의 기존 이미지도 포함하므로, 유지되는 용도에 있는 `imageId`를 다른 용도 배열에 보내면 중복으로 거부합니다.
 > - `sort_order`는 각 배열 인덱스(0부터)입니다. `altText`는 최대 300자이며 빈 문자열은 장식 이미지에 사용합니다. 기존 이미지의 `altText`를 누락/null로 보내면 저장된 설명을 유지하고 새 이미지에서 누락/null이면 상품명(없으면 빈 문자열)을 사용합니다.
 > - `imageUrl`은 `imageId`와의 관계를 검증합니다. 정확히 `{공개 URL 접두사}images/{imageId}.{jpg|png|webp}` 형식이어야 하며, 다른 사이트 URL이나 다른 이미지의 URL은 거부합니다.
-> - 두 용도 전체에서 `imageId`가 중복되면 거부합니다. 같은 DROP의 이미지를 다른 용도로 옮길 때는 두 배열을 함께 보내고 기존 용도에서 제거합니다.
+> - 두 용도 전체에서 `imageId`가 중복되면 거부합니다. 같은 DROP의 이미지를 다른 용도로 옮길 때는 두 배열을 함께 보내고 기존 용도에서 제거합니다. 옮긴 이미지도 같은 DROP의 기존 이미지이므로 `altText` 누락/null이면 저장된 설명을 유지합니다.
 > - 다른 DROP이 이미 사용 중인 `imageId`는 거부합니다. 같은 DROP의 이미지를 다시 보내는 수정은 허용하며 `public_id`는 유지됩니다.
 
 **오류 코드:**
-- `VALIDATION_FAILED` — 존재하지 않거나 비활성인 카테고리(`fieldErrors`의 `field`는 `categoryId`), 두 용도 합계 이미지 10개 초과·원소 누락(null), URL 형식 불일치·`altText` 300자 초과, 두 용도 사이 중복 또는 다른 DROP이 사용 중인 `imageId` (이미지 오류의 `field`는 `images[i]` 또는 `detailImages[i]`로 시작)
+- `VALIDATION_FAILED` — 존재하지 않거나 비활성인 카테고리(`fieldErrors`의 `field`는 `categoryId`), GALLERY 5개·DETAIL 15개 초과·원소 누락(null), URL 형식 불일치·`altText` 300자 초과, 두 용도 사이 중복 또는 다른 DROP이 사용 중인 `imageId` (개수 초과의 `field`는 `images` 또는 `detailImages`, 원소 오류의 `field`는 `images[i]` 또는 `detailImages[i]`로 시작)
 
 ### 2.2 판매자 DROP 목록
 
@@ -458,7 +459,7 @@ PATCH /api/v1/seller/drops/{dropId}
 - `DROP_ACCESS_DENIED`
 - `DROP_NOT_EDITABLE`
 - `INVALID_SCHEDULE`
-- `VALIDATION_FAILED` — 존재하지 않거나 비활성인 카테고리(`fieldErrors`의 `field`는 `categoryId`), 두 용도 합계 이미지 10개 초과·원소 누락(null), URL 형식 불일치·`altText` 300자 초과, 두 용도 사이 중복 또는 다른 DROP이 사용 중인 `imageId` (이미지 오류의 `field`는 `images[i]` 또는 `detailImages[i]`로 시작)
+- `VALIDATION_FAILED` — 존재하지 않거나 비활성인 카테고리(`fieldErrors`의 `field`는 `categoryId`), GALLERY 5개·DETAIL 15개 초과·원소 누락(null), URL 형식 불일치·`altText` 300자 초과, 두 용도 사이 중복 또는 다른 DROP이 사용 중인 `imageId` (개수 초과의 `field`는 `images` 또는 `detailImages`, 원소 오류의 `field`는 `images[i]` 또는 `detailImages[i]`로 시작)
 
 ### 2.5 DROP 공개
 

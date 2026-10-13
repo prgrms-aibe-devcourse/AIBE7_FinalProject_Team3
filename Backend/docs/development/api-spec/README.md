@@ -151,7 +151,7 @@
 | --- | --- | --- | --- |
 | POST | `/api/v1/uploads/images/presigned-url` | SELLER | 상품 이미지 업로드용 Supabase 서명 업로드 URL 발급 |
 
-> 발급된 `uploadUrl`로 클라이언트가 Supabase Storage에 이미지를 직접 업로드하고, 응답의 `{ imageId, imageUrl }`을 DROP 생성·수정 요청의 GALLERY `images` 또는 DETAIL `detailImages`에 사용합니다. 두 용도의 합계는 최대 10개입니다.
+> 발급된 `uploadUrl`로 클라이언트가 Supabase Storage에 이미지를 직접 업로드하고, 응답의 `{ imageId, imageUrl }`을 DROP 생성·수정 요청의 GALLERY `images` 또는 DETAIL `detailImages`에 사용합니다. DROP당 GALLERY는 최대 5개, DETAIL은 최대 15개입니다.
 
 ---
 

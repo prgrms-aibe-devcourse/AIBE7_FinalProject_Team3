@@ -6,7 +6,7 @@
 
 ## 조회 계약
 
-이미지는 Supabase 서명 업로드 URL을 받은 뒤 DROP 생성·DRAFT 수정 요청의 `images`(GALLERY)와 `detailImages`(DETAIL)에 등록한다. 두 배열의 합계 최대 10장, 파일당 5MB·허용 MIME을 따른다. 누락/null은 수정하지 않고 빈 배열은 해당 용도만 삭제한다.
+이미지는 Supabase 서명 업로드 URL을 받은 뒤 DROP 생성·DRAFT 수정 요청의 `images`(GALLERY)와 `detailImages`(DETAIL)에 등록한다. GALLERY 최대 5장, DETAIL 최대 15장, 파일당 5MB·허용 MIME을 따른다. 누락/null은 수정하지 않고 빈 배열은 해당 용도만 삭제한다.
 
 ## 화면 구성
 
@@ -19,7 +19,7 @@
 
 ## 상태와 예외
 
-DRAFT는 일부 필수값이 비어도 저장 가능하다. DETAIL만 있는 DRAFT는 공개할 수 없다. 이미지 10장 초과, MIME·크기 오류, 업로드 실패, 저장·공개 검증 실패, 권한 오류를 필드 가까이 안내한다.
+DRAFT는 일부 필수값이 비어도 저장 가능하다. DETAIL만 있는 DRAFT는 공개할 수 없다. 용도별 이미지 개수 초과, MIME·크기 오류, 업로드 실패, 저장·공개 검증 실패, 권한 오류를 필드 가까이 안내한다.
 
 ## 인수 조건
 
