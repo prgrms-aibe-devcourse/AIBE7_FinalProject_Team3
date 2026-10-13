@@ -144,8 +144,8 @@ class RefreshTokenRepositoryIntegrationTest {
         // when
         Duration ttl = repository.save(rawToken, session);
 
-        // then: 반환값은 남은 시간이고, Redis TTL은 저장 후 흐른 시간만큼만 짧다
-        assertThat(ttl).isLessThan(IDLE_TTL).isPositive();
+        // then: 반환값은 남은 시간을 초 단위로 내린 1초이고(GR-35 M00-05), Redis TTL은 저장 후 흐른 시간만큼만 짧다
+        assertThat(ttl).isEqualTo(Duration.ofSeconds(1));
         Long redisTtlMillis = redisTemplate.getExpire(RefreshTokenHasher.toKey(rawToken), TimeUnit.MILLISECONDS);
         assertThat(redisTtlMillis).isBetween(ttl.toMillis() - 300, ttl.toMillis());
     }

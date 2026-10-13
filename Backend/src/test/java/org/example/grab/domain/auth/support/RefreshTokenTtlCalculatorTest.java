@@ -15,7 +15,7 @@ import java.time.ZoneOffset;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-// GR-33 U4: 새 세션 TTL은 14일, 절대 만료가 가까우면 남은 시간, 지났으면 거부
+// GR-33 U4: 새 세션 TTL은 14일, 절대 만료가 가까우면 남은 시간(초 단위 내림, GR-35 M00-05), 1초 미만이면 거부
 class RefreshTokenTtlCalculatorTest {
 
     private static final Duration IDLE_TTL = Duration.ofDays(14);
@@ -60,9 +60,30 @@ class RefreshTokenTtlCalculatorTest {
         assertThat(ttl).isEqualTo(IDLE_TTL);
     }
 
+    @Test
+    @DisplayName("남은 시간은 초 단위로 내려 TTL이 된다")
+    void truncatesRemainingTimeToSeconds() {
+        // when
+        Duration ttl = calculator.calculateTtl(NOW.plus(Duration.ofDays(11)).plusMillis(999));
+
+        // then
+        assertThat(ttl).isEqualTo(Duration.ofDays(11));
+    }
+
+    @Test
+    @DisplayName("1초 이상 2초 미만 남으면 TTL은 1초다")
+    void oneSecondWhenLessThanTwoSecondsRemain() {
+        // when
+        Duration ttl = calculator.calculateTtl(NOW.plusMillis(1_999));
+
+        // then
+        assertThat(ttl).isEqualTo(Duration.ofSeconds(1));
+    }
+
+    // GR-35 M00-05: 1초 미만은 쿠키 Max-Age를 만들 수 없으므로 지난 세션과 같이 거부한다
     @ParameterizedTest
-    @ValueSource(longs = {0, -1, -86_400_000})
-    @DisplayName("절대 만료 시각이 지금이거나 지났으면 INVALID_TOKEN 예외가 발생한다")
+    @ValueSource(longs = {999, 1, 0, -1, -86_400_000})
+    @DisplayName("절대 만료까지 1초 미만 남았거나 지났으면 INVALID_TOKEN 예외가 발생한다")
     void rejectsExpiredSession(long offsetMillis) {
         // given
         Instant sessionExpiresAt = NOW.plusMillis(offsetMillis);
