@@ -60,7 +60,7 @@ export default function LoginPage({ onLogin, notify }: Props) {
   }
 
   return (
-    <section className="auth-page">
+    <section className="auth-page login-page">
       <div className="auth-copy">
         <p className="eyebrow">WELCOME TO GRAB</p>
         <h1>다시 만나 반가워요.</h1>
@@ -69,7 +69,10 @@ export default function LoginPage({ onLogin, notify }: Props) {
       </div>
       <div className="auth-form">
         <form className="auth-stack" onSubmit={submit}>
-          <h2>로그인</h2>
+          <div className="auth-heading">
+            <p className="eyebrow">YOUR NEXT GOOD FIND</p>
+            <h2>로그인</h2>
+          </div>
           <label>
             이메일
             <input

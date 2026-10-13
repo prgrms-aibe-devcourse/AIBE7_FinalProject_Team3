@@ -11,6 +11,7 @@ import {
 
 type Props = {
   drafts: Record<string, SellerDraft>
+  editableIds: string[]
   onSave: (draft: SellerDraft) => void
   notify: (message: string) => void
 }
@@ -20,7 +21,7 @@ export default function SellerDropFormPage(props: Props) {
   const draft = dropId
     ? (props.drafts[dropId] ?? existingSellerDraft(dropId))
     : undefined
-  if (dropId && !draft)
+  if (dropId && (!draft || !props.editableIds.includes(dropId)))
     return (
       <EmptyState
         title="편집할 DRAFT를 찾을 수 없어요."
@@ -36,7 +37,7 @@ function SellerDropForm({
   draft,
   onSave,
   notify,
-}: Omit<Props, 'drafts'> & { draft?: SellerDraft }) {
+}: Omit<Props, 'drafts' | 'editableIds'> & { draft?: SellerDraft }) {
   const navigate = useNavigate()
   const [groups, setGroups] = useState(draft?.groups ?? defaultGroups)
   const [gallery, setGallery] = useState(draft?.gallery ?? [])

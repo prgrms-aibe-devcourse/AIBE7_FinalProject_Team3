@@ -1,4 +1,4 @@
-import { expect, login, test, type Page } from './fixtures'
+import { expect, login, loginSeller, test, type Page } from './fixtures'
 import type { Locator } from '@playwright/test'
 
 // 페이지 전체에 가로 스크롤이 생기지 않는다. 표처럼 의도적으로 안쪽에서 스크롤하는 영역은 해당하지 않는다.
@@ -93,6 +93,11 @@ const pages: {
     actions: (page) => [page.getByRole('link', { name: '소비자 화면 ↗' })],
   },
   {
+    name: '판매자 DROP 목록',
+    path: '/#/seller/drops',
+    actions: (page) => [page.getByRole('link', { name: '＋ 새 DROP' })],
+  },
+  {
     name: 'DROP 등록',
     path: '/#/seller/drops/new',
     actions: (page) => [
@@ -104,7 +109,14 @@ const pages: {
 
 for (const { name, path, actions } of pages) {
   test(`${name}: 가로 넘침 없이 핵심 버튼에 닿는다`, async ({ page }) => {
-    await page.goto(path)
+    if (name === '판매자 DROP 상세' || name === '판매자 DROP 목록') {
+      await loginSeller(page)
+      await page.evaluate((hash) => {
+        window.location.hash = hash
+      }, path.slice(1))
+    } else {
+      await page.goto(path)
+    }
     for (const action of actions(page)) await expectReachable(page, action)
     await expectNoHorizontalOverflow(page)
   })

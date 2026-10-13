@@ -3,17 +3,22 @@ footer {
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 30px;
-  padding: 34px 5.5%;
+  padding: 40px 5.5%;
+  background: var(--ink);
+  color: #fff;
   border-top: 1px solid var(--line);
 }
 footer p {
-  color: var(--muted);
+  color: #d6d9ce;
   font-size: 12px;
 }
 footer small {
-  color: #9a9d94;
+  color: #b5b9ac;
   font-size: 10px;
   letter-spacing: 0.7px;
+}
+footer .footer-wordmark {
+  filter: brightness(0) invert(1);
 }
 .toast {
   position: fixed;
@@ -22,7 +27,7 @@ footer small {
   bottom: 24px;
   max-width: calc(100vw - 48px);
   padding: 14px 18px;
-  border-radius: 9px;
+  border-radius: 4px;
   background: var(--ink);
   color: #fff;
   font-size: 13px;
