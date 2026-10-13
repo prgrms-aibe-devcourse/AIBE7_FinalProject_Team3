@@ -30,6 +30,7 @@ import SellerDropFormPage from './pages/SellerDropForm/SellerDropFormPage'
 import SellerDropsPage from './pages/SellerDrops/SellerDropsPage'
 import SellerOrdersPage from './pages/SellerOrders/SellerOrdersPage'
 import SellerInventoryPage from './pages/SellerInventory/SellerInventoryPage'
+import SellerSalesPage from './pages/SellerSales/SellerSalesPage'
 import SellerApplyPage from './pages/SellerApply/SellerApplyPage'
 import AdminSellerApplicationsPage from './pages/AdminSellerApplications/AdminSellerApplicationsPage'
 import type { SharedProps } from './types/store'
@@ -184,6 +185,16 @@ export default function App() {
             path="/seller/inventory"
             element={
               <SellerInventoryPage
+                account={account}
+                drops={sellerDrops}
+                ownerEmail={account?.email ?? 'grab@example.com'}
+              />
+            }
+          />
+          <Route
+            path="/seller/sales"
+            element={
+              <SellerSalesPage
                 account={account}
                 drops={sellerDrops}
                 ownerEmail={account?.email ?? 'grab@example.com'}

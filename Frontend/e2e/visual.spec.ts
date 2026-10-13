@@ -91,6 +91,16 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
     await shot(page, 'seller-inventory')
   })
 
+  test('seller-sales', async ({ page }) => {
+    await loginSeller(page)
+    await page.evaluate(() => {
+      window.location.hash = '#/seller/sales?status=ENDED&page=0'
+    })
+    await expect(page.getByText('가을 코듀로이 셔츠 ↗')).toBeVisible()
+    await expect(page.getByRole('status')).toBeEmpty()
+    await shot(page, 'seller-sales')
+  })
+
   test('checkout', async ({ page }) => {
     await page.goto('/#/checkout/demo-pending')
     await page.getByLabel('이메일').fill('grab@example.com')
