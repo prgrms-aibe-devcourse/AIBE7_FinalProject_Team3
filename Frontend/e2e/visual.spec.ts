@@ -7,6 +7,7 @@ import { installHomeScenario } from './mock/home'
 test.describe('화면 기준', { tag: '@visual' }, () => {
   const shot = async (page: Page, name: string) => {
     await page.evaluate(() => document.fonts.ready)
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }))
     await expect(page).toHaveScreenshot(`${name}.png`, { fullPage: true })
   }
 

@@ -119,32 +119,6 @@
   font-size: 12px;
   line-height: 1.6;
 }
-.primary-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 46px;
-  padding: 0 20px;
-  border: 1px solid var(--ink);
-  border-radius: 9px;
-  background: var(--ink);
-  color: #fff;
-  font-weight: 800;
-  font-size: 13px;
-}
-.primary-button:hover {
-  background: #30342b;
-}
-.primary-button:disabled {
-  cursor: not-allowed;
-  border-color: #dfe1dc;
-  background: #dfe1dc;
-  color: #8b8e85;
-}
-.primary-button.full {
-  width: 100%;
-  min-height: 52px;
-}
 .buy-form {
   display: grid;
   gap: 15px;

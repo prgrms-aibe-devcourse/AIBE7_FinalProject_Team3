@@ -95,7 +95,7 @@
 .panel {
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 4px;
   background: #fff;
 }
 .panel-heading {
@@ -172,7 +172,7 @@
   place-items: center;
   min-height: 260px;
   padding: 34px;
-  border-radius: 14px;
+  border-radius: 4px;
   background: var(--soft);
   text-align: center;
 }
