@@ -151,6 +151,7 @@
   display: grid;
   gap: 14px;
   margin-bottom: 20px;
+  padding: 24px;
 }
 .seller-drop-review h2 {
   margin: 0;
@@ -172,7 +173,7 @@
   min-height: 85px;
   padding: 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 4px;
 }
 .seller-drop-review p {
   margin: 0;
@@ -195,7 +196,7 @@
   max-height: 300px;
   aspect-ratio: 16 / 9;
   object-fit: cover;
-  border-radius: 10px;
+  border-radius: 4px;
 }
 .seller-drop-image-empty {
   display: grid;
@@ -206,6 +207,9 @@
 }
 .seller-drop-product p {
   line-height: 1.6;
+}
+.seller-drop-product {
+  padding: 24px;
 }
 .seller-drop-product dl {
   display: grid;
@@ -230,6 +234,7 @@
 }
 .seller-drop-related {
   margin-top: 20px;
+  padding: 24px;
 }
 .seller-drop-related h2 {
   margin-top: 0;
@@ -301,4 +306,17 @@
 
 .seller-drops-row:hover {
   background: #fafbf7;
+}
+.seller-drop-related {
+  border-top: 3px solid var(--ink);
+}
+.seller-drop-detail-page .panel-heading {
+  background: var(--soft);
+}
+.seller-drop-detail-page .option-stock th,
+.seller-drop-detail-page .option-stock td {
+  padding: 16px 10px;
+}
+.seller-drop-product dd {
+  overflow-wrap: anywhere;
 }
