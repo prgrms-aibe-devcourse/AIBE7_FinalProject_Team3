@@ -1,0 +1,81 @@
+.home-intro-copy {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 32px;
+  padding: 8px 0 36px;
+}
+.home-intro h1 {
+  margin: 14px 0 0;
+  font-size: clamp(36px, 4.5vw, 64px);
+  line-height: 1.18;
+  letter-spacing: -2.8px;
+}
+.home-intro h1 em {
+  font-style: normal;
+  box-shadow: inset 0 -0.2em var(--lime);
+}
+.home-intro-actions p {
+  margin: 0 0 20px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.8;
+}
+.home-brand-image {
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+}
+.home-brand-caption {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--line);
+}
+.home-brand-caption > span {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+}
+.home-section .catalog-heading {
+  align-items: flex-end;
+  margin-bottom: 24px;
+}
+.home-section .catalog-heading h2 {
+  font-size: clamp(23px, 2.3vw, 32px);
+  letter-spacing: -1px;
+}
+.home-section-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+@media (max-width: 600px) {
+  .home-intro-copy {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 24px;
+    padding: 4px 0 26px;
+  }
+  .home-intro h1 {
+    letter-spacing: -1.8px;
+  }
+  .home-intro-actions p {
+    font-size: 13px;
+  }
+  .home-brand-caption {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .home-section-actions {
+    gap: 8px;
+  }
+  .home-section .catalog-heading {
+    flex-wrap: nowrap;
+  }
+  .home-section .catalog-heading > div:first-child {
+    flex-shrink: 0;
+  }
+}
