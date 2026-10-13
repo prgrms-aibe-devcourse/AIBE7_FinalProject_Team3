@@ -116,7 +116,7 @@
 .buyer-status {
   display: inline-block;
   padding: 6px 10px;
-  border-radius: 6px;
+  border-radius: 3px;
   background: var(--lime);
   color: var(--ink);
   font-size: 12px;
@@ -133,6 +133,9 @@
 }
 .buyer-order-product {
   grid-area: product;
+}
+.buyer-order-payment {
+  grid-area: payment;
 }
 .buyer-order-shipping {
   grid-area: shipping;
@@ -159,6 +162,9 @@
   min-width: 76px;
   color: var(--muted);
 }
+.buyer-shipping-info dd {
+  margin: 0;
+}
 .buyer-cancel-form {
   display: grid;
   gap: 16px;
@@ -173,7 +179,7 @@
   min-height: 96px;
   padding: 10px 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 4px;
   resize: vertical;
 }
 .buyer-cancel-form .buyer-result-choice {
