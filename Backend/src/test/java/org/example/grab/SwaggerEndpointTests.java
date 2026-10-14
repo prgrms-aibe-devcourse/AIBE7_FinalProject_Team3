@@ -1,5 +1,7 @@
 package org.example.grab;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.grab.support.TestcontainersConfiguration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -10,6 +12,9 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItems;
@@ -25,6 +30,8 @@ class SwaggerEndpointTests {
 
     @Autowired
     private MockMvc mockMvc;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
     void exposesApiDocsWithoutAuthentication() throws Exception {
@@ -83,5 +90,33 @@ class SwaggerEndpointTests {
                         hasItems("integer", "null")))
                 .andExpect(jsonPath("$.components.schemas.PublicDropDetailResponse.properties.status.enum",
                         hasItems("CANCELED", "DRAFT")));
+    }
+
+    /*
+        GR-98: 공개 상세·재고와 판매자 상세·재고 DTO가 각각 중첩 record Option을 가져 스키마 이름이 충돌한다.
+        /v3/api-docs/drop에서 네 응답의 options.items.$ref가 서로 다른 고유 스키마를 가리키는지 고정한다.
+        컴포넌트 존재만 보지 않고 각 응답 스키마의 실제 참조를 확인한다.
+     */
+    @Test
+    void exposesDistinctOptionSchemasPerDropResponse() throws Exception {
+        JsonNode doc = objectMapper.readTree(mockMvc.perform(get("/v3/api-docs/drop"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+
+        Map<String, String> expectedRefs = Map.of(
+                "PublicDropDetailResponse", "#/components/schemas/PublicDropDetailOption",
+                "PublicDropStockResponse", "#/components/schemas/PublicDropStockOption",
+                "SellerDropDetailResponse", "#/components/schemas/SellerDropDetailOption",
+                "SellerDropStockResponse", "#/components/schemas/SellerDropStockOption");
+
+        expectedRefs.forEach((responseSchema, expectedRef) -> {
+            String actualRef = doc.path("components").path("schemas").path(responseSchema)
+                    .path("properties").path("options").path("items").path("$ref").asText();
+            assertThat(actualRef)
+                    .as("%s.options.items.$ref", responseSchema)
+                    .isEqualTo(expectedRef);
+        });
+
+        assertThat(expectedRefs.values()).doesNotHaveDuplicates();
     }
 }
