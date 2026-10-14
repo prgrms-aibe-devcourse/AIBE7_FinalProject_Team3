@@ -45,6 +45,8 @@ public record PublicDropDetailResponse(
     }
 
     // 명세 1.3: options에는 판매자 상세와 달리 active 대신 availableStock·soldOut만 노출한다.
+    // 중첩 이름 Option이 다른 응답 DTO와 충돌하지 않도록 고유 스키마 이름을 지정한다(GR-98).
+    @Schema(name = "PublicDropDetailOption")
     public record Option(Long optionId, List<DropOptionSelectionResponse> selections,
                          Long unitPrice, int availableStock, boolean soldOut) {
     }
