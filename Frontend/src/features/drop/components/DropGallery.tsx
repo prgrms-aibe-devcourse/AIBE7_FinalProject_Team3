@@ -28,7 +28,7 @@ export default function DropGallery({
             onError={() => setFailedImage(image.imageUrl)}
           />
         ) : (
-          <span role="img" aria-label={`${name} 이미지 없음`}>
+          <span role="img" aria-label={`${image?.altText ?? name} 이미지 없음`}>
             상품 이미지 준비 중
           </span>
         )}

@@ -114,23 +114,19 @@ export default function DropDetailPage({
     ? 'buy'
     : detail.actions.wishable || detail.actions.wishCancelable
       ? 'wish'
-      : detail.status === 'GRAB'
-        ? 'buy'
-        : 'closed'
+      : 'closed'
   const unitPrice = selectedSku?.price ?? detail.minPrice ?? 0
-  const grabLabel = detail.soldOut
-    ? '전체 품절'
-    : !detail.actions.orderable
-      ? '판매 종료되었어요'
-      : !selectedSku
-        ? '옵션을 선택해주세요'
-        : selectedStock === 0
-          ? '선택 옵션 품절'
-          : quantity > maxQuantity
-            ? '수량을 확인해주세요'
-            : authenticated
-              ? '데모 GRAB 하기 ↗'
-              : '로그인 후 GRAB ↗'
+  const grabLabel = !detail.actions.orderable
+    ? '판매 종료되었어요'
+    : !selectedSku
+      ? '옵션을 선택해주세요'
+      : selectedStock === 0
+        ? '선택 옵션 품절'
+        : quantity > maxQuantity
+          ? '수량을 확인해주세요'
+          : authenticated
+            ? '데모 GRAB 하기 ↗'
+            : '로그인 후 GRAB ↗'
 
   const order = (event: FormEvent) => {
     event.preventDefault()
@@ -311,9 +307,11 @@ export default function DropDetailPage({
           ) : (
             <div className="wish-panel">
               <strong>
-                {detail.status === 'ENDED'
-                  ? '이 DROP은 판매가 종료됐어요.'
-                  : '이 DROP은 판매가 취소됐어요.'}
+                {detail.status === 'CANCELED'
+                  ? '이 DROP은 판매가 취소됐어요.'
+                  : detail.soldOut
+                    ? '이 DROP은 품절됐어요.'
+                    : '이 DROP은 판매가 종료됐어요.'}
               </strong>
               <p>상품 정보는 계속 확인할 수 있어요.</p>
             </div>
