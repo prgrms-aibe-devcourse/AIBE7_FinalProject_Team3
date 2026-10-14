@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   changeCatalogParams,
   readCatalogQuery,
+  resolveCategoryId,
 } from '../logic/catalogSearchParams'
 
 describe('상품 목록 URL 조건', () => {
@@ -87,5 +88,33 @@ describe('상품 목록 URL 조건', () => {
       keyword: '머그',
       category: '리빙',
     })
+  })
+})
+
+describe('카테고리 이름 → categoryId 매핑', () => {
+  const categories = [
+    { categoryId: 1, code: 'FASHION', name: '패션' },
+    { categoryId: 2, code: 'LIVING', name: '리빙' },
+  ]
+
+  it('이름이 없으면 조건 없이 전체를 조회한다', () => {
+    expect(resolveCategoryId(undefined, categories)).toBeUndefined()
+    expect(resolveCategoryId('', categories)).toBeUndefined()
+  })
+
+  it('이름과 일치하는 categoryId를 반환한다', () => {
+    expect(resolveCategoryId('리빙', categories)).toBe(2)
+  })
+
+  it('모르는 이름은 전체로 바꾸지 않고 잘못된 조건으로 거부한다', () => {
+    expect(() => resolveCategoryId('없는카테고리', categories)).toThrow(
+      RangeError,
+    )
+  })
+
+  it('이름은 찾았지만 categoryId가 없으면 거부한다', () => {
+    expect(() => resolveCategoryId('패션', [{ name: '패션' }])).toThrow(
+      RangeError,
+    )
   })
 })
