@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { getDrops } from '../../../api/drop/drops'
 import type { CardDrop } from '../../../types/drop'
-import type { HomeSectionKey } from '../mock/mockHome'
+import type { HomeSectionKey } from './homeSections'
 import { HOME_PAGE_SIZE } from './catalogQuery'
 import { toCardDrops } from './dropView'
 import { dropKeys } from './queryKeys'

@@ -5,7 +5,7 @@ import PopularRail from '../../features/drop/components/PopularRail'
 import {
   homeSections,
   type HomeSectionConfig,
-} from '../../features/drop/mock/mockHome'
+} from '../../features/drop/logic/homeSections'
 import useHomeDrops from '../../features/drop/logic/useHomeDrops'
 import type { SharedProps } from '../../types/store'
 
