@@ -27,3 +27,7 @@ export const dropKeys = {
   detail: (dropId: number) => ['drops', 'detail', dropId] as const,
   stocks: (dropId: number) => ['drops', 'detail', dropId, 'stocks'] as const,
 }
+
+export const categoryKeys = {
+  all: ['categories'] as const,
+}

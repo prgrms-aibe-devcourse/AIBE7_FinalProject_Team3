@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { HOME_PAGE_SIZE, toDropListParams } from '../logic/catalogQuery'
+import {
+  HOME_PAGE_SIZE,
+  resolveListParams,
+  toDropListParams,
+} from '../logic/catalogQuery'
 
 const categories = [
   { categoryId: 1, name: '패션' },
@@ -63,5 +67,41 @@ describe('목록 조회 조건을 API 쿼리로 변환', () => {
         24,
       ),
     ).toThrow(RangeError)
+  })
+})
+
+describe('목록 조회 조건 판정', () => {
+  it('조건이 없으면 잘못된 조건으로 본다', () => {
+    expect(resolveListParams(null, categories, 24)).toBeNull()
+  })
+
+  it('카테고리를 아직 받지 못했으면 대기 상태로 둔다', () => {
+    expect(
+      resolveListParams(
+        { status: 'WISH', category: '리빙', page: 0 },
+        undefined,
+        24,
+      ),
+    ).toBeUndefined()
+  })
+
+  it('카테고리를 찾지 못하면 잘못된 조건으로 본다', () => {
+    expect(
+      resolveListParams(
+        { status: 'WISH', category: '없는카테고리', page: 0 },
+        categories,
+        24,
+      ),
+    ).toBeNull()
+  })
+
+  it('조건이 맞으면 API 쿼리를 만든다', () => {
+    expect(
+      resolveListParams(
+        { status: 'GRAB', category: '리빙', page: 0 },
+        categories,
+        24,
+      ),
+    ).toMatchObject({ status: 'GRAB', categoryId: 2, size: 24 })
   })
 })

@@ -1,14 +1,19 @@
-import { useState, useTransition } from 'react'
+import { useTransition } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { getCategories } from '../../api/category/categories'
 import EmptyState from '../../components/EmptyState/EmptyState'
 import DropCard from '../../features/drop/components/DropCard'
-import { queryCatalog } from '../../features/drop/logic/catalog'
+import { CATALOG_PAGE_SIZE } from '../../features/drop/logic/catalog'
+import { resolveListParams } from '../../features/drop/logic/catalogQuery'
 import {
   changeCatalogParams,
   readCatalogQuery,
 } from '../../features/drop/logic/catalogSearchParams'
-import { catalogDrops } from '../../features/drop/mock/mockCatalog'
-import { categories } from '../../features/drop/mock/mockDrops'
+import { toCardDrops } from '../../features/drop/logic/dropView'
+import { categoryKeys } from '../../features/drop/logic/queryKeys'
+import { useDropList } from '../../features/drop/logic/useDrops'
+import type { CatalogQuery } from '../../features/drop/logic/catalog'
 import type { SharedProps } from '../../types/store'
 
 export default function DropListPage({
@@ -19,24 +24,58 @@ export default function DropListPage({
 }: SharedProps & { status: 'WISH' | 'GRAB' }) {
   const [params, setParams] = useSearchParams()
   const [pending, startTransition] = useTransition()
-  const [, setRetry] = useState(0)
   const updateParams: typeof setParams = (next, options) => {
     startTransition(() => setParams(next, options))
   }
-  const category = params.get('category') || '전체'
-  const keyword = params.get('keyword') ?? ''
-  let result
+
+  const categoriesQuery = useQuery({
+    queryKey: categoryKeys.all,
+    queryFn: getCategories,
+    staleTime: Infinity,
+  })
+  const categoryNames =
+    categoriesQuery.data?.flatMap((category) =>
+      category.name ? [category.name] : [],
+    ) ?? []
+
+  let catalogQuery: CatalogQuery | null = null
   let invalidQuery = false
   try {
-    result = queryCatalog(catalogDrops, readCatalogQuery(params, status))
+    catalogQuery = readCatalogQuery(params, status)
   } catch (error) {
-    invalidQuery = error instanceof RangeError
+    if (!(error instanceof RangeError)) throw error
+    invalidQuery = true
   }
+  const listParams = resolveListParams(
+    catalogQuery,
+    categoriesQuery.data,
+    CATALOG_PAGE_SIZE,
+  )
+  const listQuery = useDropList(listParams ?? null)
+
+  const category = params.get('category') || '전체'
+  const keyword = params.get('keyword') ?? ''
+  const invalid = invalidQuery || listParams === null
+  const cards = listQuery.data ? toCardDrops(listQuery.data.content ?? []) : []
+  const totalElements = listQuery.data?.totalElements ?? 0
+  const page = listQuery.data?.page ?? 0
+  const totalPages = listQuery.data?.totalPages ?? 0
+  const hasNext = listQuery.data?.hasNext ?? false
+  const loading =
+    pending ||
+    categoriesQuery.isPending ||
+    listParams === undefined ||
+    (listParams !== null && listQuery.isPending)
 
   const onWish = (id: number) => {
     const selected = wishes.has(id)
     if (!toggleWish(id)) return
     notify(selected ? 'WISH를 취소했어요.' : 'WISH에 담았어요.')
+  }
+
+  const retry = () => {
+    if (categoriesQuery.isError) void categoriesQuery.refetch()
+    void listQuery.refetch()
   }
 
   return (
@@ -69,7 +108,7 @@ export default function DropListPage({
         aria-label="상품 필터"
       >
         <div className="chips">
-          {categories.map((item) => (
+          {['전체', ...categoryNames].map((item) => (
             <button
               key={item}
               type="button"
@@ -154,44 +193,41 @@ export default function DropListPage({
 
       <div className="section-head catalog-heading">
         <h2>
-          {status} 상품{result && <small> {result.totalElements}개</small>}
+          {status} 상품
+          {listQuery.data && <small> {totalElements}개</small>}
         </h2>
-        <span>예시 상품 · 24개/페이지</span>
+        <span>{CATALOG_PAGE_SIZE}개/페이지</span>
       </div>
 
-      {pending ? (
-        <div role="status" aria-live="polite">
-          <EmptyState title="상품 목록을 불러오는 중이에요." variant="block" />
-        </div>
-      ) : !result && invalidQuery ? (
+      {invalid ? (
         <EmptyState
           title="조회 조건이 올바르지 않아요."
-          description="검색어·정렬·품절·페이지 조건을 확인해주세요."
+          description="검색어·카테고리·정렬·품절·페이지 조건을 확인해주세요."
           link={status === 'WISH' ? '/wish' : '/grab'}
           label="조회 조건 초기화"
           variant="block"
         />
-      ) : !result ? (
+      ) : categoriesQuery.isError || listQuery.isError ? (
         <div className="catalog-error" role="alert">
           <EmptyState
             title="상품 목록을 표시하지 못했어요."
             description="잠시 후 다시 시도해주세요."
             variant="block"
           />
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() => setRetry((retry) => retry + 1)}
-          >
+          <button type="button" className="secondary-button" onClick={retry}>
             다시 시도
           </button>
         </div>
-      ) : result.content.length ? (
+      ) : loading ? (
+        <div role="status" aria-live="polite">
+          <EmptyState title="상품 목록을 불러오는 중이에요." variant="block" />
+        </div>
+      ) : cards.length ? (
         <section
           className="product-grid catalog-grid"
           aria-label={`${status} 상품 목록`}
         >
-          {result.content.map((drop) => (
+          {cards.map((drop) => (
             <DropCard
               key={drop.id}
               drop={drop}
@@ -209,13 +245,17 @@ export default function DropListPage({
         />
       )}
 
-      {result && result.totalPages > 0 && (
+      {listQuery.data && !invalid && totalPages > 0 && (
         <nav className="catalog-pagination" aria-label="상품 목록 페이지">
-          {result.page > 0 ? (
+          {page > 0 ? (
             <Link
               className="secondary-button"
               to={{
-                search: `?${changeCatalogParams(params, 'page', String(Math.min(result.page - 1, result.totalPages - 1)))}`,
+                search: `?${changeCatalogParams(
+                  params,
+                  'page',
+                  String(Math.min(page - 1, totalPages - 1)),
+                )}`,
               }}
             >
               이전
@@ -226,15 +266,15 @@ export default function DropListPage({
             </button>
           )}
           <span aria-live="polite">
-            {result.page < result.totalPages
-              ? `${result.page + 1} / ${result.totalPages} 페이지`
-              : `전체 ${result.totalPages}페이지 · 범위 밖`}
+            {page < totalPages
+              ? `${page + 1} / ${totalPages} 페이지`
+              : `전체 ${totalPages}페이지 · 범위 밖`}
           </span>
-          {result.hasNext ? (
+          {hasNext ? (
             <Link
               className="secondary-button"
               to={{
-                search: `?${changeCatalogParams(params, 'page', String(result.page + 1))}`,
+                search: `?${changeCatalogParams(params, 'page', String(page + 1))}`,
               }}
             >
               다음

@@ -1,20 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
 import { getDropDetail, getDrops, getDropStocks } from '../../../api/drop/drops'
-import type { CatalogQuery } from './catalog'
-import { toDropListParams } from './catalogQuery'
+import type { DropListParams } from './queryKeys'
 import { dropKeys } from './queryKeys'
 
-type Category = { categoryId?: number; name?: string }
-
-export function useDropList(
-  query: CatalogQuery,
-  categories: readonly Category[],
-  size: number,
-) {
-  const params = toDropListParams(query, categories, size)
+// 조건이 없으면(null) 호출하지 않는다. 조건 판정은 resolveListParams가 맡는다.
+export function useDropList(params: DropListParams | null) {
   return useQuery({
-    queryKey: dropKeys.list(params),
-    queryFn: () => getDrops(params),
+    queryKey: params ? dropKeys.list(params) : dropKeys.all,
+    queryFn: () => getDrops(params ?? {}),
+    enabled: params !== null,
   })
 }
 

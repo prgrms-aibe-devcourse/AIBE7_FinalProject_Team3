@@ -23,3 +23,19 @@ export function toDropListParams(
     size,
   }
 }
+
+// 목록 화면의 조회 조건을 한 번에 판정한다.
+// 조건이 틀리거나 카테고리를 찾지 못하면 null(잘못된 조건), 카테고리를 아직 못 받았으면 undefined(대기)다.
+export function resolveListParams(
+  query: CatalogQuery | null,
+  categories: readonly { categoryId?: number; name?: string }[] | undefined,
+  size: number,
+): DropListParams | null | undefined {
+  if (!query) return null
+  if (!categories) return undefined
+  try {
+    return toDropListParams(query, categories, size)
+  } catch {
+    return null
+  }
+}
