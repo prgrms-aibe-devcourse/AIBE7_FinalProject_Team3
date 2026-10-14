@@ -42,12 +42,23 @@ class SwaggerEndpointTests {
             "payment,/api/v1/orders/{orderId}/payments",
             "user,/api/v1/auth/email-verification",
             "user,/api/v1/auth/csrf",
+            "user,/api/v1/users/me",
             "wish,/api/v1/drops/{dropId}/wish"
     })
     void exposesDomainApiDocs(String group, String path) throws Exception {
         mockMvc.perform(get("/v3/api-docs/" + group))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.paths['" + path + "']").exists());
+    }
+
+    // GR-97: 내 정보 조회의 Authentication 파라미터는 서버가 채우므로 문서 입력란에 나오지 않는다
+    @Test
+    void hidesAuthenticationParameterOfUserMe() throws Exception {
+        mockMvc.perform(get("/v3/api-docs/user"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/v1/users/me'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/users/me'].get.parameters").doesNotExist())
+                .andExpect(jsonPath("$.paths['/api/v1/users/me'].get.requestBody").doesNotExist());
     }
 
     @Test
