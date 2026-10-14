@@ -3,9 +3,12 @@ package org.example.grab.domain.seller.controller;
 import org.example.grab.domain.seller.dto.AdminSellerApplicationResponse;
 import org.example.grab.domain.seller.dto.SellerApplicationApprovalResponse;
 import org.example.grab.domain.seller.dto.SellerApplicationRejectionResponse;
+import org.example.grab.domain.seller.dto.SellerDocumentView;
+import org.example.grab.domain.seller.entity.DocumentType;
 import org.example.grab.domain.seller.entity.SellerStatus;
 import org.example.grab.domain.seller.error.SellerErrorCode;
 import org.example.grab.domain.seller.service.AdminSellerApplicationService;
+import org.example.grab.domain.seller.service.SellerDocumentViewService;
 import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.GlobalExceptionHandler;
@@ -27,15 +30,19 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class AdminSellerApplicationControllerTest {
 
     private final AdminSellerApplicationService adminSellerApplicationService = mock(AdminSellerApplicationService.class);
+    private final SellerDocumentViewService sellerDocumentViewService = mock(SellerDocumentViewService.class);
     private final CurrentUserIdProvider currentUserIdProvider = mock(CurrentUserIdProvider.class);
     private final MockMvc mockMvc = MockMvcBuilders
-            .standaloneSetup(new AdminSellerApplicationController(adminSellerApplicationService, currentUserIdProvider))
+            .standaloneSetup(new AdminSellerApplicationController(
+                    adminSellerApplicationService, sellerDocumentViewService, currentUserIdProvider))
             .setControllerAdvice(new GlobalExceptionHandler(new ValidationErrorCodeResolver(List.of())))
             .build();
 
@@ -138,5 +145,37 @@ class AdminSellerApplicationControllerTest {
                     .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
         }
         verifyNoInteractions(adminSellerApplicationService);
+    }
+
+    @Test
+    @DisplayName("서류 열람 요청은 이미지 바이트를 캐시 금지 헤더와 함께 반환한다")
+    void viewDocument() throws Exception {
+        UUID applicationId = UUID.randomUUID();
+        byte[] imageBytes = {1, 2, 3};
+        given(currentUserIdProvider.currentUserId()).willReturn(100L);
+        given(sellerDocumentViewService.view(applicationId, DocumentType.BUSINESS_LICENSE, 100L))
+                .willReturn(new SellerDocumentView(imageBytes, "image/png"));
+
+        mockMvc.perform(get("/api/v1/admin/seller-applications/{applicationId}/documents/{documentType}/view",
+                        applicationId, DocumentType.BUSINESS_LICENSE))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(content().contentType(MediaType.IMAGE_PNG))
+                .andExpect(content().bytes(imageBytes));
+        verify(sellerDocumentViewService).view(applicationId, DocumentType.BUSINESS_LICENSE, 100L);
+    }
+
+    @Test
+    @DisplayName("신청이나 해당 유형의 서류가 없으면 404로 응답한다")
+    void viewDocument_notFound() throws Exception {
+        UUID applicationId = UUID.randomUUID();
+        given(currentUserIdProvider.currentUserId()).willReturn(100L);
+        given(sellerDocumentViewService.view(applicationId, DocumentType.ID_CARD, 100L))
+                .willThrow(new BusinessException(SellerErrorCode.SELLER_APPLICATION_NOT_FOUND));
+
+        mockMvc.perform(get("/api/v1/admin/seller-applications/{applicationId}/documents/{documentType}/view",
+                        applicationId, DocumentType.ID_CARD))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("SELLER_APPLICATION_NOT_FOUND"));
     }
 }
