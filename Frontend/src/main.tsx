@@ -5,7 +5,9 @@ import { HashRouter } from 'react-router-dom'
 import App from './App'
 import './styles/global.css'
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false } },
+})
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
