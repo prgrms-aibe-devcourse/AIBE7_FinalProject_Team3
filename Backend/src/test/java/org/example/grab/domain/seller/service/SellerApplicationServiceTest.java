@@ -14,10 +14,14 @@ import org.example.grab.domain.seller.repository.SellerDocumentRepository;
 import org.example.grab.domain.seller.repository.SellerRepository;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
+import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
+
+import java.sql.SQLException;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -61,9 +65,11 @@ class SellerApplicationServiceTest {
             List<UUID> ids = invocation.getArgument(0);
             return ids.stream().map(id -> usableDocument(id, documentUploaderId)).toList();
         });
-        given(sellerRepository.save(any(Seller.class))).willAnswer(invocation -> {
+        given(sellerRepository.saveAndFlush(any(Seller.class))).willAnswer(invocation -> {
             Seller seller = invocation.getArgument(0);
-            ReflectionTestUtils.setField(seller, "id", 10L);
+            if (seller.getId() == null) {
+                ReflectionTestUtils.setField(seller, "id", 10L);
+            }
             return seller;
         });
     }
@@ -116,6 +122,38 @@ class SellerApplicationServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(SellerErrorCode.DUPLICATE_BUSINESS_REGISTRATION_NUMBER);
+    }
+
+    @Test
+    @DisplayName("사전 검사를 통과해도 저장 시 유니크 제약 위반이면 409로 변환한다(동시 신청)")
+    void convertsConstraintViolationOnSaveToDuplicateBusinessNumber() {
+        given(sellerRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
+        given(sellerRepository.saveAndFlush(any(Seller.class)))
+                .willThrow(violation("uq_sellers_business_registration_number"));
+
+        assertThatThrownBy(() -> service.apply(USER_ID, request()))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(SellerErrorCode.DUPLICATE_BUSINESS_REGISTRATION_NUMBER);
+    }
+
+    @Test
+    @DisplayName("저장 시 다른 제약 위반이면 그대로 전파한다")
+    void propagatesOtherConstraintViolations() {
+        given(sellerRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
+        DataIntegrityViolationException other = violation("uq_sellers_user");
+        given(sellerRepository.saveAndFlush(any(Seller.class))).willThrow(other);
+
+        assertThatThrownBy(() -> service.apply(USER_ID, request()))
+                .isSameAs(other);
+    }
+
+    // Spring이 Hibernate 예외를 감싼 형태(SignupServiceTest와 같은 방식)
+    private static DataIntegrityViolationException violation(String constraintName) {
+        SQLException sqlException = new SQLException(
+                "ERROR: duplicate key value violates unique constraint \"" + constraintName + "\"", "23505");
+        return new DataIntegrityViolationException("could not execute statement",
+                new ConstraintViolationException("could not execute statement", sqlException, constraintName));
     }
 
     @Test
