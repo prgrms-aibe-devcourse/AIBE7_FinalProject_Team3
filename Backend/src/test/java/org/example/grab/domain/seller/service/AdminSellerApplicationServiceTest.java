@@ -67,7 +67,7 @@ class AdminSellerApplicationServiceTest {
     void approvesApplication() {
         Seller seller = Seller.apply(1L, "길동상점", "seller@example.com", BRN, null, now());
         UUID applicationId = seller.getUuid();
-        given(sellerRepository.findByUuid(applicationId)).willReturn(Optional.of(seller));
+        given(sellerRepository.findByUuidForUpdate(applicationId)).willReturn(Optional.of(seller));
 
         SellerApplicationApprovalResponse response = service.approve(applicationId, ADMIN_ID);
 
@@ -80,7 +80,7 @@ class AdminSellerApplicationServiceTest {
     @DisplayName("존재하지 않는 신청을 승인하려 하면 404로 거부한다")
     void approveNotFound() {
         UUID applicationId = UUID.randomUUID();
-        given(sellerRepository.findByUuid(applicationId)).willReturn(Optional.empty());
+        given(sellerRepository.findByUuidForUpdate(applicationId)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.approve(applicationId, ADMIN_ID))
                 .isInstanceOf(BusinessException.class)
@@ -94,7 +94,7 @@ class AdminSellerApplicationServiceTest {
         Seller seller = Seller.apply(1L, "길동상점", "seller@example.com", BRN, null, now());
         seller.approve(ADMIN_ID, now());
         UUID applicationId = seller.getUuid();
-        given(sellerRepository.findByUuid(applicationId)).willReturn(Optional.of(seller));
+        given(sellerRepository.findByUuidForUpdate(applicationId)).willReturn(Optional.of(seller));
 
         assertThatThrownBy(() -> service.approve(applicationId, ADMIN_ID))
                 .isInstanceOf(BusinessException.class)
@@ -107,7 +107,7 @@ class AdminSellerApplicationServiceTest {
     void rejectsApplication() {
         Seller seller = Seller.apply(1L, "길동상점", "seller@example.com", BRN, null, now());
         UUID applicationId = seller.getUuid();
-        given(sellerRepository.findByUuid(applicationId)).willReturn(Optional.of(seller));
+        given(sellerRepository.findByUuidForUpdate(applicationId)).willReturn(Optional.of(seller));
 
         SellerApplicationRejectionResponse response = service.reject(applicationId, ADMIN_ID, "서류 미비");
 
@@ -119,7 +119,7 @@ class AdminSellerApplicationServiceTest {
     @DisplayName("존재하지 않는 신청을 반려하려 하면 404로 거부한다")
     void rejectNotFound() {
         UUID applicationId = UUID.randomUUID();
-        given(sellerRepository.findByUuid(applicationId)).willReturn(Optional.empty());
+        given(sellerRepository.findByUuidForUpdate(applicationId)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.reject(applicationId, ADMIN_ID, "사유"))
                 .isInstanceOf(BusinessException.class)
@@ -133,7 +133,7 @@ class AdminSellerApplicationServiceTest {
         Seller seller = Seller.apply(1L, "길동상점", "seller@example.com", BRN, null, now());
         seller.reject(ADMIN_ID, now(), "최초 반려 사유");
         UUID applicationId = seller.getUuid();
-        given(sellerRepository.findByUuid(applicationId)).willReturn(Optional.of(seller));
+        given(sellerRepository.findByUuidForUpdate(applicationId)).willReturn(Optional.of(seller));
 
         assertThatThrownBy(() -> service.reject(applicationId, ADMIN_ID, "재반려 사유"))
                 .isInstanceOf(BusinessException.class)

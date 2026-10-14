@@ -56,7 +56,7 @@ public class AdminSellerApplicationService {
     }
 
     private Seller findByApplicationId(UUID applicationId) {
-        return sellerRepository.findByUuid(applicationId)
+        return sellerRepository.findByUuidForUpdate(applicationId)
                 .orElseThrow(() -> new BusinessException(SellerErrorCode.SELLER_APPLICATION_NOT_FOUND));
     }
 }

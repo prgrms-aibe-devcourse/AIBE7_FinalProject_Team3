@@ -162,6 +162,19 @@ class SellerRepositoryTest {
     }
 
     @Test
+    @DisplayName("승인/반려용 잠금 조회도 applicationId(uuid)로 신청을 찾는다")
+    void findsByUuidForUpdate() {
+        // given
+        Long userId = insertUser();
+        insertPendingSeller(userId);
+        Seller seller = sellerRepository.findByUserId(userId).orElseThrow();
+
+        // when, then
+        assertThat(sellerRepository.findByUuidForUpdate(seller.getUuid())).isPresent();
+        assertThat(sellerRepository.findByUuidForUpdate(UUID.randomUUID())).isEmpty();
+    }
+
+    @Test
     @DisplayName("운영자 심사 목록은 상태를 지정하면 해당 상태만, 생략하면 전체를 신청자 public_id와 함께 반환한다")
     void findsApplicationsForReview() {
         // given
