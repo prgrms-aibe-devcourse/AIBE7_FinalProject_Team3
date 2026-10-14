@@ -124,6 +124,26 @@ class SellerDocumentViewServiceTest {
         assertThat(captor.getValue().getAccessedAt()).isEqualTo(OffsetDateTime.parse("2026-10-14T05:00:00Z"));
     }
 
+    @Test
+    @DisplayName("ImageIO가 지원하지 않는 형식이면 빈 이미지를 돌려주지 않고 실패한다")
+    void viewFailsWhenImageFormatUnsupported() throws IOException {
+        Seller seller = sellerWithId();
+        UUID applicationId = seller.getUuid();
+        SellerDocument document = SellerDocument.upload(UUID.randomUUID(), 1L, DocumentType.BUSINESS_LICENSE,
+                "image/x-made-up", OBJECT_KEY, ENCRYPTED_DEK);
+        byte[] plainImage = samplePng();
+        given(sellerRepository.findByUuid(applicationId)).willReturn(Optional.of(seller));
+        given(sellerDocumentRepository.findBySellerIdAndDocumentType(SELLER_ID, DocumentType.BUSINESS_LICENSE))
+                .willReturn(Optional.of(document));
+        given(documentStorage.load(OBJECT_KEY)).willReturn(CIPHERTEXT);
+        given(documentEncryptionService.decrypt(CIPHERTEXT, ENCRYPTED_DEK)).willReturn(plainImage);
+
+        assertThatThrownBy(() -> service.view(applicationId, DocumentType.BUSINESS_LICENSE, ADMIN_ID))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("x-made-up");
+        verifyNoInteractions(sellerDocumentAccessLogRepository);
+    }
+
     private static Seller sellerWithId() {
         Seller seller = Seller.apply(1L, "길동상점", "seller@example.com", "1234567890", null,
                 OffsetDateTime.now(ZoneOffset.UTC));

@@ -106,7 +106,10 @@ public class SellerDocumentViewService {
             graphics.dispose();
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
-            ImageIO.write(image, formatNameOf(contentType), out);
+            String formatName = formatNameOf(contentType);
+            if (!ImageIO.write(image, formatName, out)) {
+                throw new IllegalStateException("서류 이미지를 '" + formatName + "' 형식으로 인코딩할 수 없습니다.");
+            }
             return out.toByteArray();
         } catch (IOException e) {
             throw new IllegalStateException("서류 워터마크 합성에 실패했습니다.", e);
