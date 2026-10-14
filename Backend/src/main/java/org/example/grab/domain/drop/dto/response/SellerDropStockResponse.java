@@ -1,5 +1,6 @@
 package org.example.grab.domain.drop.dto.response;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.domain.drop.entity.option.DropOption;
 import org.example.grab.domain.drop.entity.option.DropOptionValueMap;
@@ -10,6 +11,8 @@ import java.util.stream.Collectors;
 
 public record SellerDropStockResponse(Long dropId, List<Option> options) {
 
+    // 중첩 이름 Option이 다른 응답 DTO와 충돌하지 않도록 고유 스키마 이름을 지정한다(GR-98).
+    @Schema(name = "SellerDropStockOption")
     public record Option(Long optionId, String optionName, int totalStock, int availableStock,
                          int reservedStock, int soldStock) {
     }
