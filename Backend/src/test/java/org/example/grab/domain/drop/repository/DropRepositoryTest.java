@@ -1,6 +1,9 @@
 package org.example.grab.domain.drop.repository;
 
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
 import org.example.grab.global.config.JpaConfig;
 import org.example.grab.domain.drop.dto.PublicDropListProjection;
 import org.example.grab.domain.drop.dto.PublicDropSort;
@@ -27,6 +30,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -46,6 +50,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
 @Import(JpaConfig.class)
+@TestPropertySource(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
 @Testcontainers
 class DropRepositoryTest {
 
@@ -67,6 +72,9 @@ class DropRepositoryTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private EntityManagerFactory entityManagerFactory;
 
     private static final String PRESALE = "PRESALE_10M";
 
@@ -323,8 +331,10 @@ class DropRepositoryTest {
         PublicDropListProjection wishRow = rowOf(page, wish);
         assertThat(wishRow.getStatus()).isEqualTo("WISH");
         assertThat(wishRow.getName()).isEqualTo("위시 상품");
+        assertThat(wishRow.getBrandName()).isEqualTo("GRAB 판매자");
         assertThat(wishRow.getMinPrice()).isEqualTo(20000L);
         assertThat(wishRow.getSoldOut()).isFalse();
+        assertThat(wishRow.getAvailableStock()).isEqualTo(5L);
         assertThat(wishRow.getWishCount()).isEqualTo(2L);
         assertThat(wishRow.getThumbnailUrl()).isEqualTo("https://img/1.jpg");
         assertThat(wishRow.getCategoryId()).isEqualTo(categoryId);
@@ -334,7 +344,100 @@ class DropRepositoryTest {
 
         // 활성 옵션 가용 재고 0, 옵션 없음은 모두 품절
         assertThat(rowOf(page, grab).getSoldOut()).isTrue();
+        assertThat(rowOf(page, grab).getAvailableStock()).isZero();
         assertThat(rowOf(page, ended).getSoldOut()).isTrue();
+        assertThat(rowOf(page, ended).getAvailableStock()).isZero();
+    }
+
+    @Test
+    @DisplayName("목록 availableStock은 활성 SKU 가용 재고 합이고 예약·판매·보류를 차감하며 비활성은 제외한다")
+    void aggregatesAvailableStockOverActiveSkus() {
+        // given
+        Long dropId = insertPublishedDrop(DropStatus.WISH, "재고 상품");
+        insertOption(dropId, 1000L, 10, 2, 1, 1, true, 0);
+        insertOption(dropId, 2000L, 5, 0, 0, 0, true, 1);
+        insertOption(dropId, 3000L, 100, 0, 0, 0, false, 2);
+
+        // when
+        Page<PublicDropListProjection> page = dropRepository.findPublicDrops(
+                List.of("WISH"), null, null, null, PageRequest.of(0, 20));
+
+        // then: (10-2-1-1) + 5 = 11, 비활성 100은 제외
+        assertThat(rowOf(page, dropId).getAvailableStock()).isEqualTo(11L);
+        assertThat(rowOf(page, dropId).getSoldOut()).isFalse();
+    }
+
+    @Test
+    @DisplayName("SKU가 없거나 활성 SKU가 없으면 availableStock 0·soldOut true이고 재고가 있으면 false다")
+    void fillsZeroAvailableStockWhenNoActiveSku() {
+        // given
+        Long noOptions = insertPublishedDrop(DropStatus.WISH, "옵션 없음");
+        Long inactiveOnly = insertPublishedDrop(DropStatus.WISH, "비활성만");
+        insertOption(inactiveOnly, 1000L, 10, 0, 0, 0, false, 0);
+
+        // when
+        Page<PublicDropListProjection> page = dropRepository.findPublicDrops(
+                List.of("WISH"), null, null, null, PageRequest.of(0, 20));
+
+        // then
+        assertThat(rowOf(page, noOptions).getAvailableStock()).isZero();
+        assertThat(rowOf(page, noOptions).getSoldOut()).isTrue();
+        assertThat(rowOf(page, noOptions).getMinPrice()).isNull();
+        assertThat(rowOf(page, inactiveOnly).getAvailableStock()).isZero();
+        assertThat(rowOf(page, inactiveOnly).getSoldOut()).isTrue();
+        assertThat(rowOf(page, inactiveOnly).getMinPrice()).isNull();
+    }
+
+    @Test
+    @DisplayName("목록은 판매자별 실제 브랜드명을 반환하고 판매자당 DROP이 여러 건이어도 행이 늘지 않는다")
+    void returnsBrandNamePerSellerWithoutRowMultiplication() {
+        // given: 같은 판매자의 DROP 2건 + 다른 판매자의 DROP 1건
+        Long otherSeller = insertSeller("다른 브랜드");
+        Long first = insertPublishedDrop(DropStatus.WISH, "A 상품", sellerId);
+        Long second = insertPublishedDrop(DropStatus.WISH, "A 상품2", sellerId);
+        Long third = insertPublishedDrop(DropStatus.WISH, "B 상품", otherSeller);
+        insertOption(first, 1000L, 5, 0, 0, 0, true, 0);
+        insertOption(second, 1000L, 5, 0, 0, 0, true, 0);
+        insertOption(third, 1000L, 5, 0, 0, 0, true, 0);
+        insertWish(insertBuyer(), first, false);
+
+        // when
+        Page<PublicDropListProjection> page = dropRepository.findPublicDrops(
+                List.of("WISH"), null, null, null, PageRequest.of(0, 20));
+
+        // then: 판매자 조인은 DROP→판매자 방향이라 행이 늘지 않는다
+        assertThat(page.getTotalElements()).isEqualTo(3);
+        assertThat(rowOf(page, first).getBrandName()).isEqualTo("GRAB 판매자");
+        assertThat(rowOf(page, first).getWishCount()).isEqualTo(1L);
+        assertThat(rowOf(page, first).getAvailableStock()).isEqualTo(5L);
+        assertThat(rowOf(page, second).getBrandName()).isEqualTo("GRAB 판매자");
+        assertThat(rowOf(page, third).getBrandName()).isEqualTo("다른 브랜드");
+    }
+
+    @Test
+    @DisplayName("목록 조회 쿼리 수는 상품 수와 무관하게 고정이다(브랜드 조인이 N+1을 만들지 않음)")
+    void listQueryCountDoesNotScaleWithDropCount() {
+        // given
+        Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+        for (int i = 0; i < 2; i++) {
+            insertStockedPublishedDrop("적은 목록 " + i);
+        }
+        statistics.clear();
+
+        // when
+        dropRepository.findPublicDrops(List.of("WISH"), null, null, null, PageRequest.of(0, 20));
+        long smallCount = statistics.getPrepareStatementCount();
+
+        for (int i = 0; i < 10; i++) {
+            insertStockedPublishedDrop("많은 목록 " + i);
+        }
+        statistics.clear();
+        dropRepository.findPublicDrops(List.of("WISH"), null, null, null, PageRequest.of(0, 20));
+        long largeCount = statistics.getPrepareStatementCount();
+
+        // then: count·select 2문장. 데이터를 늘려도 늘지 않는다.
+        assertThat(smallCount).isEqualTo(largeCount);
+        assertThat(largeCount).isLessThanOrEqualTo(2);
     }
 
     @Test
@@ -441,6 +544,9 @@ class DropRepositoryTest {
         assertThat(rowOf(page, two).getWishCount()).isEqualTo(2L);
         assertThat(rowOf(page, one).getWishCount()).isEqualTo(1L);
         assertThat(rowOf(page, zero).getWishCount()).isZero();
+        // 인기 정렬도 같은 공통 SELECT라 브랜드·가용 재고를 함께 반환한다(옵션 없음 → 0)
+        assertThat(rowOf(page, two).getBrandName()).isEqualTo("GRAB 판매자");
+        assertThat(rowOf(page, two).getAvailableStock()).isZero();
     }
 
     @Test
@@ -591,6 +697,9 @@ class DropRepositoryTest {
         assertThat(page.getTotalElements()).isEqualTo(3);
         assertThat(rowOf(page, multi).getWishCount()).isEqualTo(2L);
         assertThat(rowOf(page, multi).getMinPrice()).isEqualTo(10000L);
+        // 인기 GRAB도 브랜드·가용 재고를 함께 반환한다(multi는 활성 옵션 10+10)
+        assertThat(rowOf(page, multi).getBrandName()).isEqualTo("GRAB 판매자");
+        assertThat(rowOf(page, multi).getAvailableStock()).isEqualTo(20L);
     }
 
     @Test
@@ -954,6 +1063,10 @@ class DropRepositoryTest {
     }
 
     private Long insertPublishedDrop(DropStatus status, String name) {
+        return insertPublishedDrop(status, name, sellerId);
+    }
+
+    private Long insertPublishedDrop(DropStatus status, String name, Long sellerId) {
         boolean grab = status == DropStatus.GRAB || status == DropStatus.ENDED;
         boolean ended = status == DropStatus.ENDED;
         return jdbcTemplate.queryForObject(
@@ -970,6 +1083,23 @@ class DropRepositoryTest {
                 RETURNING id
                 """,
                 Long.class, sellerId, categoryId, status.name(), name, grab, ended, ended);
+    }
+
+    private Long insertSeller(String brandName) {
+        String uniqueValue = UUID.randomUUID().toString();
+        Long userId = jdbcTemplate.queryForObject(
+                "INSERT INTO users (email, password_hash, nickname) VALUES (?, 'encoded-password', ?) RETURNING id",
+                Long.class, uniqueValue + "@example.com", "판매자-" + uniqueValue);
+        return jdbcTemplate.queryForObject(
+                "INSERT INTO sellers (user_id, brand_name, contact_email) VALUES (?, ?, ?) RETURNING id",
+                Long.class, userId, brandName, "seller-" + uniqueValue + "@example.com");
+    }
+
+    private Long insertStockedPublishedDrop(String name) {
+        Long dropId = insertPublishedDrop(DropStatus.WISH, name);
+        insertOption(dropId, 1000L, 5, 0, 0, 0, true, 0);
+        insertWish(insertBuyer(), dropId, false);
+        return dropId;
     }
 
     // 판매 시작 1시간 전인 WISH 상품. published_at은 minutesAgo분 전으로 둬 동률 정렬을 검증한다.

@@ -37,9 +37,11 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.awaitility.Awaitility.await;
 
 /*
     GR-35 M01-04·M02-02: 교체·재사용 확인·세션 폐기 스크립트를 실제 Redis(Testcontainers)에서 확인한다.
+    GR-36 M02-02: 로그아웃 경로(현재 토큰의 세션 폐기, 교체된 토큰의 표식 기반 폐기)와 교체와의 순서 경계도 여기서 확인한다.
     Lua 스크립트의 원자성과 분기는 mock으로 확인할 수 없다.
     유예는 짧게(500ms) 두어 유예 안·밖을 모두 기다려 확인한다. 저장 TTL(idle-ttl)은 유예보다 길어야 표식이 남는다.
  */
@@ -120,9 +122,10 @@ class RefreshTokenRotationIntegrationTest {
 
         long newTokenTtl = redisTemplate.getExpire(RefreshTokenHasher.toKey(newToken), TimeUnit.SECONDS);
         assertThat(newTokenTtl).isBetween(IDLE_TTL.toSeconds() - 2, IDLE_TTL.toSeconds());
+        // 남은 TTL은 초 미만을 버린 값이라, 새 토큰 키를 읽은 뒤 초 경계가 지나면 뒤에 읽은 값이 1 작다
         assertThat(redisTemplate.getExpire(RefreshTokenHasher.toSessionKey(session.sessionId()), TimeUnit.SECONDS))
-                .isEqualTo(newTokenTtl);
-        assertThat(redisTemplate.getExpire(usedKey, TimeUnit.SECONDS)).isEqualTo(newTokenTtl);
+                .isBetween(newTokenTtl - 1, newTokenTtl);
+        assertThat(redisTemplate.getExpire(usedKey, TimeUnit.SECONDS)).isBetween(newTokenTtl - 1, newTokenTtl);
     }
 
     @Test
@@ -278,5 +281,165 @@ class RefreshTokenRotationIntegrationTest {
         assertThatCode(() -> repository.revokeSession(session.sessionId())).doesNotThrowAnyException();
         assertThatCode(() -> repository.revokeSession(UUID.randomUUID())).doesNotThrowAnyException();
         assertThat(repository.find(otherToken)).contains(otherSession);
+    }
+
+    // GR-36 M02-02: 로그아웃 경로
+
+    private long ttlSeconds(String key) {
+        return redisTemplate.getExpire(key, TimeUnit.SECONDS);
+    }
+
+    // M00-02: 탈취된 A로 먼저 재발급돼 B가 생겨도 A로 로그아웃하면 세션을 끊는다
+    @Test
+    @DisplayName("교체된 토큰의 표식으로 폐기하면 유예 안이어도 세션의 현재 토큰과 세션 키가 지워지고 다른 세션은 그대로다")
+    void revokeByUsedTokenWithinGraceRemovesCurrentToken() {
+        // given: 같은 사용자(7L)의 다른 로그인 세션도 둔다
+        RefreshTokenSession session = newSession();
+        String tokenA = generator.generate();
+        String tokenB = generator.generate();
+        repository.save(tokenA, session);
+        repository.rotate(tokenA, tokenB, session);
+
+        RefreshTokenSession otherSession = newSession();
+        String otherToken = generator.generate();
+        repository.save(otherToken, otherSession);
+        long otherTtl = ttlSeconds(RefreshTokenHasher.toKey(otherToken));
+
+        // when
+        Optional<UUID> revoked = repository.revokeSessionByUsedToken(tokenA);
+
+        // then
+        assertThat(revoked).contains(session.sessionId());
+        assertThat(repository.find(tokenB)).isEmpty();
+        assertThat(redisTemplate.hasKey(RefreshTokenHasher.toSessionKey(session.sessionId()))).isFalse();
+        // 표식은 지우지 않고 TTL로 만료시킨다
+        assertThat(redisTemplate.hasKey(RefreshTokenHasher.toUsedKey(tokenA))).isTrue();
+        // 폐기된 세션의 현재 토큰으로는 더 이상 교체할 수 없다
+        assertThat(repository.rotate(tokenB, generator.generate(), session)).isEmpty();
+        // 다른 세션은 키와 TTL이 유지되고 교체할 수 있다
+        assertThat(repository.find(otherToken)).contains(otherSession);
+        assertThat(ttlSeconds(RefreshTokenHasher.toKey(otherToken))).isBetween(otherTtl - 2, otherTtl);
+        assertThat(repository.rotate(otherToken, generator.generate(), otherSession)).isPresent();
+    }
+
+    @Test
+    @DisplayName("유예가 지난 교체된 토큰으로도 표식 기반 폐기는 여러 번 교체된 세션의 현재 토큰을 지운다")
+    void revokeByUsedTokenAfterGraceRemovesLatestToken() throws InterruptedException {
+        // given: A → B → C. A의 표식으로 현재 토큰 C를 찾아 지우는지 본다
+        RefreshTokenSession session = newSession();
+        String tokenA = generator.generate();
+        String tokenB = generator.generate();
+        String tokenC = generator.generate();
+        repository.save(tokenA, session);
+        repository.rotate(tokenA, tokenB, session);
+        repository.rotate(tokenB, tokenC, session);
+        waitPastGrace();
+
+        // when
+        Optional<UUID> revoked = repository.revokeSessionByUsedToken(tokenA);
+
+        // then
+        assertThat(revoked).contains(session.sessionId());
+        assertThat(repository.find(tokenC)).isEmpty();
+        assertThat(redisTemplate.hasKey(RefreshTokenHasher.toSessionKey(session.sessionId()))).isFalse();
+    }
+
+    @Test
+    @DisplayName("표식 기반 폐기는 반복해도 예외가 없고, 표식이 없는 토큰이면 빈 결과이며 다른 키를 지우지 않는다")
+    void revokeByUsedTokenIsIdempotent() {
+        // given
+        RefreshTokenSession session = newSession();
+        String tokenA = generator.generate();
+        repository.save(tokenA, session);
+        repository.rotate(tokenA, generator.generate(), session);
+        repository.revokeSessionByUsedToken(tokenA);
+
+        RefreshTokenSession otherSession = newSession();
+        String otherToken = generator.generate();
+        repository.save(otherToken, otherSession);
+
+        // when & then
+        assertThatCode(() -> repository.revokeSessionByUsedToken(tokenA)).doesNotThrowAnyException();
+        assertThat(repository.revokeSessionByUsedToken(generator.generate())).isEmpty();
+        // 현재 토큰에는 표식이 없으므로 이 연산으로는 지워지지 않는다(현재 토큰은 find → revokeSession 경로)
+        assertThat(repository.revokeSessionByUsedToken(otherToken)).isEmpty();
+        assertThat(repository.find(otherToken)).contains(otherSession);
+    }
+
+    @Test
+    @DisplayName("최신 토큰으로 로그아웃한 뒤 남은 표식의 옛 토큰으로 재발급을 시도해도 세션이 되살아나지 않는다")
+    void usedMarkerDoesNotReviveRevokedSession() throws InterruptedException {
+        // given: A → B 교체 후 B(현재 토큰)로 로그아웃한다
+        RefreshTokenSession session = newSession();
+        String tokenA = generator.generate();
+        String tokenB = generator.generate();
+        repository.save(tokenA, session);
+        repository.rotate(tokenA, tokenB, session);
+        repository.revokeSession(repository.find(tokenB).orElseThrow().sessionId());
+
+        // when & then: 유예 안·밖 모두 옛 토큰은 교체되지 않고 새 키가 생기지 않는다
+        assertThat(repository.checkReuse(tokenA).status()).isEqualTo(RefreshTokenReuseCheck.Status.WITHIN_GRACE);
+        assertThat(repository.rotate(tokenA, generator.generate(), session)).isEmpty();
+        waitPastGrace();
+        assertThat(repository.checkReuse(tokenA).status()).isEqualTo(RefreshTokenReuseCheck.Status.REUSE_DETECTED);
+        assertThat(redisTemplate.keys(RefreshTokenHasher.KEY_PREFIX + "*")).isEmpty();
+        assertThat(redisTemplate.hasKey(RefreshTokenHasher.toSessionKey(session.sessionId()))).isFalse();
+    }
+
+    // 로그아웃의 find(A)와 폐기 사이에 A → B 교체가 끼어든 경우
+    @Test
+    @DisplayName("find 후 교체가 끼어들어도 세션 폐기는 교체된 새 토큰을 지운다")
+    void revokeAfterInterleavedRotationRemovesNewToken() {
+        // given
+        RefreshTokenSession session = newSession();
+        String tokenA = generator.generate();
+        String tokenB = generator.generate();
+        repository.save(tokenA, session);
+        UUID sessionId = repository.find(tokenA).orElseThrow().sessionId();
+        repository.rotate(tokenA, tokenB, session);
+
+        // when
+        repository.revokeSession(sessionId);
+
+        // then
+        assertThat(repository.find(tokenB)).isEmpty();
+        assertThat(redisTemplate.hasKey(RefreshTokenHasher.toSessionKey(sessionId))).isFalse();
+    }
+
+    @Test
+    @DisplayName("폐기가 먼저 끝나면 이후 옛 토큰의 교체는 실패하고 새 토큰 키가 저장되지 않는다")
+    void rotateAfterRevokeFails() {
+        // given
+        RefreshTokenSession session = newSession();
+        String tokenA = generator.generate();
+        String tokenB = generator.generate();
+        repository.save(tokenA, session);
+        repository.revokeSession(session.sessionId());
+
+        // when
+        Optional<Duration> ttl = repository.rotate(tokenA, tokenB, session);
+
+        // then
+        assertThat(ttl).isEmpty();
+        assertThat(redisTemplate.hasKey(RefreshTokenHasher.toKey(tokenB))).isFalse();
+        assertThat(redisTemplate.hasKey(RefreshTokenHasher.toSessionKey(session.sessionId()))).isFalse();
+    }
+
+    @Test
+    @DisplayName("TTL로 이미 만료된 토큰은 find가 빈 결과이고 폐기 연산도 예외 없이 끝난다")
+    void expiredTokenIsHandledWithoutError() {
+        // given: 저장 TTL을 1초로 줄여 Redis가 실제로 지우게 한다
+        RefreshTokenSession session = newSession();
+        String token = generator.generate();
+        repository.save(token, session);
+        redisTemplate.expire(RefreshTokenHasher.toKey(token), Duration.ofSeconds(1));
+        redisTemplate.expire(RefreshTokenHasher.toSessionKey(session.sessionId()), Duration.ofSeconds(1));
+        await().atMost(Duration.ofSeconds(5)).pollInterval(Duration.ofMillis(100))
+                .until(() -> !redisTemplate.hasKey(RefreshTokenHasher.toKey(token)));
+
+        // when & then
+        assertThat(repository.find(token)).isEmpty();
+        assertThat(repository.revokeSessionByUsedToken(token)).isEmpty();
+        assertThatCode(() -> repository.revokeSession(session.sessionId())).doesNotThrowAnyException();
     }
 }

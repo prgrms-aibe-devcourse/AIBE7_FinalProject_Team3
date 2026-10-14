@@ -116,8 +116,10 @@ class RefreshTokenRepositoryIntegrationTest {
         // then
         String sessionKey = RefreshTokenHasher.toSessionKey(session.sessionId());
         assertThat(redisTemplate.opsForValue().get(sessionKey)).isEqualTo(RefreshTokenHasher.hash(rawToken));
+        // 남은 TTL은 초 미만을 버린 값이라, 두 번 읽는 사이에 초 경계가 지나면 뒤에 읽은 값이 1 작다
+        long tokenTtl = redisTemplate.getExpire(RefreshTokenHasher.toKey(rawToken), TimeUnit.SECONDS);
         assertThat(redisTemplate.getExpire(sessionKey, TimeUnit.SECONDS))
-                .isEqualTo(redisTemplate.getExpire(RefreshTokenHasher.toKey(rawToken), TimeUnit.SECONDS))
+                .isBetween(tokenTtl - 1, tokenTtl)
                 .isPositive();
     }
 

@@ -262,4 +262,8 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 | SELLER | 승인된 판매자 권한 필요 |
 | ADMIN | 운영자 권한 필요 |
 | USER/SELLER | 주문 소유자 또는 해당 DROP의 판매자 |
+| 이메일 가입 토큰 | Access Token 대신 `email_signup_token` HttpOnly 쿠키로 확인 |
+| 소셜 가입 토큰 | Access Token 대신 `oauth2_signup_token` HttpOnly 쿠키로 확인 |
+| Refresh Token | Access Token 대신 `refresh_token` HttpOnly 쿠키로 확인. Access Token이 만료된 상태에서도 호출 가능 |
+| Refresh Token(선택) | `refresh_token` 쿠키가 있으면 사용하고, 없거나 무효여도 요청은 성공 |
 | PG 검증 | 사용자 토큰 대신 Webhook 서명 또는 별도 Secret 검증 |

@@ -37,6 +37,8 @@ public class RefreshTokenRepository {
             RedisScript.of(new ClassPathResource("redis/refresh-token-reuse.lua"), List.class);
     private static final RedisScript<Long> REVOKE_SCRIPT =
             RedisScript.of(new ClassPathResource("redis/refresh-session-revoke.lua"), Long.class);
+    private static final RedisScript<String> REVOKE_BY_USED_SCRIPT =
+            RedisScript.of(new ClassPathResource("redis/refresh-session-revoke-by-used.lua"), String.class);
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper; // 객체 <-> JSON 변환
@@ -135,5 +137,19 @@ public class RefreshTokenRepository {
         // KEYS[1]: 세션 키 / ARGV[1]: 토큰 키 접두사
         redisTemplate.execute(REVOKE_SCRIPT,
                 List.of(RefreshTokenHasher.toSessionKey(sessionId)), RefreshTokenHasher.KEY_PREFIX);
+    }
+
+    /*
+        이미 교체된 토큰의 사용됨 표식으로 세션을 찾아 폐기한다(GR-36 M00-02). 로그아웃에서 find가 빈 결과일 때 부른다.
+        checkReuse와 달리 유예 시간 안이어도 폐기한다. 폐기한 sessionId를 돌려주고, 표식이 없으면 빈 결과다.
+     */
+    public Optional<UUID> revokeSessionByUsedToken(String rawToken) {
+        // KEYS[1]: 사용됨 표식 키 / ARGV[1~2]: 토큰 키 접두사, 세션 키 접두사
+        String sessionId = redisTemplate.execute(REVOKE_BY_USED_SCRIPT,
+                List.of(RefreshTokenHasher.toUsedKey(rawToken)),
+                RefreshTokenHasher.KEY_PREFIX,
+                RefreshTokenHasher.SESSION_KEY_PREFIX);
+        // sessionId가 있으면 uuid로 변환해 반환, 없으면 빈 Optional을 반환
+        return Optional.ofNullable(sessionId).map(UUID::fromString);
     }
 }

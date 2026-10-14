@@ -181,7 +181,7 @@ docker compose exec -T postgres psql -U grab -d grab -c "SELECT email, nickname,
 - `role`은 `USER`, `status`는 `ACTIVE`, `provider`는 `LOCAL`이다.
 - `hash_prefix`는 `$argon2id$v=19$m=19456,t=2,p=1$`이고, 원문 비밀번호는 어디에도 저장되지 않는다.
 
-가입한 회원은 7절 로그인 확인에 그대로 쓴다. 시험 데이터 정리는 7.4에서 한다.
+가입한 회원은 7절 로그인 확인에 그대로 쓴다. 시험 데이터 정리는 7.6에서 한다.
 
 ### 6.5 프론트엔드 CORS 설정
 
@@ -300,7 +300,53 @@ docker compose exec -T redis redis-cli HGETALL $usedKey
 
 10초가 지난 뒤 `$oldRefresh`로 다시 요청하면 탈취로 보고 세션을 폐기한다. 이후에는 쿠키 파일의 최신 `refresh_token`도 401이므로 7.1의 로그인을 다시 해야 한다. 서버 로그에 `reason=reuse_detected`가 WARN으로 남는다.
 
-### 7.5 정리
+### 7.5 로그아웃
+
+로그아웃(MEMBER_AUTH 1.8)을 확인한다. 7.4에서 세션이 폐기됐다면 7.1의 200 로그인을 다시 한다. 다른 세션이 유지되는지 보려고 같은 회원으로 한 번 더 로그인해 별도 쿠키 파일에 둔다.
+
+```powershell
+$logout = 'http://localhost:8080/api/v1/auth/logout'
+
+# 같은 회원의 두 번째 로그인 세션(other-cookie.txt). Redis 세션 키가 하나 늘어난다
+Copy-Item signup-cookie.txt other-cookie.txt
+'{"email":"signup-test@example.com","password":"Password123!"}' | curl.exe -s -o NUL -w "%{http_code}`n" `
+  -b other-cookie.txt -c other-cookie.txt $login -H "X-XSRF-TOKEN: $csrfToken" -H "Content-Type: application/json" --data-binary '@-'
+(docker compose exec -T redis redis-cli --scan --pattern 'auth:refresh-session:*' | Measure-Object).Count
+
+# 로그아웃할 refresh_token 값(쿠키 파일의 마지막 열)
+$loggedOut = (Select-String -Path signup-cookie.txt -Pattern "refresh_token\t(\S+)").Matches[0].Groups[1].Value
+
+# 403 ACCESS_DENIED: CSRF 헤더 없음. 세션과 쿠키 파일의 인증 쿠키가 그대로다
+curl.exe -s -w "`n%{http_code}`n" -X POST -b signup-cookie.txt $logout
+
+# 204: 본문 없이 Set-Cookie로 두 인증 쿠키를 만료시킨다(Max-Age=0). curl이 쿠키 파일에서 두 쿠키를 지운다
+curl.exe -s -i -X POST -b signup-cookie.txt -c signup-cookie.txt $logout -H "X-XSRF-TOKEN: $csrfToken"
+Select-String -Path signup-cookie.txt -Pattern "access_token|refresh_token"   # 출력 없음
+
+# 401 INVALID_TOKEN: 로그아웃한 refresh_token으로 재발급
+curl.exe -s -w "`n%{http_code}`n" -X POST $refresh -H "Cookie: XSRF-TOKEN=$csrfToken; refresh_token=$loggedOut" `
+  -H "X-XSRF-TOKEN: $csrfToken"
+
+# 204: 반복 로그아웃. 쿠키가 지워진 뒤 요청과 같은 토큰으로 다시 요청해도 같은 결과다
+curl.exe -s -w "`n%{http_code}`n" -X POST -b signup-cookie.txt $logout -H "X-XSRF-TOKEN: $csrfToken"
+curl.exe -s -w "`n%{http_code}`n" -X POST $logout -H "Cookie: XSRF-TOKEN=$csrfToken; refresh_token=$loggedOut" `
+  -H "X-XSRF-TOKEN: $csrfToken"
+
+# 204: 다른 세션은 유지되어 재발급된다. Redis 세션 키는 로그아웃한 하나만 줄었다
+curl.exe -s -w "`n%{http_code}`n" -X POST -b other-cookie.txt -c other-cookie.txt $refresh -H "X-XSRF-TOKEN: $csrfToken"
+(docker compose exec -T redis redis-cli --scan --pattern 'auth:refresh-session:*' | Measure-Object).Count
+```
+
+204 응답의 `Set-Cookie`를 확인한다. 발급과 이름·Path가 같아야 브라우저가 같은 쿠키로 보고 지운다. `XSRF-TOKEN`은 교체·삭제하지 않는다.
+
+| 쿠키 | 속성 |
+| --- | --- |
+| `access_token` | 빈 값, `Path=/api; Max-Age=0`; `Secure; HttpOnly; SameSite=Lax` |
+| `refresh_token` | 빈 값, `Path=/api/v1/auth; Max-Age=0`; `Secure; HttpOnly; SameSite=Lax` |
+
+로그아웃은 Access Token(JWT) 자체를 무효화하지 않는다. 로그아웃 전에 따로 보관한 `access_token` 값은 만료 시각(최대 15분)까지 보호 API에 인증된다(MEMBER_AUTH 1.8).
+
+### 7.6 정리
 
 시험 데이터, Refresh Token 관련 키, 쿠키 파일을 정리한다.
 
@@ -309,7 +355,7 @@ docker compose exec -T postgres psql -U grab -d grab -c "DELETE FROM users WHERE
 'auth:refresh-token:*', 'auth:refresh-session:*', 'auth:refresh-token-used:*' | ForEach-Object {
   docker compose exec -T redis redis-cli --scan --pattern $_ | ForEach-Object { docker compose exec -T redis redis-cli DEL $_ }
 }
-Remove-Item signup-cookie.txt
+Remove-Item signup-cookie.txt, other-cookie.txt
 ```
 
 ## 8. 종료 및 초기화

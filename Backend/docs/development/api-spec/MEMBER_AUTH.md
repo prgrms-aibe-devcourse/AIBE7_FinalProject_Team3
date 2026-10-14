@@ -447,7 +447,7 @@ Redis는 만료된 키를 삭제하므로 만료·로그아웃·교체·위조�
 POST /api/v1/auth/logout
 ```
 
-- **인증**: `refresh_token` HttpOnly 쿠키
+- **인증**: `refresh_token` HttpOnly 쿠키 (선택)
 
 **요청:**
 
@@ -456,6 +456,15 @@ POST /api/v1/auth/logout
 **응답:** `204 No Content`
 
 Redis의 Refresh Token을 삭제하고 두 인증 쿠키를 즉시 만료시킨다.
+
+- Access Token은 요구하지 않는다. Access Token이 없거나 만료·변조된 상태에서도 로그아웃할 수 있으며, 정리할 세션은 `refresh_token` 쿠키로 찾는다.
+- 폐기 범위는 쿠키의 Refresh Token이 속한 로그인 세션 하나다. 같은 사용자의 다른 세션은 유지된다.
+- 이미 재발급으로 교체된 Refresh Token으로 로그아웃해도 그 토큰이 속한 세션의 현재 Refresh Token을 폐기한다. 재발급과 로그아웃이 경합하거나, 탈취된 토큰으로 먼저 재발급된 경우에도 로그아웃으로 세션을 끊을 수 있다.
+- Access Token은 서버에 저장하지 않는 JWT라서 로그아웃으로 무효화하지 않는다. `access_token` 쿠키를 만료시켜 브라우저가 더 이상 보내지 않게 하지만, 로그아웃 전에 복사된 값은 만료 시각(발급 후 `<access-ttl>`, 서버 설정, 기본 15분)까지 유효할 수 있다. 로그아웃 후 인증 유지는 Refresh Token 세션 폐기로 막는다.
+- 결과는 멱등하다. `refresh_token` 쿠키가 없거나 빈 값이거나, 이미 로그아웃·교체·만료됐거나 발급한 적 없는 값이어도 같은 `204`와 두 만료 쿠키를 응답한다.
+- 다른 상태 변경 요청과 같이 CSRF 토큰이 필요하다. CSRF 검증에 실패하면 `403 ACCESS_DENIED`이며 Refresh Token과 인증 쿠키는 그대로 유지된다. 로그아웃은 `XSRF-TOKEN`을 교체하거나 삭제하지 않는다.
+
+Redis 장애 등으로 Refresh Token 폐기를 확인하지 못하면 `INTERNAL_SERVER_ERROR`(500)로 응답하고 인증 쿠키를 만료시키지 않는다. 서버에 토큰이 남아 있을 수 있으므로 쿠키를 유지해 클라이언트가 같은 요청으로 재시도할 수 있게 한다. 폐기는 멱등이므로 재시도해도 안전하다.
 
 ```http
 Set-Cookie: access_token=; HttpOnly; Secure; SameSite=Lax; Path=/api; Max-Age=0
