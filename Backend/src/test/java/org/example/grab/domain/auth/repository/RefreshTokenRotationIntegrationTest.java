@@ -122,9 +122,10 @@ class RefreshTokenRotationIntegrationTest {
 
         long newTokenTtl = redisTemplate.getExpire(RefreshTokenHasher.toKey(newToken), TimeUnit.SECONDS);
         assertThat(newTokenTtl).isBetween(IDLE_TTL.toSeconds() - 2, IDLE_TTL.toSeconds());
+        // 남은 TTL은 초 미만을 버린 값이라, 새 토큰 키를 읽은 뒤 초 경계가 지나면 뒤에 읽은 값이 1 작다
         assertThat(redisTemplate.getExpire(RefreshTokenHasher.toSessionKey(session.sessionId()), TimeUnit.SECONDS))
-                .isEqualTo(newTokenTtl);
-        assertThat(redisTemplate.getExpire(usedKey, TimeUnit.SECONDS)).isEqualTo(newTokenTtl);
+                .isBetween(newTokenTtl - 1, newTokenTtl);
+        assertThat(redisTemplate.getExpire(usedKey, TimeUnit.SECONDS)).isBetween(newTokenTtl - 1, newTokenTtl);
     }
 
     @Test
