@@ -51,3 +51,43 @@ export type CardDrop = {
   soldOut?: boolean
   skus?: Sku[]
 }
+
+export type DetailImage = { imageUrl: string; altText: string }
+
+export type DropActions = {
+  wishable: boolean
+  wishCancelable: boolean
+  orderable: boolean
+}
+
+// 공개 상세가 쓰는 화면 모델. 재고는 옵션별 재조회 값으로 덮어쓸 수 있어 optional이다.
+export type DetailSku = {
+  id: number
+  selections: Record<string, string>
+  price: number
+  stock?: number
+}
+
+export type DropDetail = {
+  id: number
+  name: string
+  brand?: string
+  description: string
+  image: string
+  category: string
+  status: DropStatus
+  wishCount: number
+  wishNotice: string
+  saleStartsAt: string
+  saleEndsAt: string
+  shippingFee: number
+  shippingNotice: string
+  optionGroups: OptionGroup[]
+  skus: DetailSku[]
+  galleryImages: DetailImage[]
+  detailImages: DetailImage[]
+  actions: DropActions
+  serverTime: string
+  minPrice: number | null
+  soldOut: boolean
+}
