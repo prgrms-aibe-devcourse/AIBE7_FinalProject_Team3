@@ -48,6 +48,43 @@ class AuthCookiesTest {
         assertThat(cookie.getMaxAge()).isEqualTo(Duration.ofDays(14));
     }
 
+    // GR-36 M02-01: 브라우저는 이름·Path가 같아야 같은 쿠키로 보므로 발급과 같은 속성으로 지운다(MEMBER_AUTH 1.8)
+    @Test
+    @DisplayName("access_token 만료 쿠키는 빈 값·Max-Age=0이고 발급과 같은 Path=/api·보안 속성이다")
+    void expiresAccessTokenCookie() {
+        // when
+        ResponseCookie cookie = AuthCookies.expireAccessToken();
+
+        // then
+        assertThat(cookie.getName()).isEqualTo("access_token");
+        assertThat(cookie.getValue()).isEmpty();
+        assertThat(cookie.getMaxAge()).isEqualTo(Duration.ZERO);
+        assertThat(cookie.getPath()).isEqualTo("/api");
+        assertThat(cookie.isHttpOnly()).isTrue();
+        assertThat(cookie.isSecure()).isTrue();
+        assertThat(cookie.getSameSite()).isEqualTo("Lax");
+        assertThat(cookie.getDomain()).isNull();
+        assertThat(cookie.toString()).contains("Max-Age=0;");
+    }
+
+    @Test
+    @DisplayName("refresh_token 만료 쿠키는 빈 값·Max-Age=0이고 발급과 같은 Path=/api/v1/auth·보안 속성이다")
+    void expiresRefreshTokenCookie() {
+        // when
+        ResponseCookie cookie = AuthCookies.expireRefreshToken();
+
+        // then
+        assertThat(cookie.getName()).isEqualTo("refresh_token");
+        assertThat(cookie.getValue()).isEmpty();
+        assertThat(cookie.getMaxAge()).isEqualTo(Duration.ZERO);
+        assertThat(cookie.getPath()).isEqualTo("/api/v1/auth");
+        assertThat(cookie.isHttpOnly()).isTrue();
+        assertThat(cookie.isSecure()).isTrue();
+        assertThat(cookie.getSameSite()).isEqualTo("Lax");
+        assertThat(cookie.getDomain()).isNull();
+        assertThat(cookie.toString()).contains("Max-Age=0;");
+    }
+
     @ParameterizedTest
     @NullAndEmptySource
     @ValueSource(strings = {"  "})
