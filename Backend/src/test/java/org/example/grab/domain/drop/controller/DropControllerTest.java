@@ -185,7 +185,7 @@ class DropControllerTest {
     void getDrop() throws Exception {
         // given
         PublicDropDetailResponse response = new PublicDropDetailResponse(
-                100L, "상품", "설명", List.of("https://img/1.jpg"),
+                100L, "상품", "그랩 스튜디오", "설명", List.of("https://img/1.jpg"),
                 List.of(new PublicDropDetailResponse.Image("https://img/1.jpg", "정면")),
                 List.of(new PublicDropDetailResponse.Image("https://img/detail.jpg", "소재")),
                 129000L,
@@ -208,6 +208,7 @@ class DropControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.dropId").value(100))
                 .andExpect(jsonPath("$.data.name").value("상품"))
+                .andExpect(jsonPath("$.data.brandName").value("그랩 스튜디오"))
                 .andExpect(jsonPath("$.data.description").value("설명"))
                 .andExpect(jsonPath("$.data.imageUrls[0]").value("https://img/1.jpg"))
                 .andExpect(jsonPath("$.data.galleryImages[0].imageUrl").value("https://img/1.jpg"))

@@ -18,6 +18,7 @@ import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.domain.wish.WishNotice;
 import org.example.grab.domain.wish.service.WishQueryService;
+import org.example.grab.domain.seller.service.SellerProfileService;
 import org.example.grab.global.config.JpaConfig;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.storage.supabase.SupabaseStorageConfig;
@@ -51,7 +52,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
 @Import({JpaConfig.class, DropService.class, CategoryService.class, WishQueryService.class,
-        SupabaseStorageConfig.class})
+        SellerProfileService.class, SupabaseStorageConfig.class})
 @TestPropertySource(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
 @Testcontainers
 class PublicDropDetailIntegrationTest {
@@ -292,7 +293,7 @@ class PublicDropDetailIntegrationTest {
         // when
         dropService.findPublicDrop(dropId);
 
-        // then: DROP·카테고리·WISH 수 + 자식 컬렉션 배치(이미지·그룹·값·옵션·valueMap)로 8회.
+        // then: DROP·카테고리·WISH 수·판매자 브랜드 + 자식 컬렉션 배치(이미지·그룹·값·옵션·valueMap)로 9회.
         // 배치가 풀리면 자식 수에 비례해 늘어나므로 10으로 상한을 둔다.
         assertThat(statistics.getPrepareStatementCount()).isLessThanOrEqualTo(10);
     }

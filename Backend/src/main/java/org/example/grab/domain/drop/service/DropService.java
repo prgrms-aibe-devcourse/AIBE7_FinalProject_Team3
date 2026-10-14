@@ -24,6 +24,7 @@ import org.example.grab.domain.drop.repository.DropImageRepository;
 import org.example.grab.domain.drop.repository.DropRepository;
 import org.example.grab.domain.category.service.CategoryService;
 import org.example.grab.domain.drop.event.DropCanceledEvent;
+import org.example.grab.domain.seller.service.SellerProfileService;
 import org.example.grab.domain.wish.service.WishQueryService;
 import org.example.grab.global.common.ErrorResponse;
 import org.example.grab.global.common.PageResponse;
@@ -67,6 +68,7 @@ public class DropService {
     private final DropImageRepository dropImageRepository;
     private final CategoryService categoryService;
     private final WishQueryService wishQueryService;
+    private final SellerProfileService sellerProfileService;
     private final ImageStorage imageStorage;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -179,6 +181,7 @@ public class DropService {
     /**
      * 공개 DROP 상세. 비로그인 조회이며 DRAFT는 존재를 숨겨 DROP_NOT_FOUND로 응답한다.
      * CANCELED는 0절 확정대로 200으로 보여 주고 actions가 모두 false가 된다.
+     * 브랜드는 판매자 도메인의 조회 service로 가져온다(다른 도메인 repository/entity 직접 참조 금지).
      * now는 actions 판정과 응답 serverTime에 같은 값을 쓴다.
      */
     public PublicDropDetailResponse findPublicDrop(Long dropId) {
@@ -188,7 +191,9 @@ public class DropService {
             throw new BusinessException(DropErrorCode.DROP_NOT_FOUND);
         }
         long wishCount = wishQueryService.countActiveByDropId(dropId);
-        return PublicDropDetailResponse.of(drop, toCategory(drop.getCategoryId()), wishCount, now);
+        String brandName = sellerProfileService.findBrandName(drop.getSellerId())
+                .orElseThrow(() -> new BusinessException(DropErrorCode.DROP_NOT_FOUND));
+        return PublicDropDetailResponse.of(drop, brandName, toCategory(drop.getCategoryId()), wishCount, now);
     }
 
     /**

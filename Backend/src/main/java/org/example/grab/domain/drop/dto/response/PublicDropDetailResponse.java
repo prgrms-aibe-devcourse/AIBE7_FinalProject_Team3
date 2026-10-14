@@ -1,5 +1,6 @@
 package org.example.grab.domain.drop.dto.response;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.example.grab.domain.drop.dto.response.common.DropCategoryResponse;
 import org.example.grab.domain.drop.dto.response.common.DropOptionGroupResponse;
 import org.example.grab.domain.drop.dto.response.common.DropOptionSelectionResponse;
@@ -16,11 +17,12 @@ import java.util.List;
 public record PublicDropDetailResponse(
         Long dropId,
         String name,
+        String brandName,
         String description,
         List<String> imageUrls,
         List<Image> galleryImages,
         List<Image> detailImages,
-        Long minPrice,
+        @Schema(nullable = true) Long minPrice,
         DropCategoryResponse category,
         DropStatus status,
         boolean soldOut,
@@ -53,7 +55,7 @@ public record PublicDropDetailResponse(
 
     // open-in-view=false이므로 컬렉션 접근과 DTO 변환은 서비스 트랜잭션 안에서 끝나야 한다.
     // now는 actions 판정과 serverTime에 같은 값을 쓴다.
-    public static PublicDropDetailResponse of(Drop drop, DropCategoryResponse category,
+    public static PublicDropDetailResponse of(Drop drop, String brandName, DropCategoryResponse category,
                                               long wishCount, OffsetDateTime now) {
         List<DropOption> activeOptions = drop.getOptions().stream()
                 .filter(DropOption::isActive)
@@ -62,6 +64,7 @@ public record PublicDropDetailResponse(
         return new PublicDropDetailResponse(
                 drop.getId(),
                 drop.getName(),
+                brandName,
                 drop.getDescription(),
                 // imageUrls는 구버전 소비자 화면 호환용으로 GALLERY URL만 같은 순서로 둔다(명세 1.3).
                 galleryImages.stream().map(DropImage::getImageUrl).toList(),
