@@ -43,6 +43,12 @@ spring:
     hibernate:
       ddl-auto: validate
 
+  # 판매자 신청 서류 업로드(GR-91). 버킷의 허용 크기 제한과 서버 검증값을 같게 유지한다
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
 grab:
   # 메일 본문 등 서버가 만드는 링크가 가리키는 프런트엔드 주소. 기본값은 로컬 Vite 개발 서버다
   web:
@@ -73,8 +79,13 @@ grab:
       url: ${SUPABASE_URL:}
       secret-key: ${SUPABASE_SECRET_KEY:}
       bucket: ${SUPABASE_DROP_IMAGE_BUCKET:drop-images}
+      documents-bucket: ${SUPABASE_SELLER_DOCUMENT_BUCKET:seller-documents}
       connect-timeout: 3s
       read-timeout: 5s
+  # 판매자 서류 봉투 암호화 마스터키(GR-91). Base64 AES-256 키, 기본값 없음(KMS 연동 없음)
+  seller:
+    document-encryption:
+      master-key: ${SELLER_DOCUMENT_ENCRYPTION_MASTER_KEY}
   auth:
     access-token:
       ttl: 15m
@@ -128,6 +139,8 @@ springdoc:
         - org.example.grab.domain.shipment
     - group: payment
       packages-to-scan: org.example.grab.domain.payment
+    - group: seller
+      packages-to-scan: org.example.grab.domain.seller
     - group: user
       packages-to-scan:
         - org.example.grab.domain.user

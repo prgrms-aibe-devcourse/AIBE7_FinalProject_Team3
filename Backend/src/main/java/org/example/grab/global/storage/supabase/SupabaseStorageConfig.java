@@ -24,4 +24,17 @@ public class SupabaseStorageConfig {
                 .requestFactory(requestFactory);
         return new SupabaseStorageClient(builder, properties);
     }
+
+    // 판매자 신청 서류(GR-91). 같은 프로젝트 URL·Secret Key를 쓰되 비공개 버킷(documentsBucket)에 올린다.
+    @Bean
+    public SupabaseDocumentStorageClient supabaseDocumentStorageClient(SupabaseStorageProperties properties) {
+        HttpClient httpClient = HttpClient.newBuilder()
+                .connectTimeout(properties.connectTimeout())
+                .build();
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
+        requestFactory.setReadTimeout(properties.readTimeout());
+        RestClient.Builder builder = RestClient.builder()
+                .requestFactory(requestFactory);
+        return new SupabaseDocumentStorageClient(builder, properties);
+    }
 }
