@@ -30,7 +30,6 @@ function HomeSection({
           <h2>{section.title}</h2>
         </div>
         <div className="home-section-actions">
-          <span className="home-note">예시 데이터</span>
           <Link className="text-link" to={section.to}>
             전체 보기 ↗
           </Link>

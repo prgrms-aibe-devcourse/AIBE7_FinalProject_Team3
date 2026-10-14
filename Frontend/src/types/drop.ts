@@ -34,3 +34,20 @@ export type Drop = {
   optionGroups: OptionGroup[]
   skus: Sku[]
 }
+
+// 공개 목록·카드가 쓰는 화면 모델. Mock Drop은 skus로 가격·재고를 계산하고,
+// API 응답은 minPrice·soldOut으로 표시한다. brandName·availableStock은 GR-96 후 연결한다.
+export type CardDrop = {
+  id: number
+  name: string
+  image: string | null
+  status: DropStatus
+  wishCount: number
+  saleStartsAt: string
+  saleEndsAt: string
+  brand?: string
+  minPrice?: number | null
+  availableStock?: number
+  soldOut?: boolean
+  skus?: Sku[]
+}

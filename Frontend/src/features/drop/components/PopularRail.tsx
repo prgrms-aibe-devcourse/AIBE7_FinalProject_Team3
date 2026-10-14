@@ -6,11 +6,11 @@ import {
   type KeyboardEvent,
   type TouchEvent,
 } from 'react'
-import type { Drop } from '../../../types/drop'
+import type { CardDrop } from '../../../types/drop'
 import DropCard from './DropCard'
 
 type Props = {
-  drops: Drop[]
+  drops: CardDrop[]
   mode: 'WISH' | 'GRAB'
   wishes: Set<number>
   onWish: (id: number) => void
