@@ -33,7 +33,7 @@
 | GET | `/api/v1/auth/oauth2/{provider}/callback` | 불필요 | 소셜 로그인 콜백 처리 (제공자 호출) |
 | POST | `/api/v1/auth/oauth2/signup` | 소셜 가입 토큰 | 최초 소셜 인증 회원의 가입 완료 |
 | POST | `/api/v1/auth/refresh` | Refresh Token | Access/Refresh Token 재발급 (Refresh Token Rotation) |
-| POST | `/api/v1/auth/logout` | 필요 | 로그아웃 및 Refresh Token 무효화 |
+| POST | `/api/v1/auth/logout` | Refresh Token(선택) | 로그아웃, Refresh Token 무효화 및 인증 쿠키 만료 |
 | GET | `/api/v1/users/me` | USER | 로그인한 사용자의 회원 정보 조회 |
 | PATCH | `/api/v1/users/me` | USER | 본인 닉네임 수정 |
 | PATCH | `/api/v1/users/me/password` | USER | 본인 비밀번호 변경 |
