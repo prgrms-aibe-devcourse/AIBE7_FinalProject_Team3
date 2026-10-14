@@ -1,4 +1,5 @@
 import { expect, login, test, toast } from './fixtures'
+import { installCatalogScenario } from './mock/catalog'
 
 const card = (page: import('@playwright/test').Page, name: string) =>
   page.getByRole('article').filter({ hasText: name })
@@ -19,7 +20,8 @@ test.describe('상품 탐색', () => {
 
   test('전체 품절과 수량 초과는 데모 주문을 막는다', async ({ page }) => {
     await page.goto('/#/drops/204')
-    await expect(page.getByRole('button', { name: '전체 품절' })).toBeDisabled()
+    await expect(page.getByText('이 DROP은 품절됐어요.')).toBeVisible()
+    await expect(page.locator('.buy-form')).toHaveCount(0)
 
     await page.goto('/#/drops/201')
     await page.getByLabel('착용감').selectOption({ label: '릴랙스' })
@@ -28,6 +30,17 @@ test.describe('상품 탐색', () => {
     await expect(
       page.getByRole('button', { name: '수량을 확인해주세요' }),
     ).toBeDisabled()
+  })
+
+  test('구매 행동은 status가 아니라 actions로 정한다', async ({ page }) => {
+    await installCatalogScenario(page, 'transition')
+    // 저장 상태는 WISH지만 판매가 시작된 DROP은 구매 폼을 보여준다.
+    await page.goto('/#/drops/104')
+    await expect(page.locator('.buy-form')).toBeVisible()
+    // 저장 상태는 GRAB지만 판매 기간이 끝난 DROP은 구매 폼 대신 종료 안내를 보여준다.
+    await page.goto('/#/drops/302')
+    await expect(page.getByText('이 DROP은 판매가 종료됐어요.')).toBeVisible()
+    await expect(page.locator('.buy-form')).toHaveCount(0)
   })
 
   test('DETAIL 이미지는 설명 아래 순서대로 보이고 빈 경우와 실패를 처리한다', async ({
@@ -108,6 +121,23 @@ test.describe('상품 탐색', () => {
     await expect(
       page.getByRole('button', { name: '♡ WISH 등록하기' }),
     ).toBeVisible()
+  })
+
+  test('카드는 브랜드명과 남은 수량을 보여준다', async ({ page }) => {
+    await page.goto('/#/grab')
+    const grabCard = page
+      .getByRole('region', { name: 'GRAB 상품 목록' })
+      .getByRole('article')
+      .first()
+    await expect(grabCard.locator('.creator')).not.toBeEmpty()
+    await expect(grabCard).toContainText('남은 수량')
+
+    await page.goto('/#/wish')
+    const wishCard = page
+      .getByRole('region', { name: 'WISH 상품 목록' })
+      .getByRole('article')
+      .first()
+    await expect(wishCard.locator('.creator')).not.toBeEmpty()
   })
 
   test('GRAB 목록에서 상세로 이동한다', async ({ page }) => {

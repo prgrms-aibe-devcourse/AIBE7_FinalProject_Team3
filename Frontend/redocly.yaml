@@ -19,6 +19,10 @@ apis:
     root: ./openapi/payment.json
     x-openapi-ts:
       output: ./src/api/schema/payment.ts
+  seller:
+    root: ./openapi/seller.json
+    x-openapi-ts:
+      output: ./src/api/schema/seller.ts
   user:
     root: ./openapi/user.json
     x-openapi-ts:

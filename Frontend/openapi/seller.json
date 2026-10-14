@@ -1,0 +1,357 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "OpenAPI definition",
+    "version": "v0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Generated server url"
+    }
+  ],
+  "tags": [
+    {
+      "name": "판매자 서류",
+      "description": "판매자 신청 서류 업로드(암호화 저장)"
+    },
+    {
+      "name": "판매자 신청",
+      "description": "일반 회원의 판매자 등록 신청·재신청·내 신청 조회"
+    }
+  ],
+  "paths": {
+    "/api/v1/seller-documents": {
+      "post": {
+        "tags": ["판매자 서류"],
+        "summary": "판매자 신청 서류 업로드",
+        "description": "서류 1건을 암호화해 비공개 버킷에 저장하고 documentId를 발급한다. 공개 imageUrl은 내려주지 않는다",
+        "operationId": "upload",
+        "parameters": [
+          {
+            "name": "documentType",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "BUSINESS_LICENSE",
+                "ID_CARD",
+                "BANKBOOK",
+                "MAIL_ORDER_BUSINESS_REPORT"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": ["file"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "업로드 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSellerDocumentUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSellerDocumentUploadResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED, INVALID_TOKEN",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSellerDocumentUploadResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/seller-applications": {
+      "post": {
+        "tags": ["판매자 신청"],
+        "summary": "판매자 등록 신청",
+        "description": "PENDING·APPROVED 상태면 409, REJECTED면 같은 건을 재신청으로 갱신한다. 사업자등록번호는 국세청 상태조회로 1차 검증한다",
+        "operationId": "apply",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SellerApplicationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "신청 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSellerApplicationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSellerApplicationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED, INVALID_TOKEN",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSellerApplicationResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "SELLER_APPLICATION_ALREADY_EXISTS, DUPLICATE_BUSINESS_REGISTRATION_NUMBER",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSellerApplicationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "BUSINESS_NOT_ACTIVE",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSellerApplicationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/seller-applications/me": {
+      "get": {
+        "tags": ["판매자 신청"],
+        "summary": "내 판매자 신청 조회",
+        "description": "본인 신청 1건을 조회한다. 없으면 404",
+        "operationId": "findMyApplication",
+        "responses": {
+          "200": {
+            "description": "조회 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMySellerApplicationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED, INVALID_TOKEN",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMySellerApplicationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "SELLER_APPLICATION_NOT_FOUND",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMySellerApplicationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiResponseSellerDocumentUploadResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SellerDocumentUploadResponse"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "SellerDocumentUploadResponse": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "documentType": {
+            "type": "string",
+            "enum": [
+              "BUSINESS_LICENSE",
+              "ID_CARD",
+              "BANKBOOK",
+              "MAIL_ORDER_BUSINESS_REPORT"
+            ]
+          }
+        }
+      },
+      "SellerApplicationRequest": {
+        "type": "object",
+        "properties": {
+          "brandName": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 0
+          },
+          "contactEmail": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254,
+            "minLength": 0
+          },
+          "businessRegistrationNumber": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "documentIds": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "minProperties": 1
+          }
+        },
+        "required": [
+          "brandName",
+          "businessRegistrationNumber",
+          "contactEmail",
+          "documentIds"
+        ]
+      },
+      "ApiResponseSellerApplicationResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SellerApplicationResponse"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "SellerApplicationResponse": {
+        "type": "object",
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "brandName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["PENDING", "APPROVED", "REJECTED"]
+          },
+          "appliedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseMySellerApplicationResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/MySellerApplicationResponse"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "MySellerApplicationResponse": {
+        "type": "object",
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "brandName": {
+            "type": "string"
+          },
+          "contactEmail": {
+            "type": "string"
+          },
+          "businessRegistrationNumber": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["PENDING", "APPROVED", "REJECTED"]
+          },
+          "appliedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    }
+  }
+}

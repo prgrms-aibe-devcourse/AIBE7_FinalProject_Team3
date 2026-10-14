@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import type { Drop } from '../../../types/drop'
+import type { CardDrop } from '../../../types/drop'
 import { daysUntil, dateLabel } from '../../../utils/date'
 import { won } from '../../../utils/price'
 
 type Props = {
-  drop: Drop
+  drop: CardDrop
   wished: boolean
   onWish: (id: number) => void
   mode?: 'WISH' | 'GRAB'
@@ -28,11 +28,19 @@ export default function DropCard({
     )
     return () => window.clearTimeout(timeout)
   }, [drop.saleStartsAt, now])
-  const activeSkus = drop.skus.filter((sku) => sku.active !== false)
-  const available = activeSkus.reduce((sum, sku) => sum + sku.stock, 0)
-  const price = activeSkus.length
-    ? Math.min(...activeSkus.map((sku) => sku.price))
-    : null
+  const activeSkus = (drop.skus ?? []).filter((sku) => sku.active !== false)
+  const available =
+    drop.availableStock ??
+    (drop.skus
+      ? activeSkus.reduce((sum, sku) => sum + sku.stock, 0)
+      : undefined)
+  const price =
+    drop.minPrice !== undefined
+      ? drop.minPrice
+      : activeSkus.length
+        ? Math.min(...activeSkus.map((sku) => sku.price))
+        : null
+  const soldOut = drop.soldOut ?? available === 0
   const wishMode = mode === 'WISH'
   const wishable = wishMode && now < new Date(drop.saleStartsAt).getTime()
 
@@ -59,15 +67,15 @@ export default function DropCard({
             ? wishable
               ? `OPEN D−${daysUntil(drop.saleStartsAt)}`
               : '판매 시작'
-            : available
-              ? 'LIMITED DROP'
-              : 'SOLD OUT'}
+            : soldOut
+              ? 'SOLD OUT'
+              : 'LIMITED DROP'}
         </span>
         <span className="round-arrow" aria-hidden="true">
           ↗
         </span>
       </Link>
-      <p className="creator">{drop.brand}</p>
+      {drop.brand && <p className="creator">{drop.brand}</p>}
       <h2>
         <Link to={`/drops/${drop.id}`}>{drop.name}</Link>
       </h2>
@@ -91,7 +99,7 @@ export default function DropCard({
             <>
               <b>{drop.wishCount + (wished ? 1 : 0)}</b> WISH
             </>
-          ) : (
+          ) : available === undefined ? null : (
             <>
               남은 수량 <b>{available}개</b>
             </>
@@ -112,7 +120,7 @@ export default function DropCard({
             className="secondary-button wish-button"
             to={`/drops/${drop.id}`}
           >
-            {available ? 'GRAB ↗' : '품절 · 상세 보기 ↗'}
+            {soldOut ? '품절 · 상세 보기 ↗' : 'GRAB ↗'}
           </Link>
         )}
       </div>

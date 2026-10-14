@@ -1,0 +1,75 @@
+import { afterEach, expect, test, vi } from 'vitest'
+import { api } from '../../client'
+import { getDropDetail, getDrops, getDropStocks } from '../drops'
+
+afterEach(() => vi.restoreAllMocks())
+
+test('목록 쿼리를 전달하고 페이지 데이터를 반환하며 잘못된 응답은 거부한다', async () => {
+  const get = vi.spyOn(api, 'get')
+  const page = {
+    content: [
+      { dropId: 100, name: '한정판 스니커즈', minPrice: null, status: 'WISH' },
+    ],
+    page: 0,
+    size: 24,
+    totalElements: 1,
+    totalPages: 1,
+    hasNext: false,
+  }
+  get.mockResolvedValueOnce({ data: { success: true, data: page } })
+  await expect(
+    getDrops({ status: 'WISH', categoryId: 1, page: 0, size: 24 }),
+  ).resolves.toEqual(page)
+  expect(get).toHaveBeenCalledWith('/drops', {
+    params: { status: 'WISH', categoryId: 1, page: 0, size: 24 },
+  })
+
+  get.mockResolvedValueOnce({
+    data: { success: true, data: { content: null } },
+  })
+  await expect(getDrops()).rejects.toThrow(
+    'DROP 목록 응답 형식이 올바르지 않습니다.',
+  )
+
+  get.mockResolvedValueOnce({ data: { success: false, data: null } })
+  await expect(getDrops()).rejects.toThrow(
+    'DROP 목록 응답 형식이 올바르지 않습니다.',
+  )
+})
+
+test('상세 응답을 반환하고 필수 데이터가 없으면 거부한다', async () => {
+  const get = vi.spyOn(api, 'get')
+  const detail = {
+    dropId: 100,
+    name: '한정판 스니커즈',
+    status: 'GRAB',
+    actions: { wishable: false, wishCancelable: false, orderable: true },
+  }
+  get.mockResolvedValueOnce({ data: { success: true, data: detail } })
+  await expect(getDropDetail(100)).resolves.toEqual(detail)
+  expect(get).toHaveBeenCalledWith('/drops/100')
+
+  get.mockResolvedValueOnce({ data: { success: false, data: null } })
+  await expect(getDropDetail(100)).rejects.toThrow(
+    'DROP 상세 응답 형식이 올바르지 않습니다.',
+  )
+})
+
+test('옵션별 재고를 반환하고 options가 배열이 아니면 거부한다', async () => {
+  const get = vi.spyOn(api, 'get')
+  const stocks = {
+    dropId: 100,
+    options: [{ optionId: 1001 }],
+    serverTime: '2026-09-20T10:01:00+09:00',
+  }
+  get.mockResolvedValueOnce({ data: { success: true, data: stocks } })
+  await expect(getDropStocks(100)).resolves.toEqual(stocks)
+  expect(get).toHaveBeenCalledWith('/drops/100/stocks')
+
+  get.mockResolvedValueOnce({
+    data: { success: true, data: { dropId: 100, options: null } },
+  })
+  await expect(getDropStocks(100)).rejects.toThrow(
+    'DROP 재고 응답 형식이 올바르지 않습니다.',
+  )
+})

@@ -1,9 +1,15 @@
 import { useState } from 'react'
-import type { Drop } from '../../../types/drop'
-import { galleryImages } from '../mock/mockDetailImages'
+import type { DetailImage, DropStatus } from '../../../types/drop'
 
-export default function DropGallery({ drop }: { drop: Drop }) {
-  const images = galleryImages(drop)
+export default function DropGallery({
+  name,
+  status,
+  images,
+}: {
+  name: string
+  status: DropStatus
+  images: DetailImage[]
+}) {
   const [selected, setSelected] = useState(0)
   const [failedImage, setFailedImage] = useState<string | null>(null)
   const image = images[selected]
@@ -12,22 +18,22 @@ export default function DropGallery({ drop }: { drop: Drop }) {
     <div
       className="detail-gallery"
       role="group"
-      aria-label={`${drop.name} 상품 갤러리`}
+      aria-label={`${name} 상품 갤러리`}
     >
       <div className="detail-media">
-        {image.imageUrl && failedImage !== image.imageUrl ? (
+        {image?.imageUrl && failedImage !== image.imageUrl ? (
           <img
             src={image.imageUrl}
             alt={image.altText}
             onError={() => setFailedImage(image.imageUrl)}
           />
         ) : (
-          <span role="img" aria-label={`${image.altText} 이미지 없음`}>
+          <span role="img" aria-label={`${image?.altText ?? name} 이미지 없음`}>
             상품 이미지 준비 중
           </span>
         )}
-        <span className={`badge ${drop.status === 'WISH' ? 'lime' : ''}`}>
-          {drop.status}
+        <span className={`badge ${status === 'WISH' ? 'lime' : ''}`}>
+          {status}
         </span>
       </div>
       {images.length > 1 && (

@@ -1417,7 +1417,7 @@
           }
         }
       },
-      "Option": {
+      "SellerDropDetailOption": {
         "type": "object",
         "properties": {
           "optionId": {
@@ -1512,7 +1512,7 @@
           "options": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Option"
+              "$ref": "#/components/schemas/SellerDropDetailOption"
             }
           }
         }
@@ -1574,6 +1574,34 @@
           }
         }
       },
+      "SellerDropStockOption": {
+        "type": "object",
+        "properties": {
+          "optionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "optionName": {
+            "type": "string"
+          },
+          "totalStock": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "availableStock": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reservedStock": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "soldStock": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "SellerDropStockResponse": {
         "type": "object",
         "properties": {
@@ -1584,7 +1612,7 @@
           "options": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Option"
+              "$ref": "#/components/schemas/SellerDropStockOption"
             }
           }
         }
@@ -1655,11 +1683,14 @@
           "name": {
             "type": "string"
           },
-          "thumbnailUrl": {
+          "brandName": {
             "type": "string"
           },
+          "thumbnailUrl": {
+            "type": ["string", "null"]
+          },
           "minPrice": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "format": "int64"
           },
           "category": {
@@ -1667,10 +1698,14 @@
           },
           "status": {
             "type": "string",
-            "enum": ["DRAFT", "WISH", "GRAB", "ENDED", "CANCELED"]
+            "enum": ["WISH", "GRAB", "ENDED"]
           },
           "soldOut": {
             "type": "boolean"
+          },
+          "availableStock": {
+            "type": "integer",
+            "format": "int64"
           },
           "wishCount": {
             "type": "integer",
@@ -1714,6 +1749,32 @@
           }
         }
       },
+      "PublicDropDetailOption": {
+        "type": "object",
+        "properties": {
+          "optionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "selections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DropOptionSelectionResponse"
+            }
+          },
+          "unitPrice": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "availableStock": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "soldOut": {
+            "type": "boolean"
+          }
+        }
+      },
       "PublicDropDetailResponse": {
         "type": "object",
         "properties": {
@@ -1722,6 +1783,9 @@
             "format": "int64"
           },
           "name": {
+            "type": "string"
+          },
+          "brandName": {
             "type": "string"
           },
           "description": {
@@ -1746,7 +1810,7 @@
             }
           },
           "minPrice": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "format": "int64"
           },
           "category": {
@@ -1786,7 +1850,7 @@
           "options": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Option"
+              "$ref": "#/components/schemas/PublicDropDetailOption"
             }
           },
           "actions": {
@@ -1812,6 +1876,22 @@
           }
         }
       },
+      "PublicDropStockOption": {
+        "type": "object",
+        "properties": {
+          "optionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "availableStock": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "soldOut": {
+            "type": "boolean"
+          }
+        }
+      },
       "PublicDropStockResponse": {
         "type": "object",
         "properties": {
@@ -1822,7 +1902,7 @@
           "options": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Option"
+              "$ref": "#/components/schemas/PublicDropStockOption"
             }
           },
           "serverTime": {

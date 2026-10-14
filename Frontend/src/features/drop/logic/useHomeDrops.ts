@@ -1,43 +1,43 @@
-import { useCallback, useEffect, useState } from 'react'
-import type { Drop } from '../../../types/drop'
-import { fetchHomeDrops, type HomeSectionKey } from '../mock/mockHome'
+import { useQuery } from '@tanstack/react-query'
+import { getDrops } from '../../../api/drop/drops'
+import type { CardDrop } from '../../../types/drop'
+import type { HomeSectionKey } from './homeSections'
+import { HOME_PAGE_SIZE } from './catalogQuery'
+import { toCardDrops } from './dropView'
+import { dropKeys } from './queryKeys'
 
 export type HomeDropsState =
   | { status: 'loading' }
   | { status: 'error' }
-  | { status: 'ready'; drops: Drop[] }
+  | { status: 'ready'; drops: CardDrop[] }
 
-// 영역별로 독립적인 로딩·실패·재시도 상태를 관리한다.
+const POPULAR_SORT: Record<
+  HomeSectionKey,
+  'wishCount,desc' | 'soldQuantity,desc'
+> = {
+  WISH: 'wishCount,desc',
+  GRAB: 'soldQuantity,desc',
+}
+
+// 영역별로 독립적인 조회 키를 쓰고, 로딩·실패·재시도 상태를 각각 관리한다.
 export default function useHomeDrops(section: HomeSectionKey) {
-  const [attempt, setAttempt] = useState(0)
-  const [result, setResult] = useState<{
-    attempt: number
-    drops?: Drop[]
-    failed?: boolean
-  }>({ attempt: -1 })
+  const query = useQuery({
+    queryKey: dropKeys.home(section),
+    queryFn: () =>
+      getDrops({
+        status: section,
+        sort: POPULAR_SORT[section],
+        page: 0,
+        size: HOME_PAGE_SIZE,
+      }),
+    select: (page) => toCardDrops(page.content ?? []),
+  })
 
-  useEffect(() => {
-    let active = true
-    fetchHomeDrops(section)
-      .then((drops) => {
-        if (active) setResult({ attempt, drops })
-      })
-      .catch(() => {
-        if (active) setResult({ attempt, failed: true })
-      })
-    return () => {
-      active = false
-    }
-  }, [section, attempt])
+  const state: HomeDropsState = query.isPending
+    ? { status: 'loading' }
+    : query.isError
+      ? { status: 'error' }
+      : { status: 'ready', drops: query.data ?? [] }
 
-  const state: HomeDropsState =
-    result.attempt === attempt
-      ? result.failed
-        ? { status: 'error' }
-        : { status: 'ready', drops: result.drops ?? [] }
-      : { status: 'loading' }
-
-  const retry = useCallback(() => setAttempt((value) => value + 1), [])
-
-  return { state, retry }
+  return { state, retry: () => void query.refetch() }
 }

@@ -1,6 +1,8 @@
-import type { OptionGroup, Sku } from '../../../types/drop'
+import type { OptionGroup } from '../../../types/drop'
 
-export function findMatchingSku(skus: Sku[], selected: Record<string, string>) {
+export function findMatchingSku<
+  T extends { selections: Record<string, string> },
+>(skus: readonly T[], selected: Record<string, string>): T | undefined {
   return skus.find((sku) =>
     Object.entries(sku.selections).every(
       ([groupId, valueId]) => selected[groupId] === valueId,

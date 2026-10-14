@@ -1,14 +1,21 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import axios from 'axios'
+import EmptyState from '../../components/EmptyState/EmptyState'
 import DropDetailImages from '../../features/drop/components/DropDetailImages'
 import DropGallery from '../../features/drop/components/DropGallery'
-import { findMockDetailDrop } from '../../features/drop/mock/mockDetailDrops'
-import { detailImages } from '../../features/drop/mock/mockDetailImages'
+import {
+  toDropDetail,
+  toOrderDrop,
+} from '../../features/drop/logic/dropDetailView'
 import {
   findMatchingSku,
   selectionLabel,
 } from '../../features/drop/logic/option'
-import { minPrice, stock } from '../../features/drop/logic/selectors'
+import {
+  useDropDetail,
+  useDropStocks,
+} from '../../features/drop/logic/useDrops'
 import type { SharedProps } from '../../types/store'
 import { dateLabel, daysUntil } from '../../utils/date'
 import { won } from '../../utils/price'
@@ -28,25 +35,97 @@ export default function DropDetailPage({
   const { dropId } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const drop = findMockDetailDrop(Number(dropId))
+  const validId =
+    /^\d+$/.test(dropId ?? '') &&
+    Number.isSafeInteger(Number(dropId)) &&
+    Number(dropId) > 0
+  const id = validId ? Number(dropId) : 0
+
+  const detailQuery = useDropDetail(id)
+  const stocksQuery = useDropStocks(id)
   const [selected, setSelected] = useState<Record<string, string>>({})
   const [quantity, setQuantity] = useState(1)
 
-  if (!drop || drop.status === 'DRAFT') return <NotFoundPage />
+  if (!validId) return <NotFoundPage />
+  if (detailQuery.isPending)
+    return (
+      <div role="status" aria-live="polite">
+        <EmptyState title="상품 정보를 불러오는 중이에요." variant="block" />
+      </div>
+    )
+  if (detailQuery.isError) {
+    if (
+      axios.isAxiosError(detailQuery.error) &&
+      detailQuery.error.response?.status === 404
+    )
+      return <NotFoundPage />
+    return (
+      <div className="catalog-error" role="alert">
+        <EmptyState
+          title="상품 정보를 표시하지 못했어요."
+          description="잠시 후 다시 시도해주세요."
+          variant="block"
+        />
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={() => void detailQuery.refetch()}
+        >
+          다시 시도
+        </button>
+      </div>
+    )
+  }
 
-  const selectedSku = findMatchingSku(drop.skus, selected)
-  const wished = wishes.has(drop.id)
-  const soldOut = stock(drop) === 0
-  const maxQuantity = Math.min(5, selectedSku?.stock ?? 1)
+  const detail = toDropDetail(detailQuery.data)
+  const stockByOption = new Map<number, number>()
+  for (const option of stocksQuery.data?.options ?? []) {
+    if (option.optionId === undefined) continue
+    if (option.availableStock !== undefined)
+      stockByOption.set(option.optionId, option.availableStock)
+  }
+  const totalStock = stocksQuery.data?.options?.length
+    ? stocksQuery.data.options.reduce(
+        (sum, option) => sum + (option.availableStock ?? 0),
+        0,
+      )
+    : undefined
+
+  const selectedSku = findMatchingSku(detail.skus, selected)
+  const wished = wishes.has(detail.id)
+  const selectedStock = selectedSku
+    ? (stockByOption.get(selectedSku.id) ?? selectedSku.stock)
+    : undefined
+  const maxQuantity = Math.min(
+    5,
+    selectedStock && selectedStock > 0 ? selectedStock : 1,
+  )
   const orderable =
-    drop.status === 'GRAB' &&
-    selectedSku &&
-    selectedSku.stock > 0 &&
+    detail.actions.orderable &&
+    !!selectedSku &&
+    (selectedStock ?? 0) > 0 &&
     quantity >= 1 &&
     quantity <= maxQuantity
   const optionLabel = selectedSku
-    ? selectionLabel(drop.optionGroups, selectedSku.selections) || '기본 옵션'
+    ? selectionLabel(detail.optionGroups, selectedSku.selections) || '기본 옵션'
     : ''
+  const mode = detail.actions.orderable
+    ? 'buy'
+    : detail.actions.wishable || detail.actions.wishCancelable
+      ? 'wish'
+      : 'closed'
+  const unitPrice = selectedSku?.price ?? detail.minPrice ?? 0
+  const grabLabel = !detail.actions.orderable
+    ? '판매 종료되었어요'
+    : !selectedSku
+      ? '옵션을 선택해주세요'
+      : selectedStock === 0
+        ? '선택 옵션 품절'
+        : quantity > maxQuantity
+          ? '수량을 확인해주세요'
+          : authenticated
+            ? '데모 GRAB 하기 ↗'
+            : '로그인 후 GRAB ↗'
 
   const order = (event: FormEvent) => {
     event.preventDefault()
@@ -56,93 +135,105 @@ export default function DropDetailPage({
       navigate('/login', { state: { from: location.pathname } })
       return
     }
-    const id = generateOrderId()
+    const orderId = generateOrderId()
     addOrder({
-      id,
-      drop,
+      id: orderId,
+      drop: toOrderDrop(detail),
       optionLabel,
       quantity,
-      total: selectedSku.price * quantity + drop.shippingFee,
+      total: unitPrice * quantity + detail.shippingFee,
     })
     notify('Mock 주문을 만들었어요. 배송지와 결제 결과를 확인해주세요.')
-    navigate(`/checkout/${id}`)
+    navigate(`/checkout/${orderId}`)
   }
 
   return (
     <>
       <div className="breadcrumbs">
-        <Link to={drop.status === 'WISH' ? '/wish' : '/grab'}>← 목록으로</Link>
+        <Link to={detail.status === 'WISH' ? '/wish' : '/grab'}>
+          ← 목록으로
+        </Link>
         <span>/</span>
-        <span>{drop.category}</span>
+        <span>{detail.category}</span>
       </div>
       <section className="detail-layout">
-        <DropGallery key={drop.id} drop={drop} />
+        <DropGallery
+          key={detail.id}
+          name={detail.name}
+          status={detail.status}
+          images={detail.galleryImages}
+        />
         <div className="detail-summary">
           <div className="detail-status">
             <b>
-              {drop.status === 'WISH'
-                ? `오픈 D−${daysUntil(drop.saleStartsAt)}`
-                : drop.status === 'GRAB'
+              {detail.status === 'WISH'
+                ? `오픈 D−${daysUntil(detail.saleStartsAt)}`
+                : detail.status === 'GRAB'
                   ? 'LIMITED DROP'
-                  : drop.status === 'ENDED'
+                  : detail.status === 'ENDED'
                     ? '판매 종료'
                     : '판매 취소'}
             </b>
             <span>
-              {drop.status === 'WISH'
-                ? `${drop.wishCount} WISH`
-                : drop.status === 'GRAB'
-                  ? `재고 ${stock(drop)}개`
+              {detail.status === 'WISH'
+                ? `${detail.wishCount} WISH`
+                : detail.status === 'GRAB' && totalStock !== undefined
+                  ? `재고 ${totalStock}개`
                   : ''}
             </span>
           </div>
-          <p className="creator">{drop.brand}</p>
-          <h1>{drop.name}</h1>
-          <p className="detail-description">{drop.description}</p>
+          {detail.brand && <p className="creator">{detail.brand}</p>}
+          <h1>{detail.name}</h1>
+          <p className="detail-description">{detail.description}</p>
           <p className="detail-price">
-            {won(selectedSku?.price ?? minPrice(drop))}
-            <small>{selectedSku ? '선택 옵션 가격' : '최저가'}</small>
+            {selectedSku
+              ? won(selectedSku.price)
+              : detail.minPrice !== null
+                ? won(detail.minPrice)
+                : '판매 옵션 없음'}
+            {(selectedSku || detail.minPrice !== null) && (
+              <small>{selectedSku ? '선택 옵션 가격' : '최저가'}</small>
+            )}
           </p>
 
           <dl className="meta-list">
             <div>
               <dt>판매 기간</dt>
               <dd>
-                {dateLabel(drop.saleStartsAt)} – {dateLabel(drop.saleEndsAt)}
+                {dateLabel(detail.saleStartsAt)} –{' '}
+                {dateLabel(detail.saleEndsAt)}
               </dd>
             </div>
             <div>
               <dt>배송</dt>
               <dd>
-                {won(drop.shippingFee)} · {drop.shippingNotice}
+                {won(detail.shippingFee)} · {detail.shippingNotice}
               </dd>
             </div>
           </dl>
 
-          {drop.status === 'WISH' ? (
+          {mode === 'wish' ? (
             <div className="wish-panel">
               <strong>
-                {drop.optionGroups.map((group) => group.name).join(' · ') ||
+                {detail.optionGroups.map((group) => group.name).join(' · ') ||
                   '기본'}{' '}
                 옵션으로 공개될 예정이에요.
               </strong>
-              <p>
-                WISH는 구매, 재고 예약 또는 구매 우선권을 보장하지 않습니다.
-              </p>
+              <p>{detail.wishNotice}</p>
               <button
                 type="button"
                 className="primary-button full"
                 onClick={() => {
-                  if (toggleWish(drop.id))
+                  if (toggleWish(detail.id))
                     notify(wished ? 'WISH를 취소했어요.' : 'WISH에 담았어요.')
                 }}
               >
                 {wished ? '✓ WISH 취소하기' : '♡ WISH 등록하기'}
               </button>
             </div>
-          ) : drop.status === 'GRAB' ? (
+          ) : mode === 'buy' ? (
             <form className="buy-form" onSubmit={order}>
-              {drop.optionGroups.map((group) => (
+              {detail.optionGroups.map((group) => (
                 <label key={group.id}>
                   <span>{group.name}</span>
                   <select
@@ -165,7 +256,7 @@ export default function DropDetailPage({
                   </select>
                 </label>
               ))}
-              {drop.optionGroups.length === 0 && (
+              {detail.optionGroups.length === 0 && (
                 <p className="default-option">
                   별도 선택이 없는 기본 옵션 상품입니다.
                 </p>
@@ -187,9 +278,11 @@ export default function DropDetailPage({
                   <>
                     <span>{optionLabel}</span>
                     <strong>
-                      {selectedSku.stock
-                        ? `재고 ${selectedSku.stock}개`
-                        : '품절'}
+                      {selectedStock
+                        ? `재고 ${selectedStock}개`
+                        : selectedStock === 0
+                          ? '품절'
+                          : '재고 확인 중'}
                     </strong>
                   </>
                 ) : (
@@ -200,34 +293,24 @@ export default function DropDetailPage({
               </div>
               <div className="total-row">
                 <span>상품 합계</span>
-                <strong>
-                  {won((selectedSku?.price ?? minPrice(drop)) * quantity)}
-                </strong>
+                <strong>{won(unitPrice * quantity)}</strong>
               </div>
               <button
                 type="submit"
                 className="primary-button full"
                 disabled={!orderable}
               >
-                {soldOut
-                  ? '전체 품절'
-                  : orderable
-                    ? authenticated
-                      ? '데모 GRAB 하기 ↗'
-                      : '로그인 후 GRAB ↗'
-                    : selectedSku?.stock === 0
-                      ? '선택 옵션 품절'
-                      : quantity > maxQuantity
-                        ? '수량을 확인해주세요'
-                        : '옵션을 선택해주세요'}
+                {grabLabel}
               </button>
             </form>
           ) : (
             <div className="wish-panel">
               <strong>
-                {drop.status === 'ENDED'
-                  ? '이 DROP은 판매가 종료됐어요.'
-                  : '이 DROP은 판매가 취소됐어요.'}
+                {detail.status === 'CANCELED'
+                  ? '이 DROP은 판매가 취소됐어요.'
+                  : detail.soldOut
+                    ? '이 DROP은 품절됐어요.'
+                    : '이 DROP은 판매가 종료됐어요.'}
               </strong>
               <p>상품 정보는 계속 확인할 수 있어요.</p>
             </div>
@@ -237,13 +320,13 @@ export default function DropDetailPage({
 
       <section className="story-section">
         <h2>상품 상세 설명</h2>
-        <p>{drop.description}</p>
-        <DropDetailImages images={detailImages(drop.id)} />
+        <p>{detail.description}</p>
+        <DropDetailImages images={detail.detailImages} />
       </section>
       <section className="detail-shipping panel">
         <h2>배송 안내</h2>
-        <p>배송비 {won(drop.shippingFee)}</p>
-        <p>{drop.shippingNotice}</p>
+        <p>배송비 {won(detail.shippingFee)}</p>
+        <p>{detail.shippingNotice}</p>
       </section>
     </>
   )

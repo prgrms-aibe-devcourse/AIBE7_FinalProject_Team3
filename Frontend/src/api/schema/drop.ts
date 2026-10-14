@@ -389,7 +389,7 @@ export interface components {
       imageUrl?: string
       altText?: string
     }
-    Option: {
+    SellerDropDetailOption: {
       /** Format: int64 */
       optionId?: number
       selections?: components['schemas']['DropOptionSelectionResponse'][]
@@ -424,7 +424,7 @@ export interface components {
       saleEndsAt?: string
       shipping?: components['schemas']['DropShippingResponse']
       optionGroups?: components['schemas']['DropOptionGroupResponse'][]
-      options?: components['schemas']['Option'][]
+      options?: components['schemas']['SellerDropDetailOption'][]
     }
     Value: {
       /** Format: int64 */
@@ -449,10 +449,23 @@ export interface components {
       data?: components['schemas']['SellerDropStockResponse']
       message?: string
     }
+    SellerDropStockOption: {
+      /** Format: int64 */
+      optionId?: number
+      optionName?: string
+      /** Format: int32 */
+      totalStock?: number
+      /** Format: int32 */
+      availableStock?: number
+      /** Format: int32 */
+      reservedStock?: number
+      /** Format: int32 */
+      soldStock?: number
+    }
     SellerDropStockResponse: {
       /** Format: int64 */
       dropId?: number
-      options?: components['schemas']['Option'][]
+      options?: components['schemas']['SellerDropStockOption'][]
     }
     ApiResponsePageResponsePublicDropListResponse: {
       success?: boolean
@@ -480,13 +493,16 @@ export interface components {
       /** Format: int64 */
       dropId?: number
       name?: string
-      thumbnailUrl?: string
+      brandName?: string
+      thumbnailUrl?: string | null
       /** Format: int64 */
-      minPrice?: number
+      minPrice?: number | null
       category?: components['schemas']['DropCategoryResponse']
       /** @enum {string} */
-      status?: 'DRAFT' | 'WISH' | 'GRAB' | 'ENDED' | 'CANCELED'
+      status?: 'WISH' | 'GRAB' | 'ENDED'
       soldOut?: boolean
+      /** Format: int64 */
+      availableStock?: number
       /** Format: int64 */
       wishCount?: number
       /** Format: date-time */
@@ -504,16 +520,27 @@ export interface components {
       data?: components['schemas']['PublicDropDetailResponse']
       message?: string
     }
+    PublicDropDetailOption: {
+      /** Format: int64 */
+      optionId?: number
+      selections?: components['schemas']['DropOptionSelectionResponse'][]
+      /** Format: int64 */
+      unitPrice?: number
+      /** Format: int32 */
+      availableStock?: number
+      soldOut?: boolean
+    }
     PublicDropDetailResponse: {
       /** Format: int64 */
       dropId?: number
       name?: string
+      brandName?: string
       description?: string
       imageUrls?: string[]
       galleryImages?: components['schemas']['Image'][]
       detailImages?: components['schemas']['Image'][]
       /** Format: int64 */
-      minPrice?: number
+      minPrice?: number | null
       category?: components['schemas']['DropCategoryResponse']
       /** @enum {string} */
       status?: 'DRAFT' | 'WISH' | 'GRAB' | 'ENDED' | 'CANCELED'
@@ -527,7 +554,7 @@ export interface components {
       saleEndsAt?: string
       shipping?: components['schemas']['DropShippingResponse']
       optionGroups?: components['schemas']['DropOptionGroupResponse'][]
-      options?: components['schemas']['Option'][]
+      options?: components['schemas']['PublicDropDetailOption'][]
       actions?: components['schemas']['Actions']
       /** Format: date-time */
       serverTime?: string
@@ -537,10 +564,17 @@ export interface components {
       data?: components['schemas']['PublicDropStockResponse']
       message?: string
     }
+    PublicDropStockOption: {
+      /** Format: int64 */
+      optionId?: number
+      /** Format: int32 */
+      availableStock?: number
+      soldOut?: boolean
+    }
     PublicDropStockResponse: {
       /** Format: int64 */
       dropId?: number
-      options?: components['schemas']['Option'][]
+      options?: components['schemas']['PublicDropStockOption'][]
       /** Format: date-time */
       serverTime?: string
     }
