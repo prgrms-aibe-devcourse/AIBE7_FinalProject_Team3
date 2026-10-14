@@ -5,7 +5,6 @@ import EmptyState from '../../components/EmptyState/EmptyState'
 import DropDetailImages from '../../features/drop/components/DropDetailImages'
 import DropGallery from '../../features/drop/components/DropGallery'
 import {
-  optionStock,
   toDropDetail,
   toOrderDrop,
 } from '../../features/drop/logic/dropDetailView'
@@ -82,12 +81,12 @@ export default function DropDetailPage({
   const stockByOption = new Map<number, number>()
   for (const option of stocksQuery.data?.options ?? []) {
     if (option.optionId === undefined) continue
-    const stock = optionStock(option)
-    if (stock !== undefined) stockByOption.set(option.optionId, stock)
+    if (option.availableStock !== undefined)
+      stockByOption.set(option.optionId, option.availableStock)
   }
   const totalStock = stocksQuery.data?.options?.length
     ? stocksQuery.data.options.reduce(
-        (sum, option) => sum + (optionStock(option) ?? 0),
+        (sum, option) => sum + (option.availableStock ?? 0),
         0,
       )
     : undefined

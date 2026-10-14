@@ -9,16 +9,7 @@ import type {
 } from '../../../types/drop'
 
 type PublicDropDetail = components['schemas']['PublicDropDetailResponse']
-type PublicOption = components['schemas']['Option']
-
-// 명세(DROP.md 1.3, INVENTORY.md 1.2)와 백엔드는 공개 상세·재고 옵션에 availableStock·soldOut을
-// 포함하지만, OpenAPI의 Option 스키마가 판매자 옵션과 이름 충돌로 병합돼 생성 타입에서 빠져 있다.
-// 서버 응답은 명세대로 오므로 여기서 읽는다. 백엔드 OpenAPI에서 스키마명이 분리되면 이 어댑터를 걷어낸다.
-type OptionWithStock = { availableStock?: number }
-
-export function optionStock(option: PublicOption): number | undefined {
-  return (option as PublicOption & OptionWithStock).availableStock
-}
+type PublicOption = components['schemas']['PublicDropDetailOption']
 
 const toImages = (
   images: components['schemas']['Image'][] | undefined,
@@ -51,7 +42,7 @@ const toSkus = (options: PublicOption[] | undefined): DetailSku[] =>
       ]),
     ),
     price: option.unitPrice ?? 0,
-    stock: optionStock(option),
+    stock: option.availableStock,
   }))
 
 const toActions = (
