@@ -554,6 +554,7 @@ PK와 UQ에서 자동 생성되는 인덱스는 중복 생성하지 않는다.
 | 테이블 | 인덱스 | 용도 |
 | --- | --- | --- |
 | `sellers` | (`status`, `submitted_at`, `id`) | 판매자 신청 심사 |
+| `seller_document_access_logs` | (`seller_id`, `accessed_at`) | 신청별 서류 열람 이력 조회 |
 | `drops` | (`status`, `category_id`, `published_at`, `id`) | 공개 DROP 목록 |
 | `drops` | (`seller_id`, `status`, `id`) | 판매자 DROP 관리 |
 | `drops` | `idx_drops_sale_start` (`status`, `sale_starts_at`) | 시작 전환 배치(`WISH AND sale_starts_at <= now`) |
