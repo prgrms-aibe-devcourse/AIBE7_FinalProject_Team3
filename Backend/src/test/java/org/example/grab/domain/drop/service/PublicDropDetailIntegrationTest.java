@@ -117,6 +117,7 @@ class PublicDropDetailIntegrationTest {
         assertThat(detail.options().get(0).selections()).extracting(DropOptionSelectionResponse::groupId)
                 .containsExactly(detail.optionGroups().get(0).groupId(), detail.optionGroups().get(1).groupId());
         assertThat(detail.minPrice()).isEqualTo(10000L);
+        assertThat(detail.brandName()).isEqualTo("GRAB 판매자");
         assertThat(detail.wishNotice()).isEqualTo(WishNotice.MESSAGE);
         assertThat(detail.actions()).isEqualTo(new PublicDropDetailResponse.Actions(true, true, false));
         assertThat(detail.serverTime()).isNotNull();
@@ -267,6 +268,36 @@ class PublicDropDetailIntegrationTest {
     }
 
     @Test
+    @DisplayName("상세 brandName은 DROP 판매자의 실제 브랜드명이고 판매자마다 다르다")
+    void findPublicDrop_usesEachSellerBrandName() {
+        // given
+        Long dropId = publishDrop(sellerId);
+        Long otherSeller = insertSeller("다른 브랜드");
+        Long otherDropId = publishDrop(otherSeller);
+
+        // when & then
+        assertThat(dropService.findPublicDrop(dropId).brandName()).isEqualTo("GRAB 판매자");
+        assertThat(dropService.findPublicDrop(otherDropId).brandName()).isEqualTo("다른 브랜드");
+    }
+
+    @Test
+    @DisplayName("활성 SKU가 없으면 minPrice는 null이고 soldOut은 true다")
+    void findPublicDrop_withoutActiveSkuHasNullMinPrice() {
+        // given
+        Long dropId = publishDrop();
+        jdbcTemplate.update("UPDATE drop_options SET is_active = false WHERE drop_id = ?", dropId);
+        entityManager.clear();
+
+        // when
+        PublicDropDetailResponse detail = dropService.findPublicDrop(dropId);
+
+        // then
+        assertThat(detail.minPrice()).isNull();
+        assertThat(detail.soldOut()).isTrue();
+        assertThat(detail.options()).isEmpty();
+    }
+
+    @Test
     @DisplayName("DRAFT 상세 조회는 DROP_NOT_FOUND로 숨긴다")
     void findPublicDrop_hidesDraft() {
         // given
@@ -300,6 +331,10 @@ class PublicDropDetailIntegrationTest {
 
     // 그룹·값·SKU의 sort_order를 뒤섞어 저장해도 응답은 sortOrder 순이어야 한다.
     private Long publishDrop() {
+        return publishDrop(sellerId);
+    }
+
+    private Long publishDrop(Long sellerId) {
         OffsetDateTime start = OffsetDateTime.now().plusDays(1);
         UUID imageId = UUID.randomUUID();
         DropDraftRequest request = new DropDraftRequest(
@@ -332,6 +367,10 @@ class PublicDropDetailIntegrationTest {
     }
 
     private Long insertSeller() {
+        return insertSeller("GRAB 판매자");
+    }
+
+    private Long insertSeller(String brandName) {
         String uniqueValue = UUID.randomUUID().toString();
         Long userId = jdbcTemplate.queryForObject(
                 """
@@ -345,11 +384,12 @@ class PublicDropDetailIntegrationTest {
         return jdbcTemplate.queryForObject(
                 """
                 INSERT INTO sellers (user_id, brand_name, contact_email)
-                VALUES (?, 'GRAB 판매자', ?)
+                VALUES (?, ?, ?)
                 RETURNING id
                 """,
                 Long.class,
                 userId,
+                brandName,
                 "seller-" + uniqueValue + "@example.com");
     }
 
