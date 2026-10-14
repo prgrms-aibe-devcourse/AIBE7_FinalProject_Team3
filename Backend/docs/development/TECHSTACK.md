@@ -112,7 +112,7 @@
 - `.github/workflows/frontend-ci.yml`: `main` 또는 `deploy` 대상 PR과 두 브랜치의 푸시에서 Frontend lint·Vitest·build와 Playwright E2E·시각 비교 검증. 실패 시 리포트·trace를 산출물로 보관
 - `.github/workflows/publish-backend.yml`: Backend 이미지를 빌드해 GHCR에 `latest`, 커밋 SHA 태그로 게시. 운영 기준은 `deploy` 푸시지만 현재 트리거는 `main`이므로 변경이 필요하다.
 
-Actuator와 Prometheus의 로컬 메트릭 수집 연결은 완료됐다. Redis 연결 설정과 Refresh Token 저장소(생성·해시·TTL·저장·조회·삭제)는 구현됐고, LOCAL 로그인 API가 Refresh Token을 저장하고 Access·Refresh Token을 HttpOnly 쿠키로 발급하며, 재발급 API가 Refresh Token Rotation(재사용 탐지 포함)으로 두 토큰을 교체한다. 로그아웃 API 연동은 구현 예정이다. Grafana·Loki·Alloy는 실행 틀만 마련된 상태다.
+Actuator와 Prometheus의 로컬 메트릭 수집 연결은 완료됐다. Redis 연결 설정과 Refresh Token 저장소(생성·해시·TTL·저장·조회·삭제)는 구현됐고, LOCAL 로그인 API가 Refresh Token을 저장하고 Access·Refresh Token을 HttpOnly 쿠키로 발급하며, 재발급 API가 Refresh Token Rotation(재사용 탐지 포함)으로 두 토큰을 교체한다. 로그아웃 API는 Refresh Token이 속한 세션(이미 교체된 토큰이면 사용됨 표식으로 찾은 세션)을 Redis에서 폐기하고 두 인증 쿠키를 만료시킨다. Access Token은 서버에 저장하지 않으므로 로그아웃 후에도 만료 시각까지 유효할 수 있다. Grafana·Loki·Alloy는 실행 틀만 마련된 상태다.
 
 ### 4.2 목표 운영 구성
 
