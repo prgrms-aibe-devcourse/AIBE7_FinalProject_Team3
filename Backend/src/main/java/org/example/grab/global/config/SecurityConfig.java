@@ -75,6 +75,10 @@ public class SecurityConfig {
                         // CSRF 예외는 두지 않는다(MEMBER_AUTH 1.7, GR-44 M00-02). JwtAuthenticationFilter는 /api/v1/auth/**를 건너뛴다
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/refresh")
                         .permitAll()
+                        // 로그아웃도 Access Token이 만료된 뒤 호출할 수 있어야 하므로 로그인 없이 연다. 폐기할 세션은 refresh_token 쿠키로 찾고,
+                        // CSRF 예외는 두지 않는다(MEMBER_AUTH 1.8, GR-36 M00-01)
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout")
+                        .permitAll()
                         // 판매자 API는 URL에서 SELLER를 먼저 거르고, 승인 상태는 CurrentSellerIdProvider가 DB로 다시 확인한다.
                         // 세그먼트 단위 매칭이라 /api/v1/seller-applications(USER의 판매자 신청)에는 걸리지 않는다.
                         .requestMatchers("/api/v1/seller/**").hasRole("SELLER")
