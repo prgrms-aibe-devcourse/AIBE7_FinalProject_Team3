@@ -2,10 +2,14 @@ package org.example.grab.domain.payment.service;
 
 import org.example.grab.domain.order.dto.PaymentExpiryCandidate;
 import org.example.grab.domain.order.dto.PaymentExpiryResult;
+import org.example.grab.domain.order.entity.OrderStatus;
 import org.example.grab.domain.order.service.OrderPaymentService;
+import org.example.grab.domain.payment.dto.OrderCancelResponse;
+import org.example.grab.domain.payment.dto.RefundStatus;
 import org.example.grab.domain.payment.entity.Payment;
 import org.example.grab.domain.payment.entity.PaymentProvider;
 import org.example.grab.domain.payment.entity.PaymentStatus;
+import org.example.grab.domain.payment.gateway.PaymentCancelCommand;
 import org.example.grab.domain.payment.gateway.PaymentConfirmCommand;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -24,6 +28,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.LongStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -52,13 +57,20 @@ class PaymentBatchServiceTest {
     @Mock
     private OrderPaymentService orderPaymentService;
 
+    @Mock
+    private OrderCancelTransactionService cancelTransactionService;
+
+    @Mock
+    private OrderCancelService orderCancelService;
+
     private StepClock clock;
     private PaymentBatchService batchService;
 
     @BeforeEach
     void setUp() {
         clock = new StepClock(NOW.toInstant());
-        batchService = new PaymentBatchService(transactionService, paymentService, orderPaymentService, clock);
+        batchService = new PaymentBatchService(transactionService, paymentService, orderPaymentService,
+                cancelTransactionService, orderCancelService, clock);
     }
 
     @Nested
@@ -66,31 +78,35 @@ class PaymentBatchServiceTest {
     class Run {
 
         @Test
-        @DisplayName("진행 중 결제 정리를 만료보다 먼저 같은 now로 실행한다")
-        void cleansUpBeforeExpiry() {
+        @DisplayName("진행 중 결제 정리 → 만료 → 취소 재요청 순서로 같은 now로 실행한다")
+        void runsStepsInOrder() {
             // when
             batchService.run(NOW);
 
             // then
-            InOrder order = inOrder(transactionService, orderPaymentService);
+            InOrder order = inOrder(transactionService, orderPaymentService, cancelTransactionService);
             order.verify(transactionService).claimInProgress(NOW, PaymentBatchService.CLEANUP_BATCH_SIZE);
             order.verify(orderPaymentService)
                     .findPaymentExpiryCandidates(NOW, null, PaymentBatchService.EXPIRY_BATCH_SIZE);
+            order.verify(cancelTransactionService).claimRetries(NOW, PaymentBatchService.CANCEL_RETRY_BATCH_SIZE);
         }
 
         @Test
-        @DisplayName("진행 중 결제 정리에서 예외가 나도 만료는 실행하고, 예외를 밖으로 전파하지 않는다")
-        void expiresEvenIfCleanUpFails() {
+        @DisplayName("앞 단계에서 예외가 나도 다음 단계를 실행하고, 예외를 밖으로 전파하지 않는다")
+        void runsNextStepsEvenIfPreviousFails() {
             // given
             given(transactionService.claimInProgress(any(), anyInt()))
                     .willThrow(new RuntimeException("일시적 DB 오류"));
             given(orderPaymentService.findPaymentExpiryCandidates(any(), any(), anyInt()))
+                    .willThrow(new RuntimeException("일시적 DB 오류"));
+            given(cancelTransactionService.claimRetries(any(), anyInt()))
                     .willThrow(new RuntimeException("일시적 DB 오류"));
 
             // when & then
             assertThatCode(() -> batchService.run(NOW)).doesNotThrowAnyException();
             then(orderPaymentService).should()
                     .findPaymentExpiryCandidates(NOW, null, PaymentBatchService.EXPIRY_BATCH_SIZE);
+            then(cancelTransactionService).should().claimRetries(NOW, PaymentBatchService.CANCEL_RETRY_BATCH_SIZE);
         }
     }
 
@@ -251,6 +267,113 @@ class PaymentBatchServiceTest {
             assertThat(expired).isZero();
             then(orderPaymentService).should(never()).expireIfDueSkippingLocked(anyLong(), any());
         }
+    }
+
+    @Nested
+    @DisplayName("결제 취소 재요청")
+    class RetryCancellations {
+
+        @Test
+        @DisplayName("주기당 상한만큼 선점하고, 성공·거절로 확정한 취소 수를 돌려준다")
+        void claimsAndCountsDecided() {
+            // given: 1번은 취소 성공, 2번은 거절, 3번은 여전히 결과를 모른다
+            given(cancelTransactionService.claimRetries(NOW, PaymentBatchService.CANCEL_RETRY_BATCH_SIZE))
+                    .willReturn(List.of(1L, 2L, 3L));
+            givenRetry(1L, OrderCancelTransactionService.CancelOutcome.completed(response(RefundStatus.SUCCEEDED)));
+            givenRetry(2L, OrderCancelTransactionService.CancelOutcome.rejection());
+            givenRetry(3L, OrderCancelTransactionService.CancelOutcome.completed(response(RefundStatus.UNKNOWN)));
+
+            // when
+            int decided = batchService.retryCancellations(NOW);
+
+            // then
+            assertThat(decided).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("한 취소의 재요청이 실패해도 나머지 취소를 계속 재요청한다")
+        void isolatesFailurePerCancellation() {
+            // given
+            given(cancelTransactionService.claimRetries(NOW, PaymentBatchService.CANCEL_RETRY_BATCH_SIZE))
+                    .willReturn(List.of(1L, 2L));
+            given(cancelTransactionService.findRetryTarget(1L)).willThrow(new RuntimeException("일시적 DB 오류"));
+            givenRetry(2L, OrderCancelTransactionService.CancelOutcome.completed(response(RefundStatus.SUCCEEDED)));
+
+            // when
+            int decided = batchService.retryCancellations(NOW);
+
+            // then
+            assertThat(decided).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("시간 예산을 넘기면 남은 선점 취소는 처리하지 않고 넘긴다")
+        void defersRemainingCancellationsAfterTimeBudget() {
+            // given: 첫 취소의 PG 처리가 예산보다 오래 걸린다
+            given(cancelTransactionService.claimRetries(NOW, PaymentBatchService.CANCEL_RETRY_BATCH_SIZE))
+                    .willReturn(List.of(1L, 2L, 3L));
+            OrderCancelTransactionService.CancelRetryTarget first = retryTarget(1L);
+            given(cancelTransactionService.findRetryTarget(1L)).willReturn(Optional.of(first));
+            given(orderCancelService.retry(first)).willAnswer(invocation -> {
+                clock.advance(PaymentBatchService.CANCEL_RETRY_TIME_BUDGET.plusSeconds(1));
+                return OrderCancelTransactionService.CancelOutcome.completed(response(RefundStatus.UNKNOWN));
+            });
+
+            // when
+            batchService.retryCancellations(NOW);
+
+            // then
+            then(cancelTransactionService).should(never()).findRetryTarget(2L);
+            then(cancelTransactionService).should(never()).findRetryTarget(3L);
+        }
+
+        @Test
+        @DisplayName("선점한 뒤 다른 요청이 먼저 결과를 확정했으면 PG에 다시 요청하지 않는다")
+        void skipsAlreadySettledCancellation() {
+            // given
+            given(cancelTransactionService.claimRetries(NOW, PaymentBatchService.CANCEL_RETRY_BATCH_SIZE))
+                    .willReturn(List.of(1L));
+            given(cancelTransactionService.findRetryTarget(1L)).willReturn(Optional.empty());
+
+            // when
+            int decided = batchService.retryCancellations(NOW);
+
+            // then
+            assertThat(decided).isZero();
+            then(orderCancelService).should(never()).retry(any());
+        }
+
+        @Test
+        @DisplayName("선점한 취소가 없으면 재요청을 호출하지 않는다")
+        void doesNothingWithoutClaims() {
+            // given
+            given(cancelTransactionService.claimRetries(NOW, PaymentBatchService.CANCEL_RETRY_BATCH_SIZE))
+                    .willReturn(List.of());
+
+            // when
+            int decided = batchService.retryCancellations(NOW);
+
+            // then
+            assertThat(decided).isZero();
+            then(cancelTransactionService).should(never()).findRetryTarget(any());
+        }
+
+        private void givenRetry(Long cancellationId, OrderCancelTransactionService.CancelOutcome outcome) {
+            OrderCancelTransactionService.CancelRetryTarget target = retryTarget(cancellationId);
+            given(cancelTransactionService.findRetryTarget(cancellationId)).willReturn(Optional.of(target));
+            given(orderCancelService.retry(target)).willReturn(outcome);
+        }
+    }
+
+    private static OrderCancelTransactionService.CancelRetryTarget retryTarget(Long cancellationId) {
+        return new OrderCancelTransactionService.CancelRetryTarget(cancellationId, NOW.minusMinutes(2),
+                new PaymentCancelCommand("payment-key", "단순 변심", "server-key-" + cancellationId));
+    }
+
+    private static OrderCancelResponse response(RefundStatus refundStatus) {
+        OrderStatus status = refundStatus == RefundStatus.SUCCEEDED ? OrderStatus.CANCELED : OrderStatus.PAID;
+        OffsetDateTime canceledAt = refundStatus == RefundStatus.SUCCEEDED ? NOW : null;
+        return new OrderCancelResponse(UUID.randomUUID(), status, refundStatus, canceledAt);
     }
 
     private static PaymentPreparation.Resolve target(Long paymentId) {

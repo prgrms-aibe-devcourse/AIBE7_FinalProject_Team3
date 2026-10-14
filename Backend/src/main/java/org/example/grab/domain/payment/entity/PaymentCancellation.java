@@ -32,8 +32,8 @@ import java.util.UUID;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PaymentCancellation extends UUIDEntity {
 
-    // 결과 불명 취소를 정리 작업(GR-65)이 다시 요청할 때까지 기다리는 시간
-    static final Duration RETRY_AFTER = Duration.ofMinutes(1);
+    // 진행 중인 취소를 결제 취소 재요청 배치(GR-87)가 다시 요청할 때까지 기다리는 시간
+    public static final Duration RETRY_AFTER = Duration.ofMinutes(1);
     private static final int FAILURE_CODE_MAX_LENGTH = 100;
 
     @Id
@@ -83,7 +83,13 @@ public class PaymentCancellation extends UUIDEntity {
     private OffsetDateTime nextRetryAt;
 
     private PaymentCancellation(
-            Long paymentId, Long requestedBy, PaymentCancellationPurpose purpose, long amount, String reason) {
+            Long paymentId,
+            Long requestedBy,
+            PaymentCancellationPurpose purpose,
+            long amount,
+            String reason,
+            OffsetDateTime now
+    ) {
         if (amount < 0) {
             throw new IllegalArgumentException("취소 금액은 0 이상이어야 합니다.");
         }
@@ -94,12 +100,15 @@ public class PaymentCancellation extends UUIDEntity {
         this.amount = amount;
         this.reason = Objects.requireNonNull(reason);
         this.status = PaymentCancellationStatus.REQUESTED;
+        // PG 응답을 기다리는 사용자 요청과 겹치지 않도록 재요청 배치는 RETRY_AFTER가 지난 뒤에 고른다(ERD.md 3.3).
+        this.nextRetryAt = now.plus(RETRY_AFTER);
     }
 
     // 소비자 주문 취소로 결제를 전액 취소한다. MVP는 전액 취소만 지원한다.
-    public static PaymentCancellation requestOrderCancel(Long paymentId, Long buyerId, long amount, String reason) {
-        return new PaymentCancellation(
-                paymentId, Objects.requireNonNull(buyerId), PaymentCancellationPurpose.ORDER_CANCEL, amount, reason);
+    public static PaymentCancellation requestOrderCancel(
+            Long paymentId, Long buyerId, long amount, String reason, OffsetDateTime now) {
+        return new PaymentCancellation(paymentId, Objects.requireNonNull(buyerId),
+                PaymentCancellationPurpose.ORDER_CANCEL, amount, reason, Objects.requireNonNull(now));
     }
 
     // PG 응답을 기다리거나 결과를 알 수 없는 요청. 이 요청이 끝날 때까지 주문의 배송 처리와 다른 취소 요청을 막는다.
