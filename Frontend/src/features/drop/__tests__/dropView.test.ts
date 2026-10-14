@@ -8,10 +8,12 @@ describe('공개 목록 응답 → 카드 모델', () => {
         {
           dropId: 100,
           name: '한정판 스니커즈',
+          brandName: 'SLOW OBJECT',
           thumbnailUrl: 'https://example.com/a.jpg',
           minPrice: 129000,
           status: 'WISH',
           soldOut: false,
+          availableStock: 24,
           wishCount: 152,
           saleStartsAt: '2026-09-20T10:00:00+09:00',
           saleEndsAt: '2026-09-20T12:00:00+09:00',
@@ -26,7 +28,9 @@ describe('공개 목록 응답 → 카드 모델', () => {
         wishCount: 152,
         saleStartsAt: '2026-09-20T10:00:00+09:00',
         saleEndsAt: '2026-09-20T12:00:00+09:00',
+        brand: 'SLOW OBJECT',
         minPrice: 129000,
+        availableStock: 24,
         soldOut: false,
       },
     ])

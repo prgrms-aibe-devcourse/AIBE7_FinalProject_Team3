@@ -123,6 +123,23 @@ test.describe('상품 탐색', () => {
     ).toBeVisible()
   })
 
+  test('카드는 브랜드명과 남은 수량을 보여준다', async ({ page }) => {
+    await page.goto('/#/grab')
+    const grabCard = page
+      .getByRole('region', { name: 'GRAB 상품 목록' })
+      .getByRole('article')
+      .first()
+    await expect(grabCard.locator('.creator')).not.toBeEmpty()
+    await expect(grabCard).toContainText('남은 수량')
+
+    await page.goto('/#/wish')
+    const wishCard = page
+      .getByRole('region', { name: 'WISH 상품 목록' })
+      .getByRole('article')
+      .first()
+    await expect(wishCard.locator('.creator')).not.toBeEmpty()
+  })
+
   test('GRAB 목록에서 상세로 이동한다', async ({ page }) => {
     await page.goto('/#/wish')
     await page.getByRole('link', { name: 'GRAB', exact: true }).click()

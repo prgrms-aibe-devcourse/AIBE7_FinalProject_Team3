@@ -38,7 +38,8 @@ const detail = (overrides: Partial<PublicDropDetail> = {}): PublicDropDetail =>
 
 describe('공개 상세 응답 → 상세 모델', () => {
   it('옵션 그룹·SKU·이미지·행동을 화면 형태로 옮긴다', () => {
-    const view = toDropDetail(detail())
+    const view = toDropDetail(detail({ brandName: 'SLOW OBJECT' }))
+    expect(view.brand).toBe('SLOW OBJECT')
     expect(view.optionGroups).toEqual([
       { id: '11', name: '소재', values: [{ id: '111', label: '코튼' }] },
     ])
@@ -55,7 +56,6 @@ describe('공개 상세 응답 → 상세 모델', () => {
       orderable: true,
     })
     expect(view.category).toBe('')
-    expect(view.brand).toBeUndefined()
   })
 
   it('옵션 가용 재고가 없으면 stock을 비워 둔다', () => {

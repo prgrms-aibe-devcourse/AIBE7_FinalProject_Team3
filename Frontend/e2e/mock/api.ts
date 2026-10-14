@@ -608,11 +608,13 @@ const minPrice = (drop: FixtureDrop): number | null => {
 const listItem = (drop: FixtureDrop) => ({
   dropId: drop.dropId,
   name: drop.name,
+  brandName: drop.brand,
   thumbnailUrl: drop.thumbnailUrl,
   minPrice: minPrice(drop),
   category: { categoryId: drop.categoryId, name: drop.categoryName },
   status: drop.status,
   soldOut: isSoldOut(drop),
+  availableStock: totalStock(drop),
   wishCount: drop.wishCount,
   saleStartsAt: drop.saleStartsAt,
   saleEndsAt: drop.saleEndsAt,
@@ -643,6 +645,7 @@ const actions = (drop: FixtureDrop) => {
 const detailBody = (drop: FixtureDrop) => ({
   dropId: drop.dropId,
   name: drop.name,
+  brandName: drop.brand,
   description: drop.description,
   imageUrls: drop.gallery.map((item) => item.imageUrl),
   galleryImages: drop.gallery,

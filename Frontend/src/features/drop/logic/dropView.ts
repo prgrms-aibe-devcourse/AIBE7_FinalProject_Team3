@@ -12,7 +12,9 @@ function toCardDrop(id: number, drop: PublicDropList): CardDrop {
     wishCount: drop.wishCount ?? 0,
     saleStartsAt: drop.saleStartsAt ?? '',
     saleEndsAt: drop.saleEndsAt ?? '',
+    brand: drop.brandName,
     minPrice: drop.minPrice,
+    availableStock: drop.availableStock,
     soldOut: drop.soldOut,
   }
 }
