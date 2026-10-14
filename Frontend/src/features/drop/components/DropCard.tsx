@@ -9,6 +9,7 @@ type Props = {
   wished: boolean
   onWish: (id: number) => void
   mode?: 'WISH' | 'GRAB'
+  wishReady?: boolean
 }
 
 export default function DropCard({
@@ -16,6 +17,7 @@ export default function DropCard({
   wished,
   onWish,
   mode = drop.status === 'WISH' ? 'WISH' : 'GRAB',
+  wishReady = true,
 }: Props) {
   const [failedImage, setFailedImage] = useState<string | null>(null)
   const [now, setNow] = useState(() => Date.now())
@@ -97,7 +99,7 @@ export default function DropCard({
         <span>
           {wishMode ? (
             <>
-              <b>{drop.wishCount + (wished ? 1 : 0)}</b> WISH
+              <b>{drop.wishCount}</b> WISH
             </>
           ) : available === undefined ? null : (
             <>
@@ -110,7 +112,7 @@ export default function DropCard({
             type="button"
             className={`secondary-button wish-button ${wished ? 'selected' : ''}`}
             aria-pressed={wished}
-            disabled={!wishable}
+            disabled={!wishable || !wishReady}
             onClick={() => onWish(drop.id)}
           >
             {!wishable ? 'WISH 마감' : wished ? '✓ WISHED' : '♡ WISH'}

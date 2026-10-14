@@ -19,8 +19,8 @@ import type { SharedProps } from '../../types/store'
 export default function DropListPage({
   status,
   wishes,
+  wishesReady,
   toggleWish,
-  notify,
 }: SharedProps & { status: 'WISH' | 'GRAB' }) {
   const [params, setParams] = useSearchParams()
   const [pending, startTransition] = useTransition()
@@ -68,9 +68,7 @@ export default function DropListPage({
     (listParams !== null && listQuery.isPending)
 
   const onWish = (id: number) => {
-    const selected = wishes.has(id)
-    if (!toggleWish(id)) return
-    notify(selected ? 'WISH를 취소했어요.' : 'WISH에 담았어요.')
+    void toggleWish(id)
   }
 
   const retry = () => {
@@ -233,6 +231,7 @@ export default function DropListPage({
               drop={drop}
               mode={status}
               wished={wishes.has(drop.id)}
+              wishReady={wishesReady}
               onWish={onWish}
             />
           ))}

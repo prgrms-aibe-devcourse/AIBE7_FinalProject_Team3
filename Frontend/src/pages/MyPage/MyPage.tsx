@@ -189,7 +189,7 @@ export default function MyPage({
                 <button
                   type="button"
                   onClick={() => {
-                    if (toggleWish(drop.id)) notify('WISH를 취소했어요.')
+                    void toggleWish(drop.id)
                   }}
                 >
                   취소
