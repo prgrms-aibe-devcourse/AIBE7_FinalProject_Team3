@@ -27,6 +27,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 // 판매자 등록 신청·재신청·내 신청 조회(GR-91, SELLER-001·SELLER-005·SELLER-006).
 @Service
@@ -140,13 +142,24 @@ public class SellerApplicationService {
         }
     }
 
-    // 본인이 업로드했고 다른 신청에 연결되지 않은 서류만 붙인다(SELLER-006, 도용 방지)
+    // 본인이 업로드했고, 다른 신청에 연결되지 않았고, 요청한 키와 실제 documentType이 일치하는 서류만 붙인다(SELLER-006, 도용·유형 바꿔치기 방지)
     private void attachDocuments(Long userId, Long sellerId, Map<DocumentType, UUID> documentIds) {
         List<UUID> ids = new ArrayList<>(documentIds.values());
         List<SellerDocument> documents = sellerDocumentRepository.findAllByIdIn(ids);
-        if (documents.size() != ids.size() || documents.stream().anyMatch(document -> !document.isUsableBy(userId, sellerId))) {
+        if (documents.size() != ids.size()) {
             throw new BusinessException(CommonErrorCode.VALIDATION_FAILED);
         }
+        Map<UUID, SellerDocument> documentsById = documents.stream()
+                .collect(Collectors.toMap(SellerDocument::getId, Function.identity()));
+
+        for (Map.Entry<DocumentType, UUID> entry : documentIds.entrySet()) {
+            SellerDocument document = documentsById.get(entry.getValue());
+            boolean typeMatches = document.getDocumentType() == entry.getKey();
+            if (!typeMatches || !document.isUsableBy(userId, sellerId)) {
+                throw new BusinessException(CommonErrorCode.VALIDATION_FAILED);
+            }
+        }
+
         documents.forEach(document -> document.attachToSeller(sellerId));
     }
 }

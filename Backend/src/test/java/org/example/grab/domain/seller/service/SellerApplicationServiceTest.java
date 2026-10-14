@@ -49,6 +49,7 @@ class SellerApplicationServiceTest {
     private BusinessRegistrationVerifier businessRegistrationVerifier;
     private SellerApplicationService service;
     private Long documentUploaderId;
+    private Map<DocumentType, UUID> documentIds;
 
     @BeforeEach
     void setUp() {
@@ -58,12 +59,18 @@ class SellerApplicationServiceTest {
         Clock clock = Clock.fixed(Instant.parse("2026-10-14T00:00:00Z"), ZoneOffset.UTC);
         service = new SellerApplicationService(sellerRepository, sellerDocumentRepository, businessRegistrationVerifier, clock);
         documentUploaderId = USER_ID;
+        documentIds = allDocumentIds();
 
         given(businessRegistrationVerifier.verify(anyString())).willReturn(BusinessRegistrationStatus.ACTIVE);
         given(sellerRepository.findByBusinessRegistrationNumber(anyString())).willReturn(Optional.empty());
         given(sellerDocumentRepository.findAllByIdIn(any())).willAnswer(invocation -> {
+            // any()로 이 메서드를 재스텁하는 테스트가 있는데, 그 재스텁 호출 자체가 이 기존 스텁을
+            // null 인자로 한 번 먼저 거쳐가므로 null을 방어한다
             List<UUID> ids = invocation.getArgument(0);
-            return ids.stream().map(id -> usableDocument(id, documentUploaderId)).toList();
+            if (ids == null) {
+                return List.of();
+            }
+            return ids.stream().map(id -> usableDocument(id, documentUploaderId, typeOf(id))).toList();
         });
         given(sellerRepository.saveAndFlush(any(Seller.class))).willAnswer(invocation -> {
             Seller seller = invocation.getArgument(0);
@@ -208,6 +215,26 @@ class SellerApplicationServiceTest {
     }
 
     @Test
+    @DisplayName("documentId의 실제 유형이 요청 키와 다르면 400으로 거부한다(유형 바꿔치기 방지)")
+    void rejectsDocumentTypeMismatch() {
+        given(sellerRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
+        // BUSINESS_LICENSE 키에 실제로는 ID_CARD로 업로드된 서류의 id를 끼워 넣는다
+        UUID businessLicenseId = documentIds.get(DocumentType.BUSINESS_LICENSE);
+        given(sellerDocumentRepository.findAllByIdIn(any())).willAnswer(invocation -> {
+            List<UUID> ids = invocation.getArgument(0);
+            return ids.stream()
+                    .map(id -> usableDocument(id, documentUploaderId,
+                            id.equals(businessLicenseId) ? DocumentType.ID_CARD : typeOf(id)))
+                    .toList();
+        });
+
+        assertThatThrownBy(() -> service.apply(USER_ID, request()))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(CommonErrorCode.VALIDATION_FAILED);
+    }
+
+    @Test
     @DisplayName("내 신청이 없으면 404로 응답한다")
     void findMyApplicationNotFound() {
         given(sellerRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
@@ -230,8 +257,17 @@ class SellerApplicationServiceTest {
         assertThat(response.status()).isEqualTo(SellerStatus.PENDING);
     }
 
-    private static SellerDocument usableDocument(UUID id, Long uploadedBy) {
-        return SellerDocument.upload(id, uploadedBy, DocumentType.BUSINESS_LICENSE, "image/png", "key", "dek");
+    private static SellerDocument usableDocument(UUID id, Long uploadedBy, DocumentType documentType) {
+        return SellerDocument.upload(id, uploadedBy, documentType, "image/png", "key", "dek");
+    }
+
+    // 요청에 쓴 documentIds에서 역으로 유형을 찾는다. 업로드 스텁이 실제 요청과 같은 유형의 서류를 돌려주게 하기 위함
+    private DocumentType typeOf(UUID id) {
+        return documentIds.entrySet().stream()
+                .filter(entry -> entry.getValue().equals(id))
+                .map(Map.Entry::getKey)
+                .findFirst()
+                .orElse(null);
     }
 
     private static Map<DocumentType, UUID> allDocumentIds() {
@@ -243,8 +279,8 @@ class SellerApplicationServiceTest {
         );
     }
 
-    private static SellerApplicationRequest request() {
-        return request(allDocumentIds());
+    private SellerApplicationRequest request() {
+        return request(documentIds);
     }
 
     private static SellerApplicationRequest request(Map<DocumentType, UUID> documentIds) {
