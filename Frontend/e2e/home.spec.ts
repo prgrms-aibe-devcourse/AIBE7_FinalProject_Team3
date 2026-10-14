@@ -81,6 +81,14 @@ test.describe('소비자 메인', () => {
     await expect(rail).toContainText('슬로우 모닝 머그')
   })
 
+  test('판매가 시작된 WISH도 인기 GRAB 후보에 들어간다', async ({ page }) => {
+    await installCatalogScenario(page, 'transition')
+    await page.goto('/')
+
+    const rail = page.getByRole('group', { name: '지금 인기 GRAB' })
+    await expect(rail).toContainText('전환 지연 한정 티셔츠')
+  })
+
   test('화면 크기가 바뀌어도 이동이 어긋나지 않는다', async ({ page }) => {
     await installHomeScenario(page, 'many')
     await page.setViewportSize({ width: 390, height: 844 })

@@ -214,11 +214,7 @@ test('목록 표시 실패를 안내하고 복구 후 다시 시도할 수 있�
   await expect(page.getByRole('alert')).toContainText(
     '상품 목록을 표시하지 못했어요.',
   )
-  await page.evaluate(() => {
-    const restore = (window as unknown as { restoreCatalogMock: () => void })
-      .restoreCatalogMock
-    restore()
-  })
+  await installCatalogScenario(page, 'base')
   await page.getByRole('button', { name: '다시 시도' }).click()
   await expect(
     page.getByRole('region', { name: 'WISH 상품 목록' }).getByRole('article'),

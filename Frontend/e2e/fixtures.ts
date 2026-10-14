@@ -1,9 +1,7 @@
 import { expect, test as base, type Page } from '@playwright/test'
+import { FIXED_NOW, installPublicApi } from './mock/api'
 
 export type { Page }
-
-// Mock 일정이 모두 Date.now() 기준이라 시각을 고정해야 D-day·날짜 표시가 매번 같다.
-export const FIXED_NOW = new Date('2026-10-01T10:00:00+09:00')
 
 const PLACEHOLDER_IMAGE = 'src/assets/images/grab-symbol.png'
 
@@ -21,6 +19,8 @@ export const test = base.extend({
           ? route.fulfill({ path: PLACEHOLDER_IMAGE })
           : route.abort(),
     )
+    // 공개 DROP API를 fixture로 고정한다. 시나리오 테스트는 뒤에서 다시 등록해 덮어쓴다.
+    await installPublicApi(page)
     await provide(page)
   },
 })
