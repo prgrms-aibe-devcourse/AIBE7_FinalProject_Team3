@@ -13,6 +13,8 @@ public interface PublicDropListProjection {
 
     String getName();
 
+    String getBrandName();
+
     String getStatus();
 
     Instant getSaleStartsAt();
@@ -28,6 +30,8 @@ public interface PublicDropListProjection {
     Long getMinPrice();
 
     Boolean getSoldOut();
+
+    Long getAvailableStock();
 
     Long getWishCount();
 }

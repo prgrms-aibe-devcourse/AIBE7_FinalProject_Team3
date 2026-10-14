@@ -15,6 +15,7 @@ import org.example.grab.domain.drop.dto.response.SellerDropStockResponse;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.domain.wish.service.WishQueryService;
+import org.example.grab.domain.seller.service.SellerProfileService;
 import org.example.grab.global.config.JpaConfig;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.storage.supabase.SupabaseStorageConfig;
@@ -55,7 +56,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
 @Import({JpaConfig.class, DropService.class, CategoryService.class, WishQueryService.class,
-        SupabaseStorageConfig.class})
+        SellerProfileService.class, SupabaseStorageConfig.class})
 @TestPropertySource(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
 @Testcontainers
 class DropStockQueryIntegrationTest {

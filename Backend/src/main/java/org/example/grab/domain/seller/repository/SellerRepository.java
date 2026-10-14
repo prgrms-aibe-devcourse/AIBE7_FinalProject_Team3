@@ -25,6 +25,10 @@ public interface SellerRepository extends JpaRepository<Seller, Long> {
     // 신청·재신청·중복 신청 판단용. uq_sellers_user라 결과는 많아야 한 건
     Optional<Seller> findByUserId(Long userId);
 
+    // 공개 DROP 상세 등에서 브랜드명만 필요할 때 쓴다. sellers.id는 PK라 결과는 많아야 한 건
+    @Query("select s.brandName from Seller s where s.id = :sellerId")
+    Optional<String> findBrandNameById(@Param("sellerId") Long sellerId);
+
     // 중복 사업자등록번호 판단용. uq_sellers_business_registration_number라 결과는 많아야 한 건
     Optional<Seller> findByBusinessRegistrationNumber(String businessRegistrationNumber);
 

@@ -27,6 +27,7 @@ import org.example.grab.domain.drop.entity.option.DropOptionValue;
 import org.example.grab.domain.drop.entity.option.DropOptionValueMap;
 import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.domain.drop.event.DropCanceledEvent;
+import org.example.grab.domain.seller.service.SellerProfileService;
 import org.example.grab.domain.drop.repository.DropImageRepository;
 import org.example.grab.domain.drop.repository.DropRepository;
 import org.example.grab.global.common.ErrorResponse;
@@ -82,6 +83,9 @@ class DropServiceTest {
     private WishQueryService wishQueryService;
 
     @Mock
+    private SellerProfileService sellerProfileService;
+
+    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     private final ImageStorage imageStorage = new ImageStorage() {
@@ -101,8 +105,8 @@ class DropServiceTest {
     @BeforeEach
     void setUp() {
         dropService = new DropService(
-                dropRepository, dropImageRepository, categoryService, wishQueryService, imageStorage,
-                eventPublisher);
+                dropRepository, dropImageRepository, categoryService, wishQueryService, sellerProfileService,
+                imageStorage, eventPublisher);
     }
 
     @Test
@@ -547,7 +551,7 @@ class DropServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(DropErrorCode.DROP_NOT_FOUND);
-        verifyNoInteractions(categoryService, wishQueryService);
+        verifyNoInteractions(categoryService, wishQueryService, sellerProfileService);
     }
 
     @Test
@@ -561,12 +565,14 @@ class DropServiceTest {
         given(categoryService.findCategory(1L))
                 .willReturn(Optional.of(new CategoryResponse(1L, "FASHION", "패션")));
         given(wishQueryService.countActiveByDropId(10L)).willReturn(3L);
+        given(sellerProfileService.findBrandName(1L)).willReturn(Optional.of("그랩 스튜디오"));
 
         // when
         PublicDropDetailResponse response = dropService.findPublicDrop(10L);
 
         // then
         assertThat(response.status()).isEqualTo(DropStatus.CANCELED);
+        assertThat(response.brandName()).isEqualTo("그랩 스튜디오");
         assertThat(response.category()).isEqualTo(new DropCategoryResponse(1L, "패션"));
         assertThat(response.wishCount()).isEqualTo(3L);
         assertThat(response.wishNotice()).isEqualTo(WishNotice.MESSAGE);

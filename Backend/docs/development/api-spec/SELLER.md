@@ -2,7 +2,31 @@
 
 ## 1. 판매자 API
 
-### 1.1 판매자 등록 신청
+### 1.1 판매자 신청 서류 업로드
+
+```http
+POST /api/v1/seller-documents
+```
+
+- **인증**: `USER`
+- **요청**: `multipart/form-data` — `documentType`(폼 필드) + `file`(파일 1개)
+- `documentType`: `BUSINESS_LICENSE`(사업자등록증 사본) / `ID_CARD`(신분증 사본) / `BANKBOOK`(통장 사본) / `MAIL_ORDER_BUSINESS_REPORT`(통신판매업신고증) 중 하나
+- 서버가 파일을 받아 랜덤 DEK로 AES-256-GCM 암호화한 뒤 원본은 버리고 비공개 버킷(`seller-documents`)에 암호문만 저장한다. 공개 `imageUrl`은 내려주지 않고 `documentId`(UUID)만 발급한다.
+- `ID_CARD`는 주민등록번호 뒷자리를 가려서 촬영한 이미지를 제출해야 한다. 가려지지 않은 경우 운영자가 심사 단계(1.6절)에서 확인 후 반려한다.
+
+**응답:** `201 Created`
+
+```json
+{
+  "success": true,
+  "data": {
+    "documentId": "b1f2c3d4-5678-4abc-9012-3456789abcde",
+    "documentType": "ID_CARD"
+  }
+}
+```
+
+### 1.2 판매자 등록 신청
 
 ```http
 POST /api/v1/seller-applications
@@ -17,13 +41,20 @@ POST /api/v1/seller-applications
   "brandName": "길동상점",
   "contactEmail": "seller@example.com",
   "businessRegistrationNumber": "1234567890",
-  "description": "한정판 상품 판매점"
+  "description": "한정판 상품 판매점",
+  "documentIds": {
+    "BUSINESS_LICENSE": "b1f2c3d4-5678-4abc-9012-3456789abcde",
+    "ID_CARD": "c2f3d4e5-6789-4abc-9012-3456789abcde",
+    "BANKBOOK": "d3f4e5f6-7890-4abc-9012-3456789abcde",
+    "MAIL_ORDER_BUSINESS_REPORT": "e4f5f6a7-8901-4abc-9012-3456789abcde"
+  }
 }
 ```
 
 - `businessRegistrationNumber`: 하이픈 없는 10자리 숫자. 국세청 사업자등록 상태조회로 검증하며, 계속사업자가 아니면(휴업자·폐업자) `422 BUSINESS_NOT_ACTIVE`로 거부한다. 조회 실패·타임아웃이면 검증을 생략하고 `PENDING`으로 접수한다.
 - 이미 `PENDING` 또는 `APPROVED` 상태의 신청이 있으면 `409 SELLER_APPLICATION_ALREADY_EXISTS`로 거부한다. `REJECTED` 상태에서 다시 호출하면 기존 레코드를 갱신해 재신청으로 처리한다(신청 시각·심사 정보 초기화).
 - 다른 계정이 같은 `businessRegistrationNumber`로 이미 신청했으면 `409 DUPLICATE_BUSINESS_REGISTRATION_NUMBER`로 거부한다.
+- `documentIds`는 1.1절에서 발급받은 `documentId`를 4종 모두 채워야 한다. 하나라도 비어 있으면 `400 VALIDATION_FAILED`로 거부한다.
 
 **응답:** `201 Created`
 
@@ -39,7 +70,7 @@ POST /api/v1/seller-applications
 }
 ```
 
-### 1.2 내 판매자 신청 조회
+### 1.3 내 판매자 신청 조회
 
 ```http
 GET /api/v1/seller-applications/me
@@ -64,7 +95,7 @@ GET /api/v1/seller-applications/me
 }
 ```
 
-### 1.3 판매자 신청 목록 조회
+### 1.4 판매자 신청 목록 조회
 
 ```http
 GET /api/v1/admin/seller-applications?status=PENDING&page=0&size=20
@@ -98,7 +129,7 @@ GET /api/v1/admin/seller-applications?status=PENDING&page=0&size=20
 }
 ```
 
-### 1.4 판매자 신청 승인
+### 1.5 판매자 신청 승인
 
 ```http
 POST /api/v1/admin/seller-applications/{applicationId}/approve
@@ -121,7 +152,7 @@ POST /api/v1/admin/seller-applications/{applicationId}/approve
 }
 ```
 
-### 1.5 판매자 신청 반려
+### 1.6 판매자 신청 반려
 
 ```http
 POST /api/v1/admin/seller-applications/{applicationId}/reject
@@ -150,6 +181,22 @@ POST /api/v1/admin/seller-applications/{applicationId}/reject
   }
 }
 ```
+
+### 1.7 판매자 신청 서류 열람 (전용 뷰어)
+
+```http
+GET /api/v1/admin/seller-applications/{applicationId}/documents/{documentType}/view
+```
+
+- **인증**: `ADMIN`
+- `documentType`: `BUSINESS_LICENSE` / `ID_CARD` / `BANKBOOK` / `MAIL_ORDER_BUSINESS_REPORT`
+- presigned URL을 발급하지 않는다. 서버가 암호문을 복호화하고 그 위에 운영자 ID + 열람 시각 워터마크를 합성해 이미지 바이너리(`image/*`)를 직접 스트리밍한다.
+- 응답에 `Cache-Control: no-store`를 포함해 브라우저·프록시 캐시를 막는다.
+- 요청마다 `seller_document_access_logs`에 열람 기록(운영자 ID, 신청 ID, 서류 종류, 열람 시각)을 남긴다.
+- 다운로드 자체를 막지는 않는다(스트림을 저장해도 워터마크가 찍힌 사본만 남는다). 화면 캡처 방지는 프론트 담당이다.
+- 신청이 없거나 해당 `documentType`의 서류가 없으면 `404 SELLER_APPLICATION_NOT_FOUND`로 거부한다.
+
+**응답:** `200 OK`, `Content-Type: image/png`(또는 원본 포맷) 바이너리 스트림
 
 ---
 

@@ -68,13 +68,17 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
     /*
      * 공개 DROP 목록 쿼리의 공통 SELECT·FROM. 날짜 정렬과 인기 정렬 쿼리가 같은 응답 형태를 쓰도록 공유한다.
      * 썸네일(LIMIT 1)·ILIKE ESCAPE·컬럼명 기준 정렬 때문에 네이티브로 작성하고, 목록에 필요한 값
-     * (minPrice·soldOut·wishCount·thumbnailUrl)을 한 쿼리 안에서 서브쿼리로 계산해 N+1을 막는다.
+     * (brandName·minPrice·soldOut·availableStock·wishCount·thumbnailUrl)을 한 쿼리 안에서 계산해 N+1을 막는다.
+     * 브랜드는 sellers를 PK(seller_id)로 조인해 가져온다. 판매자당 DROP이 여러 건이어도 조인 방향이
+     * DROP→판매자라 목록 행이 늘지 않아 다른 집계를 부풀리지 않는다.
      * 활성 WISH 집계(canceled_at IS NULL)는 WishRepository 대신 같은 쿼리 안에서 네이티브로 센다.
      * 썸네일은 GALLERY 중 순서가 가장 앞선 이미지이고 DETAIL은 쓰지 않는다(DROP.md 1.2).
-     * soldOut 판정식은 SELECT와 PUBLIC_DROP_FILTERS 두 곳에 중복되므로 한쪽만 바꾸지 않도록 주의한다.
+     * 가용 재고 합계식은 soldOut·availableStock SELECT와 PUBLIC_DROP_FILTERS 세 곳에 중복되므로
+     * 한쪽만 바꾸지 않도록 주의한다(활성 SKU 없으면 COALESCE로 0).
      */
     String PUBLIC_DROP_SELECT = """
-            SELECT d.id AS "dropId", d.name AS "name", d.status AS "status",
+            SELECT d.id AS "dropId", d.name AS "name", s.brand_name AS "brandName",
+                   d.status AS "status",
                    d.sale_starts_at AS "saleStartsAt", d.sale_ends_at AS "saleEndsAt",
                    c.id AS "categoryId", c.name AS "categoryName",
                    (SELECT i.image_url FROM drop_images i WHERE i.drop_id = d.id AND i.image_type = 'GALLERY'
@@ -83,10 +87,13 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
                      WHERE o.drop_id = d.id AND o.is_active) AS "minPrice",
                    (SELECT COALESCE(SUM(o.total_quantity - o.reserved_quantity - o.sold_quantity - o.withheld_quantity), 0) = 0
                       FROM drop_options o WHERE o.drop_id = d.id AND o.is_active) AS "soldOut",
+                   (SELECT COALESCE(SUM(o.total_quantity - o.reserved_quantity - o.sold_quantity - o.withheld_quantity), 0)
+                      FROM drop_options o WHERE o.drop_id = d.id AND o.is_active) AS "availableStock",
                    (SELECT COUNT(*) FROM wishes w
                      WHERE w.drop_id = d.id AND w.canceled_at IS NULL) AS "wishCount"
             FROM drops d
             JOIN categories c ON c.id = d.category_id
+            JOIN sellers s ON s.id = d.seller_id
             """;
 
     String PUBLIC_DROP_COUNT = """

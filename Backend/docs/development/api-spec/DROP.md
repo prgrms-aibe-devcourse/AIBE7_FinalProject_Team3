@@ -57,6 +57,7 @@ GET /api/v1/drops
       {
         "dropId": 100,
         "name": "한정판 스니커즈",
+        "brandName": "그랩 스튜디오",
         "thumbnailUrl": "https://example.com/image.jpg",
         "minPrice": 129000,
         "category": {
@@ -65,6 +66,7 @@ GET /api/v1/drops
         },
         "status": "WISH",
         "soldOut": false,
+        "availableStock": 24,
         "wishCount": 152,
         "saleStartsAt": "2026-09-20T10:00:00+09:00",
         "saleEndsAt": "2026-09-20T12:00:00+09:00"
@@ -84,6 +86,8 @@ GET /api/v1/drops
 > - `status`에 `WISH`·`GRAB`·`ENDED` 외의 값(예: `DRAFT`, `CANCELED`)을 주면 거부합니다.
 > - `keyword`는 앞뒤 공백을 제거하고, 비어 있으면 검색 조건을 무시합니다. 상품명을 대소문자 구분 없이 부분 일치로 찾고, `%`·`_`·`\`는 와일드카드가 아니라 리터럴로 처리합니다. 100자를 넘으면 거부합니다.
 > - `soldOut`은 활성 옵션(`is_active = true`)의 가용 재고(`total - reserved - sold - withheld`) 합이 0이면 `true`입니다. 활성 옵션이 하나도 없으면 `true`입니다. DROP 상태가 `GRAB`이어도 재고가 없으면 `true`입니다.
+> - `availableStock`은 활성 옵션(`is_active = true`)의 가용 재고(`total - reserved - sold - withheld`) 합계이며, 활성 옵션이 없으면 `0`입니다. 조회 시점 값이고 구매 가능성이나 재고 예약을 보장하지 않습니다. `soldOut`은 이 합계가 `0`인지와 같은 기준입니다.
+> - `brandName`은 DROP 판매자의 `sellers.brand_name`입니다.
 > - `minPrice`는 활성 SKU(`is_active = true`) 중 최저 `unitPrice`이며, 활성 SKU가 없으면 `null`입니다(2.2와 같은 규칙).
 > - `wishCount`는 취소되지 않은(`canceled_at IS NULL`) WISH 수입니다.
 > - `thumbnailUrl`은 GALLERY의 첫 이미지(`sort_order = 0`)이며, 이미지가 없으면 `null`입니다. DETAIL은 썸네일에 사용하지 않습니다.
@@ -112,6 +116,7 @@ GET /api/v1/drops/{dropId}
   "data": {
     "dropId": 100,
     "name": "한정판 스니커즈",
+    "brandName": "그랩 스튜디오",
     "description": "상품 설명",
     "imageUrls": [
       "https://example.com/image1.jpg"
@@ -182,6 +187,7 @@ GET /api/v1/drops/{dropId}
 > 옵션 그룹명과 값은 판매자가 자유롭게 정의합니다. 프론트엔드는 `optionGroups`를 순서대로 표시하고 선택된 값 조합과 일치하는 `options[].optionId`를 주문에 사용합니다.
 >
 > `minPrice`·`soldOut`·`wishCount`는 1.2와 같은 규칙입니다. `minPrice`는 활성 SKU 최저 `unitPrice`(없으면 `null`), `soldOut`은 활성 옵션의 가용 재고 합이 0이면 `true`, `wishCount`는 취소되지 않은(`canceled_at IS NULL`) WISH 수입니다.
+> `brandName`은 DROP 판매자의 `sellers.brand_name`입니다. 상세 응답에는 목록의 `availableStock`처럼 최상위 가용 재고 합계를 두지 않습니다.
 > `options`에는 활성 SKU(`is_active = true`)만 포함하고, 각 SKU의 `soldOut`은 `availableStock == 0`입니다. `optionGroups`·`values`는 활성 개념 없이 전부 반환합니다.
 > 없는 DROP과 `DRAFT`는 `DROP_NOT_FOUND`로 숨깁니다. `CANCELED`는 200으로 보여 주고 `actions`가 모두 `false`입니다.
 > `wishNotice`는 WISH 안내 문구이고, `serverTime`은 `actions`를 판정한 서버 시각입니다.

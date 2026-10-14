@@ -112,7 +112,7 @@ class SupabaseStorageClientTest {
     void notConfigured() {
         // given
         SupabaseStorageClient client = new SupabaseStorageClient(builder,
-                new SupabaseStorageProperties("", " ", BUCKET, Duration.ofSeconds(3), Duration.ofSeconds(5)));
+                new SupabaseStorageProperties("", " ", BUCKET, "seller-documents", Duration.ofSeconds(3), Duration.ofSeconds(5)));
 
         // when & then
         assertThatThrownBy(() -> client.createSignedUploadUrl(OBJECT_KEY))
@@ -122,6 +122,6 @@ class SupabaseStorageClientTest {
     }
 
     private static SupabaseStorageProperties properties(String secretKey) {
-        return new SupabaseStorageProperties(BASE_URL, secretKey, BUCKET, Duration.ofSeconds(3), Duration.ofSeconds(5));
+        return new SupabaseStorageProperties(BASE_URL, secretKey, BUCKET, "seller-documents", Duration.ofSeconds(3), Duration.ofSeconds(5));
     }
 }

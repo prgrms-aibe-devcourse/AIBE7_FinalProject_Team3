@@ -53,9 +53,9 @@ class DropControllerTest {
     void listDrops() throws Exception {
         // given
         PublicDropListResponse item = new PublicDropListResponse(
-                100L, "상품", "https://img/1.jpg", 129000L,
+                100L, "상품", "그랩 스튜디오", "https://img/1.jpg", 129000L,
                 new DropCategoryResponse(1L, "패션"),
-                DropStatus.WISH, false, 152L,
+                DropStatus.WISH, false, 24L, 152L,
                 OffsetDateTime.parse("2026-09-20T01:00:00Z"),
                 OffsetDateTime.parse("2026-09-20T03:00:00Z"));
         given(dropService.findPublicDrops(any(), any(), any(), any(), any(), eq(0), eq(20)))
@@ -66,12 +66,14 @@ class DropControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.content[0].dropId").value(100))
+                .andExpect(jsonPath("$.data.content[0].brandName").value("그랩 스튜디오"))
                 .andExpect(jsonPath("$.data.content[0].thumbnailUrl").value("https://img/1.jpg"))
                 .andExpect(jsonPath("$.data.content[0].minPrice").value(129000))
                 .andExpect(jsonPath("$.data.content[0].category.categoryId").value(1))
                 .andExpect(jsonPath("$.data.content[0].category.name").value("패션"))
                 .andExpect(jsonPath("$.data.content[0].status").value("WISH"))
                 .andExpect(jsonPath("$.data.content[0].soldOut").value(false))
+                .andExpect(jsonPath("$.data.content[0].availableStock").value(24))
                 .andExpect(jsonPath("$.data.content[0].wishCount").value(152))
                 .andExpect(jsonPath("$.data.page").value(0))
                 .andExpect(jsonPath("$.data.size").value(20))
@@ -183,7 +185,7 @@ class DropControllerTest {
     void getDrop() throws Exception {
         // given
         PublicDropDetailResponse response = new PublicDropDetailResponse(
-                100L, "상품", "설명", List.of("https://img/1.jpg"),
+                100L, "상품", "그랩 스튜디오", "설명", List.of("https://img/1.jpg"),
                 List.of(new PublicDropDetailResponse.Image("https://img/1.jpg", "정면")),
                 List.of(new PublicDropDetailResponse.Image("https://img/detail.jpg", "소재")),
                 129000L,
@@ -206,6 +208,7 @@ class DropControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.dropId").value(100))
                 .andExpect(jsonPath("$.data.name").value("상품"))
+                .andExpect(jsonPath("$.data.brandName").value("그랩 스튜디오"))
                 .andExpect(jsonPath("$.data.description").value("설명"))
                 .andExpect(jsonPath("$.data.imageUrls[0]").value("https://img/1.jpg"))
                 .andExpect(jsonPath("$.data.galleryImages[0].imageUrl").value("https://img/1.jpg"))
