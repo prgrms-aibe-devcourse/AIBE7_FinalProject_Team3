@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.imageio.ImageIO;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.UUID;
 
@@ -34,6 +36,9 @@ public class SellerDocumentUploadService {
         }
 
         byte[] plaintext = readBytes(file);
+        if (!isDecodableImage(plaintext)) {
+            throw new BusinessException(CommonErrorCode.VALIDATION_FAILED);
+        }
         EncryptedDocument encrypted = documentEncryptionService.encrypt(plaintext);
 
         UUID documentId = UUID.randomUUID();
@@ -55,6 +60,15 @@ public class SellerDocumentUploadService {
             return file.getBytes();
         } catch (IOException e) {
             throw new BusinessException(CommonErrorCode.INVALID_REQUEST);
+        }
+    }
+
+    // 운영자 뷰어(GR-92)가 열람 시점에 디코딩 실패를 겪지 않도록, 암호화 전에 이미지로 해석되는 파일인지 먼저 확인한다.
+    private static boolean isDecodableImage(byte[] bytes) {
+        try {
+            return ImageIO.read(new ByteArrayInputStream(bytes)) != null;
+        } catch (IOException e) {
+            return false;
         }
     }
 }
