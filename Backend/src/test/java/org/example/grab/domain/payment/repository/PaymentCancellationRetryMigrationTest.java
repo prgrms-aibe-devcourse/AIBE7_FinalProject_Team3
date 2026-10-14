@@ -20,14 +20,14 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /*
- * V19(payment_cancellations.next_retry_at 채우기) 검증. 이관 직전 버전까지만 적용한 DB에 next_retry_at 없이 저장된
+ * V21(payment_cancellations.next_retry_at 채우기) 검증. 이관 직전 버전까지만 적용한 DB에 next_retry_at 없이 저장된
  * 취소 기록을 넣고 나머지를 적용해, REQUESTED에만 created_at + 1분이 채워지는지 확인한다.
- * 이관 직전 버전은 V19보다 낮은 마이그레이션 중 가장 높은 버전으로 계산한다(DropImageTypeMigrationTest와 같은 이유).
+ * 이관 직전 버전은 V21보다 낮은 마이그레이션 중 가장 높은 버전으로 계산한다(DropImageTypeMigrationTest와 같은 이유).
  */
 @Testcontainers
 class PaymentCancellationRetryMigrationTest {
 
-    private static final MigrationVersion RETRY_FILL_VERSION = MigrationVersion.fromVersion("19");
+    private static final MigrationVersion RETRY_FILL_VERSION = MigrationVersion.fromVersion("21");
     private static final OffsetDateTime CREATED_AT = OffsetDateTime.of(2026, 10, 1, 9, 0, 0, 0, ZoneOffset.UTC);
     private static final OffsetDateTime UNKNOWN_RETRY_AT = OffsetDateTime.of(2026, 10, 1, 9, 5, 0, 0, ZoneOffset.UTC);
 
@@ -35,7 +35,7 @@ class PaymentCancellationRetryMigrationTest {
     static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18");
 
     @Test
-    @DisplayName("V19 적용 후 next_retry_at이 없던 REQUESTED는 created_at + 1분이 되고, UNKNOWN 값과 끝난 취소는 그대로다")
+    @DisplayName("V21 적용 후 next_retry_at이 없던 REQUESTED는 created_at + 1분이 되고, UNKNOWN 값과 끝난 취소는 그대로다")
     void fillsNextRetryAtOfRequested() {
         // given: REQUESTED가 next_retry_at 없이 저장되던 시점의 스키마와 데이터
         DriverManagerDataSource dataSource = new DriverManagerDataSource(
