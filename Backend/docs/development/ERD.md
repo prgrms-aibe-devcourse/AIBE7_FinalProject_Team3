@@ -81,6 +81,40 @@ MVP에서는 판매자 신청과 프로필을 한 테이블에서 관리한다. 
 - 외부 API 장애·타임아웃 시에는 신청을 막지 않는다. 검증을 생략한 채 `PENDING`으로 접수하고, 운영자가 승인 전 수동으로 사업자 상태를 확인한다.
 - 같은 사업자등록번호로 복수 계정이 신청하는 것은 `uq_sellers_user`가 아니라 이 UQ로 막는다.
 
+#### `seller_documents`
+
+| 컬럼 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `id` | UUID | O | PK, 업로드 시 발급하는 `documentId` |
+| `uploaded_by` | BIGINT | O | FK users, 업로드한 회원 |
+| `seller_id` | BIGINT | X | FK sellers, 신청 제출 전 먼저 업로드되므로 생성 시점엔 `NULL`일 수 있다 |
+| `document_type` | VARCHAR(30) | O | `BUSINESS_LICENSE`, `ID_CARD`, `BANKBOOK`, `MAIL_ORDER_BUSINESS_REPORT` |
+| `content_type` | VARCHAR(100) | O | 원본 파일의 MIME 타입(복호화 후 스트리밍 응답에 사용) |
+| `encrypted_object_key` | VARCHAR(500) | O | 비공개 버킷(`seller-documents`)에 저장된 암호문 객체 키 |
+| `encrypted_dek` | VARCHAR(500) | O | 마스터키로 암호화한 DEK (봉투 암호화) |
+| `created_at` | TIMESTAMPTZ | O | 업로드 시각 |
+| `updated_at` | TIMESTAMPTZ | O | 최종 수정 시각(신청에 연결될 때 갱신) |
+
+- 파일마다 랜덤 DEK로 AES-256-GCM 암호화 후 원본은 버리고 암호문만 버킷에 저장한다. DEK는 환경변수 마스터키로 한 번 더 암호화해 `encrypted_dek`에 저장한다(KMS 연동 없음).
+- 공개 `imageUrl`을 발급하지 않는다. 열람은 운영자 전용 뷰어(`seller_document_access_logs` 참고)로만 가능하다.
+- `document_type`은 신청 1건당 4종이 모두 있어야 하며, 신청 생성 시 누락이 있으면 `400 VALIDATION_FAILED`로 거부한다.
+- 신청 생성 시 `documentId`의 `uploaded_by`가 신청자 본인이 아니거나 이미 다른 신청에 연결된 서류면 `400 VALIDATION_FAILED`로 거부한다(다른 회원의 서류 도용 방지).
+- `ID_CARD`는 주민등록번호 뒷자리를 가려서 촬영·제출하도록 안내한다(서버가 자동 검증하지 않으며, 미가림이 확인되면 운영자가 반려한다).
+- 버킷에는 서버사이드 암호화(SSE)도 함께 적용한다(저장소 레벨 방어, 애플리케이션 레벨 암호화와 별개).
+
+#### `seller_document_access_logs`
+
+| 컬럼 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `id` | BIGINT | O | PK |
+| `admin_id` | BIGINT | O | FK users, 열람한 운영자 |
+| `seller_id` | BIGINT | O | FK sellers, 열람 대상 신청 |
+| `document_type` | VARCHAR(30) | O | 열람한 서류 종류 |
+| `accessed_at` | TIMESTAMPTZ | O | 열람 시각 |
+
+- 운영자가 전용 뷰어로 서류를 열람할 때마다(`GET .../documents/{documentType}/view`) 한 행을 남긴다.
+- 응답은 URL이 아니라 서버가 복호화 후 운영자 ID + 열람 시각 워터마크를 합성한 이미지 바이트 스트림이며, `Cache-Control: no-store`로 캐시를 막는다.
+
 ### 1.2 DROP 및 옵션
 
 #### `categories`
