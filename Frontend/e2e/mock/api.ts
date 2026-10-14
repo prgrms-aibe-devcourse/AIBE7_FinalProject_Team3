@@ -43,6 +43,8 @@ export type FixtureDrop = {
   options: Option[]
   // 공개 목록에 노출할지. 상세 전용 예시(품절·종료)는 false다.
   listed: boolean
+  // 목록은 WISH로 보이지만 서버는 판매 시작으로 판정하는 전환 지연 재현용.
+  rejectWish?: boolean
 }
 
 export const CATEGORIES = [
@@ -605,7 +607,15 @@ const minPrice = (drop: FixtureDrop): number | null => {
   return prices.length ? Math.min(...prices) : null
 }
 
-const listItem = (drop: FixtureDrop) => ({
+// 데모 사용자가 처음부터 담고 있는 WISH. 서버 공개 목록의 wishCount에는 이 사용자의 WISH도 포함된다.
+const INITIAL_WISHES = new Set([101])
+
+const wishCountOf = (drop: FixtureDrop, wished: ReadonlySet<number>) =>
+  drop.wishCount +
+  (wished.has(drop.dropId) ? 1 : 0) -
+  (INITIAL_WISHES.has(drop.dropId) ? 1 : 0)
+
+const listItem = (drop: FixtureDrop, wished: ReadonlySet<number>) => ({
   dropId: drop.dropId,
   name: drop.name,
   brandName: drop.brand,
@@ -615,7 +625,7 @@ const listItem = (drop: FixtureDrop) => ({
   status: drop.status,
   soldOut: isSoldOut(drop),
   availableStock: totalStock(drop),
-  wishCount: drop.wishCount,
+  wishCount: wishCountOf(drop, wished),
   saleStartsAt: drop.saleStartsAt,
   saleEndsAt: drop.saleEndsAt,
 })
@@ -642,7 +652,7 @@ const actions = (drop: FixtureDrop) => {
   }
 }
 
-const detailBody = (drop: FixtureDrop) => ({
+const detailBody = (drop: FixtureDrop, wished: ReadonlySet<number>) => ({
   dropId: drop.dropId,
   name: drop.name,
   brandName: drop.brand,
@@ -654,7 +664,7 @@ const detailBody = (drop: FixtureDrop) => ({
   category: { categoryId: drop.categoryId, name: drop.categoryName },
   status: drop.status,
   soldOut: isSoldOut(drop),
-  wishCount: drop.wishCount,
+  wishCount: wishCountOf(drop, wished),
   wishNotice: WISH_NOTICE,
   saleStartsAt: drop.saleStartsAt,
   saleEndsAt: drop.saleEndsAt,
@@ -687,14 +697,22 @@ const stockBody = (drop: FixtureDrop) => ({
 type SortField =
   'publishedAt' | 'createdAt' | 'saleStartsAt' | 'wishCount' | 'soldQuantity'
 
-const sortValue = (drop: FixtureDrop, field: SortField) =>
+const sortValue = (
+  drop: FixtureDrop,
+  field: SortField,
+  wished: ReadonlySet<number>,
+) =>
   field === 'wishCount'
-    ? drop.wishCount
+    ? wishCountOf(drop, wished)
     : field === 'soldQuantity'
       ? drop.soldQuantity
       : Date.parse(drop[field])
 
-function listResponse(dataset: FixtureDrop[], params: URLSearchParams) {
+function listResponse(
+  dataset: FixtureDrop[],
+  params: URLSearchParams,
+  wished: ReadonlySet<number>,
+) {
   const status = params.get('status')
   const categoryId = params.get('categoryId')
   const keyword = (params.get('keyword') ?? '').trim().toLowerCase()
@@ -736,7 +754,7 @@ function listResponse(dataset: FixtureDrop[], params: URLSearchParams) {
   }
 
   items = [...items].sort((a, b) => {
-    const diff = sortValue(a, field) - sortValue(b, field)
+    const diff = sortValue(a, field, wished) - sortValue(b, field, wished)
     const directed =
       field === 'wishCount' || field === 'soldQuantity'
         ? -diff
@@ -753,7 +771,9 @@ function listResponse(dataset: FixtureDrop[], params: URLSearchParams) {
   const totalElements = items.length
   const totalPages = Math.max(1, Math.ceil(totalElements / size))
   return {
-    content: items.slice(page * size, page * size + size).map(listItem),
+    content: items
+      .slice(page * size, page * size + size)
+      .map((drop) => listItem(drop, wished)),
     page,
     size,
     totalElements,
@@ -770,10 +790,40 @@ const json = (route: Route, body: unknown, status = 200) =>
   })
 
 export type Scenario =
-  'base' | 'empty' | 'failure' | 'many' | 'states' | 'transition'
+  | 'base'
+  | 'empty'
+  | 'failure'
+  | 'many'
+  | 'states'
+  | 'transition'
+  | 'wishes'
+  | 'no-wishes'
+  | 'wish-409'
 
 function datasetFor(scenario: Scenario): FixtureDrop[] {
   const dataset = baseDrops()
+  if (scenario === 'wishes') {
+    const sample = dataset.find((drop) => drop.dropId === 103) as FixtureDrop
+    return [
+      ...dataset,
+      ...Array.from({ length: 23 }, (_, index) => ({
+        ...sample,
+        dropId: 3000 + index,
+        name: `WISH 더미 ${index + 1}`,
+        status: 'WISH' as const,
+        wishCount: index,
+        saleStartsAt: at(3),
+        saleEndsAt: at(10),
+        publishedAt: daysAgo(1),
+        listed: true,
+      })),
+    ]
+  }
+  if (scenario === 'wish-409') {
+    return dataset.map((drop) =>
+      drop.dropId === 103 ? { ...drop, rejectWish: true } : drop,
+    )
+  }
   if (scenario === 'transition') {
     const sample = dataset.find((drop) => drop.dropId === 203) as FixtureDrop
     return [
@@ -866,18 +916,101 @@ function datasetFor(scenario: Scenario): FixtureDrop[] {
   return dataset
 }
 
+type ApiState = {
+  drops: FixtureDrop[]
+  wished: Set<number>
+}
+
+const wishListItem = (drop: FixtureDrop) => ({
+  dropId: drop.dropId,
+  name: drop.name,
+  thumbnailUrl: drop.thumbnailUrl,
+  minPrice: minPrice(drop),
+  status: drop.status,
+  wishedAt: daysAgo(1),
+})
+
+function wishListResponse(state: ApiState, params: URLSearchParams) {
+  const page = Number(params.get('page') ?? '0')
+  const size = Number(params.get('size') ?? '20')
+  const items = state.drops.filter((drop) => state.wished.has(drop.dropId))
+  const totalElements = items.length
+  return {
+    content: items.slice(page * size, page * size + size).map(wishListItem),
+    page,
+    size,
+    totalElements,
+    totalPages: totalElements === 0 ? 0 : Math.ceil(totalElements / size),
+    hasNext: (page + 1) * size < totalElements,
+  }
+}
+
+// 등록·취소 판정은 명세(WISH.md 1.1·1.2)와 서버 시각을 따른다.
+function wishError(
+  drop: FixtureDrop | undefined,
+): { status: number; code: string } | null {
+  if (!drop || drop.status === 'DRAFT')
+    return { status: 404, code: 'DROP_NOT_FOUND' }
+  if (drop.status === 'CANCELED')
+    return { status: 409, code: 'DROP_NOT_WISHABLE' }
+  if (drop.status === 'GRAB' || drop.status === 'ENDED' || drop.rejectWish)
+    return { status: 409, code: 'GRAB_ALREADY_STARTED' }
+  if (Date.parse(drop.saleStartsAt) <= FIXED_NOW.getTime())
+    return { status: 409, code: 'GRAB_ALREADY_STARTED' }
+  return null
+}
+
 async function handleRoute(
   route: Route,
+  state: ApiState,
   scenario: Scenario,
   failureStatus: 'all' | 'GRAB' | null,
 ) {
   const url = new URL(route.request().url())
   const path = url.pathname
-  const dataset = datasetFor(scenario)
+  const { drops, wished } = state
 
   if (path === '/api/v1/categories') {
     await json(route, { success: true, data: CATEGORIES })
     return
+  }
+  if (path === '/api/v1/users/me/wishes') {
+    await json(route, {
+      success: true,
+      data: wishListResponse(state, url.searchParams),
+    })
+    return
+  }
+  const wish = path.match(/^\/api\/v1\/drops\/(\d+)\/wish$/)
+  if (wish) {
+    const drop = drops.find((item) => item.dropId === Number(wish[1]))
+    const error = wishError(drop)
+    if (route.request().method() === 'PUT') {
+      if (error) {
+        await json(route, { success: false, message: error.code }, error.status)
+        return
+      }
+      wished.add(Number(wish[1]))
+      await json(route, {
+        success: true,
+        data: {
+          dropId: Number(wish[1]),
+          wished: true,
+          wishedAt: FIXED_NOW.toISOString(),
+          notice: WISH_NOTICE,
+        },
+      })
+      return
+    }
+    if (route.request().method() === 'DELETE') {
+      if (error) {
+        await json(route, { success: false, message: error.code }, error.status)
+        return
+      }
+      wished.delete(Number(wish[1]))
+      await route.fulfill({ status: 204, body: '' })
+      return
+    }
   }
   if (path === '/api/v1/drops') {
     const status = url.searchParams.get('status')
@@ -900,21 +1033,21 @@ async function handleRoute(
     else
       await json(route, {
         success: true,
-        data: listResponse(dataset, url.searchParams),
+        data: listResponse(drops, url.searchParams, wished),
       })
     return
   }
   const detail = path.match(/^\/api\/v1\/drops\/(\d+)$/)
   if (detail) {
-    const drop = dataset.find((item) => item.dropId === Number(detail[1]))
+    const drop = drops.find((item) => item.dropId === Number(detail[1]))
     if (!drop || drop.status === 'DRAFT')
       await json(route, { success: false, message: 'DROP_NOT_FOUND' }, 404)
-    else await json(route, { success: true, data: detailBody(drop) })
+    else await json(route, { success: true, data: detailBody(drop, wished) })
     return
   }
   const stocks = path.match(/^\/api\/v1\/drops\/(\d+)\/stocks$/)
   if (stocks) {
-    const drop = dataset.find((item) => item.dropId === Number(stocks[1]))
+    const drop = drops.find((item) => item.dropId === Number(stocks[1]))
     if (!drop || drop.status === 'DRAFT')
       await json(route, { success: false, message: 'DROP_NOT_FOUND' }, 404)
     else await json(route, { success: true, data: stockBody(drop) })
@@ -923,22 +1056,47 @@ async function handleRoute(
   await route.fallback()
 }
 
+function initialWishesFor(scenario: Scenario): Set<number> {
+  if (scenario === 'no-wishes') return new Set()
+  if (scenario === 'wishes')
+    return new Set([
+      ...INITIAL_WISHES,
+      ...Array.from({ length: 23 }, (_, index) => 3000 + index),
+    ])
+  return new Set(INITIAL_WISHES)
+}
+
 // 모든 소비자 화면이 공개 API만 호출하도록 기본 응답을 고정한다.
+// WISH 상태는 페이지 세션 동안 유지되어 등록·취소가 다음 조회에 반영된다.
 export async function installPublicApi(page: Page) {
-  await page.route('**/api/v1/**', (route) => handleRoute(route, 'base', null))
+  const state: ApiState = {
+    drops: datasetFor('base'),
+    wished: initialWishesFor('base'),
+  }
+  await page.route('**/api/v1/**', (route) =>
+    handleRoute(route, state, 'base', null),
+  )
 }
 
 export async function installHomeScenario(
   page: Page,
   scenario: 'empty' | 'failure' | 'many',
 ) {
+  const state: ApiState = {
+    drops: datasetFor(scenario),
+    wished: initialWishesFor(scenario),
+  }
   await page.route('**/api/v1/**', (route) =>
-    handleRoute(route, scenario, scenario === 'failure' ? 'GRAB' : null),
+    handleRoute(route, state, scenario, scenario === 'failure' ? 'GRAB' : null),
   )
 }
 
 export async function installCatalogScenario(page: Page, scenario: Scenario) {
+  const state: ApiState = {
+    drops: datasetFor(scenario),
+    wished: initialWishesFor(scenario),
+  }
   await page.route('**/api/v1/**', (route) =>
-    handleRoute(route, scenario, scenario === 'failure' ? 'all' : null),
+    handleRoute(route, state, scenario, scenario === 'failure' ? 'all' : null),
   )
 }
