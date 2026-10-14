@@ -480,13 +480,16 @@ export interface components {
       /** Format: int64 */
       dropId?: number
       name?: string
-      thumbnailUrl?: string
+      brandName?: string
+      thumbnailUrl?: string | null
       /** Format: int64 */
-      minPrice?: number
+      minPrice?: number | null
       category?: components['schemas']['DropCategoryResponse']
       /** @enum {string} */
-      status?: 'DRAFT' | 'WISH' | 'GRAB' | 'ENDED' | 'CANCELED'
+      status?: 'WISH' | 'GRAB' | 'ENDED'
       soldOut?: boolean
+      /** Format: int64 */
+      availableStock?: number
       /** Format: int64 */
       wishCount?: number
       /** Format: date-time */
@@ -508,12 +511,13 @@ export interface components {
       /** Format: int64 */
       dropId?: number
       name?: string
+      brandName?: string
       description?: string
       imageUrls?: string[]
       galleryImages?: components['schemas']['Image'][]
       detailImages?: components['schemas']['Image'][]
       /** Format: int64 */
-      minPrice?: number
+      minPrice?: number | null
       category?: components['schemas']['DropCategoryResponse']
       /** @enum {string} */
       status?: 'DRAFT' | 'WISH' | 'GRAB' | 'ENDED' | 'CANCELED'

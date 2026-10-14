@@ -12,6 +12,10 @@
   ],
   "tags": [
     {
+      "name": "토큰 재발급",
+      "description": "Refresh Token Rotation"
+    },
+    {
       "name": "CSRF",
       "description": "상태 변경 요청에 쓸 CSRF 토큰 발급"
     },
@@ -26,6 +30,10 @@
     {
       "name": "이메일 인증",
       "description": "LOCAL 회원가입용 이메일 인증 코드 요청·확인"
+    },
+    {
+      "name": "로그아웃",
+      "description": "Refresh Token 세션 폐기와 인증 쿠키 만료"
     }
   ],
   "paths": {
@@ -95,6 +103,47 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "tags": ["토큰 재발급"],
+        "summary": "토큰 재발급",
+        "description": "refresh_token 쿠키로 Access·Refresh Token을 새로 발급한다. 사용한 Refresh Token은 폐기된다",
+        "operationId": "refresh",
+        "responses": {
+          "204": {
+            "description": "재발급 성공, Set-Cookie로 access_token·refresh_token 전달"
+          },
+          "401": {
+            "description": "INVALID_TOKEN"
+          },
+          "403": {
+            "description": "ACCESS_DENIED(CSRF 토큰 없음·불일치)"
+          },
+          "500": {
+            "description": "INTERNAL_SERVER_ERROR(Redis 장애 등. 로그아웃하지 않고 다시 시도한다)"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": ["로그아웃"],
+        "summary": "로그아웃",
+        "description": "refresh_token 쿠키의 세션을 폐기하고 두 인증 쿠키를 만료시킨다. 쿠키가 없거나 이미 폐기된 토큰이어도 204다",
+        "operationId": "logout",
+        "responses": {
+          "204": {
+            "description": "로그아웃 성공, Set-Cookie로 access_token·refresh_token 만료"
+          },
+          "403": {
+            "description": "ACCESS_DENIED(CSRF 토큰 없음·불일치)"
+          },
+          "500": {
+            "description": "INTERNAL_SERVER_ERROR(Redis 장애 등. 쿠키가 유지되므로 다시 시도한다)"
           }
         }
       }

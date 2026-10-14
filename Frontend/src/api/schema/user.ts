@@ -24,6 +24,46 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/auth/refresh': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * 토큰 재발급
+     * @description refresh_token 쿠키로 Access·Refresh Token을 새로 발급한다. 사용한 Refresh Token은 폐기된다
+     */
+    post: operations['refresh']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/auth/logout': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * 로그아웃
+     * @description refresh_token 쿠키의 세션을 폐기하고 두 인증 쿠키를 만료시킨다. 쿠키가 없거나 이미 폐기된 토큰이어도 204다
+     */
+    post: operations['logout']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/auth/login': {
     parameters: {
       query?: never
@@ -211,6 +251,77 @@ export interface operations {
         content: {
           '*/*': components['schemas']['ApiResponseSignupResponse']
         }
+      }
+    }
+  }
+  refresh: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description 재발급 성공, Set-Cookie로 access_token·refresh_token 전달 */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description ACCESS_DENIED(CSRF 토큰 없음·불일치) */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description INTERNAL_SERVER_ERROR(Redis 장애 등. 로그아웃하지 않고 다시 시도한다) */
+      500: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  logout: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description 로그아웃 성공, Set-Cookie로 access_token·refresh_token 만료 */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description ACCESS_DENIED(CSRF 토큰 없음·불일치) */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description INTERNAL_SERVER_ERROR(Redis 장애 등. 쿠키가 유지되므로 다시 시도한다) */
+      500: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
       }
     }
   }

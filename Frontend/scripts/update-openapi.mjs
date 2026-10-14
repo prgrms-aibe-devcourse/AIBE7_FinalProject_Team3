@@ -6,6 +6,7 @@ const groups = [
   'drop',
   'order',
   'payment',
+  'seller',
   'user',
   'wish',
 ]

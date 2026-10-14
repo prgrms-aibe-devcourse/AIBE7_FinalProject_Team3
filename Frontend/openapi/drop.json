@@ -1655,11 +1655,14 @@
           "name": {
             "type": "string"
           },
-          "thumbnailUrl": {
+          "brandName": {
             "type": "string"
           },
+          "thumbnailUrl": {
+            "type": ["string", "null"]
+          },
           "minPrice": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "format": "int64"
           },
           "category": {
@@ -1667,10 +1670,14 @@
           },
           "status": {
             "type": "string",
-            "enum": ["DRAFT", "WISH", "GRAB", "ENDED", "CANCELED"]
+            "enum": ["WISH", "GRAB", "ENDED"]
           },
           "soldOut": {
             "type": "boolean"
+          },
+          "availableStock": {
+            "type": "integer",
+            "format": "int64"
           },
           "wishCount": {
             "type": "integer",
@@ -1724,6 +1731,9 @@
           "name": {
             "type": "string"
           },
+          "brandName": {
+            "type": "string"
+          },
           "description": {
             "type": "string"
           },
@@ -1746,7 +1756,7 @@
             }
           },
           "minPrice": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "format": "int64"
           },
           "category": {
