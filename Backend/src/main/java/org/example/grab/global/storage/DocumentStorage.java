@@ -4,4 +4,6 @@ package org.example.grab.global.storage;
 public interface DocumentStorage {
 
     void store(String objectKey, byte[] data);
+
+    byte[] load(String objectKey);
 }

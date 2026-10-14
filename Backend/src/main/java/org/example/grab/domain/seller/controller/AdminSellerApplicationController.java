@@ -8,13 +8,19 @@ import org.example.grab.domain.seller.dto.AdminSellerApplicationResponse;
 import org.example.grab.domain.seller.dto.SellerApplicationApprovalResponse;
 import org.example.grab.domain.seller.dto.SellerApplicationRejectRequest;
 import org.example.grab.domain.seller.dto.SellerApplicationRejectionResponse;
+import org.example.grab.domain.seller.dto.SellerDocumentView;
+import org.example.grab.domain.seller.entity.DocumentType;
 import org.example.grab.domain.seller.entity.SellerStatus;
 import org.example.grab.domain.seller.service.AdminSellerApplicationService;
+import org.example.grab.domain.seller.service.SellerDocumentViewService;
 import org.example.grab.global.common.ApiResponse;
 import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
 import org.example.grab.global.security.identity.CurrentUserIdProvider;
+import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -32,6 +38,7 @@ import java.util.UUID;
 public class AdminSellerApplicationController {
 
     private final AdminSellerApplicationService adminSellerApplicationService;
+    private final SellerDocumentViewService sellerDocumentViewService;
     private final CurrentUserIdProvider currentUserIdProvider;
 
     @Operation(summary = "판매자 신청 목록 조회", description = "status 미지정 시 전체 상태를 반환한다")
@@ -74,5 +81,22 @@ public class AdminSellerApplicationController {
             @Valid @RequestBody SellerApplicationRejectRequest request) {
         return ApiResponse.success(adminSellerApplicationService.reject(
                 applicationId, currentUserIdProvider.currentUserId(), request.reason()));
+    }
+
+    @Operation(summary = "판매자 신청 서류 열람(전용 뷰어)",
+            description = "응답은 URL이 아니라 복호화+워터마크 합성을 마친 이미지 바이트다. 열람마다 접근 로그를 남긴다")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "열람 성공")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "AUTHENTICATION_REQUIRED, INVALID_TOKEN")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "ACCESS_DENIED")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "SELLER_APPLICATION_NOT_FOUND")
+    @GetMapping("/{applicationId}/documents/{documentType}/view")
+    public ResponseEntity<byte[]> viewDocument(@PathVariable UUID applicationId,
+            @PathVariable DocumentType documentType) {
+        SellerDocumentView view = sellerDocumentViewService.view(
+                applicationId, documentType, currentUserIdProvider.currentUserId());
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(view.contentType()))
+                .cacheControl(CacheControl.noStore())
+                .body(view.imageBytes());
     }
 }
