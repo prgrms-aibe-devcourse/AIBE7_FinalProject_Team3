@@ -495,6 +495,17 @@ GET /api/v1/users/me
 }
 ```
 
+- 사용자 ID는 경로·쿼리로 받지 않는다. 항상 `access_token`의 본인 정보를 돌려준다.
+- `roles`는 요청 Access Token의 권한이며 로그인 응답과 같은 값·순서(`USER`, `SELLER`, `ADMIN`)다. 판매자 승인·취소는 다음 재발급(1.7)부터 반영된다. 즉시 반영하려면 재발급한 뒤 다시 조회한다.
+- `profileImageUrl`은 등록된 이미지가 없으면 `null`이다. 키는 생략하지 않는다.
+- `createdAt`은 ISO 8601 형식이다. 같은 시각을 다른 오프셋(예: `Z`)으로 표기할 수 있다.
+- 로그인 후 정지·탈퇴된 회원은 토큰이 유효해도 `AUTHENTICATION_REQUIRED`(401)로 거부한다. 계정 상태는 드러내지 않으며 로그인(1.3)에서 `ACCOUNT_DISABLED`로 안내된다. 클라이언트는 다른 401과 같이 재발급을 시도하고, 재발급이 세션을 폐기해 비로그인 상태가 된다.
+
+**오류 코드:**
+- `AUTHENTICATION_REQUIRED`: `access_token` 쿠키 없음, 회원 없음·정지·탈퇴
+- `INVALID_TOKEN`: 만료·변조된 Access Token
+- `ACCESS_DENIED`: `USER` 권한이 없는 토큰
+
 ### 1.10 내 정보 수정
 
 ```http

@@ -234,7 +234,15 @@ curl.exe -s -w "`n%{http_code}`n" -b signup-cookie.txt http://localhost:8080/api
 
 # 401 AUTHENTICATION_REQUIRED: 쿠키 없이 호출
 curl.exe -s -w "`n%{http_code}`n" http://localhost:8080/api/v1/users/me/wishes
+
+# 200: 내 정보(MEMBER_AUTH 1.9). data에 userId·email·nickname·roles·profileImageUrl(null)·createdAt만 있다
+curl.exe -s -w "`n%{http_code}`n" -b signup-cookie.txt http://localhost:8080/api/v1/users/me
+
+# 401 AUTHENTICATION_REQUIRED: 쿠키 없이 호출
+curl.exe -s -w "`n%{http_code}`n" http://localhost:8080/api/v1/users/me
 ```
+
+`roles`는 로그인 응답의 `roles`와 같다(요청 Access Token의 권한). 판매자 승인은 7.4의 재발급 뒤에 조회해야 반영된다.
 
 ### 7.3 Refresh Token 저장 확인
 
@@ -253,6 +261,9 @@ docker compose exec -T redis redis-cli GET $key
 
 ```powershell
 docker compose exec -T postgres psql -U grab -d grab -c "UPDATE users SET status = 'SUSPENDED' WHERE email = 'signup-test@example.com';"
+
+# 401 AUTHENTICATION_REQUIRED: 정지 직후 기존 access_token으로 내 정보 조회. 계정 상태는 드러내지 않는다
+curl.exe -s -w "`n%{http_code}`n" -b signup-cookie.txt http://localhost:8080/api/v1/users/me
 ```
 
 ### 7.4 토큰 재발급
