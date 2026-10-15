@@ -112,6 +112,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/seller/orders/{orderId}/payments': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * 판매자 주문 결제 이력 조회
+     * @description 본인 DROP 주문의 결제 시도와 결과를 시도 순서대로 반환한다. PG 실패 사유는 구매자 정보라 반환하지 않는다
+     */
+    get: operations['findOrderPayments']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/orders/{orderId}': {
     parameters: {
       query?: never
@@ -302,6 +322,31 @@ export interface components {
       shipping?: components['schemas']['OrderShippingResponse']
       /** Format: date-time */
       orderedAt?: string
+    }
+    ApiResponseListSellerPaymentHistoryResponse: {
+      success?: boolean
+      data?: components['schemas']['SellerPaymentHistoryResponse'][]
+      message?: string
+    }
+    SellerPaymentHistoryResponse: {
+      /** Format: uuid */
+      paymentId?: string
+      /** Format: uuid */
+      orderId?: string
+      /** @enum {string} */
+      provider?: 'MOCK' | 'TOSS'
+      /** Format: int64 */
+      amount?: number
+      /** @enum {string} */
+      status?: 'PENDING' | 'SUCCEEDED' | 'FAILED' | 'UNKNOWN' | 'CANCELED'
+      /** @enum {string} */
+      reconciliationStatus?: 'NONE' | 'REQUIRED' | 'RESOLVED'
+      /** Format: date-time */
+      requestedAt?: string
+      /** Format: date-time */
+      paidAt?: string
+      /** Format: date-time */
+      canceledAt?: string
     }
     ApiResponsePageResponseMyOrderListResponse: {
       success?: boolean
@@ -828,6 +873,55 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['ApiResponseSellerOrderDetailResponse']
+        }
+      }
+    }
+  }
+  findOrderPayments: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        orderId: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description 조회 성공 */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseListSellerPaymentHistoryResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseListSellerPaymentHistoryResponse']
+        }
+      }
+      /** @description ACCESS_DENIED, ORDER_ACCESS_DENIED */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseListSellerPaymentHistoryResponse']
+        }
+      }
+      /** @description RESOURCE_NOT_FOUND (UUID 형식 오류), ORDER_NOT_FOUND */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseListSellerPaymentHistoryResponse']
         }
       }
     }

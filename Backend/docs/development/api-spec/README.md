@@ -58,9 +58,9 @@
 | GET | `/api/v1/drops` | 불필요 | 공개된 WISH·GRAB·ENDED DROP 목록 조회 |
 | GET | `/api/v1/drops/{dropId}` | 불필요 | DROP 상세, 옵션, 일정 및 배송 정보 조회 |
 | GET | `/api/v1/drops/{dropId}/stocks` | 불필요 | 옵션별 현재 가용 재고 조회 |
-| GET | `/api/v1/drops/stock-stream?dropIds=100,101` | 불필요. 무효 쿠키는 401 | 단일·다중 상품 변경 구독. 도메인 자동 알림은 GR-110 3단계 예정 |
+| GET | `/api/v1/drops/stock-stream?dropIds=100,101` | 불필요. 무효 쿠키는 401 | 단일·다중 상품 변경 구독. 커밋 후 도메인 자동 알림 |
 
-> SSE endpoint·전송·실행 OpenAPI는 GR-110 2단계에서 구현했습니다. 도메인 변경 자동 발행은 3단계, 생성 스냅샷·프론트 타입 갱신은 5단계에 남아 있습니다. 변경 알림 후 기존 조회 API를 재사용하는 정책과 API·복구·초기 운영 목표는 [실시간 변경 전달 계약](../REALTIME_STOCK.md)을 따릅니다. 운영 성능은 미실측입니다.
+> GR-110에서 SSE endpoint·전송·커밋 후 도메인 변경 알림·OpenAPI 스냅샷·프론트 생성 타입을 구현했습니다. 화면 구독은 GR-111/112, Redis·프록시·운영 검증은 GR-113 범위입니다. 변경 알림 후 기존 조회 API를 재사용하는 정책과 API·복구·초기 운영 목표는 [실시간 변경 전달 계약](../REALTIME_STOCK.md)을 따릅니다. 운영 성능은 미실측입니다.
 
 **목록 API 지원 파라미터:**
 - 상태 필터: `status`

@@ -11,7 +11,11 @@ export interface paths {
       path?: never
       cookie?: never
     }
-    get?: never
+    /**
+     * 주문 결제 이력 조회
+     * @description 본인 주문의 모든 결제 시도와 결과를 시도 순서대로 반환한다. 시도가 없으면 빈 배열이다
+     */
+    get: operations['findPayments']
     put?: never
     /**
      * Mock 결제 요청
@@ -103,6 +107,32 @@ export interface components {
       /** Format: date-time */
       canceledAt?: string
     }
+    ApiResponseListPaymentHistoryResponse: {
+      success?: boolean
+      data?: components['schemas']['PaymentHistoryResponse'][]
+      message?: string
+    }
+    PaymentHistoryResponse: {
+      /** Format: uuid */
+      paymentId?: string
+      /** Format: uuid */
+      orderId?: string
+      /** @enum {string} */
+      provider?: 'MOCK' | 'TOSS'
+      /** Format: int64 */
+      amount?: number
+      /** @enum {string} */
+      status?: 'PENDING' | 'SUCCEEDED' | 'FAILED' | 'UNKNOWN' | 'CANCELED'
+      /** @enum {string} */
+      reconciliationStatus?: 'NONE' | 'REQUIRED' | 'RESOLVED'
+      /** Format: date-time */
+      requestedAt?: string
+      /** Format: date-time */
+      paidAt?: string
+      /** Format: date-time */
+      canceledAt?: string
+      failure?: components['schemas']['Failure']
+    }
   }
   responses: never
   parameters: never
@@ -112,6 +142,46 @@ export interface components {
 }
 export type $defs = Record<string, never>
 export interface operations {
+  findPayments: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        orderId: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description 조회 성공 */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseListPaymentHistoryResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseListPaymentHistoryResponse']
+        }
+      }
+      /** @description RESOURCE_NOT_FOUND (UUID 형식 오류), ORDER_NOT_FOUND */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseListPaymentHistoryResponse']
+        }
+      }
+    }
+  }
   pay: {
     parameters: {
       query?: never

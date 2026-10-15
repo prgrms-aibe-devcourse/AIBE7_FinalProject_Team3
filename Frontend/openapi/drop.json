@@ -12,6 +12,10 @@
   ],
   "tags": [
     {
+      "name": "공개 DROP",
+      "description": "로그인 없이 호출하는 DROP 목록·상세·재고 조회와 변경 구독"
+    },
+    {
       "name": "판매자 DROP",
       "description": "본인 DROP의 임시 저장·수정·공개·취소와 현황 조회. 403 ACCESS_DENIED는 SELLER 권한 없음 또는 CSRF 토큰 누락, DROP_ACCESS_DENIED는 다른 판매자의 DROP"
     },
@@ -927,6 +931,118 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponsePublicDropStockResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/drops/stock-stream": {
+      "get": {
+        "tags": ["공개 DROP"],
+        "summary": "공개 DROP 변경 구독",
+        "description": "최대 100개 입력 ID의 재고·판매량·상태 변경 신호를 구독한다. ready 후 기존 API 재조회가 필요하며 replay는 지원하지 않는다. 상세는 REALTIME_STOCK.md 6~9절 참고",
+        "operationId": "subscribe",
+        "parameters": [
+          {
+            "name": "dropIds",
+            "in": "query",
+            "description": "쉼표 구분 양의 정수. 중복 쿼리 파라미터 불가",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "100,101"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "지속 스트림: ready, drop-changed, stream-closed",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "INVALID_TOKEN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "DROP_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "STOCK_STREAM_LIMIT_EXCEEDED",
+            "headers": {
+              "Retry-After": {
+                "description": "재시도 대기 초",
+                "style": "simple",
+                "schema": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "STOCK_STREAM_UNAVAILABLE",
+            "headers": {
+              "Retry-After": {
+                "description": "재시도 대기 초",
+                "style": "simple",
+                "schema": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1908,6 +2024,46 @@
           "serverTime": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ErrorDetail": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "fieldErrors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldError"
+            }
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {},
+          "error": {
+            "$ref": "#/components/schemas/ErrorDetail"
+          }
+        }
+      },
+      "FieldError": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
           }
         }
       }
