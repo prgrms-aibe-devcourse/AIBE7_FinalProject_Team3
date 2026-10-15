@@ -38,12 +38,14 @@ function DocumentUploadField({
   hint,
   documentId,
   onUploaded,
+  onCleared,
 }: {
   type: SellerDocumentType
   label: string
   hint?: string
   documentId: string | undefined
   onUploaded: (type: SellerDocumentType, documentId: string) => void
+  onCleared: (type: SellerDocumentType) => void
 }) {
   const upload = useUploadSellerDocument()
 
@@ -58,6 +60,8 @@ function DocumentUploadField({
         onChange={(event) => {
           const file = event.target.files?.[0]
           if (!file) return
+          // 재업로드가 실패해도 이전 documentId가 제출에 쓰이지 않도록 먼저 지운다.
+          onCleared(type)
           upload.mutate(
             { documentType: type, file },
             { onSuccess: (data) => onUploaded(type, data.documentId) },
@@ -119,7 +123,11 @@ export default function SellerApplyPage({ account, notify }: Props) {
         documentIds: documentIds as Record<SellerDocumentType, string>,
       },
       {
-        onSuccess: () => notify('판매자 신청이 접수됐어요.'),
+        onSuccess: () => {
+          notify('판매자 신청이 접수됐어요.')
+          // 이후 반려되어 폼이 다시 보일 때 이전 서류 ID가 남지 않게 한다.
+          setDocumentIds({})
+        },
         onError: (error) => setFormError(applicationErrorMessage(error)),
       },
     )
@@ -231,6 +239,9 @@ export default function SellerApplyPage({ account, notify }: Props) {
             documentId={documentIds[field.type]}
             onUploaded={(type, documentId) =>
               setDocumentIds((current) => ({ ...current, [type]: documentId }))
+            }
+            onCleared={(type) =>
+              setDocumentIds((current) => ({ ...current, [type]: undefined }))
             }
           />
         ))}
