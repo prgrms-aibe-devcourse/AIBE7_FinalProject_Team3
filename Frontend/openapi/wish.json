@@ -312,6 +312,10 @@
             "type": "string",
             "enum": ["DRAFT", "WISH", "GRAB", "ENDED", "CANCELED"]
           },
+          "saleStartsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
           "wishedAt": {
             "type": "string",
             "format": "date-time"

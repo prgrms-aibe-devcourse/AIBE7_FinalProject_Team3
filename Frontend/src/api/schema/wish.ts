@@ -92,6 +92,8 @@ export interface components {
       /** @enum {string} */
       status?: 'DRAFT' | 'WISH' | 'GRAB' | 'ENDED' | 'CANCELED'
       /** Format: date-time */
+      saleStartsAt?: string
+      /** Format: date-time */
       wishedAt?: string
     }
   }
