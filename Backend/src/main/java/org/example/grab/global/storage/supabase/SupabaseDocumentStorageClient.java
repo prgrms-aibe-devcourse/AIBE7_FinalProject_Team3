@@ -56,6 +56,24 @@ public class SupabaseDocumentStorageClient implements DocumentStorage {
         }
     }
 
+    @Override
+    public byte[] load(String objectKey) {
+        if (!configured) {
+            log.error("Supabase Storage 설정이 없어 서류 다운로드를 시도하지 않음");
+            throw new BusinessException(CommonErrorCode.EXTERNAL_SERVICE_ERROR);
+        }
+        try {
+            return restClient.get()
+                    .uri(baseUrl + OBJECT_PATH + bucket + "/" + objectKey)
+                    .retrieve()
+                    .body(byte[].class);
+        } catch (RestClientException e) {
+            // 타임아웃·4xx·5xx. 응답·예외 메시지에 Secret Key를 넣지 않는다.
+            log.warn("Supabase Storage 서류 다운로드 실패: cause={}", e.getClass().getSimpleName());
+            throw new BusinessException(CommonErrorCode.EXTERNAL_SERVICE_ERROR);
+        }
+    }
+
     private static String stripTrailingSlash(String value) {
         if (value == null) {
             return "";

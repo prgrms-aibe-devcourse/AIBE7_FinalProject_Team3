@@ -16,6 +16,13 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       # JWT_SECRET과 같이 기본값을 두지 않는다. .env에 없으면 이메일 인증 HMAC 키를 쓰는 시점에 기동에 실패한다
       EMAIL_VERIFICATION_SECRET: ${EMAIL_VERIFICATION_SECRET}
+      # JWT_SECRET과 같이 기본값을 두지 않는다. .env에 없으면 판매자 서류 봉투 암호화(GR-91)를 쓰는 시점에 기동에 실패한다
+      SELLER_DOCUMENT_ENCRYPTION_MASTER_KEY: ${SELLER_DOCUMENT_ENCRYPTION_MASTER_KEY}
+      # Supabase Storage(GR-51 이미지, GR-91 서류) 연동 설정. 비워 두면 업로드·다운로드 시 EXTERNAL_SERVICE_ERROR로 거부된다
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY:-}
+      SUPABASE_DROP_IMAGE_BUCKET: ${SUPABASE_DROP_IMAGE_BUCKET:-drop-images}
+      SUPABASE_SELLER_DOCUMENT_BUCKET: ${SUPABASE_SELLER_DOCUMENT_BUCKET:-seller-documents}
       # 쿠키를 포함한 요청을 허용할 프론트엔드 Origin. 기본값은 로컬 Vite 개발 서버다
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
       REDIS_HOST: redis

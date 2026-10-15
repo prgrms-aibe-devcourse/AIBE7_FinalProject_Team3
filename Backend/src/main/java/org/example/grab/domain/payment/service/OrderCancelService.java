@@ -50,6 +50,15 @@ public class OrderCancelService {
         return outcome.response();
     }
 
+    /**
+     * 결제 취소 재요청 배치(GR-87)가 선점한 취소를 같은 서버 멱등 키로 다시 요청하고 결과를 반영한다.
+     * 거절도 예외 없이 결과로 돌려준다. 배치에는 응답할 사용자가 없다.
+     */
+    public OrderCancelTransactionService.CancelOutcome retry(OrderCancelTransactionService.CancelRetryTarget target) {
+        PaymentCancelResult result = paymentGateway.cancel(target.command());
+        return transactionService.applyResult(target.cancellationId(), result, now());
+    }
+
     // PostgreSQL TIMESTAMPTZ 정밀도(마이크로초)와 UTC로 맞춰, 최초 응답과 재전송 응답의 canceledAt이 같게 한다.
     private static OffsetDateTime now() {
         return OffsetDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.MICROS);

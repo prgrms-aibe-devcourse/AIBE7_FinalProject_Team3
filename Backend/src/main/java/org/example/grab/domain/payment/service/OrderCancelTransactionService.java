@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /*
@@ -33,6 +34,7 @@ import java.util.UUID;
     - prepare: 주문 행을 잠근 채 멱등성·취소 가능 상태·진행 중인 결제를 확인한다. 결제 전 주문은 여기서 취소를 끝내고,
       결제 후 주문은 취소 요청을 주문에 기록하고 payment_cancellations에 REQUESTED를 저장한다.
     - applyResult: 주문 → 결제 → 취소 기록 순서로 행을 잠그고 PG 취소 결과를 결제·주문·예약·재고에 반영한다.
+    결제 취소 재요청 배치(GR-87)도 claimRetries로 대상을 선점하고 findRetryTarget으로 값을 읽은 뒤 같은 applyResult로 반영한다.
  */
 @Service
 @RequiredArgsConstructor
@@ -70,7 +72,7 @@ public class OrderCancelTransactionService {
         Payment payment = approvedPayment(order);
         orderPaymentService.requestPaidCancel(order, idempotencyKey.value(), requestHash.value(), request.reason());
         PaymentCancellation cancellation = cancellationRepository.save(PaymentCancellation.requestOrderCancel(
-                payment.getId(), buyerId, payment.getAmount(), request.reason()));
+                payment.getId(), buyerId, payment.getAmount(), request.reason(), now));
         return new CancelPreparation.RequestPgCancel(cancellation.getId(), cancelCommand(payment, cancellation));
     }
 
@@ -107,6 +109,29 @@ public class OrderCancelTransactionService {
                 yield CancelOutcome.completed(OrderCancelResponse.of(order, RefundStatus.UNKNOWN));
             }
         };
+    }
+
+    /**
+     * 결제 취소 재요청 배치(GR-87)의 대상을 최대 limit건 선점하고 ID를 돌려준다. 선점한 취소는 RETRY_AFTER 동안 다시 선점되지 않는다.
+     */
+    @Transactional
+    public List<Long> claimRetries(OffsetDateTime now, int limit) {
+        return cancellationRepository.claimOrderCancelRetries(now, now.plus(PaymentCancellation.RETRY_AFTER), limit);
+    }
+
+    /**
+     * 선점한 취소를 다시 요청하는 데 필요한 값을 읽는다. 잠그지 않는다. 그사이 다른 요청이 결과를 확정했으면 비어 있다.
+     */
+    @Transactional(readOnly = true)
+    public Optional<CancelRetryTarget> findRetryTarget(Long cancellationId) {
+        PaymentCancellation cancellation = cancellationRepository.findById(cancellationId)
+                .orElseThrow(() -> new IllegalStateException("결제 취소 요청이 없습니다: " + cancellationId));
+        if (!cancellation.isInProgress()) {
+            return Optional.empty();
+        }
+        Payment payment = paymentRepository.findById(cancellation.getPaymentId()).orElseThrow();
+        return Optional.of(new CancelRetryTarget(
+                cancellation.getId(), cancellation.getCreatedAt(), cancelCommand(payment, cancellation)));
     }
 
     private CancelPreparation replay(CancelableOrder order, IdempotencyKey idempotencyKey, RequestHash requestHash) {
@@ -177,6 +202,10 @@ public class OrderCancelTransactionService {
     private static PaymentCancelCommand cancelCommand(Payment payment, PaymentCancellation cancellation) {
         return new PaymentCancelCommand(
                 payment.getProviderPaymentId(), cancellation.getReason(), cancellation.getIdempotencyKey());
+    }
+
+    // 재요청 배치가 다시 요청할 취소. command는 최초 요청과 같은 서버 멱등 키를 쓴다. createdAt은 오래 진행 중인 취소의 경고에 쓴다.
+    public record CancelRetryTarget(Long cancellationId, OffsetDateTime createdAt, PaymentCancelCommand command) {
     }
 
     /**

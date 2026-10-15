@@ -16,6 +16,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -55,7 +56,8 @@ class WishQueryServiceTest {
         assertThat(item.thumbnailUrl()).isEqualTo("https://img/1.jpg");
         assertThat(item.minPrice()).isEqualTo(129000L);
         assertThat(item.status().name()).isEqualTo("WISH");
-        assertThat(item.wishedAt()).isNotNull();
+        assertThat(item.saleStartsAt()).isEqualTo(OffsetDateTime.parse("2026-09-20T05:00:00Z"));
+        assertThat(item.wishedAt()).isEqualTo(OffsetDateTime.parse("2026-09-18T05:00:00Z"));
         assertThat(response.page()).isZero();
         assertThat(response.size()).isEqualTo(20);
         assertThat(response.totalElements()).isEqualTo(1);
@@ -108,6 +110,11 @@ class WishQueryServiceTest {
             @Override
             public Instant getWishedAt() {
                 return Instant.parse("2026-09-18T05:00:00Z");
+            }
+
+            @Override
+            public Instant getSaleStartsAt() {
+                return Instant.parse("2026-09-20T05:00:00Z");
             }
         };
     }

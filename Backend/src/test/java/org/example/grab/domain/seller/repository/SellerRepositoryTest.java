@@ -148,6 +148,53 @@ class SellerRepositoryTest {
         assertThat(page.getContent().get(0).getUserId()).isEqualTo(pendingUserId);
     }
 
+    @Test
+    @DisplayName("applicationId(uuid)로 신청을 조회할 수 있다")
+    void findsByUuid() {
+        // given
+        Long userId = insertUser();
+        insertPendingSeller(userId);
+        Seller seller = sellerRepository.findByUserId(userId).orElseThrow();
+
+        // when, then
+        assertThat(sellerRepository.findByUuid(seller.getUuid())).isPresent();
+        assertThat(sellerRepository.findByUuid(UUID.randomUUID())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("승인/반려용 잠금 조회도 applicationId(uuid)로 신청을 찾는다")
+    void findsByUuidForUpdate() {
+        // given
+        Long userId = insertUser();
+        insertPendingSeller(userId);
+        Seller seller = sellerRepository.findByUserId(userId).orElseThrow();
+
+        // when, then
+        assertThat(sellerRepository.findByUuidForUpdate(seller.getUuid())).isPresent();
+        assertThat(sellerRepository.findByUuidForUpdate(UUID.randomUUID())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("운영자 심사 목록은 상태를 지정하면 해당 상태만, 생략하면 전체를 신청자 public_id와 함께 반환한다")
+    void findsApplicationsForReview() {
+        // given
+        Long reviewerId = insertUser();
+        Long pendingUserId = insertUser();
+        insertPendingSeller(pendingUserId);
+        Long approvedUserId = insertUser();
+        insertApprovedSeller(approvedUserId, reviewerId);
+
+        // when
+        var pendingOnly = sellerRepository.findApplications(SellerStatus.PENDING,
+                org.springframework.data.domain.PageRequest.of(0, 20));
+        var all = sellerRepository.findApplications(null, org.springframework.data.domain.PageRequest.of(0, 20));
+
+        // then
+        assertThat(pendingOnly.getContent()).hasSize(1);
+        assertThat(pendingOnly.getContent().get(0).userId()).isEqualTo(publicIdOf(pendingUserId));
+        assertThat(all.getTotalElements()).isEqualTo(2);
+    }
+
     private Optional<Long> findApprovedId(UUID userPublicId) {
         return sellerRepository.findIdByUserPublicIdAndStatus(userPublicId, SellerStatus.APPROVED);
     }

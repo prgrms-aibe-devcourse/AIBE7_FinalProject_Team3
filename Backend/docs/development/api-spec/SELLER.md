@@ -13,6 +13,7 @@ POST /api/v1/seller-documents
 - `documentType`: `BUSINESS_LICENSE`(사업자등록증 사본) / `ID_CARD`(신분증 사본) / `BANKBOOK`(통장 사본) / `MAIL_ORDER_BUSINESS_REPORT`(통신판매업신고증) 중 하나
 - 서버가 파일을 받아 랜덤 DEK로 AES-256-GCM 암호화한 뒤 원본은 버리고 비공개 버킷(`seller-documents`)에 암호문만 저장한다. 공개 `imageUrl`은 내려주지 않고 `documentId`(UUID)만 발급한다.
 - `ID_CARD`는 주민등록번호 뒷자리를 가려서 촬영한 이미지를 제출해야 한다. 가려지지 않은 경우 운영자가 심사 단계(1.6절)에서 확인 후 반려한다.
+- 암호화 전에 이미지로 디코딩되는 파일인지 검증한다. 디코딩할 수 없으면(이미지가 아니거나 손상된 파일) `400 VALIDATION_FAILED`로 거부한다. 운영자 뷰어(1.7절)는 저장 시점에 이미 검증된 파일만 복호화·열람하므로 디코딩 실패를 다시 겪지 않는다.
 
 **응답:** `201 Created`
 

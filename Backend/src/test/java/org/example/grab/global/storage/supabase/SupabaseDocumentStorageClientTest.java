@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.headerDoesNotExist;
@@ -59,6 +60,54 @@ class SupabaseDocumentStorageClientTest {
         client.store(OBJECT_KEY, CIPHERTEXT);
 
         // then
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("서류 버킷 경로로 GET 요청해 암호문 바이트를 그대로 돌려받는다")
+    void loadsCiphertextFromDocumentsBucket() {
+        // given
+        SupabaseDocumentStorageClient client = new SupabaseDocumentStorageClient(builder, properties(SECRET_KEY));
+        server.expect(requestTo(BASE_URL + "/storage/v1/object/" + DOCUMENTS_BUCKET + "/" + OBJECT_KEY))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header("apikey", SECRET_KEY))
+                .andRespond(withSuccess(CIPHERTEXT, MediaType.APPLICATION_OCTET_STREAM));
+
+        // when
+        byte[] result = client.load(OBJECT_KEY);
+
+        // then
+        assertThat(result).isEqualTo(CIPHERTEXT);
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("다운로드 중 Supabase 4xx·5xx·타임아웃은 공통 오류로 바꾼다")
+    void mapsLoadFailuresToCommonError() {
+        // given
+        SupabaseDocumentStorageClient client = new SupabaseDocumentStorageClient(builder, properties(SECRET_KEY));
+        server.expect(requestTo(BASE_URL + "/storage/v1/object/" + DOCUMENTS_BUCKET + "/" + OBJECT_KEY))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND));
+
+        // when & then
+        assertThatThrownBy(() -> client.load(OBJECT_KEY))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(CommonErrorCode.EXTERNAL_SERVICE_ERROR));
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("설정값이 없으면 다운로드도 호출하지 않고 공통 오류를 던진다")
+    void loadNotConfigured() {
+        // given
+        SupabaseDocumentStorageClient client = new SupabaseDocumentStorageClient(builder,
+                new SupabaseStorageProperties("", " ", "drop-images", DOCUMENTS_BUCKET,
+                        Duration.ofSeconds(3), Duration.ofSeconds(5)));
+
+        // when & then
+        assertThatThrownBy(() -> client.load(OBJECT_KEY))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(CommonErrorCode.EXTERNAL_SERVICE_ERROR));
         server.verify();
     }
 
