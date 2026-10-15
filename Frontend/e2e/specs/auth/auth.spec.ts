@@ -1,4 +1,4 @@
-import { expect, login, test } from './fixtures'
+import { expect, login, test } from '../../fixtures'
 
 test('로그인 오류와 원래 화면 복귀', async ({ page }) => {
   await page.goto('/#/my')

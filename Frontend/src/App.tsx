@@ -42,7 +42,7 @@ export default function App() {
     window.setTimeout(() => setToast(''), 2600)
   }
   const { account, authenticated, login, logout } = useAuth()
-  const { wishes, toggleWish } = useWish(authenticated, notify)
+  const { wishes, wishesReady, toggleWish } = useWish(authenticated, notify)
   const { orders, buyerOrders, addOrder, updateBuyerOrder } = useOrders()
   const [sellerApplications, setSellerApplications] = useState(
     demoSellerApplications,
@@ -67,6 +67,7 @@ export default function App() {
   const shared: SharedProps = {
     authenticated,
     wishes,
+    wishesReady,
     orders,
     notify,
     toggleWish,

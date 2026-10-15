@@ -51,6 +51,7 @@ class UserWishControllerTest {
         given(currentUserIdProvider.currentUserId()).willReturn(USER_ID);
         WishListResponse item = new WishListResponse(100L, "한정판 스니커즈",
                 "https://img/1.jpg", 129000L, DropStatus.WISH,
+                OffsetDateTime.parse("2026-09-20T14:00:00Z"),
                 OffsetDateTime.parse("2026-09-18T14:00:00Z"));
         given(wishQueryService.findMyWishes(eq(USER_ID), eq(0), eq(20)))
                 .willReturn(new PageResponse<>(List.of(item), 0, 20, 1, 1, false));
@@ -64,7 +65,8 @@ class UserWishControllerTest {
                 .andExpect(jsonPath("$.data.content[0].thumbnailUrl").value("https://img/1.jpg"))
                 .andExpect(jsonPath("$.data.content[0].minPrice").value(129000))
                 .andExpect(jsonPath("$.data.content[0].status").value("WISH"))
-                .andExpect(jsonPath("$.data.content[0].wishedAt").exists())
+                .andExpect(jsonPath("$.data.content[0].saleStartsAt").value("2026-09-20T14:00:00Z"))
+                .andExpect(jsonPath("$.data.content[0].wishedAt").value("2026-09-18T14:00:00Z"))
                 .andExpect(jsonPath("$.data.page").value(0))
                 .andExpect(jsonPath("$.data.size").value(20))
                 .andExpect(jsonPath("$.data.totalElements").value(1))

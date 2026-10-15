@@ -12,10 +12,12 @@ import type { SharedProps } from '../../types/store'
 function HomeSection({
   section,
   wishes,
+  wishesReady,
   onWish,
 }: {
   section: HomeSectionConfig
-  wishes: Set<number>
+  wishes: ReadonlySet<number>
+  wishesReady: boolean
   onWish: (id: number) => void
 }) {
   const { state, retry } = useHomeDrops(section.status)
@@ -63,6 +65,7 @@ function HomeSection({
           drops={state.drops}
           mode={section.status}
           wishes={wishes}
+          wishReady={wishesReady}
           onWish={onWish}
           label={section.title}
         />
@@ -71,11 +74,13 @@ function HomeSection({
   )
 }
 
-export default function HomePage({ wishes, toggleWish, notify }: SharedProps) {
+export default function HomePage({
+  wishes,
+  wishesReady,
+  toggleWish,
+}: SharedProps) {
   const onWish = (id: number) => {
-    const selected = wishes.has(id)
-    if (!toggleWish(id)) return
-    notify(selected ? 'WISH를 취소했어요.' : 'WISH에 담았어요.')
+    void toggleWish(id)
   }
 
   return (
@@ -93,6 +98,7 @@ export default function HomePage({ wishes, toggleWish, notify }: SharedProps) {
           key={section.status}
           section={section}
           wishes={wishes}
+          wishesReady={wishesReady}
           onWish={onWish}
         />
       ))}

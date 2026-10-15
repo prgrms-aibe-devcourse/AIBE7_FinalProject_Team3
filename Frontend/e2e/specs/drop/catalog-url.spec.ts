@@ -1,5 +1,5 @@
-import { expect, test } from './fixtures'
-import { installCatalogScenario, LONG_PRODUCT_NAME } from './mock/catalog'
+import { expect, test } from '../../fixtures'
+import { installCatalogScenario, LONG_PRODUCT_NAME } from '../../mock/catalog'
 
 test('목록 조건을 직접 진입·새로고침·상세에서 뒤로 가기로 복원한다', async ({
   page,

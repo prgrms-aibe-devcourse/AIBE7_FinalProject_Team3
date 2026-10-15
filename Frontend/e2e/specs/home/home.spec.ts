@@ -1,6 +1,6 @@
-import { expect, test } from './fixtures'
-import { installCatalogScenario } from './mock/catalog'
-import { installHomeScenario } from './mock/home'
+import { expect, test } from '../../fixtures'
+import { installCatalogScenario } from '../../mock/catalog'
+import { installHomeScenario } from '../../mock/home'
 
 test.describe('소비자 메인', () => {
   test('인기 GRAB·WISH를 독립 슬라이드로 보여준다', async ({ page }) => {

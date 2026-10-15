@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures'
+import { expect, test } from '../../fixtures'
 
 test('첫 화면은 메인 화면을 보여준다', async ({ page }) => {
   await page.goto('/')

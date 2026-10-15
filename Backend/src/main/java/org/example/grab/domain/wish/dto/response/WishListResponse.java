@@ -13,6 +13,7 @@ public record WishListResponse(
         String thumbnailUrl,
         Long minPrice,
         DropStatus status,
+        OffsetDateTime saleStartsAt,
         OffsetDateTime wishedAt
 ) {
 
@@ -24,6 +25,7 @@ public record WishListResponse(
                 projection.getThumbnailUrl(),
                 projection.getMinPrice(),
                 DropStatus.valueOf(projection.getStatus()),
+                toOffsetDateTime(projection.getSaleStartsAt()),
                 toOffsetDateTime(projection.getWishedAt()));
     }
 

@@ -1,4 +1,4 @@
-import { expect, loginSeller, test } from './fixtures'
+import { expect, loginSeller, test } from '../../fixtures'
 
 test('목록의 상태·페이지를 상세 뒤로 가기에서도 유지한다', async ({ page }) => {
   await loginSeller(page)

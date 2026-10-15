@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures'
+import { expect, test } from '../../fixtures'
 
 declare const Buffer: {
   from(value: string, encoding: string): Uint8Array

@@ -1,6 +1,6 @@
-import { expect, loginSeller, test, type Page } from './fixtures'
-import { installCatalogScenario } from './mock/catalog'
-import { installHomeScenario } from './mock/home'
+import { expect, loginSeller, test, type Page } from '../../fixtures'
+import { installCatalogScenario } from '../../mock/catalog'
+import { installHomeScenario } from '../../mock/home'
 
 // 기준 이미지는 CI와 같은 Playwright Docker 이미지에서만 만든다(npm run e2e:docker).
 test.describe('화면 기준', { tag: '@visual' }, () => {
@@ -33,7 +33,9 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
     await page.getByLabel('비밀번호').fill('password1234')
     await page.getByRole('button', { name: '로그인', exact: true }).click()
     await page.getByRole('link', { name: 'MY', exact: true }).click()
-    await expect(page.getByRole('status')).toBeEmpty()
+    // WISH 패널도 로딩 상태를 role=status로 두므로 토스트만 확인하고, 목록 로딩이 끝난 뒤 촬영한다.
+    await expect(page.locator('.toast')).toBeEmpty()
+    await expect(page.getByText('매일을 담는 캔버스 토트')).toBeVisible()
     await shot(page, 'my')
   })
 

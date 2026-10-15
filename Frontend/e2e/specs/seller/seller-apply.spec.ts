@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures'
+import { expect, test } from '../../fixtures'
 
 const DOCUMENT_LABELS = [
   '사업자등록증 사본',
@@ -134,7 +134,9 @@ test('반려 상태에서 재신청 폼을 보여주고 중복 신청 오류를 
   await loginFromApplyRedirect(page)
   await expect(page.getByText('REJECTED')).toBeVisible()
   await expect(
-    page.getByText('신청이 반려됐어요. 서류와 정보를 확인한 뒤 다시 신청해주세요.'),
+    page.getByText(
+      '신청이 반려됐어요. 서류와 정보를 확인한 뒤 다시 신청해주세요.',
+    ),
   ).toBeVisible()
 
   await page.getByLabel('브랜드명').fill('메이드 스튜디오')

@@ -3,6 +3,7 @@ package org.example.grab;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.grab.support.TestcontainersConfiguration;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -214,6 +215,34 @@ class SwaggerEndpointTests {
         assertThat(refs).doesNotHaveDuplicates();
     }
 
+    /*
+        GR-99: 내 WISH 목록 200 응답 계약. 래퍼 → data → content.items의 참조를 따라 실제 목록 항목에
+        도달해 saleStartsAt과 wishedAt이 각각 string(date-time)으로 노출되는지 확인한다.
+        컴포넌트 존재만으로 완료 처리하지 않는다.
+     */
+    @Test
+    @DisplayName("내 WISH 목록의 saleStartsAt·wishedAt이 date-time으로 노출된다")
+    void exposesWishListSaleStartsAtContract() throws Exception {
+        for (String uri : List.of("/v3/api-docs/wish", "/v3/api-docs")) {
+            JsonNode doc = readApiDoc(uri);
+            JsonNode response = doc.path("paths").path("/api/v1/users/me/wishes").path("get")
+                    .path("responses").path("200");
+            JsonNode wrapper = deref(doc, responseSchema(response));
+            JsonNode data = deref(doc, wrapper.path("properties").path("data"));
+            JsonNode itemProperties = deref(doc, data.path("properties").path("content").path("items"))
+                    .path("properties");
+
+            assertThat(itemProperties.path("saleStartsAt").path("type").asText())
+                    .as("%s saleStartsAt.type", uri).isEqualTo("string");
+            assertThat(itemProperties.path("saleStartsAt").path("format").asText())
+                    .as("%s saleStartsAt.format", uri).isEqualTo("date-time");
+            assertThat(itemProperties.path("wishedAt").path("type").asText())
+                    .as("%s wishedAt.type", uri).isEqualTo("string");
+            assertThat(itemProperties.path("wishedAt").path("format").asText())
+                    .as("%s wishedAt.format", uri).isEqualTo("date-time");
+        }
+    }
+
     private JsonNode readApiDoc(String uri) throws Exception {
         return objectMapper.readTree(mockMvc.perform(get(uri))
                 .andExpect(status().isOk())
@@ -236,6 +265,10 @@ class SwaggerEndpointTests {
             node = node.path(token);
         }
         return node;
+    }
+
+    private static JsonNode deref(JsonNode doc, JsonNode node) {
+        return node.has("$ref") ? resolveRef(doc, node.path("$ref").asText()) : node;
     }
 
     private static List<String> propertyNames(JsonNode properties) {

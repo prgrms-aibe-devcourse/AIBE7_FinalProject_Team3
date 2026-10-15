@@ -28,6 +28,7 @@ function generateOrderId() {
 export default function DropDetailPage({
   authenticated,
   wishes,
+  wishesReady,
   toggleWish,
   addOrder,
   notify,
@@ -223,9 +224,9 @@ export default function DropDetailPage({
               <button
                 type="button"
                 className="primary-button full"
+                disabled={!wishesReady}
                 onClick={() => {
-                  if (toggleWish(detail.id))
-                    notify(wished ? 'WISH를 취소했어요.' : 'WISH에 담았어요.')
+                  void toggleWish(detail.id)
                 }}
               >
                 {wished ? '✓ WISH 취소하기' : '♡ WISH 등록하기'}

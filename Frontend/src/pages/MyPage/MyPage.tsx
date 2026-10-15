@@ -1,12 +1,14 @@
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { getMyWishes } from '../../api/wish/wishes'
 import EmptyState from '../../components/EmptyState/EmptyState'
 import {
   mockSignupErrors,
   nicknameError,
   type MockAccount,
 } from '../../features/auth/mock/mockAuth'
-import { drops } from '../../features/drop/mock/mockDrops'
+import { wishKeys } from '../../features/wish/logic/queryKeys'
 import {
   buyerOrderStatusText,
   type BuyerOrder,
@@ -14,6 +16,16 @@ import {
 import type { SharedProps } from '../../types/store'
 import { dateLabel } from '../../utils/date'
 import { won } from '../../utils/price'
+
+const WISH_PAGE_SIZE = 20
+
+const WISH_STATUS_TEXT: Record<string, string> = {
+  WISH: 'WISH',
+  GRAB: 'GRAB',
+  ENDED: '판매 종료',
+  CANCELED: '판매 취소',
+  DRAFT: '준비 중',
+}
 
 type Props = SharedProps & {
   account: MockAccount | null
@@ -26,7 +38,7 @@ export default function MyPage({
   account,
   onAccountChange,
   onLogout,
-  wishes,
+  authenticated,
   orders,
   buyerOrders,
   toggleWish,
@@ -35,16 +47,27 @@ export default function MyPage({
   const navigate = useNavigate()
   const location = useLocation()
   const [editing, setEditing] = useState(false)
+  const [page, setPage] = useState(0)
   const [nickname, setNickname] = useState(account?.nickname ?? '')
   const [saveResult, setSaveResult] = useState<'success' | 'nickname' | 'save'>(
     'success',
   )
   const [error, setError] = useState('')
 
+  const wishesQuery = useQuery({
+    queryKey: wishKeys.list(page, WISH_PAGE_SIZE),
+    queryFn: () => getMyWishes({ page, size: WISH_PAGE_SIZE }),
+    enabled: authenticated,
+  })
+  const wishItems = (wishesQuery.data?.content ?? []).flatMap((item) =>
+    item.dropId === undefined ? [] : [{ ...item, dropId: item.dropId }],
+  )
+  const totalWishes = wishesQuery.data?.totalElements ?? 0
+  const totalPages = wishesQuery.data?.totalPages ?? 0
+
   if (!account)
     return <Navigate to="/login" state={{ from: location.pathname }} replace />
 
-  const wishedDrops = drops.filter((drop) => wishes.has(drop.id))
   const saveNickname = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const invalid = nicknameError(nickname)
@@ -174,28 +197,90 @@ export default function MyPage({
         <section className="panel wish-panel">
           <div className="panel-heading">
             <h2>WISH</h2>
-            <span>{wishedDrops.length}</span>
+            <span>{totalWishes}</span>
           </div>
-          {wishedDrops.length ? (
-            wishedDrops.map((drop) => (
-              <div className="compact-item" key={drop.id}>
-                <img src={drop.image} alt="" />
-                <div>
-                  <Link to={`/drops/${drop.id}`}>
-                    <strong>{drop.name}</strong>
-                  </Link>
-                  <small>{dateLabel(drop.saleStartsAt)} 오픈</small>
+          {wishesQuery.isPending ? (
+            <div role="status" aria-live="polite">
+              <EmptyState title="WISH 목록을 불러오는 중이에요." />
+            </div>
+          ) : wishesQuery.isError ? (
+            <div className="catalog-error" role="alert">
+              <EmptyState
+                title="WISH 목록을 불러오지 못했어요."
+                description="잠시 후 다시 시도해주세요."
+              />
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => void wishesQuery.refetch()}
+              >
+                다시 시도
+              </button>
+            </div>
+          ) : wishItems.length ? (
+            <>
+              {wishItems.map((item) => (
+                <div className="compact-item" key={item.dropId}>
+                  {item.thumbnailUrl ? (
+                    <img src={item.thumbnailUrl} alt="" />
+                  ) : (
+                    <span role="img" aria-label={`${item.name} 이미지 없음`}>
+                      이미지 준비 중
+                    </span>
+                  )}
+                  <div>
+                    <Link to={`/drops/${item.dropId}`}>
+                      <strong>{item.name}</strong>
+                    </Link>
+                    <small>
+                      {item.minPrice != null
+                        ? `${won(item.minPrice)}부터`
+                        : '가격 미정'}{' '}
+                      · {WISH_STATUS_TEXT[item.status ?? ''] ?? item.status}
+                    </small>
+                    <small>
+                      오픈 일정 ·{' '}
+                      {item.saleStartsAt
+                        ? dateLabel(item.saleStartsAt)
+                        : '미정'}
+                    </small>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void toggleWish(item.dropId)
+                    }}
+                  >
+                    취소
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (toggleWish(drop.id)) notify('WISH를 취소했어요.')
-                  }}
-                >
-                  취소
-                </button>
-              </div>
-            ))
+              ))}
+              {totalPages > 1 && (
+                <div className="catalog-pagination">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    disabled={page === 0}
+                    onClick={() =>
+                      setPage((current) => Math.max(0, current - 1))
+                    }
+                  >
+                    이전
+                  </button>
+                  <span aria-live="polite">
+                    {page + 1} / {totalPages} 페이지
+                  </span>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    disabled={!wishesQuery.data?.hasNext}
+                    onClick={() => setPage((current) => current + 1)}
+                  >
+                    다음
+                  </button>
+                </div>
+              )}
+            </>
           ) : (
             <EmptyState
               title="아직 담은 WISH가 없어요."

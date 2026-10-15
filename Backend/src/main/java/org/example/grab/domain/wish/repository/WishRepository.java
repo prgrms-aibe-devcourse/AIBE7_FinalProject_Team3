@@ -43,7 +43,8 @@ public interface WishRepository extends JpaRepository<Wish, Long> {
                      ORDER BY i.sort_order LIMIT 1) AS "thumbnailUrl",
                    (SELECT MIN(o.unit_price) FROM drop_options o
                      WHERE o.drop_id = d.id AND o.is_active) AS "minPrice",
-                   w.activated_at AS "wishedAt"
+                   w.activated_at AS "wishedAt",
+                   d.sale_starts_at AS "saleStartsAt"
             FROM wishes w
             JOIN drops d ON d.id = w.drop_id
             WHERE w.user_id = :userId AND w.canceled_at IS NULL

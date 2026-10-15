@@ -16,10 +16,13 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 /**
  * GR-54 내 WISH 목록 쿼리의 저장소 검증. 활성 WISH만, 썸네일·최저가 계산, 정렬·페이지를
@@ -184,6 +187,74 @@ class WishListQueryIntegrationTest {
         assertThat(page.hasNext()).isTrue();
     }
 
+    @Test
+    @DisplayName("활성 WISH는 DROP 상태와 무관하게 각 DROP의 판매 시작 예정 시각을 반환한다")
+    void returnsSaleStartsAtPerDropStatus() {
+        // given
+        OffsetDateTime wishStart = OffsetDateTime.parse("2026-09-20T05:00:00Z");
+        OffsetDateTime grabStart = OffsetDateTime.parse("2026-09-21T05:00:00Z");
+        OffsetDateTime endedStart = OffsetDateTime.parse("2026-09-22T05:00:00Z");
+        OffsetDateTime canceledStart = OffsetDateTime.parse("2026-09-23T05:00:00Z");
+        Long wishDrop = insertDrop("위시", "WISH", wishStart);
+        Long grabDrop = insertDrop("그랩", "GRAB", grabStart);
+        Long endedDrop = insertDrop("종료", "ENDED", endedStart);
+        Long canceledDrop = insertDrop("취소", "CANCELED", canceledStart);
+        insertWish(userId, wishDrop, true, 3);
+        insertWish(userId, grabDrop, true, 2);
+        insertWish(userId, endedDrop, true, 1);
+        insertWish(userId, canceledDrop, true, 0);
+
+        // when
+        Page<WishListProjection> page = wishRepository.findActiveWishes(userId, PageRequest.of(0, 20));
+
+        // then: 최신 등록순이므로 canceled, ended, grab, wish 순서다
+        assertThat(page.getTotalElements()).isEqualTo(4);
+        assertThat(page.getContent())
+                .extracting(WishListProjection::getDropId, WishListProjection::getSaleStartsAt)
+                .containsExactly(
+                        tuple(canceledDrop, canceledStart.toInstant()),
+                        tuple(endedDrop, endedStart.toInstant()),
+                        tuple(grabDrop, grabStart.toInstant()),
+                        tuple(wishDrop, wishStart.toInstant()));
+    }
+
+    @Test
+    @DisplayName("작은 페이지로 나눠 조회해도 각 항목의 saleStartsAt이 뒤섞이지 않는다")
+    void returnsSaleStartsAtConsistentlyAcrossPages() {
+        // given
+        OffsetDateTime base = OffsetDateTime.parse("2026-09-20T05:00:00Z");
+        int total = 5;
+        List<Long> dropIds = new ArrayList<>();
+        List<OffsetDateTime> starts = new ArrayList<>();
+        for (int i = 0; i < total; i++) {
+            OffsetDateTime start = base.plusDays(i);
+            Long dropId = insertDrop("상품" + i, "WISH", start);
+            insertWish(userId, dropId, true, i); // i=0이 가장 최근 등록이다
+            dropIds.add(dropId);
+            starts.add(start);
+        }
+        // 제외 대상: 취소한 WISH와 타 사용자 WISH
+        Long canceledDrop = insertDrop("취소", "WISH", base.plusDays(10));
+        insertWish(userId, canceledDrop, false, 0);
+        Long otherDrop = insertDrop("타인", "WISH", base.plusDays(11));
+        insertWish(otherUserId, otherDrop, true, 0);
+
+        // when
+        Page<WishListProjection> firstPage = wishRepository.findActiveWishes(userId, PageRequest.of(0, 2));
+        List<WishListProjection> items = new ArrayList<>(firstPage.getContent());
+        items.addAll(wishRepository.findActiveWishes(userId, PageRequest.of(1, 2)).getContent());
+        items.addAll(wishRepository.findActiveWishes(userId, PageRequest.of(2, 2)).getContent());
+
+        // then
+        assertThat(firstPage.getTotalElements()).isEqualTo(total);
+        assertThat(firstPage.getTotalPages()).isEqualTo(3);
+        assertThat(items).hasSize(total);
+        for (int i = 0; i < total; i++) {
+            assertThat(items.get(i).getDropId()).isEqualTo(dropIds.get(i));
+            assertThat(items.get(i).getSaleStartsAt()).isEqualTo(starts.get(i).toInstant());
+        }
+    }
+
     private Long insertUser() {
         String unique = UUID.randomUUID().toString();
         return jdbcTemplate.queryForObject(
@@ -211,15 +282,18 @@ class WishListQueryIntegrationTest {
                 "seller-" + unique + "@example.com");
     }
 
-    // GRAB은 grab_started_at, ENDED·CANCELED는 closed_at·close_reason까지 각 CHECK 제약을 만족해야 한다.
     private Long insertDrop(String name, String status) {
+        return insertDrop(name, status, OffsetDateTime.now().minusHours(2));
+    }
+
+    // GRAB은 grab_started_at, ENDED·CANCELED는 closed_at·close_reason까지 각 CHECK 제약을 만족해야 한다.
+    private Long insertDrop(String name, String status, OffsetDateTime saleStartsAt) {
         return jdbcTemplate.queryForObject(
                 """
                 INSERT INTO drops (seller_id, category_id, status, name, description, shipping_fee, shipping_notice,
                                    sale_starts_at, sale_ends_at, published_at, grab_started_at, closed_at, close_reason)
                 VALUES (?, 1, ?, ?, '설명', 3000, '배송 안내',
-                        CURRENT_TIMESTAMP - INTERVAL '2 hours', CURRENT_TIMESTAMP + INTERVAL '2 hours',
-                        CURRENT_TIMESTAMP - INTERVAL '1 day',
+                        ?, ?, CURRENT_TIMESTAMP - INTERVAL '1 day',
                         CASE WHEN ? IN ('GRAB', 'ENDED') THEN CURRENT_TIMESTAMP - INTERVAL '1 hour' ELSE NULL END,
                         CASE WHEN ? IN ('ENDED', 'CANCELED') THEN CURRENT_TIMESTAMP ELSE NULL END,
                         CASE WHEN ? = 'ENDED' THEN 'TIME_EXPIRED'
@@ -230,6 +304,8 @@ class WishListQueryIntegrationTest {
                 sellerId,
                 status,
                 name,
+                saleStartsAt,
+                saleStartsAt.plusHours(4),
                 status,
                 status,
                 status,

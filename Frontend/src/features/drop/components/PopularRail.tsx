@@ -12,7 +12,8 @@ import DropCard from './DropCard'
 type Props = {
   drops: CardDrop[]
   mode: 'WISH' | 'GRAB'
-  wishes: Set<number>
+  wishes: ReadonlySet<number>
+  wishReady?: boolean
   onWish: (id: number) => void
   label?: string
 }
@@ -31,6 +32,7 @@ export default function PopularRail({
   drops,
   mode,
   wishes,
+  wishReady,
   onWish,
   label,
 }: Props) {
@@ -102,6 +104,7 @@ export default function PopularRail({
                   drop={drop}
                   mode={mode}
                   wished={wishes.has(drop.id)}
+                  wishReady={wishReady}
                   onWish={onWish}
                 />
               </div>
