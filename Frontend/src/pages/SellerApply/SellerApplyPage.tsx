@@ -9,37 +9,99 @@ import {
   type AuthStatus,
   type AuthUser,
 } from '../../features/auth/logic/authUser'
-import type {
-  SellerApplication,
-  SellerApplicationInput,
-  SellerApplicationStatus,
-} from '../../features/seller/mock/mockSellerApplications'
+import type { SellerDocumentType } from '../../api/seller/applications'
+import {
+  useMySellerApplication,
+  useSubmitSellerApplication,
+  useUploadSellerDocument,
+} from '../../features/seller/logic/useSellerApplication'
+import { applicationErrorMessage } from '../../features/seller/logic/sellerApplicationState'
 import { dateLabel } from '../../utils/date'
 
 type Props = {
   user: AuthUser | null
   authStatus: AuthStatus
-  application: SellerApplication | undefined
-  onApply: (input: SellerApplicationInput) => void
   notify: (message: string) => void
 }
 
-type Example =
-  'CURRENT' | 'NONE' | SellerApplicationStatus | 'ERROR' | 'FORBIDDEN'
+const DOCUMENT_FIELDS: {
+  type: SellerDocumentType
+  label: string
+  hint?: string
+}[] = [
+  { type: 'BUSINESS_LICENSE', label: '사업자등록증 사본' },
+  {
+    type: 'ID_CARD',
+    label: '신분증 사본',
+    hint: '주민등록번호 뒷자리를 가리고 촬영해주세요.',
+  },
+  { type: 'BANKBOOK', label: '통장 사본' },
+  { type: 'MAIL_ORDER_BUSINESS_REPORT', label: '통신판매업신고증' },
+]
 
-export default function SellerApplyPage({
-  user,
-  authStatus,
-  application,
-  onApply,
-  notify,
-}: Props) {
-  const location = useLocation()
-  const [example, setExample] = useState<Example>('CURRENT')
-  const [result, setResult] = useState<'SUCCESS' | 'DUPLICATE' | 'ERROR'>(
-    'SUCCESS',
+function DocumentUploadField({
+  type,
+  label,
+  hint,
+  documentId,
+  onUploaded,
+  onCleared,
+}: {
+  type: SellerDocumentType
+  label: string
+  hint?: string
+  documentId: string | undefined
+  onUploaded: (type: SellerDocumentType, documentId: string) => void
+  onCleared: (type: SellerDocumentType) => void
+}) {
+  const upload = useUploadSellerDocument()
+
+  return (
+    <label className="seller-document-field">
+      {label}
+      {hint && <small>{hint}</small>}
+      <input
+        type="file"
+        accept="image/*"
+        required={!documentId}
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          if (!file) return
+          // 재업로드가 실패해도 이전 documentId가 제출에 쓰이지 않도록 먼저 지운다.
+          onCleared(type)
+          upload.mutate(
+            { documentType: type, file },
+            { onSuccess: (data) => onUploaded(type, data.documentId) },
+          )
+        }}
+      />
+      {upload.isPending && (
+        <small className="seller-document-status">업로드 중...</small>
+      )}
+      {documentId && !upload.isPending && (
+        <small className="seller-document-status seller-document-status--done">
+          ✓ 업로드 완료
+        </small>
+      )}
+      {upload.isError && (
+        <small role="alert">{applicationErrorMessage(upload.error)}</small>
+      )}
+    </label>
   )
-  const [error, setError] = useState('')
+}
+
+export default function SellerApplyPage({ user, authStatus, notify }: Props) {
+  const location = useLocation()
+  const {
+    data: application,
+    isLoading,
+    isError,
+  } = useMySellerApplication(authStatus === 'authenticated' && !isAdmin(user))
+  const submit = useSubmitSellerApplication()
+  const [documentIds, setDocumentIds] = useState<
+    Partial<Record<SellerDocumentType, string>>
+  >({})
+  const [formError, setFormError] = useState('')
 
   if (authStatus === 'loading') return <AuthLoading />
   if (!user)
@@ -54,44 +116,38 @@ export default function SellerApplyPage({
       />
     )
 
-  const current =
-    example === 'CURRENT'
-      ? application
-      : example === 'NONE' || example === 'ERROR' || example === 'FORBIDDEN'
-        ? undefined
-        : {
-            brandName: '길동상점',
-            contactEmail: 'seller@example.com',
-            appliedAt: '2026-09-18T14:00:00+09:00',
-            status: example,
-            rejectedReason:
-              example === 'REJECTED' ? '사업자 정보 확인이 필요합니다.' : null,
-          }
-  const approved = isSeller(user) || current?.status === 'APPROVED'
+  const approved = isSeller(user) || application?.status === 'APPROVED'
+  const allDocumentsUploaded = DOCUMENT_FIELDS.every(
+    (field) => documentIds[field.type],
+  )
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (application || isSeller(user)) {
-      setError('이미 신청했거나 승인된 계정입니다.')
-      return
-    }
-    if (result !== 'SUCCESS') {
-      setError(
-        result === 'DUPLICATE'
-          ? '이미 접수된 신청이 있습니다.'
-          : '신청을 접수하지 못했어요. 다시 시도해주세요.',
-      )
+    if (!allDocumentsUploaded) {
+      setFormError('서류 4종을 모두 업로드해주세요.')
       return
     }
     const form = new FormData(event.currentTarget)
-    onApply({
-      brandName: String(form.get('brandName') ?? ''),
-      contactEmail: String(form.get('contactEmail') ?? ''),
-      description: String(form.get('description') ?? ''),
-    })
-    setError('')
-    setExample('CURRENT')
-    notify('Mock 판매자 신청이 접수됐어요. 실제 신청은 진행되지 않았습니다.')
+    setFormError('')
+    submit.mutate(
+      {
+        brandName: String(form.get('brandName') ?? ''),
+        contactEmail: String(form.get('contactEmail') ?? ''),
+        businessRegistrationNumber: String(
+          form.get('businessRegistrationNumber') ?? '',
+        ),
+        description: String(form.get('description') ?? ''),
+        documentIds: documentIds as Record<SellerDocumentType, string>,
+      },
+      {
+        onSuccess: () => {
+          notify('판매자 신청이 접수됐어요.')
+          // 이후 반려되어 폼이 다시 보일 때 이전 서류 ID가 남지 않게 한다.
+          setDocumentIds({})
+        },
+        onError: (error) => setFormError(applicationErrorMessage(error)),
+      },
+    )
   }
 
   return (
@@ -104,23 +160,29 @@ export default function SellerApplyPage({
           <p>신청 후 운영자 승인을 받으면 판매자 기능을 사용할 수 있습니다.</p>
         </div>
         <section className="panel seller-apply-panel">
-          <h2>{current || approved ? '판매자 신청 상태' : '판매자 신청'}</h2>
-          {example === 'ERROR' ? (
+          <h2>
+            {isLoading
+              ? '판매자 신청'
+              : application || approved
+                ? '판매자 신청 상태'
+                : '판매자 신청'}
+          </h2>
+          {isLoading ? (
+            <p>불러오는 중...</p>
+          ) : isError ? (
             <p role="alert">
               신청 정보를 불러오지 못했어요. 다시 시도해주세요.
             </p>
-          ) : example === 'FORBIDDEN' ? (
-            <p role="alert">신청 정보를 볼 권한이 없습니다.</p>
-          ) : current || approved ? (
+          ) : application || approved ? (
             <div className="seller-application-status">
               <span className="status-pill">
-                {approved ? 'APPROVED' : current?.status}
+                {approved ? 'APPROVED' : application?.status}
               </span>
-              <strong>{current?.brandName ?? '승인된 판매자'}</strong>
-              {current && (
+              <strong>{application?.brandName ?? '승인된 판매자'}</strong>
+              {application && (
                 <>
-                  <p>{current.contactEmail}</p>
-                  <small>신청일 {dateLabel(current.appliedAt)}</small>
+                  <p>{application.contactEmail}</p>
+                  <small>신청일 {dateLabel(application.appliedAt ?? '')}</small>
                 </>
               )}
               {approved ? (
@@ -134,77 +196,85 @@ export default function SellerApplyPage({
                     확인해야 합니다.
                   </p>
                 )
-              ) : current?.status === 'PENDING' ? (
+              ) : application?.status === 'PENDING' ? (
                 <p className="seller-application-note">
                   심사를 기다리고 있어요.
                 </p>
               ) : (
-                <p className="seller-application-note">
-                  반려 사유: {current?.rejectedReason}
-                  <br />
-                  재신청 절차는 API 계약이 추가되면 안내합니다.
-                </p>
+                <>
+                  <p className="seller-application-note">
+                    신청이 반려됐어요. 서류와 정보를 확인한 뒤 다시
+                    신청해주세요.
+                  </p>
+                  <form className="seller-apply-form" onSubmit={handleSubmit}>
+                    {renderFields()}
+                  </form>
+                </>
               )}
             </div>
           ) : (
-            <form className="seller-apply-form" onSubmit={submit}>
-              <label>
-                브랜드명
-                <input required name="brandName" maxLength={100} />
-              </label>
-              <label>
-                연락 이메일
-                <input required name="contactEmail" type="email" />
-              </label>
-              <label>
-                브랜드 소개
-                <textarea required name="description" rows={5} />
-              </label>
-              <label className="demo-select">
-                신청 결과 예시
-                <select
-                  value={result}
-                  onChange={(event) => {
-                    setResult(event.target.value as typeof result)
-                    setError('')
-                  }}
-                >
-                  <option value="SUCCESS">접수 성공</option>
-                  <option value="DUPLICATE">중복 신청</option>
-                  <option value="ERROR">제출 실패</option>
-                </select>
-              </label>
-              {error && (
-                <p className="form-error" role="alert">
-                  {error}
-                </p>
-              )}
-              <button type="submit" className="primary-button">
-                Mock 신청 결과 보기
-              </button>
+            <form className="seller-apply-form" onSubmit={handleSubmit}>
+              {renderFields()}
             </form>
           )}
         </section>
       </div>
-      <label className="seller-application-demo">
-        신청 상태 예시
-        <select
-          value={example}
-          onChange={(event) => {
-            setExample(event.target.value as Example)
-            setError('')
-          }}
-        >
-          <option value="CURRENT">현재 Mock 상태</option>
-          <option value="NONE">미신청</option>
-          <option value="PENDING">심사 대기</option>
-          <option value="APPROVED">승인</option>
-          <option value="REJECTED">반려</option>
-          <option value="ERROR">조회 실패</option>
-          <option value="FORBIDDEN">권한 부족</option>
-        </select>
-      </label>
-      <small>상태 전환과 신청 결과는 이 화면의 Mock 예시입니다.</small>
     </section>
   )
+
+  function renderFields() {
+    return (
+      <>
+        <label>
+          브랜드명
+          <input required name="brandName" maxLength={100} />
+        </label>
+        <label>
+          연락 이메일
+          <input required name="contactEmail" type="email" />
+        </label>
+        <label>
+          사업자등록번호
+          <input
+            required
+            name="businessRegistrationNumber"
+            pattern="\d{10}"
+            maxLength={10}
+            placeholder="하이픈 없이 10자리"
+          />
+        </label>
+        <label>
+          브랜드 소개
+          <textarea name="description" rows={5} />
+        </label>
+        {DOCUMENT_FIELDS.map((field) => (
+          <DocumentUploadField
+            key={field.type}
+            type={field.type}
+            label={field.label}
+            hint={field.hint}
+            documentId={documentIds[field.type]}
+            onUploaded={(type, documentId) =>
+              setDocumentIds((current) => ({ ...current, [type]: documentId }))
+            }
+            onCleared={(type) =>
+              setDocumentIds((current) => ({ ...current, [type]: undefined }))
+            }
+          />
+        ))}
+        {formError && (
+          <p className="form-error" role="alert">
+            {formError}
+          </p>
+        )}
+        <button
+          type="submit"
+          className="primary-button"
+          disabled={!allDocumentsUploaded || submit.isPending}
+        >
+          {submit.isPending ? '신청 중...' : '판매자 신청하기'}
+        </button>
+      </>
+    )
+  }
 }

@@ -60,6 +60,49 @@
 .seller-apply-form textarea {
   resize: vertical;
 }
+.seller-document-field {
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+}
+.seller-document-field input[type='file'] {
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.seller-document-field input[type='file']::file-selector-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  margin-right: 12px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+.seller-document-field input[type='file']::file-selector-button:hover {
+  background: var(--soft);
+}
+.seller-document-status {
+  color: var(--muted);
+}
+.seller-document-status--done {
+  color: var(--ink);
+  font-weight: 700;
+}
+.seller-document-field small[role='alert'] {
+  color: var(--danger);
+}
 .seller-apply-form .primary-button,
 .seller-application-status .primary-button {
   justify-self: start;

@@ -7,7 +7,6 @@ import useOrders from './features/order/logic/useOrders'
 import useWish from './features/wish/logic/useWish'
 import {
   demoSellerApplications,
-  newSellerApplication,
   reviewSellerApplication,
 } from './features/seller/mock/mockSellerApplications'
 import type { SellerDraft } from './features/seller/mock/mockSellerDrafts'
@@ -147,16 +146,6 @@ export default function App() {
               <SellerApplyPage
                 user={user}
                 authStatus={status}
-                application={sellerApplications.find(
-                  (item) => item.applicantEmail === user?.email,
-                )}
-                onApply={(input) => {
-                  if (!user) return
-                  setSellerApplications((current) => [
-                    newSellerApplication(user.email, input),
-                    ...current,
-                  ])
-                }}
                 notify={notify}
               />
             }
