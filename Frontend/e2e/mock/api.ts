@@ -927,6 +927,7 @@ const wishListItem = (drop: FixtureDrop) => ({
   thumbnailUrl: drop.thumbnailUrl,
   minPrice: minPrice(drop),
   status: drop.status,
+  saleStartsAt: drop.saleStartsAt,
   wishedAt: daysAgo(1),
 })
 

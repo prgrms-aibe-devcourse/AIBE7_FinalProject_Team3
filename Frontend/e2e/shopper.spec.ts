@@ -220,6 +220,7 @@ test.describe('WISH', () => {
       .filter({ has: page.getByRole('heading', { name: 'WISH' }) })
     // 101은 데모 기본 WISH다
     await expect(wishPanel).toContainText('매일을 담는 캔버스 토트')
+    await expect(wishPanel).toContainText('오픈 일정 · 10월 4일')
     const mugItem = wishPanel
       .locator('.compact-item')
       .filter({ hasText: '나의 작은 휴식, 데일리 머그' })
