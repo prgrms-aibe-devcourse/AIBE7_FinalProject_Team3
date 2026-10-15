@@ -170,9 +170,9 @@ class UserMeApiIntegrationTest {
 
     // 성공
 
-    // 완료 조건 1: 명세 1.9의 여섯 필드만 담는다. 휴대폰 번호·내부 id·status·provider는 없다(AUTH-004)
+    // 완료 조건 1: 명세 1.9의 일곱 필드만 담는다(GR-108 provider 추가). 휴대폰 번호·내부 id·status는 없다(AUTH-004)
     @Test
-    @DisplayName("로그인한 회원은 200과 public_id·이메일·닉네임·roles·profileImageUrl(null)·createdAt만 받는다")
+    @DisplayName("로그인한 회원은 200과 public_id·이메일·닉네임·provider·roles·profileImageUrl(null)·createdAt만 받는다")
     void returnsMyInfo() throws Exception {
         // given
         Map<String, Object> user = insertUser("ok");
@@ -185,6 +185,7 @@ class UserMeApiIntegrationTest {
                 .andExpect(jsonPath("$.data.userId").value(user.get("public_id").toString()))
                 .andExpect(jsonPath("$.data.email").value(email("ok")))
                 .andExpect(jsonPath("$.data.nickname").value("me-" + run + "-ok"))
+                .andExpect(jsonPath("$.data.provider").value("LOCAL"))
                 .andExpect(jsonPath("$.data.roles", contains("USER")))
                 // 등록된 이미지가 없으면 키를 생략하지 않고 null이다(M00-05)
                 .andExpect(jsonPath("$.data.profileImageUrl").value((Object) null))
@@ -192,7 +193,8 @@ class UserMeApiIntegrationTest {
 
         // then: 명세 밖 필드가 없다
         Map<String, Object> data = JsonPath.read(body, "$.data");
-        assertThat(data).containsOnlyKeys("userId", "email", "nickname", "roles", "profileImageUrl", "createdAt");
+        assertThat(data).containsOnlyKeys(
+                "userId", "email", "nickname", "provider", "roles", "profileImageUrl", "createdAt");
 
         // then: createdAt은 ISO 8601 문자열이고 DB 값과 같은 시각이다. 오프셋 표기는 변환하지 않는다(M00-05)
         String createdAt = JsonPath.read(body, "$.data.createdAt");
@@ -229,6 +231,23 @@ class UserMeApiIntegrationTest {
         getMe(cookieValue(refreshed, "access_token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.roles", contains("USER", "SELLER")));
+    }
+
+    // GR-108: 소셜 회원은 비밀번호가 없어 로그인 API 대신 토큰을 직접 발급한다
+    @Test
+    @DisplayName("소셜 회원은 provider에 가입 방식(KAKAO)을 그대로 받는다")
+    void returnsSocialProvider() throws Exception {
+        // given
+        Map<String, Object> user = jdbcTemplate.queryForMap("""
+                INSERT INTO users (email, nickname, status, provider) VALUES (?, ?, 'ACTIVE', 'KAKAO')
+                RETURNING public_id
+                """, email("kakao"), "me-" + run + "-kakao");
+        String token = jwtProvider.issue((UUID) user.get("public_id"), Set.of(AuthRole.USER)).value();
+
+        // when & then
+        getMe(token)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.provider").value("KAKAO"));
     }
 
     // 완료 조건 3: 경로·쿼리로 사용자를 고를 수 없어 각자 본인 정보만 받는다

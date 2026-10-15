@@ -1,6 +1,7 @@
 package org.example.grab.domain.user.service;
 
 import org.example.grab.domain.user.dto.response.UserMeResponse;
+import org.example.grab.domain.user.entity.AuthProvider;
 import org.example.grab.domain.user.entity.User;
 import org.example.grab.domain.user.entity.UserStatus;
 import org.example.grab.domain.user.repository.UserRepository;
@@ -29,7 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 
-// GR-97 M02-01: 내 정보 조회의 필드 매핑, roles 정렬, 회원 없음·비활성 거부(M00-03). 저장소는 mock이다
+// GR-97 M02-01: 내 정보 조회의 필드 매핑(GR-108 provider 포함), roles 정렬, 회원 없음·비활성 거부(M00-03). 저장소는 mock이다
 @ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class UserMeQueryServiceTest {
 
@@ -51,7 +52,7 @@ class UserMeQueryServiceTest {
     }
 
     @Test
-    @DisplayName("활성 회원이면 public_id·이메일·닉네임·roles·프로필 이미지(null)·가입 시각을 돌려준다")
+    @DisplayName("활성 회원이면 public_id·이메일·닉네임·가입 방식·roles·프로필 이미지(null)·가입 시각을 돌려준다")
     void returnsActiveUser() {
         // given
         User user = user(UserStatus.ACTIVE);
@@ -62,7 +63,23 @@ class UserMeQueryServiceTest {
 
         // then
         assertThat(response).isEqualTo(new UserMeResponse(
-                user.getUuid(), EMAIL, "드롭헌터", List.of("USER"), null, CREATED_AT));
+                user.getUuid(), EMAIL, "드롭헌터", AuthProvider.LOCAL, List.of("USER"), null, CREATED_AT));
+    }
+
+    // GR-108: 가입 방식은 저장된 값 그대로다
+    @Test
+    @DisplayName("소셜 회원이면 provider에 저장된 가입 방식을 그대로 담는다")
+    void returnsSocialProvider() {
+        // given
+        User user = user(UserStatus.ACTIVE);
+        ReflectionTestUtils.setField(user, "provider", AuthProvider.KAKAO);
+        given(userRepository.findById(7L)).willReturn(Optional.of(user));
+
+        // when
+        UserMeResponse response = service.findMe(7L, Set.of(AuthRole.USER));
+
+        // then
+        assertThat(response.provider()).isEqualTo(AuthProvider.KAKAO);
     }
 
     // 로그인 응답·JWT Claim과 같은 AuthRole 선언 순서(USER, SELLER, ADMIN)

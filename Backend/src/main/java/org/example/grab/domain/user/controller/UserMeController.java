@@ -35,7 +35,7 @@ public class UserMeController {
     private final CurrentUserIdProvider currentUserIdProvider;
 
     @Operation(summary = "내 정보 조회",
-            description = "본인의 회원 정보를 반환한다. roles는 요청 Access Token의 권한이고, profileImageUrl은 없으면 null이다")
+            description = "본인의 회원 정보를 반환한다. provider는 가입 방식, roles는 요청 Access Token의 권한이고, profileImageUrl은 없으면 null이다")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401",
             description = "AUTHENTICATION_REQUIRED(쿠키 없음, 회원 없음·정지·탈퇴), INVALID_TOKEN")

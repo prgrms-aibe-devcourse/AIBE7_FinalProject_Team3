@@ -488,6 +488,7 @@ GET /api/v1/users/me
     "userId": "6f1a2b3c-4d5e-4f70-8192-a3b4c5d6e7f8",
     "email": "user@example.com",
     "nickname": "드롭헌터",
+    "provider": "LOCAL",
     "roles": ["USER", "SELLER"],
     "profileImageUrl": "https://cdn.example.com/images/profile.jpg",
     "createdAt": "2026-09-18T14:00:00+09:00"
@@ -496,6 +497,7 @@ GET /api/v1/users/me
 ```
 
 - 사용자 ID는 경로·쿼리로 받지 않는다. 항상 `access_token`의 본인 정보를 돌려준다.
+- `provider`는 가입 방식(`LOCAL`, `KAKAO`, `GOOGLE`)이다. `LOCAL` 회원만 비밀번호 변경(1.11)을 사용할 수 있다.
 - `roles`는 요청 Access Token의 권한이며 로그인 응답과 같은 값·순서(`USER`, `SELLER`, `ADMIN`)다. 판매자 승인·취소는 다음 재발급(1.7)부터 반영된다. 즉시 반영하려면 재발급한 뒤 다시 조회한다.
 - `profileImageUrl`은 등록된 이미지가 없으면 `null`이다. 키는 생략하지 않는다.
 - `createdAt`은 ISO 8601 형식이다. 같은 시각을 다른 오프셋(예: `Z`)으로 표기할 수 있다.

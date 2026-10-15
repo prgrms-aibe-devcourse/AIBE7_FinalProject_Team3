@@ -235,7 +235,7 @@ curl.exe -s -w "`n%{http_code}`n" -b signup-cookie.txt http://localhost:8080/api
 # 401 AUTHENTICATION_REQUIRED: 쿠키 없이 호출
 curl.exe -s -w "`n%{http_code}`n" http://localhost:8080/api/v1/users/me/wishes
 
-# 200: 내 정보(MEMBER_AUTH 1.9). data에 userId·email·nickname·roles·profileImageUrl(null)·createdAt만 있다
+# 200: 내 정보(MEMBER_AUTH 1.9). data에 userId·email·nickname·provider(LOCAL)·roles·profileImageUrl(null)·createdAt만 있다
 curl.exe -s -w "`n%{http_code}`n" -b signup-cookie.txt http://localhost:8080/api/v1/users/me
 
 # 401 AUTHENTICATION_REQUIRED: 쿠키 없이 호출

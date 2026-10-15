@@ -243,6 +243,23 @@ class SwaggerEndpointTests {
         }
     }
 
+    // GR-108: 내 정보 조회 200 응답의 provider가 허용값 목록과 함께 노출돼 프론트 생성 타입이 리터럴 유니언이 된다
+    @Test
+    @DisplayName("내 정보 조회의 provider가 LOCAL·KAKAO·GOOGLE enum으로 노출된다")
+    void exposesUserMeProviderEnum() throws Exception {
+        JsonNode doc = readApiDoc("/v3/api-docs/user");
+        JsonNode response = doc.path("paths").path("/api/v1/users/me").path("get")
+                .path("responses").path("200");
+        JsonNode wrapper = deref(doc, responseSchema(response));
+        JsonNode data = deref(doc, wrapper.path("properties").path("data"));
+        JsonNode provider = deref(doc, data.path("properties").path("provider"));
+
+        List<String> values = new ArrayList<>();
+        provider.path("enum").forEach(value -> values.add(value.asText()));
+        assertThat(provider.path("type").asText()).isEqualTo("string");
+        assertThat(values).containsExactly("LOCAL", "KAKAO", "GOOGLE");
+    }
+
     private JsonNode readApiDoc(String uri) throws Exception {
         return objectMapper.readTree(mockMvc.perform(get(uri))
                 .andExpect(status().isOk())
