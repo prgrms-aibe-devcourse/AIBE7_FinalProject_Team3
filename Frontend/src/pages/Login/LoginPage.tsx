@@ -1,28 +1,24 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import logo from '../../assets/images/grab-symbol.png'
-import {
-  adminAccount,
-  localAccount,
-  mockLoginErrors,
-  socialAccount,
-  type MockAccount,
-} from '../../features/auth/mock/mockAuth'
+import { loginErrorMessage } from '../../features/auth/logic/authUser'
+import { mockLoginErrors } from '../../features/auth/mock/mockAuth'
 
 type Props = {
-  onLogin: (account: MockAccount) => void
+  login: (email: string, password: string) => Promise<void>
   notify: (message: string) => void
 }
 
-type LoginResult = 'success' | 'admin' | 'credentials' | 'inactive' | 'network'
 type SocialResult = 'existing' | 'new' | 'linked' | 'social'
 
-export default function LoginPage({ onLogin, notify }: Props) {
+export default function LoginPage({ login, notify }: Props) {
   const navigate = useNavigate()
   const location = useLocation()
-  const [loginResult, setLoginResult] = useState<LoginResult>('success')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [socialResult, setSocialResult] = useState<SocialResult>('existing')
   const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
   const returnTo =
     typeof location.state?.from === 'string' &&
     location.state.from.startsWith('/') &&
@@ -30,33 +26,33 @@ export default function LoginPage({ onLogin, notify }: Props) {
       ? location.state.from
       : '/wish'
 
-  const completeLogin = (account: MockAccount) => {
-    onLogin(account)
-    notify('데모 로그인했어요. 브라우저를 다시 열면 로그인 상태가 사라집니다.')
-    navigate(returnTo, { replace: true })
-  }
-
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (loginResult === 'admin') {
-      completeLogin(adminAccount)
-      return
+    if (submitting) return
+    setSubmitting(true)
+    setError('')
+    try {
+      await login(email, password)
+      notify('로그인했어요.')
+      navigate(returnTo, { replace: true })
+    } catch (loginError) {
+      setError(loginErrorMessage(loginError))
+    } finally {
+      setSubmitting(false)
     }
-    if (loginResult !== 'success') {
-      setError(mockLoginErrors[loginResult])
-      return
-    }
-    completeLogin(localAccount)
   }
 
+  // 소셜 로그인은 GR-47에서 실제 리다이렉트로 연동한다. 지금은 결과 안내만 한다.
   const socialLogin = (provider: 'KAKAO' | 'GOOGLE') => {
     if (socialResult === 'new') {
       navigate('/signup', { state: { provider } })
-    } else if (socialResult === 'existing') {
-      completeLogin(socialAccount(provider))
-    } else {
-      setError(mockLoginErrors[socialResult])
+      return
     }
+    if (socialResult === 'existing') {
+      notify('소셜 로그인은 준비 중이에요. 곧 제공될 예정입니다.')
+      return
+    }
+    setError(mockLoginErrors[socialResult])
   }
 
   return (
@@ -80,6 +76,8 @@ export default function LoginPage({ onLogin, notify }: Props) {
               type="email"
               autoComplete="email"
               placeholder="grab@example.com"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
             />
           </label>
           <label>
@@ -89,31 +87,21 @@ export default function LoginPage({ onLogin, notify }: Props) {
               type="password"
               autoComplete="current-password"
               placeholder="비밀번호"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
             />
-          </label>
-          <label className="demo-select">
-            LOCAL 결과 예시
-            <select
-              value={loginResult}
-              onChange={(event) => {
-                setLoginResult(event.target.value as LoginResult)
-                setError('')
-              }}
-            >
-              <option value="success">로그인 성공</option>
-              <option value="admin">운영자 계정 예시</option>
-              <option value="credentials">자격 증명 오류</option>
-              <option value="inactive">비활성 계정</option>
-              <option value="network">네트워크 오류</option>
-            </select>
           </label>
           {error && (
             <p className="form-error" role="alert">
               {error}
             </p>
           )}
-          <button type="submit" className="primary-button full">
-            로그인
+          <button
+            type="submit"
+            className="primary-button full"
+            disabled={submitting}
+          >
+            {submitting ? '로그인 중…' : '로그인'}
           </button>
         </form>
         <div className="auth-stack auth-social">
@@ -156,8 +144,8 @@ export default function LoginPage({ onLogin, notify }: Props) {
             </Link>
           </p>
           <small>
-            현재 화면은 Mock 데모입니다. 입력한 정보는 저장하거나 전송하지
-            않습니다.
+            LOCAL 로그인은 실제 인증 API를 사용합니다. 소셜 로그인은 준비 중이며
+            소셜 결과 예시는 화면 안내용입니다.
           </small>
         </div>
       </div>

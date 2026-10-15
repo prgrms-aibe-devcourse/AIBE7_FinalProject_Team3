@@ -1,4 +1,4 @@
-import { expect, test } from '../../fixtures'
+import { expect, getAuth, test } from '../../fixtures'
 
 type Item = {
   applicationId: string
@@ -36,12 +36,12 @@ function listResponse(content: Item[], hasNext = false) {
   }
 }
 
-async function loginAsAdmin(page: import('@playwright/test').Page) {
+async function loginFromAdminRedirect(page: import('@playwright/test').Page) {
+  getAuth(page).setRoles(['USER', 'ADMIN'])
   await page.goto('/#/admin/seller-applications')
   await expect(page).toHaveURL(/#\/login$/)
   await page.getByLabel('이메일').fill('grab@example.com')
   await page.getByLabel('비밀번호').fill('password1234')
-  await page.getByLabel('LOCAL 결과 예시').selectOption('admin')
   await page.getByRole('button', { name: '로그인', exact: true }).click()
   await expect(page).toHaveURL(/#\/admin\/seller-applications$/)
 }
@@ -52,7 +52,6 @@ test('비관리자는 접근 권한 안내를 본다', async ({ page }) => {
   await page.getByLabel('이메일').fill('grab@example.com')
   await page.getByLabel('비밀번호').fill('password1234')
   await page.getByRole('button', { name: '로그인', exact: true }).click()
-  await page.goto('/#/admin/seller-applications')
   await expect(page.getByText('접근 권한이 없어요.')).toBeVisible()
 })
 
@@ -78,7 +77,7 @@ test('상태 필터·페이지 이동이 URL에 반영되고 목록을 다시 �
     })
   })
 
-  await loginAsAdmin(page)
+  await loginFromAdminRedirect(page)
   await expect(page.getByRole('button', { name: /길동상점/ })).toBeVisible()
   await page.getByRole('button', { name: '다음' }).click()
   await expect(page).toHaveURL(/status=PENDING.*page=1/)
@@ -116,7 +115,7 @@ test('승인은 두 번 눌러 확정하고 성공하면 목록을 다시 불러
     },
   )
 
-  await loginAsAdmin(page)
+  await loginFromAdminRedirect(page)
   await page.getByRole('button', { name: /길동상점/ }).click()
   await page.getByRole('button', { name: '승인 확인' }).click()
   await expect(page.getByText(/다시 누르면 확정됩니다/)).toBeVisible()
@@ -149,7 +148,7 @@ test('반려 사유 누락은 막고, 이미 처리된 신청은 409 안내 후 
       }),
   )
 
-  await loginAsAdmin(page)
+  await loginFromAdminRedirect(page)
   await page.getByRole('button', { name: /길동상점/ }).click()
   const callsBeforeSubmit = listCalls
   await page.getByRole('button', { name: '반려 확인' }).click()

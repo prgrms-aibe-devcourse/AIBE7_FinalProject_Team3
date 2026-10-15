@@ -5,18 +5,16 @@ import {
   mockSignupErrors,
   nicknameError,
   passwordError,
-  type MockAccount,
 } from '../../features/auth/mock/mockAuth'
 
 type Props = {
-  onLogin: (account: MockAccount) => void
   notify: (message: string) => void
 }
 
 type CodeResult = 'success' | 'mismatch' | 'expired' | 'attempts'
 type SaveResult = 'success' | 'existing' | 'nickname' | 'save' | 'context'
 
-export default function SignupPage({ onLogin, notify }: Props) {
+export default function SignupPage({ notify }: Props) {
   const navigate = useNavigate()
   const location = useLocation()
   const provider =
@@ -74,16 +72,9 @@ export default function SignupPage({ onLogin, notify }: Props) {
       setError(mockSignupErrors[saveResult])
       return
     }
-    onLogin({
-      email: provider ? `${provider.toLowerCase()}@example.com` : email,
-      nickname,
-      provider: provider ?? 'LOCAL',
-      role: 'MEMBER',
-    })
-    notify(
-      '데모 가입이 완료됐어요. 입력한 정보는 브라우저 재접속 후 유지되지 않습니다.',
-    )
-    navigate('/wish')
+    // 실제 가입 API는 인증 쿠키를 발급하지 않는다. 완료 후 로그인 화면으로 이동한다(M00-07).
+    notify('회원가입이 완료됐어요. 로그인해주세요.')
+    navigate('/login')
   }
 
   return (

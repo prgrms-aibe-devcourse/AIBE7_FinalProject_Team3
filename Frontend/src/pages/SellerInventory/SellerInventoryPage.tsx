@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import EmptyState from '../../components/EmptyState/EmptyState'
-import type { MockAccount } from '../../features/auth/mock/mockAuth'
+import AuthLoading from '../../features/auth/components/AuthLoading'
+import {
+  isAdmin,
+  isSeller,
+  type AuthStatus,
+  type AuthUser,
+} from '../../features/auth/logic/authUser'
 import {
   inventoryPageSize,
   inventoryTotals,
@@ -17,11 +23,13 @@ import {
 type Result = 'READY' | 'LOADING' | 'ERROR' | 'EMPTY'
 
 export default function SellerInventoryPage({
-  account,
+  user,
+  authStatus,
   drops,
   ownerEmail,
 }: {
-  account: MockAccount | null
+  user: AuthUser | null
+  authStatus: AuthStatus
   drops: SellerMockDrop[]
   ownerEmail: string
 }) {
@@ -46,8 +54,10 @@ export default function SellerInventoryPage({
   )
   const totalPages = Math.max(1, Math.ceil(filtered.length / inventoryPageSize))
 
+  const seller = isSeller(user)
+
   useEffect(() => {
-    if (account?.role !== 'SELLER' || !dropId || selected) return
+    if (!seller || !dropId || selected) return
     setParams(
       { status, page: String(page) },
       {
@@ -57,9 +67,10 @@ export default function SellerInventoryPage({
         },
       },
     )
-  }, [account?.role, dropId, page, selected, setParams, status])
+  }, [seller, dropId, page, selected, setParams, status])
 
-  if (!account)
+  if (authStatus === 'loading') return <AuthLoading />
+  if (!user)
     return (
       <Navigate
         to="/login"
@@ -67,16 +78,12 @@ export default function SellerInventoryPage({
         replace
       />
     )
-  if (account.role !== 'SELLER')
+  if (!isSeller(user))
     return (
       <EmptyState
         title="판매자 권한이 필요해요."
-        link={account.role === 'MEMBER' ? '/seller/apply' : '/my'}
-        label={
-          account.role === 'MEMBER'
-            ? '판매자 신청 보기'
-            : '내 계정으로 돌아가기'
-        }
+        link={isAdmin(user) ? '/my' : '/seller/apply'}
+        label={isAdmin(user) ? '내 계정으로 돌아가기' : '판매자 신청 보기'}
         variant="page"
       />
     )

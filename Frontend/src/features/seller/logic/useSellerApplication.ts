@@ -9,9 +9,10 @@ import { sellerApplicationKeys } from './applicationQueryKeys'
 import { isNoApplication } from './sellerApplicationState'
 
 // 신청이 없으면 404다. react-query 에러로 흘리지 않고 null로 돌려준다.
-export function useMySellerApplication() {
+export function useMySellerApplication(enabled = true) {
   return useQuery({
     queryKey: sellerApplicationKeys.mine(),
+    enabled,
     queryFn: async () => {
       try {
         return await getMySellerApplication()

@@ -7,13 +7,17 @@ import {
 } from '../../../api/seller/adminApplications'
 import { adminSellerApplicationKeys } from './applicationQueryKeys'
 
-export function useAdminSellerApplications(params: {
-  status: AdminApplicationStatus
-  page: number
-  size: number
-}) {
+export function useAdminSellerApplications(
+  params: {
+    status: AdminApplicationStatus
+    page: number
+    size: number
+  },
+  enabled = true,
+) {
   return useQuery({
     queryKey: adminSellerApplicationKeys.list(params),
+    enabled,
     queryFn: () => getAdminSellerApplications(params),
   })
 }

@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation, useParams } from 'react-router-dom'
 import EmptyState from '../../components/EmptyState/EmptyState'
+import AuthLoading from '../../features/auth/components/AuthLoading'
+import type { AuthStatus } from '../../features/auth/logic/authUser'
 import BuyerOrderAmounts from '../../features/order/components/BuyerOrderAmounts'
 import BuyerOrderItem from '../../features/order/components/BuyerOrderItem'
 import {
@@ -12,7 +14,7 @@ import {
 import { dateLabel } from '../../utils/date'
 
 type Props = {
-  authenticated: boolean
+  authStatus: AuthStatus
   buyerOrders: BuyerOrder[]
   updateBuyerOrder: (
     id: string,
@@ -25,7 +27,7 @@ function CheckoutContent({
   order,
   updateBuyerOrder,
   notify,
-}: Omit<Props, 'authenticated' | 'buyerOrders'> & { order: BuyerOrder }) {
+}: Omit<Props, 'authStatus' | 'buyerOrders'> & { order: BuyerOrder }) {
   const [address, setAddress] = useState(order.shippingAddress)
   const [result, setResult] = useState<PaymentDemoResult>('SUCCEEDED')
   const payable = canPay(order)
@@ -204,13 +206,14 @@ function CheckoutContent({
 }
 
 export default function CheckoutPage({
-  authenticated,
+  authStatus,
   buyerOrders,
   ...actions
 }: Props) {
   const { orderId } = useParams()
   const location = useLocation()
-  if (!authenticated)
+  if (authStatus === 'loading') return <AuthLoading />
+  if (authStatus === 'anonymous')
     return <Navigate to="/login" state={{ from: location.pathname }} replace />
   const order = buyerOrders.find((item) => item.id === orderId)
   if (!order)

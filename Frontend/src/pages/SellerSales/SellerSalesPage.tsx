@@ -1,7 +1,13 @@
 import { useState } from 'react'
 import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import EmptyState from '../../components/EmptyState/EmptyState'
-import type { MockAccount } from '../../features/auth/mock/mockAuth'
+import AuthLoading from '../../features/auth/components/AuthLoading'
+import {
+  isAdmin,
+  isSeller,
+  type AuthStatus,
+  type AuthUser,
+} from '../../features/auth/logic/authUser'
 import {
   readSalesQuery,
   salesPageSize,
@@ -16,11 +22,13 @@ import { won } from '../../utils/price'
 type Result = 'READY' | 'LOADING' | 'ERROR' | 'EMPTY'
 
 export default function SellerSalesPage({
-  account,
+  user,
+  authStatus,
   drops,
   ownerEmail,
 }: {
-  account: MockAccount | null
+  user: AuthUser | null
+  authStatus: AuthStatus
   drops: SellerMockDrop[]
   ownerEmail: string
 }) {
@@ -28,7 +36,8 @@ export default function SellerSalesPage({
   const [params, setParams] = useSearchParams()
   const [result, setResult] = useState<Result>('READY')
 
-  if (!account)
+  if (authStatus === 'loading') return <AuthLoading />
+  if (!user)
     return (
       <Navigate
         to="/login"
@@ -36,16 +45,12 @@ export default function SellerSalesPage({
         replace
       />
     )
-  if (account.role !== 'SELLER')
+  if (!isSeller(user))
     return (
       <EmptyState
         title="판매자 권한이 필요해요."
-        link={account.role === 'MEMBER' ? '/seller/apply' : '/my'}
-        label={
-          account.role === 'MEMBER'
-            ? '판매자 신청 보기'
-            : '내 계정으로 돌아가기'
-        }
+        link={isAdmin(user) ? '/my' : '/seller/apply'}
+        label={isAdmin(user) ? '내 계정으로 돌아가기' : '판매자 신청 보기'}
         variant="page"
       />
     )

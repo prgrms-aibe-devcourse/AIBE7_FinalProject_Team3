@@ -2,7 +2,13 @@ import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation } from 'react-router-dom'
 import symbol from '../../assets/images/grab-symbol.png'
 import EmptyState from '../../components/EmptyState/EmptyState'
-import type { MockAccount } from '../../features/auth/mock/mockAuth'
+import AuthLoading from '../../features/auth/components/AuthLoading'
+import {
+  isAdmin,
+  isSeller,
+  type AuthStatus,
+  type AuthUser,
+} from '../../features/auth/logic/authUser'
 import type { SellerDocumentType } from '../../api/seller/applications'
 import {
   useMySellerApplication,
@@ -13,7 +19,8 @@ import { applicationErrorMessage } from '../../features/seller/logic/sellerAppli
 import { dateLabel } from '../../utils/date'
 
 type Props = {
-  account: MockAccount | null
+  user: AuthUser | null
+  authStatus: AuthStatus
   notify: (message: string) => void
 }
 
@@ -83,18 +90,23 @@ function DocumentUploadField({
   )
 }
 
-export default function SellerApplyPage({ account, notify }: Props) {
+export default function SellerApplyPage({ user, authStatus, notify }: Props) {
   const location = useLocation()
-  const { data: application, isLoading, isError } = useMySellerApplication()
+  const {
+    data: application,
+    isLoading,
+    isError,
+  } = useMySellerApplication(authStatus === 'authenticated' && !isAdmin(user))
   const submit = useSubmitSellerApplication()
   const [documentIds, setDocumentIds] = useState<
     Partial<Record<SellerDocumentType, string>>
   >({})
   const [formError, setFormError] = useState('')
 
-  if (!account)
+  if (authStatus === 'loading') return <AuthLoading />
+  if (!user)
     return <Navigate to="/login" state={{ from: location.pathname }} replace />
-  if (account.role === 'ADMIN')
+  if (isAdmin(user))
     return (
       <EmptyState
         title="접근 권한이 없어요."
@@ -104,8 +116,7 @@ export default function SellerApplyPage({ account, notify }: Props) {
       />
     )
 
-  const approved =
-    account.role === 'SELLER' || application?.status === 'APPROVED'
+  const approved = isSeller(user) || application?.status === 'APPROVED'
   const allDocumentsUploaded = DOCUMENT_FIELDS.every(
     (field) => documentIds[field.type],
   )
@@ -175,7 +186,7 @@ export default function SellerApplyPage({ account, notify }: Props) {
                 </>
               )}
               {approved ? (
-                account.role === 'SELLER' ? (
+                isSeller(user) ? (
                   <Link className="primary-button" to="/seller">
                     판매자 작업 공간 ↗
                   </Link>

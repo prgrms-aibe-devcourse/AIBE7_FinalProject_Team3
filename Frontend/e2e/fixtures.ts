@@ -1,7 +1,9 @@
 import { expect, test as base, type Page } from '@playwright/test'
 import { FIXED_NOW, installPublicApi } from './mock/api'
+import { getAuth, installAuthApi } from './mock/auth'
 
 export type { Page }
+export { getAuth }
 
 const PLACEHOLDER_IMAGE = 'src/assets/images/grab-symbol.png'
 
@@ -21,25 +23,35 @@ export const test = base.extend({
     )
     // 공개 DROP API를 fixture로 고정한다. 시나리오 테스트는 뒤에서 다시 등록해 덮어쓴다.
     await installPublicApi(page)
+    // 인증 API는 공개 API 뒤에 등록해 인증 경로만 처리하고 나머지는 위 핸들러로 넘긴다.
+    installAuthApi(page)
     await provide(page)
   },
 })
 
 export { expect }
 
-// 로그인 상태는 메모리에만 있어 page.goto로 새로 열면 사라진다. 로그인 후에는 화면 안 링크로 이동한다.
-export async function login(page: Page) {
+async function submitLogin(page: Page) {
   await page.goto('/#/login')
   await page.getByLabel('이메일').fill('grab@example.com')
   await page.getByLabel('비밀번호').fill('password1234')
-  await page.getByRole('button', { name: '로그인' }).click()
+  await page.getByRole('button', { name: '로그인', exact: true }).click()
   await expect(page).toHaveURL(/#\/wish$/)
 }
 
+// 인증 상태는 users/me 쿼리에서 오므로, role은 로그인 전에 mock 상태로 정한다.
+export async function login(page: Page) {
+  await submitLogin(page)
+}
+
 export async function loginSeller(page: Page) {
-  await login(page)
-  await page.getByRole('link', { name: 'MY', exact: true }).click()
-  await page.getByLabel('계정 유형 예시').selectOption('SELLER')
+  getAuth(page).setRoles(['USER', 'SELLER'])
+  await submitLogin(page)
+}
+
+export async function loginAdmin(page: Page) {
+  getAuth(page).setRoles(['USER', 'ADMIN'])
+  await submitLogin(page)
 }
 
 export const toast = (page: Page) => page.locator('.toast')

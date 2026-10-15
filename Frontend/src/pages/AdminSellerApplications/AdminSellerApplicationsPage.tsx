@@ -1,7 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import EmptyState from '../../components/EmptyState/EmptyState'
-import type { MockAccount } from '../../features/auth/mock/mockAuth'
+import AuthLoading from '../../features/auth/components/AuthLoading'
+import {
+  isAdmin,
+  type AuthStatus,
+  type AuthUser,
+} from '../../features/auth/logic/authUser'
 import type { AdminApplicationStatus } from '../../api/seller/adminApplications'
 import {
   useAdminSellerApplications,
@@ -12,7 +17,8 @@ import { adminApplicationErrorMessage } from '../../features/seller/logic/seller
 import { dateLabel } from '../../utils/date'
 
 type Props = {
-  account: MockAccount | null
+  user: AuthUser | null
+  authStatus: AuthStatus
   notify: (message: string) => void
 }
 
@@ -25,7 +31,8 @@ const statusText: Record<AdminApplicationStatus, string> = {
 }
 
 export default function AdminSellerApplicationsPage({
-  account,
+  user,
+  authStatus,
   notify,
 }: Props) {
   const location = useLocation()
@@ -42,14 +49,18 @@ export default function AdminSellerApplicationsPage({
   const rawPage = Number(params.get('page') ?? 0)
   const page = Number.isInteger(rawPage) && rawPage >= 0 ? rawPage : 0
 
-  const query = useAdminSellerApplications({ status, page, size: PAGE_SIZE })
+  const query = useAdminSellerApplications(
+    { status, page, size: PAGE_SIZE },
+    authStatus === 'authenticated' && isAdmin(user),
+  )
   const approve = useApproveSellerApplication()
   const reject = useRejectSellerApplication()
   const submitting = approve.isPending || reject.isPending
 
-  if (!account)
+  if (authStatus === 'loading') return <AuthLoading />
+  if (!user)
     return <Navigate to="/login" state={{ from: location.pathname }} replace />
-  if (account.role !== 'ADMIN')
+  if (!isAdmin(user))
     return (
       <EmptyState
         title="접근 권한이 없어요."

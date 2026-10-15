@@ -8,6 +8,17 @@ const DOCUMENT_LABELS = [
 ]
 const DOCUMENT_FILE = 'src/assets/images/grab-symbol.png'
 
+test('비회원은 신청 조회 없이 로그인으로 이동한다', async ({ page }) => {
+  let requests = 0
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/api/v1/seller-applications/me')
+      requests += 1
+  })
+  await page.goto('/#/seller/apply')
+  await expect(page).toHaveURL(/#\/login$/)
+  expect(requests).toBe(0)
+})
+
 async function loginFromApplyRedirect(page: import('@playwright/test').Page) {
   await page.goto('/#/seller/apply')
   await expect(page).toHaveURL(/#\/login$/)
@@ -152,11 +163,11 @@ test('반려 상태에서 재신청 폼을 보여주고 중복 신청 오류를 
 test('신청 조회 실패를 안내한다', async ({ page }) => {
   await page.route('**/api/v1/seller-applications/me', (route) =>
     route.fulfill({
-      status: 401,
+      status: 500,
       json: {
         success: false,
         data: null,
-        error: { code: 'AUTHENTICATION_REQUIRED', message: '인증 필요' },
+        error: { code: 'INTERNAL_ERROR', message: '조회 실패' },
       },
     }),
   )
