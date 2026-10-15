@@ -27,6 +27,7 @@ function generateOrderId() {
 
 export default function DropDetailPage({
   authenticated,
+  authStatus,
   wishes,
   wishesReady,
   toggleWish,
@@ -131,6 +132,7 @@ export default function DropDetailPage({
   const order = (event: FormEvent) => {
     event.preventDefault()
     if (!selectedSku || !orderable) return
+    if (authStatus === 'loading') return
     if (!authenticated) {
       notify('로그인 후 주문할 수 있어요.')
       navigate('/login', { state: { from: location.pathname } })

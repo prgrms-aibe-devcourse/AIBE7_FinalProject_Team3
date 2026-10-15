@@ -29,7 +29,7 @@ npm run e2e:docker -- --grep @visual   # 시각 비교 (CI와 같은 Docker 이�
 - `src/api/schema` — OpenAPI 생성 타입, `src/api/<도메인>` — 도메인별 요청·테스트, `src/api/client.ts` — 공통 클라이언트
 - 단위 테스트는 해당 기능의 `__tests__/`에 모은다(`src/features/<도메인>/__tests__/`, `src/api/<도메인>/__tests__/`). Mock 관련 테스트도 도메인의 `__tests__/`에 둔다. 공통 UI·유틸리티 테스트는 해당 소스 디렉터리의 `__tests__/`에 둔다. E2E·시각 비교와 전용 fixture는 `e2e/`에서 관리한다.
 - 라우터는 `HashRouter`다. URL은 `/#/wish` 형태다.
-- 로그인·WISH·주문 상태는 `App.tsx`의 `useState`에만 있다. 새 전역 상태 관리 도입은 별도 합의 후 진행한다.
+- 인증 상태는 TanStack Query의 `users/me` 쿼리(`['auth', 'me']`)를 단일 근거로 삼고(`src/features/auth/logic/useAuth.ts`), WISH·주문 상태는 `App.tsx`의 `useState`에 있다. 새 전역 상태 관리 도입은 별도 합의 후 진행한다.
 
 ## 기술 스택
 
@@ -83,7 +83,7 @@ npm run e2e:docker -- --grep @visual   # 시각 비교 (CI와 같은 Docker 이�
 - API 요청은 `src/api/client.ts`를 사용하고 `/api/v1` 상대 경로로 보낸다. 서버 응답은 TanStack Query로 관리한다.
 - 백엔드 API가 바뀌면 백엔드 컨테이너를 재빌드·기동한 뒤 `Frontend/`에서 `npm run api:snapshot` → `npm run api:generate` 순서로 실행한다. 앞 명령은 `openapi/*.json`, 뒤 명령은 `src/api/schema/*.ts`를 갱신한다. `npm run build`는 두 파일을 갱신하지 않는다.
 - 생성 파일을 직접 수정하지 않고 명세 변경 시 `README.md`의 불일치 확인 절차를 따른다. 브라우저 런타임에서는 `/v3/api-docs`를 호출하지 않는다.
-- 생성 타입은 API 계약, `src/api`는 요청·오류 처리, 화면용 변환은 해당 `src/features`가 맡는다. 인증 쿠키·CSRF·401 재시도는 GR-45 범위다.
+- 생성 타입은 API 계약, `src/api`는 요청·오류 처리, 화면용 변환은 해당 `src/features`가 맡는다. 인증 쿠키(`withCredentials`)·CSRF(XSRF-TOKEN)·401 재발급·재시도는 `src/api/client.ts`와 `src/api/auth/`의 공통 클라이언트가 처리한다(GR-45).
 - Mock 타입과 주석에 적힌 API 경로·이슈 번호(GR-xx)는 연동 시 기준이 된다. 함부로 바꾸지 않는다.
 - 코드와 사양이 어긋나면 코드를 먼저 고치지 말고 문서를 수정할지 먼저 묻는다.
 

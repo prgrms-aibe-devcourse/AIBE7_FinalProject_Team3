@@ -3,10 +3,15 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getMyWishes } from '../../api/wish/wishes'
 import EmptyState from '../../components/EmptyState/EmptyState'
+import AuthLoading from '../../features/auth/components/AuthLoading'
 import {
-  mockSignupErrors,
+  isAdmin,
+  isSeller,
+  type AuthUser,
+} from '../../features/auth/logic/authUser'
+import {
   nicknameError,
-  type MockAccount,
+  mockSignupErrors,
 } from '../../features/auth/mock/mockAuth'
 import { wishKeys } from '../../features/wish/logic/queryKeys'
 import {
@@ -28,17 +33,15 @@ const WISH_STATUS_TEXT: Record<string, string> = {
 }
 
 type Props = SharedProps & {
-  account: MockAccount | null
-  onAccountChange: (account: MockAccount) => void
-  onLogout: () => void
+  user: AuthUser | null
+  onLogout: () => Promise<void>
   buyerOrders: BuyerOrder[]
 }
 
 export default function MyPage({
-  account,
-  onAccountChange,
+  user,
   onLogout,
-  authenticated,
+  authStatus,
   orders,
   buyerOrders,
   toggleWish,
@@ -48,16 +51,18 @@ export default function MyPage({
   const location = useLocation()
   const [editing, setEditing] = useState(false)
   const [page, setPage] = useState(0)
-  const [nickname, setNickname] = useState(account?.nickname ?? '')
+  const [nickname, setNickname] = useState(user?.nickname ?? '')
   const [saveResult, setSaveResult] = useState<'success' | 'nickname' | 'save'>(
     'success',
   )
   const [error, setError] = useState('')
+  const [loggingOut, setLoggingOut] = useState(false)
+  const [logoutError, setLogoutError] = useState('')
 
   const wishesQuery = useQuery({
     queryKey: wishKeys.list(page, WISH_PAGE_SIZE),
     queryFn: () => getMyWishes({ page, size: WISH_PAGE_SIZE }),
-    enabled: authenticated,
+    enabled: authStatus === 'authenticated',
   })
   const wishItems = (wishesQuery.data?.content ?? []).flatMap((item) =>
     item.dropId === undefined ? [] : [{ ...item, dropId: item.dropId }],
@@ -65,7 +70,10 @@ export default function MyPage({
   const totalWishes = wishesQuery.data?.totalElements ?? 0
   const totalPages = wishesQuery.data?.totalPages ?? 0
 
-  if (!account)
+  if (authStatus === 'loading') return <AuthLoading />
+  // 로그아웃 완료 후의 이동은 아래 처리에 맡겨 로그인 가드와 경합하지 않게 한다.
+  if (!user && loggingOut) return <AuthLoading />
+  if (!user)
     return <Navigate to="/login" state={{ from: location.pathname }} replace />
 
   const saveNickname = (event: FormEvent<HTMLFormElement>) => {
@@ -79,17 +87,23 @@ export default function MyPage({
       setError(mockSignupErrors[saveResult])
       return
     }
-    onAccountChange({ ...account, nickname: nickname.trim() })
+    // 사용자 정보가 users/me 캐시라 화면에서만 바꾼 값은 저장되지 않는다. 실제 연동 전까지 안내만 한다(M00-07).
     setEditing(false)
     setError('')
-    notify('데모 닉네임을 변경했어요.')
+    notify('닉네임 변경은 API 연동 후 제공됩니다.')
   }
 
-  const switchAccount = (role: MockAccount['role']) => {
-    onAccountChange({ ...account, role })
-    setNickname(account.nickname)
-    setEditing(false)
-    setError('')
+  const logout = async () => {
+    if (loggingOut) return
+    setLoggingOut(true)
+    setLogoutError('')
+    try {
+      await onLogout()
+      navigate('/wish')
+    } catch {
+      setLogoutError('로그아웃하지 못했어요. 잠시 뒤 다시 시도해주세요.')
+      setLoggingOut(false)
+    }
   }
 
   return (
@@ -101,13 +115,13 @@ export default function MyPage({
           <div>
             <p className="eyebrow">MY ACCOUNT</p>
             <h2>내 계정</h2>
-            <strong>{account.nickname}</strong>
-            <p>{account.email}</p>
+            <strong>{user.nickname}</strong>
+            <p>{user.email}</p>
             <small>
-              {account.provider} 계정 ·{' '}
-              {account.role === 'ADMIN'
+              {user.provider} 계정 ·{' '}
+              {isAdmin(user)
                 ? '운영자'
-                : account.role === 'SELLER'
+                : isSeller(user)
                   ? '승인된 판매자'
                   : '일반 회원'}
             </small>
@@ -118,7 +132,7 @@ export default function MyPage({
             onClick={() => {
               setEditing(!editing)
               setError('')
-              setNickname(account.nickname)
+              setNickname(user.nickname)
             }}
           >
             {editing ? '닫기' : '정보 수정'}
@@ -128,7 +142,7 @@ export default function MyPage({
           <form className="account-edit" onSubmit={saveNickname}>
             <label>
               이메일
-              <input readOnly value={account.email} />
+              <input readOnly value={user.email} />
             </label>
             <label>
               닉네임 변경
@@ -164,15 +178,15 @@ export default function MyPage({
         )}
         <div className="account-footer">
           <p>
-            {account.provider === 'LOCAL'
+            {user.provider === 'LOCAL'
               ? 'LOCAL 계정의 비밀번호 변경과 프로필 이미지 관리는 API 연동 시 제공됩니다.'
               : '소셜 계정에는 비밀번호 변경이 제공되지 않습니다.'}
           </p>
-          {account.role === 'ADMIN' ? (
+          {isAdmin(user) ? (
             <Link className="secondary-button" to="/admin/seller-applications">
               판매자 신청 심사 ↗
             </Link>
-          ) : account.role === 'SELLER' ? (
+          ) : isSeller(user) ? (
             <Link className="secondary-button" to="/seller">
               판매자 작업 공간 ↗
             </Link>
@@ -181,15 +195,18 @@ export default function MyPage({
               판매자 신청 ↗
             </Link>
           )}
+          {logoutError && (
+            <p className="form-error" role="alert">
+              {logoutError}
+            </p>
+          )}
           <button
             type="button"
             className="text-link"
-            onClick={() => {
-              onLogout()
-              navigate('/wish')
-            }}
+            disabled={loggingOut}
+            onClick={() => void logout()}
           >
-            로그아웃
+            {loggingOut ? '로그아웃 중…' : '로그아웃'}
           </button>
         </div>
       </section>
@@ -327,22 +344,6 @@ export default function MyPage({
             />
           )}
         </section>
-      </div>
-      <div className="my-demo-controls">
-        <label>
-          계정 유형 예시
-          <select
-            value={account.role}
-            onChange={(event) =>
-              switchAccount(event.target.value as MockAccount['role'])
-            }
-          >
-            <option value="MEMBER">일반 회원 예시</option>
-            <option value="SELLER">승인 판매자 예시</option>
-            <option value="ADMIN">운영자 예시</option>
-          </select>
-        </label>
-        <small>계정 유형 전환과 목록은 이 화면의 Mock 데모입니다.</small>
       </div>
     </section>
   )

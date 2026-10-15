@@ -1,7 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import EmptyState from '../../components/EmptyState/EmptyState'
-import type { MockAccount } from '../../features/auth/mock/mockAuth'
+import AuthLoading from '../../features/auth/components/AuthLoading'
+import {
+  isAdmin,
+  type AuthStatus,
+  type AuthUser,
+} from '../../features/auth/logic/authUser'
 import type {
   SellerApplication,
   SellerApplicationStatus,
@@ -9,7 +14,8 @@ import type {
 import { dateLabel } from '../../utils/date'
 
 type Props = {
-  account: MockAccount | null
+  user: AuthUser | null
+  authStatus: AuthStatus
   applications: SellerApplication[]
   onReview: (
     id: string,
@@ -28,7 +34,8 @@ const statusText: Record<SellerApplicationStatus, string> = {
 }
 
 export default function AdminSellerApplicationsPage({
-  account,
+  user,
+  authStatus,
   applications,
   onReview,
   notify,
@@ -48,9 +55,10 @@ export default function AdminSellerApplicationsPage({
   )
   const [error, setError] = useState('')
 
-  if (!account)
+  if (authStatus === 'loading') return <AuthLoading />
+  if (!user)
     return <Navigate to="/login" state={{ from: location.pathname }} replace />
-  if (account.role !== 'ADMIN')
+  if (!isAdmin(user))
     return (
       <EmptyState
         title="접근 권한이 없어요."

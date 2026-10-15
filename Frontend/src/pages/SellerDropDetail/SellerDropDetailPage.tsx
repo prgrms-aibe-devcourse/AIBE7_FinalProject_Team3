@@ -7,7 +7,13 @@ import {
   useSearchParams,
 } from 'react-router-dom'
 import EmptyState from '../../components/EmptyState/EmptyState'
-import type { MockAccount } from '../../features/auth/mock/mockAuth'
+import AuthLoading from '../../features/auth/components/AuthLoading'
+import {
+  isAdmin,
+  isSeller,
+  type AuthStatus,
+  type AuthUser,
+} from '../../features/auth/logic/authUser'
 import { endedDrops } from '../../features/drop/mock/mockEndedDrops'
 import { sellerOrders } from '../../features/order/mock/mockSellerOrders'
 import {
@@ -25,7 +31,8 @@ import { dateLabel } from '../../utils/date'
 import { won } from '../../utils/price'
 
 type Props = {
-  account: MockAccount | null
+  user: AuthUser | null
+  authStatus: AuthStatus
   drops: SellerMockDrop[]
   ownerEmail: string
   onChange: (drops: SellerMockDrop[]) => void
@@ -33,7 +40,8 @@ type Props = {
 }
 
 export default function SellerDropDetailPage({
-  account,
+  user,
+  authStatus,
   drops,
   ownerEmail,
   onChange,
@@ -63,7 +71,8 @@ export default function SellerDropDetailPage({
     drops.find((item) => item.id === dropId) ??
     (dropId === '999' ? otherSellerDrop : undefined)
 
-  if (!account)
+  if (authStatus === 'loading') return <AuthLoading />
+  if (!user)
     return (
       <Navigate
         to="/login"
@@ -71,16 +80,12 @@ export default function SellerDropDetailPage({
         replace
       />
     )
-  if (account.role !== 'SELLER')
+  if (!isSeller(user))
     return (
       <EmptyState
         title="판매자 권한이 필요해요."
-        link={account.role === 'MEMBER' ? '/seller/apply' : '/my'}
-        label={
-          account.role === 'MEMBER'
-            ? '판매자 신청 보기'
-            : '내 계정으로 돌아가기'
-        }
+        link={isAdmin(user) ? '/my' : '/seller/apply'}
+        label={isAdmin(user) ? '내 계정으로 돌아가기' : '판매자 신청 보기'}
         variant="page"
       />
     )

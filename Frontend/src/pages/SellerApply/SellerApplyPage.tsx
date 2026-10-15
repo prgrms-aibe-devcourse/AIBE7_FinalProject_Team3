@@ -2,7 +2,13 @@ import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation } from 'react-router-dom'
 import symbol from '../../assets/images/grab-symbol.png'
 import EmptyState from '../../components/EmptyState/EmptyState'
-import type { MockAccount } from '../../features/auth/mock/mockAuth'
+import AuthLoading from '../../features/auth/components/AuthLoading'
+import {
+  isAdmin,
+  isSeller,
+  type AuthStatus,
+  type AuthUser,
+} from '../../features/auth/logic/authUser'
 import type {
   SellerApplication,
   SellerApplicationInput,
@@ -11,7 +17,8 @@ import type {
 import { dateLabel } from '../../utils/date'
 
 type Props = {
-  account: MockAccount | null
+  user: AuthUser | null
+  authStatus: AuthStatus
   application: SellerApplication | undefined
   onApply: (input: SellerApplicationInput) => void
   notify: (message: string) => void
@@ -21,7 +28,8 @@ type Example =
   'CURRENT' | 'NONE' | SellerApplicationStatus | 'ERROR' | 'FORBIDDEN'
 
 export default function SellerApplyPage({
-  account,
+  user,
+  authStatus,
   application,
   onApply,
   notify,
@@ -33,9 +41,10 @@ export default function SellerApplyPage({
   )
   const [error, setError] = useState('')
 
-  if (!account)
+  if (authStatus === 'loading') return <AuthLoading />
+  if (!user)
     return <Navigate to="/login" state={{ from: location.pathname }} replace />
-  if (account.role === 'ADMIN')
+  if (isAdmin(user))
     return (
       <EmptyState
         title="접근 권한이 없어요."
@@ -58,11 +67,11 @@ export default function SellerApplyPage({
             rejectedReason:
               example === 'REJECTED' ? '사업자 정보 확인이 필요합니다.' : null,
           }
-  const approved = account.role === 'SELLER' || current?.status === 'APPROVED'
+  const approved = isSeller(user) || current?.status === 'APPROVED'
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (application || account.role === 'SELLER') {
+    if (application || isSeller(user)) {
       setError('이미 신청했거나 승인된 계정입니다.')
       return
     }
@@ -115,7 +124,7 @@ export default function SellerApplyPage({
                 </>
               )}
               {approved ? (
-                account.role === 'SELLER' ? (
+                isSeller(user) ? (
                   <Link className="primary-button" to="/seller">
                     판매자 작업 공간 ↗
                   </Link>

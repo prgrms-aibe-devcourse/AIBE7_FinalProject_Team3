@@ -12,6 +12,10 @@
   ],
   "tags": [
     {
+      "name": "판매자 신청 심사",
+      "description": "운영자의 판매자 신청 목록 조회·승인·반려(ADMIN 전용)"
+    },
+    {
       "name": "판매자 서류",
       "description": "판매자 신청 서류 업로드(암호화 저장)"
     },
@@ -163,6 +167,168 @@
         }
       }
     },
+    "/api/v1/admin/seller-applications/{applicationId}/reject": {
+      "post": {
+        "tags": ["판매자 신청 심사"],
+        "summary": "판매자 신청 반려",
+        "description": "사유(reason) 필수. PENDING이 아니면 409 INVALID_STATE_TRANSITION",
+        "operationId": "reject",
+        "parameters": [
+          {
+            "name": "applicationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SellerApplicationRejectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "반려 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSellerApplicationRejectionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSellerApplicationRejectionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED, INVALID_TOKEN",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSellerApplicationRejectionResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSellerApplicationRejectionResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "SELLER_APPLICATION_NOT_FOUND",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSellerApplicationRejectionResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "INVALID_STATE_TRANSITION",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSellerApplicationRejectionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/seller-applications/{applicationId}/approve": {
+      "post": {
+        "tags": ["판매자 신청 심사"],
+        "summary": "판매자 신청 승인",
+        "description": "PENDING이 아니면 409 INVALID_STATE_TRANSITION",
+        "operationId": "approve",
+        "parameters": [
+          {
+            "name": "applicationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "승인 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSellerApplicationApprovalResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED, INVALID_TOKEN",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSellerApplicationApprovalResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSellerApplicationApprovalResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "SELLER_APPLICATION_NOT_FOUND",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSellerApplicationApprovalResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "INVALID_STATE_TRANSITION",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSellerApplicationApprovalResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/seller-applications/me": {
       "get": {
         "tags": ["판매자 신청"],
@@ -196,6 +362,166 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseMySellerApplicationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/seller-applications": {
+      "get": {
+        "tags": ["판매자 신청 심사"],
+        "summary": "판매자 신청 목록 조회",
+        "description": "status 미지정 시 전체 상태를 반환한다",
+        "operationId": "findApplications",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["PENDING", "APPROVED", "REJECTED"]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "조회 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseAdminSellerApplicationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseAdminSellerApplicationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED, INVALID_TOKEN",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseAdminSellerApplicationResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseAdminSellerApplicationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/seller-applications/{applicationId}/documents/{documentType}/view": {
+      "get": {
+        "tags": ["판매자 신청 심사"],
+        "summary": "판매자 신청 서류 열람(전용 뷰어)",
+        "description": "응답은 URL이 아니라 복호화+워터마크 합성을 마친 이미지 바이트다. 열람마다 접근 로그를 남긴다",
+        "operationId": "viewDocument",
+        "parameters": [
+          {
+            "name": "applicationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "documentType",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "BUSINESS_LICENSE",
+                "ID_CARD",
+                "BANKBOOK",
+                "MAIL_ORDER_BUSINESS_REPORT"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "열람 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "string",
+                  "format": "byte"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED, INVALID_TOKEN",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "string",
+                  "format": "byte"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "string",
+                  "format": "byte"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "SELLER_APPLICATION_NOT_FOUND",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "string",
+                  "format": "byte"
                 }
               }
             }
@@ -309,6 +635,81 @@
           }
         }
       },
+      "SellerApplicationRejectRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["reason"]
+      },
+      "ApiResponseSellerApplicationRejectionResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SellerApplicationRejectionResponse"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "SellerApplicationRejectionResponse": {
+        "type": "object",
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["PENDING", "APPROVED", "REJECTED"]
+          },
+          "rejectedReason": {
+            "type": "string"
+          },
+          "rejectedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseSellerApplicationApprovalResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SellerApplicationApprovalResponse"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "SellerApplicationApprovalResponse": {
+        "type": "object",
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["PENDING", "APPROVED", "REJECTED"]
+          },
+          "approvedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "ApiResponseMySellerApplicationResponse": {
         "type": "object",
         "properties": {
@@ -349,6 +750,80 @@
           "appliedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "AdminSellerApplicationResponse": {
+        "type": "object",
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "brandName": {
+            "type": "string"
+          },
+          "contactEmail": {
+            "type": "string"
+          },
+          "businessRegistrationNumber": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["PENDING", "APPROVED", "REJECTED"]
+          },
+          "appliedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponsePageResponseAdminSellerApplicationResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PageResponseAdminSellerApplicationResponse"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "PageResponseAdminSellerApplicationResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminSellerApplicationResponse"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hasNext": {
+            "type": "boolean"
           }
         }
       }

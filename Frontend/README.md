@@ -94,13 +94,15 @@ npx playwright show-trace test-results/<테스트>/trace.zip
 - 화면은 도메인 타입과 props를 사용해 표시합니다. 기존 컴포넌트를 재사용하고, 나중의 API 호출을 위해 쓰이지 않는 요청 계층이나 추상 인터페이스를 미리 만들지 않습니다.
 - 로딩·빈 결과·오류·권한 부족·상태별 버튼의 화면 상태를 준비합니다. Mock 버튼은 로컬 데모 동작이며 실제 주문·결제·판매자 승인·배송 처리로 안내하지 않습니다.
 - 실제 연동 이슈에서는 Mock 공급 부분을 `src/api/client.ts` 요청과 TanStack Query로 교체하고, API 응답을 화면용 데이터로 바꾸는 코드는 해당 `src/features`에 둡니다. 쓰이지 않게 된 Mock만 제거하고 화면 배치와 컴포넌트는 유지합니다.
-- 인증 쿠키·CSRF·401 재시도, 저장 결과·서버 오류·중복 요청 검증은 실제 API 연동 단계에서 확인합니다. 화면 초안의 Mock 성공 상태를 서버 처리 성공의 증거로 취급하지 않습니다.
+- 인증 쿠키·CSRF·401 재시도는 `src/api/client.ts`의 공통 클라이언트와 `src/api/auth/`가 처리합니다(GR-45). 저장 결과·도메인 서버 오류·중복 요청 검증은 각 화면의 실제 API 연동 단계에서 확인합니다. 화면 초안의 Mock 성공 상태를 서버 처리 성공의 증거로 취급하지 않습니다.
 
 화면별 PR 범위와 검증 항목은 해당 Linear 이슈에, 로컬 작업 순서는 `todo/page-renewal.md`에 적습니다. `todo/`는 git에서 제외되는 개인 작업 메모입니다.
 
 ## API 계약 및 로컬 확인
 
 백엔드를 먼저 실행한 뒤 `npm run dev`로 프론트엔드를 띄웁니다. 프론트엔드는 `/api/v1` 상대 경로로 요청하고 Vite가 백엔드에 프록시합니다. 기본 주소는 `http://localhost:8080`입니다. 다른 백엔드를 사용하려면 `.env.example`을 `.env.local`로 복사하고 `VITE_API_PROXY_TARGET`에 백엔드 원점 주소(예: `https://api.example.com`, `/api/v1` 제외)를 설정합니다. 값이 없거나 공백이면 기본 주소를 사용합니다. `.env`·`.env.local`·`.env.[mode]` 설정은 [Vite의 `loadEnv`](https://vite.dev/config/#using-environment-variables-in-config)로 읽으며 변경 후 개발 서버를 재시작해야 합니다. 실제 환경 파일은 git에서 제외하고 `.env.example`만 공유합니다. 이 설정은 개발 서버 프록시용이며, 배포 서버에서는 `/api`를 백엔드로 전달하도록 별도로 설정합니다.
+
+LOCAL 로그인과 `users/me`는 실제 백엔드가 필요합니다. 백엔드 없이 `npm run dev`만 띄우면 인증 요청이 401이 되어 비로그인 상태로 동작합니다. 소셜 로그인은 준비 중(GR-47)이며 로그인 화면의 결과 예시는 화면 안내용입니다.
 
 공개 카테고리 조회(`GET /api/v1/categories`)는 `src/api/category/categories.ts`에서 생성 타입을 사용합니다. 화면에 남은 Mock 상품 데이터의 실제 API 전환은 화면 작업과 분리한 후속 이슈에서 진행합니다.
 
@@ -109,6 +111,6 @@ npm run api:snapshot
 npm run api:generate
 ```
 
-`api:snapshot`은 백엔드의 `/v3/api-docs/{도메인}`을 `openapi/*.json`에 저장하고, `api:generate`는 `redocly.yaml`에 정의한 출력 경로에 `src/api/schema/*.ts`를 생성합니다. 새 도메인을 추가할 때는 백엔드 `springdoc.group-configs`, `scripts/update-openapi.mjs`, `redocly.yaml`에 같은 그룹을 추가합니다. 스냅샷과 생성 타입을 함께 커밋하고 생성 파일은 직접 수정하지 않습니다. `src/api/client.ts`는 공통 요청 주소를 지정하며 Axios가 HTTP 오류를 거부합니다. 각 요청 함수는 성공 응답의 `data`를 확인하고 반환합니다. 화면용 모델 변환은 요청 함수가 아닌 해당 `src/features`에서 합니다. 서버 응답 캐시는 TanStack Query를 사용합니다. 인증 쿠키·CSRF·401 재시도는 GR-45에서 구현합니다.
+`api:snapshot`은 백엔드의 `/v3/api-docs/{도메인}`을 `openapi/*.json`에 저장하고, `api:generate`는 `redocly.yaml`에 정의한 출력 경로에 `src/api/schema/*.ts`를 생성합니다. 새 도메인을 추가할 때는 백엔드 `springdoc.group-configs`, `scripts/update-openapi.mjs`, `redocly.yaml`에 같은 그룹을 추가합니다. 스냅샷과 생성 타입을 함께 커밋하고 생성 파일은 직접 수정하지 않습니다. `src/api/client.ts`는 공통 요청 주소를 지정하며 Axios가 HTTP 오류를 거부합니다. 각 요청 함수는 성공 응답의 `data`를 확인하고 반환합니다. 화면용 모델 변환은 요청 함수가 아닌 해당 `src/features`에서 합니다. 서버 응답 캐시는 TanStack Query를 사용합니다. 인증 쿠키(`withCredentials`)·CSRF(XSRF-TOKEN)·401 재발급·재시도는 `src/api/client.ts`와 `src/api/auth/`의 공통 클라이언트가 처리합니다(GR-45). 인증 상태는 `GET /api/v1/users/me` 쿼리(`['auth', 'me']`)를 단일 근거로 삼고, 서버 상태는 TanStack Query로 관리합니다.
 
 명세가 바뀌면 위 명령으로 다시 생성한 후 `git diff -- openapi src/api/schema`를 확인합니다. 대상 경로와 응답 형태를 `Backend/docs/development/api-spec/`의 Markdown 명세와 비교하고, 불일치하면 구현 전에 사양 방향을 확인합니다. 로컬 실행 확인은 프론트엔드 개발 서버가 켜진 상태에서 브라우저로 `http://localhost:5173/api/v1/categories`를 열어 `success: true`와 카테고리 배열을 확인합니다.

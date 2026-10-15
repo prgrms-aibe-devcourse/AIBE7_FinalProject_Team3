@@ -1,33 +1,3 @@
-export type MockAccount = {
-  email: string
-  nickname: string
-  provider: 'LOCAL' | 'KAKAO' | 'GOOGLE'
-  role: 'MEMBER' | 'SELLER' | 'ADMIN'
-}
-
-export const localAccount: MockAccount = {
-  email: 'grab@example.com',
-  nickname: '드롭헌터',
-  provider: 'LOCAL',
-  role: 'MEMBER',
-}
-
-export const adminAccount: MockAccount = {
-  email: 'admin@example.com',
-  nickname: '운영자',
-  provider: 'LOCAL',
-  role: 'ADMIN',
-}
-
-export function socialAccount(provider: 'KAKAO' | 'GOOGLE'): MockAccount {
-  return {
-    email: `${provider.toLowerCase()}@example.com`,
-    nickname: '소셜회원',
-    provider,
-    role: 'MEMBER',
-  }
-}
-
 export const mockLoginErrors = {
   credentials: '이메일 또는 비밀번호를 확인해주세요.',
   inactive: '사용할 수 없는 계정이에요.',

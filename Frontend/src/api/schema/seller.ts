@@ -44,6 +44,46 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/admin/seller-applications/{applicationId}/reject': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * 판매자 신청 반려
+     * @description 사유(reason) 필수. PENDING이 아니면 409 INVALID_STATE_TRANSITION
+     */
+    post: operations['reject']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/seller-applications/{applicationId}/approve': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * 판매자 신청 승인
+     * @description PENDING이 아니면 409 INVALID_STATE_TRANSITION
+     */
+    post: operations['approve']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/seller-applications/me': {
     parameters: {
       query?: never
@@ -56,6 +96,46 @@ export interface paths {
      * @description 본인 신청 1건을 조회한다. 없으면 404
      */
     get: operations['findMyApplication']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/seller-applications': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * 판매자 신청 목록 조회
+     * @description status 미지정 시 전체 상태를 반환한다
+     */
+    get: operations['findApplications']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/seller-applications/{applicationId}/documents/{documentType}/view': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * 판매자 신청 서류 열람(전용 뷰어)
+     * @description 응답은 URL이 아니라 복호화+워터마크 합성을 마친 이미지 바이트다. 열람마다 접근 로그를 남긴다
+     */
+    get: operations['viewDocument']
     put?: never
     post?: never
     delete?: never
@@ -107,6 +187,36 @@ export interface components {
       /** Format: date-time */
       appliedAt?: string
     }
+    SellerApplicationRejectRequest: {
+      reason: string
+    }
+    ApiResponseSellerApplicationRejectionResponse: {
+      success?: boolean
+      data?: components['schemas']['SellerApplicationRejectionResponse']
+      message?: string
+    }
+    SellerApplicationRejectionResponse: {
+      /** Format: uuid */
+      applicationId?: string
+      /** @enum {string} */
+      status?: 'PENDING' | 'APPROVED' | 'REJECTED'
+      rejectedReason?: string
+      /** Format: date-time */
+      rejectedAt?: string
+    }
+    ApiResponseSellerApplicationApprovalResponse: {
+      success?: boolean
+      data?: components['schemas']['SellerApplicationApprovalResponse']
+      message?: string
+    }
+    SellerApplicationApprovalResponse: {
+      /** Format: uuid */
+      applicationId?: string
+      /** @enum {string} */
+      status?: 'PENDING' | 'APPROVED' | 'REJECTED'
+      /** Format: date-time */
+      approvedAt?: string
+    }
     ApiResponseMySellerApplicationResponse: {
       success?: boolean
       data?: components['schemas']['MySellerApplicationResponse']
@@ -123,6 +233,36 @@ export interface components {
       status?: 'PENDING' | 'APPROVED' | 'REJECTED'
       /** Format: date-time */
       appliedAt?: string
+    }
+    AdminSellerApplicationResponse: {
+      /** Format: uuid */
+      applicationId?: string
+      /** Format: uuid */
+      userId?: string
+      brandName?: string
+      contactEmail?: string
+      businessRegistrationNumber?: string
+      /** @enum {string} */
+      status?: 'PENDING' | 'APPROVED' | 'REJECTED'
+      /** Format: date-time */
+      appliedAt?: string
+    }
+    ApiResponsePageResponseAdminSellerApplicationResponse: {
+      success?: boolean
+      data?: components['schemas']['PageResponseAdminSellerApplicationResponse']
+      message?: string
+    }
+    PageResponseAdminSellerApplicationResponse: {
+      content?: components['schemas']['AdminSellerApplicationResponse'][]
+      /** Format: int32 */
+      page?: number
+      /** Format: int32 */
+      size?: number
+      /** Format: int64 */
+      totalElements?: number
+      /** Format: int32 */
+      totalPages?: number
+      hasNext?: boolean
     }
   }
   responses: never
@@ -244,6 +384,135 @@ export interface operations {
       }
     }
   }
+  reject: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        applicationId: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SellerApplicationRejectRequest']
+      }
+    }
+    responses: {
+      /** @description 반려 성공 */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerApplicationRejectionResponse']
+        }
+      }
+      /** @description VALIDATION_FAILED */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerApplicationRejectionResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerApplicationRejectionResponse']
+        }
+      }
+      /** @description ACCESS_DENIED */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerApplicationRejectionResponse']
+        }
+      }
+      /** @description SELLER_APPLICATION_NOT_FOUND */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerApplicationRejectionResponse']
+        }
+      }
+      /** @description INVALID_STATE_TRANSITION */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerApplicationRejectionResponse']
+        }
+      }
+    }
+  }
+  approve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        applicationId: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description 승인 성공 */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerApplicationApprovalResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerApplicationApprovalResponse']
+        }
+      }
+      /** @description ACCESS_DENIED */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerApplicationApprovalResponse']
+        }
+      }
+      /** @description SELLER_APPLICATION_NOT_FOUND */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerApplicationApprovalResponse']
+        }
+      }
+      /** @description INVALID_STATE_TRANSITION */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSellerApplicationApprovalResponse']
+        }
+      }
+    }
+  }
   findMyApplication: {
     parameters: {
       query?: never
@@ -278,6 +547,111 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['ApiResponseMySellerApplicationResponse']
+        }
+      }
+    }
+  }
+  findApplications: {
+    parameters: {
+      query?: {
+        status?: 'PENDING' | 'APPROVED' | 'REJECTED'
+        page?: number
+        size?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description 조회 성공 */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePageResponseAdminSellerApplicationResponse']
+        }
+      }
+      /** @description INVALID_REQUEST */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePageResponseAdminSellerApplicationResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePageResponseAdminSellerApplicationResponse']
+        }
+      }
+      /** @description ACCESS_DENIED */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponsePageResponseAdminSellerApplicationResponse']
+        }
+      }
+    }
+  }
+  viewDocument: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        applicationId: string
+        documentType:
+          | 'BUSINESS_LICENSE'
+          | 'ID_CARD'
+          | 'BANKBOOK'
+          | 'MAIL_ORDER_BUSINESS_REPORT'
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description 열람 성공 */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': string
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': string
+        }
+      }
+      /** @description ACCESS_DENIED */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': string
+        }
+      }
+      /** @description SELLER_APPLICATION_NOT_FOUND */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': string
         }
       }
     }

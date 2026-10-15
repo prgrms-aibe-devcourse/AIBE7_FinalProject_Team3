@@ -1,13 +1,27 @@
-import { expect, loginSeller, test, type Page } from '../../fixtures'
+import {
+  expect,
+  loginAdmin,
+  loginSeller,
+  test,
+  type Page,
+} from '../../fixtures'
 import { installCatalogScenario } from '../../mock/catalog'
 import { installHomeScenario } from '../../mock/home'
 
 // 기준 이미지는 CI와 같은 Playwright Docker 이미지에서만 만든다(npm run e2e:docker).
 test.describe('화면 기준', { tag: '@visual' }, () => {
   const shot = async (page: Page, name: string) => {
+    // 직전 동작이 남긴 마우스 위치의 hover 스타일이 화면에 섞이지 않게 한다.
+    await page.mouse.move(0, 0)
     await page.evaluate(() => document.fonts.ready)
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }))
     await expect(page).toHaveScreenshot(`${name}.png`, { fullPage: true })
+  }
+
+  // 로그인 후 뜨는 토스트가 사라진 뒤에 촬영한다. 로그인이 비동기라 토스트가 늦게 뜬다.
+  const settleToast = async (page: Page) => {
+    await expect(page.locator('.toast')).not.toBeEmpty()
+    await expect(page.locator('.toast')).toBeEmpty()
   }
 
   for (const [name, path] of [
@@ -34,7 +48,7 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
     await page.getByRole('button', { name: '로그인', exact: true }).click()
     await page.getByRole('link', { name: 'MY', exact: true }).click()
     // WISH 패널도 로딩 상태를 role=status로 두므로 토스트만 확인하고, 목록 로딩이 끝난 뒤 촬영한다.
-    await expect(page.locator('.toast')).toBeEmpty()
+    await settleToast(page)
     await expect(page.getByText('매일을 담는 캔버스 토트')).toBeVisible()
     await shot(page, 'my')
   })
@@ -44,17 +58,14 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
     await page.getByLabel('이메일').fill('grab@example.com')
     await page.getByLabel('비밀번호').fill('password1234')
     await page.getByRole('button', { name: '로그인', exact: true }).click()
-    await expect(page.getByRole('status')).toBeEmpty()
+    await settleToast(page)
     await shot(page, 'seller-apply')
   })
 
   test('admin-seller-applications', async ({ page }) => {
+    await loginAdmin(page)
     await page.goto('/#/admin/seller-applications')
-    await page.getByLabel('이메일').fill('grab@example.com')
-    await page.getByLabel('비밀번호').fill('password1234')
-    await page.getByLabel('LOCAL 결과 예시').selectOption('admin')
-    await page.getByRole('button', { name: '로그인', exact: true }).click()
-    await expect(page.getByRole('status')).toBeEmpty()
+    await settleToast(page)
     await shot(page, 'admin-seller-applications')
   })
 
@@ -68,7 +79,7 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
     await page.evaluate(() => {
       window.location.hash = '#/seller/drops'
     })
-    await expect(page.getByRole('status')).toBeEmpty()
+    await settleToast(page)
     await shot(page, 'seller-drops')
   })
 
@@ -77,7 +88,7 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
     await page.evaluate(() => {
       window.location.hash = '#/seller/drops/401'
     })
-    await expect(page.getByRole('status')).toBeEmpty()
+    await settleToast(page)
     await shot(page, 'seller-drop-detail')
   })
 
@@ -89,7 +100,7 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
     await expect(
       page.getByRole('region', { name: '선택 상품 옵션별 재고' }),
     ).toContainText('와이드 / 롱')
-    await expect(page.getByRole('status')).toBeEmpty()
+    await settleToast(page)
     await shot(page, 'seller-inventory')
   })
 
@@ -99,7 +110,7 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
       window.location.hash = '#/seller/sales?status=ENDED&page=0'
     })
     await expect(page.getByText('가을 코듀로이 셔츠 ↗')).toBeVisible()
-    await expect(page.getByRole('status')).toBeEmpty()
+    await settleToast(page)
     await shot(page, 'seller-sales')
   })
 
@@ -108,7 +119,7 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
     await page.getByLabel('이메일').fill('grab@example.com')
     await page.getByLabel('비밀번호').fill('password1234')
     await page.getByRole('button', { name: '로그인', exact: true }).click()
-    await expect(page.getByRole('status')).toBeEmpty()
+    await settleToast(page)
     await shot(page, 'checkout')
   })
 
@@ -117,7 +128,7 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
     await page.getByLabel('이메일').fill('grab@example.com')
     await page.getByLabel('비밀번호').fill('password1234')
     await page.getByRole('button', { name: '로그인', exact: true }).click()
-    await expect(page.getByRole('status')).toBeEmpty()
+    await settleToast(page)
     await shot(page, 'order-detail')
   })
 
