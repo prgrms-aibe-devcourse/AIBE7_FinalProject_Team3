@@ -117,7 +117,7 @@
 | Method | Endpoint | 인증 | 용도 |
 | --- | --- | --- | --- |
 | POST | `/api/v1/orders/{orderId}/payments` | USER | 결제창 인증 결과(`paymentKey`)로 토스페이먼츠 테스트 결제 승인 |
-| GET | `/api/v1/orders/{orderId}/payments` | USER/SELLER | 주문에 대한 결제 시도 및 결과 이력 조회 |
+| GET | `/api/v1/orders/{orderId}/payments` | USER | 본인 주문의 결제 시도 및 결과 이력 조회 |
 | POST | `/api/v1/payments/toss/webhook` | 토스 조회 재확인 | 토스페이먼츠 결제 상태 변경 웹훅 수신 (후속 구현) |
 
 > Mock 결제는 토스페이먼츠 테스트 환경(테스트 API 키)으로 진행하며 실제 결제는 일어나지 않습니다.
@@ -129,6 +129,7 @@
 | --- | --- | --- | --- |
 | GET | `/api/v1/seller/orders` | SELLER | 본인 DROP에 접수된 주문 목록 조회 |
 | GET | `/api/v1/seller/orders/{orderId}` | SELLER | 본인 DROP의 주문 상세 조회 |
+| GET | `/api/v1/seller/orders/{orderId}/payments` | SELLER | 본인 DROP 주문의 결제 시도 및 결과 이력 조회 (PG 실패 사유 제외) |
 | POST | `/api/v1/seller/orders/{orderId}/prepare-shipment` | SELLER | 결제 완료 주문을 배송 준비 상태로 변경 |
 | POST | `/api/v1/seller/orders/{orderId}/shipment` | SELLER | 택배사와 송장번호를 등록하고 발송 처리 |
 | PATCH | `/api/v1/seller/orders/{orderId}/shipment` | SELLER | 등록한 택배사·송장번호 수정 (`SHIPPED`만) |
