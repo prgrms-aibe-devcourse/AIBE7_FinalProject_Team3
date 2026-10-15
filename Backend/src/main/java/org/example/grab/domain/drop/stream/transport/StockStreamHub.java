@@ -35,6 +35,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
+import java.util.concurrent.atomic.LongAdder;
 
 @Slf4j
 @Component
@@ -46,6 +47,12 @@ public class StockStreamHub implements SmartLifecycle {
     private final ThreadPoolExecutor sender;
     private final ScheduledThreadPoolExecutor scheduler;
     private final Map<UUID, Connection> connections = new ConcurrentHashMap<>();
+    private final LongAdder signals = new LongAdder();
+    private final LongAdder merged = new LongAdder();
+    private final LongAdder sent = new LongAdder();
+    private final LongAdder failures = new LongAdder();
+    private final LongAdder timeouts = new LongAdder();
+    private final LongAdder rejected = new LongAdder();
     private volatile boolean stopping;
     private volatile boolean running;
     private ScheduledFuture<?> pump;
@@ -57,6 +64,19 @@ public class StockStreamHub implements SmartLifecycle {
         this.publicDrops = publicDrops;
         this.sender = executors.sender();
         this.scheduler = executors.scheduler();
+    }
+
+    public Metrics metrics() {
+        int pending = 0;
+        for (Connection connection : connections.values()) {
+            synchronized (connection) {
+                pending += connection.pending.size();
+            }
+        }
+        return new Metrics(pending, signals.sum(), merged.sum(), sent.sum(), failures.sum(), timeouts.sum(), rejected.sum());
+    }
+
+    public record Metrics(int pending, long signals, long merged, long sent, long failures, long timeouts, long rejected) {
     }
 
     @Override
@@ -128,6 +148,7 @@ public class StockStreamHub implements SmartLifecycle {
         if (changes.isEmpty() || stopping) {
             return;
         }
+        signals.increment();
         Set<StockChange> signal = EnumSet.copyOf(changes);
         for (StockStreamSubscription subscription : registry.findSubscribers(dropId)) {
             Connection connection = connections.get(subscription.id());
@@ -140,6 +161,9 @@ public class StockStreamHub implements SmartLifecycle {
                 }
                 if (connection.pending.isEmpty()) {
                     connection.pendingDue = System.nanoTime() + properties.coalesceWindow().toNanos();
+                }
+                if (connection.pending.containsKey(dropId)) {
+                    merged.increment();
                 }
                 connection.pending.computeIfAbsent(dropId, ignored -> EnumSet.noneOf(StockChange.class)).addAll(signal);
             }
@@ -172,6 +196,7 @@ public class StockStreamHub implements SmartLifecycle {
                 }
             }
             if (timedOut) {
+                timeouts.increment();
                 dispose(connection);
                 continue;
             }
@@ -208,6 +233,7 @@ public class StockStreamHub implements SmartLifecycle {
         try {
             sender.execute(task);
         } catch (RejectedExecutionException error) {
+            rejected.increment();
             // 스트림이 이미 시작됐을 수 있어 HTTP 오류로 바꾸지 않고 연결을 정리한다.
             dispose(connection);
         }
@@ -269,6 +295,7 @@ public class StockStreamHub implements SmartLifecycle {
                 }
             }
         } catch (IOException | RuntimeException error) {
+            failures.increment();
             // 응답 시작 후 JSON 오류를 쓰지 않는다. payload와 개인정보는 로그에 남기지 않는다.
             log.debug("SSE 전송 종료: {}", error.getClass().getSimpleName());
             dispose(connection);
@@ -292,6 +319,7 @@ public class StockStreamHub implements SmartLifecycle {
             throw new IOException("재고 스트림 수신자가 전송을 따라오지 못합니다.");
         }
         connection.emitter.send(event);
+        sent.increment();
     }
 
     private void dispose(Connection connection) {

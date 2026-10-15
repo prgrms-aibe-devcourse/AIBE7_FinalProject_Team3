@@ -24,6 +24,21 @@ public class StockStreamRegistry {
     private final Map<Long, Set<UUID>> subscribersByDrop = new HashMap<>();
     private final Map<String, IpState> ipStates = new HashMap<>();
 
+    private long rateRejected;
+    private long ipRejected;
+    private long capacityRejected;
+    private long trackingRejected;
+    private long disposed;
+
+    public synchronized Metrics metrics() {
+        return new Metrics(subscriptions.size(), subscribersByDrop.values().stream().mapToInt(Set::size).sum(),
+                rateRejected, ipRejected, capacityRejected, trackingRejected, disposed);
+    }
+
+    public record Metrics(int connections, int subscriptions, long rateRejected, long ipRejected,
+            long capacityRejected, long trackingRejected, long disposed) {
+    }
+
     // 모든 상태 변경을 같은 잠금으로 묶어 admission과 중복 종료 사이 슬롯/인덱스 불일치를 막는다.
     public synchronized void recordAttempt(String remoteAddress) {
         Instant now = clock.instant();
@@ -34,6 +49,7 @@ public class StockStreamRegistry {
             state.attempts = 0;
         }
         if (state.attempts >= properties.connectRateMax()) {
+            rateRejected++;
             throw new BusinessException(DropErrorCode.STOCK_STREAM_LIMIT_EXCEEDED, retryAfterSeconds());
         }
         state.attempts++;
@@ -49,9 +65,11 @@ public class StockStreamRegistry {
         removeExpiredIps(now);
         IpState state = getIpState(remoteAddress, now);
         if (state.connections >= properties.maxConnectionsPerIp()) {
+            ipRejected++;
             throw new BusinessException(DropErrorCode.STOCK_STREAM_LIMIT_EXCEEDED, retryAfterSeconds());
         }
         if (subscriptions.size() >= properties.maxConnections()) {
+            capacityRejected++;
             throw new BusinessException(DropErrorCode.STOCK_STREAM_UNAVAILABLE, retryAfterSeconds());
         }
         StockStreamSubscription subscription = new StockStreamSubscription(UUID.randomUUID(), dropIds);
@@ -76,6 +94,7 @@ public class StockStreamRegistry {
             }
         }
         ipStates.get(entry.remoteAddress()).connections--;
+        disposed++;
         removeExpiredIps(clock.instant());
         return true;
     }
@@ -110,6 +129,7 @@ public class StockStreamRegistry {
         IpState state = ipStates.get(remoteAddress);
         if (state == null) {
             if (ipStates.size() >= properties.maxTrackedIps()) {
+                trackingRejected++;
                 throw new BusinessException(DropErrorCode.STOCK_STREAM_UNAVAILABLE, retryAfterSeconds());
             }
             state = new IpState(now);
