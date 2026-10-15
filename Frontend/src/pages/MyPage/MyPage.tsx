@@ -14,6 +14,7 @@ import {
   type BuyerOrder,
 } from '../../features/order/mock/mockBuyerOrders'
 import type { SharedProps } from '../../types/store'
+import { dateLabel } from '../../utils/date'
 import { won } from '../../utils/price'
 
 const WISH_PAGE_SIZE = 20
@@ -236,6 +237,12 @@ export default function MyPage({
                         ? `${won(item.minPrice)}부터`
                         : '가격 미정'}{' '}
                       · {WISH_STATUS_TEXT[item.status ?? ''] ?? item.status}
+                    </small>
+                    <small>
+                      오픈 일정 ·{' '}
+                      {item.saleStartsAt
+                        ? dateLabel(item.saleStartsAt)
+                        : '미정'}
                     </small>
                   </div>
                   <button
