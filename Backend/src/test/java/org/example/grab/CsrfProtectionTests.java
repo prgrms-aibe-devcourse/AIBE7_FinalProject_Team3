@@ -162,6 +162,32 @@ class CsrfProtectionTests {
                 .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(403));
     }
 
+    /*
+        JWT 필터가 요청마다 인증을 세우는 것을 새 로그인으로 보고 CSRF 토큰을 지우고 다시 발급하면,
+        먼저 읽어 둔 토큰으로 보낸 상태 변경 요청이 403이 된다. 로그인도 토큰을 교체하지 않는다(MEMBER_AUTH 1.3)
+     */
+    @Test
+    @DisplayName("로그인 사용자의 요청은 XSRF-TOKEN을 지우거나 다시 발급하지 않아, 처음 받은 토큰을 계속 쓸 수 있다")
+    void keepsCsrfTokenOnAuthenticatedRequests() throws Exception {
+        // given
+        Cookie accessToken = new Cookie("access_token",
+                jwtProvider.issue(UUID.randomUUID(), Set.of(AuthRole.USER)).value());
+        String token = issueCsrfToken();
+        Cookie csrfCookie = new Cookie(XSRF_COOKIE, token);
+
+        // when & then: 인증된 GET 두 번에 Set-Cookie XSRF-TOKEN이 없다
+        for (int i = 0; i < 2; i++) {
+            mockMvc.perform(get("/api/v1/categories").cookie(accessToken, csrfCookie))
+                    .andExpect(status().isOk())
+                    .andExpect(cookie().doesNotExist(XSRF_COOKIE));
+        }
+
+        // then: 처음 받은 토큰으로 보낸 상태 변경 요청이 CSRF를 통과한다
+        mockMvc.perform(put("/api/v1/drops/1/wish").cookie(accessToken, csrfCookie).header(XSRF_HEADER, token))
+                .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(403))
+                .andExpect(cookie().doesNotExist(XSRF_COOKIE));
+    }
+
     @Test
     @DisplayName("인증 쿠키 중 email_signup_token은 HttpOnly이고, XSRF-TOKEN만 JavaScript가 읽을 수 있다")
     void exposesOnlyCsrfCookieToJavaScript() throws Exception {
