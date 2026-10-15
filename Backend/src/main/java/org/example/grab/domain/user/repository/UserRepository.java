@@ -1,5 +1,6 @@
 package org.example.grab.domain.user.repository;
 
+import org.example.grab.domain.user.entity.AuthProvider;
 import org.example.grab.domain.user.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -12,6 +13,9 @@ import java.util.UUID;
 public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByEmail(String email);
+
+    // 소셜 콜백의 기존 회원 조회(MEMBER_AUTH.md 1.5 판정 1). 이메일이 아니라 제공자 식별자로 찾는다(GR-46 M00-05)
+    Optional<User> findByProviderAndProviderUserId(AuthProvider provider, String providerUserId);
 
     boolean existsByEmail(String email);
 

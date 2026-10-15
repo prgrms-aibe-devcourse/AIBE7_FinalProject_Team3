@@ -345,8 +345,8 @@ class LoginApiIntegrationTest {
     @DisplayName("비밀번호가 없는 소셜 회원은 LOCAL 로그인에서 401 INVALID_CREDENTIALS")
     void rejectsSocialUser() throws Exception {
         // given
-        jdbcTemplate.update("INSERT INTO users (email, nickname, provider) VALUES (?, ?, 'KAKAO')",
-                email("kakao"), "login-" + run + "-kakao");
+        jdbcTemplate.update("INSERT INTO users (email, nickname, provider, provider_user_id) VALUES (?, ?, 'KAKAO', ?)",
+                email("kakao"), "login-" + run + "-kakao", "sub-" + run);
 
         // when & then
         MockHttpServletResponse response = login(body(email("kakao"), PASSWORD))

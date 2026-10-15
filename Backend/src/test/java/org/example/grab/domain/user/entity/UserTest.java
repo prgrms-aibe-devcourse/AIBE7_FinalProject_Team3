@@ -56,4 +56,46 @@ class UserTest {
         assertThatThrownBy(() -> User.createLocal(EMAIL, passwordHash, NICKNAME))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    @DisplayName("LOCAL 회원은 제공자 식별자가 없다")
+    void createLocalHasNoProviderUserId() {
+        assertThat(User.createLocal(EMAIL, PASSWORD_HASH, NICKNAME).getProviderUserId()).isNull();
+    }
+
+    // GR-46 M00-01: 소셜 회원은 비밀번호 해시 없이 제공자 식별자를 가진다(MEMBER_AUTH.md 1.6)
+    @Test
+    @DisplayName("소셜 회원은 비밀번호 해시 없이 USER, ACTIVE와 제공자·식별자로 생성된다")
+    void createSocialAppliesDefaults() {
+        // when
+        User user = User.createSocial(EMAIL, AuthProvider.KAKAO, "sub-1", NICKNAME);
+
+        // then
+        assertThat(user.getEmail()).isEqualTo(EMAIL);
+        assertThat(user.getPasswordHash()).isNull();
+        assertThat(user.getNickname()).isEqualTo(NICKNAME);
+        assertThat(user.getRole()).isEqualTo(UserRole.USER);
+        assertThat(user.getStatus()).isEqualTo(UserStatus.ACTIVE);
+        assertThat(user.getProvider()).isEqualTo(AuthProvider.KAKAO);
+        assertThat(user.getProviderUserId()).isEqualTo("sub-1");
+        assertThat(user.getUuid()).isNotNull();
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {" ", "\t"})
+    @DisplayName("소셜 회원은 제공자 식별자가 없으면 생성할 수 없다")
+    void createSocialRejectsMissingProviderUserId(String providerUserId) {
+        assertThatThrownBy(() -> User.createSocial(EMAIL, AuthProvider.GOOGLE, providerUserId, NICKNAME))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("소셜 회원의 제공자는 LOCAL이거나 비어 있을 수 없다")
+    void createSocialRejectsLocalOrMissingProvider() {
+        assertThatThrownBy(() -> User.createSocial(EMAIL, AuthProvider.LOCAL, "sub-1", NICKNAME))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> User.createSocial(EMAIL, null, "sub-1", NICKNAME))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 }
