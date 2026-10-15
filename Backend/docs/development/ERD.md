@@ -35,6 +35,7 @@
 | `role`              | VARCHAR(20)  | O   | `USER`, `ADMIN`                    |
 | `status`            | VARCHAR(20)  | O   | `ACTIVE`, `SUSPENDED`, `WITHDRAWN` |
 | `provider`          | VARCHAR(20)  | O   | `LOCAL`, `KAKAO`, `GOOGLE`         |
+| `provider_user_id`  | VARCHAR(255) | 조건부 | 소셜 회원만 필수, 제공자 고유 사용자 식별자(OIDC `sub`). UQ(`provider`, `provider_user_id`) |
 | `created_at`        | TIMESTAMPTZ  | O   | 회원 생성 시각                           |
 | `updated_at`        | TIMESTAMPTZ  | O   | 회원 정보 최종 수정 시각                     |
 
@@ -42,6 +43,10 @@
 판매자는 회원의 배타적인 역할이 아니다. `sellers.status = APPROVED`인 회원에게 판매자 기능을 허용한다.
 
 MVP 회원가입은 `LOCAL` 및 소셜 로그인 `KAKAO`, `GOOGLE`을 구현한다. 회원 휴대폰 번호는 수집·저장하지 않으며, 배송 연락처는 주문 시 `orders.recipient_phone`으로 받는다.
+
+소셜 회원은 이메일이 아니라 `provider`와 `provider_user_id`로 식별한다. 제공자 쪽 이메일이 바뀌어도 같은 회원으로 로그인하며, 저장된 `email`은 갱신하지 않는다.
+- `LOCAL` 회원은 `provider_user_id`가 NULL이고, 소셜 회원은 필수이며 `password_hash`가 NULL이다(`ck_users_social_identifier`).
+- 한 회원은 하나의 제공자에만 속한다. 같은 이메일의 다른 가입 방식 계정은 자동으로 연결하지 않는다(`ACCOUNT_LINK_REQUIRED`). `email` UQ도 이를 보장한다.
 
 `nickname`은 회원이 직접 정하는 닉네임이며 본명이 아니다. 기존 `display_name` 컬럼의 이름을 바꾼 것이다. 회원 본명은 수집하지 않으며, 배송에 필요한 수령인 이름은 주문 시 `orders.recipient_name`으로 받는다.
 닉네임은 리뷰 등 공개 기능에서 다른 회원에게 노출되므로 중복을 허용하지 않는다.
