@@ -5,10 +5,6 @@ import Header from './components/Header/Header'
 import useAuth from './features/auth/logic/useAuth'
 import useOrders from './features/order/logic/useOrders'
 import useWish from './features/wish/logic/useWish'
-import {
-  demoSellerApplications,
-  reviewSellerApplication,
-} from './features/seller/mock/mockSellerApplications'
 import type { SellerDraft } from './features/seller/mock/mockSellerDrafts'
 import {
   demoSellerDrops,
@@ -44,9 +40,6 @@ export default function App() {
   const { account, authenticated, login, logout } = useAuth()
   const { wishes, wishesReady, toggleWish } = useWish(authenticated, notify)
   const { orders, buyerOrders, addOrder, updateBuyerOrder } = useOrders()
-  const [sellerApplications, setSellerApplications] = useState(
-    demoSellerApplications,
-  )
   const [sellerDrafts, setSellerDrafts] = useState<Record<string, SellerDraft>>(
     {},
   )
@@ -150,16 +143,7 @@ export default function App() {
           <Route
             path="/admin/seller-applications"
             element={
-              <AdminSellerApplicationsPage
-                account={account}
-                applications={sellerApplications}
-                onReview={(id, status, reason) =>
-                  setSellerApplications((current) =>
-                    reviewSellerApplication(current, id, status, reason),
-                  )
-                }
-                notify={notify}
-              />
+              <AdminSellerApplicationsPage account={account} notify={notify} />
             }
           />
           <Route

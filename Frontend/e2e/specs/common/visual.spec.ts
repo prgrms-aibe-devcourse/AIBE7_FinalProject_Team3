@@ -61,12 +61,39 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
   })
 
   test('admin-seller-applications', async ({ page }) => {
+    // PENDING 1건을 고정해 목록·심사 패널이 모두 보이는 화면을 기준으로 찍는다.
+    await page.route('**/api/v1/admin/seller-applications*', (route) =>
+      route.fulfill({
+        json: {
+          success: true,
+          data: {
+            content: [
+              {
+                applicationId: 'app-1',
+                userId: 'user-1',
+                brandName: '길동상점',
+                contactEmail: 'seller@example.com',
+                businessRegistrationNumber: '1234567890',
+                status: 'PENDING',
+                appliedAt: '2026-09-18T14:00:00+09:00',
+              },
+            ],
+            page: 0,
+            size: 20,
+            totalElements: 1,
+            totalPages: 1,
+            hasNext: false,
+          },
+        },
+      }),
+    )
     await page.goto('/#/admin/seller-applications')
     await page.getByLabel('이메일').fill('grab@example.com')
     await page.getByLabel('비밀번호').fill('password1234')
     await page.getByLabel('LOCAL 결과 예시').selectOption('admin')
     await page.getByRole('button', { name: '로그인', exact: true }).click()
     await expect(page.getByRole('status')).toBeEmpty()
+    await page.getByRole('button', { name: /길동상점/ }).click()
     await shot(page, 'admin-seller-applications')
   })
 
