@@ -68,8 +68,14 @@ function DocumentUploadField({
           )
         }}
       />
-      {upload.isPending && <small>업로드 중...</small>}
-      {documentId && !upload.isPending && <small>업로드 완료</small>}
+      {upload.isPending && (
+        <small className="seller-document-status">업로드 중...</small>
+      )}
+      {documentId && !upload.isPending && (
+        <small className="seller-document-status seller-document-status--done">
+          ✓ 업로드 완료
+        </small>
+      )}
       {upload.isError && (
         <small role="alert">{applicationErrorMessage(upload.error)}</small>
       )}
