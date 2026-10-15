@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest'
 import {
+  adminApplicationErrorMessage,
   applicationErrorMessage,
   isNoApplication,
 } from '../logic/sellerApplicationState'
@@ -38,4 +39,22 @@ test('에러 코드별로 안내 문구를 맞춘다', () => {
   ).toContain('서류')
   expect(applicationErrorMessage(axiosError(500))).toContain('처리하지')
   expect(applicationErrorMessage(new Error('network'))).toContain('처리하지')
+})
+
+test('관리자 심사 에러 코드별로 안내 문구를 맞춘다', () => {
+  expect(adminApplicationErrorMessage(axiosError(401))).toContain('관리자 권한')
+  expect(adminApplicationErrorMessage(axiosError(403))).toContain('관리자 권한')
+  expect(
+    adminApplicationErrorMessage(axiosError(409, 'INVALID_STATE_TRANSITION')),
+  ).toContain('이미 처리된')
+  expect(
+    adminApplicationErrorMessage(axiosError(400, 'VALIDATION_FAILED')),
+  ).toContain('반려 사유')
+  expect(adminApplicationErrorMessage(axiosError(404))).toContain(
+    '찾을 수 없어요',
+  )
+  expect(adminApplicationErrorMessage(axiosError(500))).toContain('처리하지')
+  expect(adminApplicationErrorMessage(new Error('network'))).toContain(
+    '처리하지',
+  )
 })
