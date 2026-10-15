@@ -1,5 +1,8 @@
 import { expect, getAuth, test } from '../../fixtures'
 
+// 실제 서류 대신 열람 플로우만 검증한다. 기존 자산 이미지를 그대로 재사용한다.
+const DOCUMENT_IMAGE = 'src/assets/images/grab-symbol.png'
+
 type Item = {
   applicationId: string
   brandName: string
@@ -163,4 +166,79 @@ test('반려 사유 누락은 막고, 이미 처리된 신청은 409 안내 후 
     '이미 처리된 신청이에요. 목록을 다시 불러올게요.',
   )
   await expect.poll(() => listCalls).toBeGreaterThan(callsBeforeSubmit)
+})
+
+test('서류를 열람할 때마다 서버에 재요청하고, 신청을 바꾸면 이전 이미지는 사라진다', async ({
+  page,
+}) => {
+  let viewCalls = 0
+  await page.route('**/api/v1/admin/seller-applications*', (route) =>
+    route.fulfill({
+      json: listResponse([
+        item('app-1', '길동상점'),
+        item('app-2', '두 번째 브랜드'),
+      ]),
+    }),
+  )
+  await page.route(
+    '**/api/v1/admin/seller-applications/*/documents/*/view',
+    (route) => {
+      viewCalls += 1
+      return route.fulfill({ path: DOCUMENT_IMAGE })
+    },
+  )
+
+  await loginFromAdminRedirect(page)
+  await page.getByRole('button', { name: /길동상점/ }).click()
+  await page.getByRole('button', { name: '사업자등록증 사본 열람' }).click()
+  await expect(
+    page.getByRole('img', { name: '사업자등록증 사본 열람 이미지' }),
+  ).toBeVisible()
+  expect(viewCalls).toBe(1)
+
+  // 열람 중 같은 버튼을 다시 누르면 재요청 없이 닫히기만 한다.
+  await page.getByRole('button', { name: '사업자등록증 사본 닫기' }).click()
+  await expect(
+    page.getByRole('img', { name: '사업자등록증 사본 열람 이미지' }),
+  ).toHaveCount(0)
+  expect(viewCalls).toBe(1)
+
+  // 닫힌 뒤 다시 열람 버튼을 누르면 캐시가 아니라 서버에 재요청한다.
+  await page.getByRole('button', { name: '사업자등록증 사본 열람' }).click()
+  await expect.poll(() => viewCalls).toBe(2)
+  await expect(
+    page.getByRole('img', { name: '사업자등록증 사본 열람 이미지' }),
+  ).toBeVisible()
+
+  // 다른 신청을 선택하면 이전에 열람한 이미지는 더 이상 보이지 않는다.
+  await page.getByRole('button', { name: /두 번째 브랜드/ }).click()
+  await expect(
+    page.getByRole('img', { name: '사업자등록증 사본 열람 이미지' }),
+  ).toHaveCount(0)
+})
+
+test('서류나 신청이 없으면 404 안내를 보여준다', async ({ page }) => {
+  await page.route('**/api/v1/admin/seller-applications*', (route) =>
+    route.fulfill({ json: listResponse([item('app-1', '길동상점')]) }),
+  )
+  await page.route(
+    '**/api/v1/admin/seller-applications/*/documents/*/view',
+    (route) =>
+      route.fulfill({
+        status: 404,
+        json: {
+          success: false,
+          data: null,
+          error: {
+            code: 'SELLER_APPLICATION_NOT_FOUND',
+            message: '없음',
+          },
+        },
+      }),
+  )
+
+  await loginFromAdminRedirect(page)
+  await page.getByRole('button', { name: /길동상점/ }).click()
+  await page.getByRole('button', { name: '신분증 사본 열람' }).click()
+  await expect(page.getByRole('alert')).toHaveText('서류를 찾을 수 없어요.')
 })

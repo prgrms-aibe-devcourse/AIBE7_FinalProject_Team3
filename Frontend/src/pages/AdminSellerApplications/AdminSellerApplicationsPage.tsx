@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import EmptyState from '../../components/EmptyState/EmptyState'
 import AuthLoading from '../../features/auth/components/AuthLoading'
@@ -8,12 +8,17 @@ import {
   type AuthUser,
 } from '../../features/auth/logic/authUser'
 import type { AdminApplicationStatus } from '../../api/seller/adminApplications'
+import type { SellerDocumentType } from '../../api/seller/applications'
 import {
   useAdminSellerApplications,
   useApproveSellerApplication,
   useRejectSellerApplication,
 } from '../../features/seller/logic/useAdminSellerApplications'
-import { adminApplicationErrorMessage } from '../../features/seller/logic/sellerApplicationState'
+import { useViewSellerDocument } from '../../features/seller/logic/useViewSellerDocument'
+import {
+  adminApplicationErrorMessage,
+  documentViewErrorMessage,
+} from '../../features/seller/logic/sellerApplicationState'
 import { dateLabel } from '../../utils/date'
 
 type Props = {
@@ -28,6 +33,71 @@ const statusText: Record<AdminApplicationStatus, string> = {
   PENDING: '대기',
   APPROVED: '승인',
   REJECTED: '반려',
+}
+const DOCUMENT_FIELDS: { type: SellerDocumentType; label: string }[] = [
+  { type: 'BUSINESS_LICENSE', label: '사업자등록증 사본' },
+  { type: 'ID_CARD', label: '신분증 사본' },
+  { type: 'BANKBOOK', label: '통장 사본' },
+  { type: 'MAIL_ORDER_BUSINESS_REPORT', label: '통신판매업신고증' },
+]
+
+// 서류 1종의 열람 버튼 + 이미지. 열람할 때마다 서버에 재요청하고 브라우저 캐시를 쓰지 않는다.
+function DocumentViewerField({
+  applicationId,
+  type,
+  label,
+}: {
+  applicationId: string
+  type: SellerDocumentType
+  label: string
+}) {
+  const view = useViewSellerDocument()
+  const [open, setOpen] = useState(false)
+  const imageUrl = useMemo(
+    () => (open && view.data ? URL.createObjectURL(view.data) : null),
+    [open, view.data],
+  )
+  useEffect(() => {
+    return () => {
+      if (imageUrl) URL.revokeObjectURL(imageUrl)
+    }
+  }, [imageUrl])
+
+  const toggle = () => {
+    // 이미 열람 중이면 다시 눌렀을 때 닫기만 한다(재요청하지 않는다).
+    if (open) {
+      setOpen(false)
+      return
+    }
+    setOpen(true)
+    view.mutate({ applicationId, documentType: type })
+  }
+
+  return (
+    <div className="admin-document-viewer-field">
+      <button
+        type="button"
+        className="secondary-button"
+        disabled={view.isPending}
+        onClick={toggle}
+      >
+        {open ? `${label} 닫기` : `${label} 열람`}
+      </button>
+      {open && view.isPending && <small>불러오는 중...</small>}
+      {open && view.isError && (
+        <small role="alert">{documentViewErrorMessage(view.error)}</small>
+      )}
+      {imageUrl && (
+        <img
+          className="admin-document-viewer-image"
+          src={imageUrl}
+          alt={`${label} 열람 이미지`}
+          draggable={false}
+          onContextMenu={(event) => event.preventDefault()}
+        />
+      )}
+    </div>
+  )
 }
 
 export default function AdminSellerApplicationsPage({
@@ -226,6 +296,20 @@ export default function AdminSellerApplicationsPage({
               <p className="seller-review-note">
                 브랜드 소개는 현재 목록 조회 계약에 포함되지 않습니다.
               </p>
+              <div
+                key={selected.applicationId}
+                className="admin-document-viewer"
+              >
+                <h3>제출 서류</h3>
+                {DOCUMENT_FIELDS.map((field) => (
+                  <DocumentViewerField
+                    key={field.type}
+                    applicationId={selected.applicationId ?? ''}
+                    type={field.type}
+                    label={field.label}
+                  />
+                ))}
+              </div>
               {selected.status === 'PENDING' ? (
                 <div className="seller-review-actions">
                   <button

@@ -2,6 +2,7 @@ import { expect, test } from 'vitest'
 import {
   adminApplicationErrorMessage,
   applicationErrorMessage,
+  documentViewErrorMessage,
   isNoApplication,
 } from '../logic/sellerApplicationState'
 
@@ -56,5 +57,19 @@ test('관리자 심사 에러 코드별로 안내 문구를 맞춘다', () => {
   expect(adminApplicationErrorMessage(axiosError(500))).toContain('처리하지')
   expect(adminApplicationErrorMessage(new Error('network'))).toContain(
     '처리하지',
+  )
+})
+
+test('서류 열람 에러는 상태 코드만으로 안내 문구를 맞춘다(blob 응답이라 코드 못 읽음)', () => {
+  expect(documentViewErrorMessage(axiosError(401))).toContain('관리자 권한')
+  expect(documentViewErrorMessage(axiosError(403))).toContain('관리자 권한')
+  expect(documentViewErrorMessage(axiosError(404))).toContain(
+    '서류를 찾을 수 없어요',
+  )
+  expect(documentViewErrorMessage(axiosError(500))).toContain(
+    '불러오지 못했어요',
+  )
+  expect(documentViewErrorMessage(new Error('network'))).toContain(
+    '불러오지 못했어요',
   )
 })

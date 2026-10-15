@@ -187,6 +187,32 @@
   text-align: left;
   cursor: pointer;
 }
+.admin-document-viewer {
+  display: grid;
+  gap: 12px;
+  margin: 20px 0;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.admin-document-viewer h3 {
+  margin: 0;
+  font-size: 14px;
+}
+.admin-document-viewer-field {
+  display: grid;
+  gap: 8px;
+}
+.admin-document-viewer-field small[role='alert'] {
+  color: var(--danger);
+}
+.admin-document-viewer-image {
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  /* 완벽히 막을 순 없지만(화면 캡처는 어차피 못 막음) 무심한 우클릭·드래그 저장 정도는 막는다 */
+  user-select: none;
+  -webkit-user-drag: none;
+}
 .seller-review-item[aria-pressed='true'] {
   border-color: var(--ink);
   background: var(--soft);

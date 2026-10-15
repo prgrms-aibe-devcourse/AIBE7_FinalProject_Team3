@@ -56,3 +56,19 @@ export function adminApplicationErrorMessage(error: unknown): string {
   }
   return '처리하지 못했어요. 잠시 후 다시 시도해주세요.'
 }
+
+// 서류 열람 응답은 responseType: 'blob'이라 에러 본문도 Blob으로 와서 코드(error.code)를
+// 읽을 수 없다. 문서에 정의된 404(SELLER_APPLICATION_NOT_FOUND)만 상태 코드로 구분한다.
+export function documentViewErrorMessage(error: unknown): string {
+  if (!axios.isAxiosError(error)) {
+    return '서류를 불러오지 못했어요. 다시 시도해주세요.'
+  }
+  const status = error.response?.status
+  if (status === 401 || status === 403) {
+    return '관리자 권한으로 로그인한 뒤 이용할 수 있어요.'
+  }
+  if (status === 404) {
+    return '서류를 찾을 수 없어요.'
+  }
+  return '서류를 불러오지 못했어요. 다시 시도해주세요.'
+}
