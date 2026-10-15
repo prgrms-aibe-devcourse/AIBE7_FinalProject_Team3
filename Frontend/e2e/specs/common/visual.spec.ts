@@ -40,11 +40,23 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
   })
 
   test('seller-apply', async ({ page }) => {
+    // 미신청 상태(404)를 고정해 실제 신청 폼을 기준 화면으로 찍는다.
+    await page.route('**/api/v1/seller-applications/me', (route) =>
+      route.fulfill({
+        status: 404,
+        json: {
+          success: false,
+          data: null,
+          error: { code: 'SELLER_APPLICATION_NOT_FOUND', message: '없음' },
+        },
+      }),
+    )
     await page.goto('/#/seller/apply')
     await page.getByLabel('이메일').fill('grab@example.com')
     await page.getByLabel('비밀번호').fill('password1234')
     await page.getByRole('button', { name: '로그인', exact: true }).click()
     await expect(page.getByRole('status')).toBeEmpty()
+    await expect(page.getByLabel('브랜드명')).toBeVisible()
     await shot(page, 'seller-apply')
   })
 
