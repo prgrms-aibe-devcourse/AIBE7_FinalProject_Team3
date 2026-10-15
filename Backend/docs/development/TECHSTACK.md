@@ -213,6 +213,8 @@ Mock 결제(`PAYMENT.md` 1.1절)는 토스페이먼츠 **테스트 환경**으�
 
 MVP 초기에는 Actuator와 Prometheus를 연결해 JVM·HTTP·DB Connection Pool 메트릭을 수집한다. Grafana 대시보드와 Alloy·Loki 로그 파이프라인은 배포 환경과 핵심 API가 안정된 뒤 단계적으로 완성한다.
 
+SSE의 초기 연결·조회 주기·부하 조건과 수용 기준은 [실시간 변경 전달 계약](REALTIME_STOCK.md) 11~13절을 따른다. 일반 HTTP 지연과 지속 연결 수명을 분리하고, 실제 인프라 용량·프록시·Redis 다중 서버 동작은 GR-113에서 실측한다. 문서의 초기 목표를 운영 성능 검증 결과로 취급하지 않는다.
+
 ## 7. Testing
 
 | 구분 | 기술 | 용도 및 범위 |
