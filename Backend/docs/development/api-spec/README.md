@@ -59,7 +59,7 @@
 | GET | `/api/v1/drops/{dropId}` | 불필요 | DROP 상세, 옵션, 일정 및 배송 정보 조회 |
 | GET | `/api/v1/drops/{dropId}/stocks` | 불필요 | 옵션별 현재 가용 재고 조회 |
 
-> SSE 재고 구독 API는 MVP 이후 도입 후보이며 위 MVP API 수에는 포함하지 않습니다.
+> SSE 구독 API는 GR-109에서 명세 확정 중이며 현재 미구현입니다. 변경 알림 후 기존 조회 API를 재사용하는 정책은 [실시간 변경 전달 계약](../REALTIME_STOCK.md)을 따릅니다. 경로·이벤트 세부 계약은 미확정이며 위 API 수에는 포함하지 않습니다.
 
 **목록 API 지원 파라미터:**
 - 상태 필터: `status`
