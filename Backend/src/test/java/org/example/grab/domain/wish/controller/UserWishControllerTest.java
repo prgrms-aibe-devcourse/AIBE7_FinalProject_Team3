@@ -51,6 +51,7 @@ class UserWishControllerTest {
         given(currentUserIdProvider.currentUserId()).willReturn(USER_ID);
         WishListResponse item = new WishListResponse(100L, "한정판 스니커즈",
                 "https://img/1.jpg", 129000L, DropStatus.WISH,
+                OffsetDateTime.parse("2026-09-20T14:00:00Z"),
                 OffsetDateTime.parse("2026-09-18T14:00:00Z"));
         given(wishQueryService.findMyWishes(eq(USER_ID), eq(0), eq(20)))
                 .willReturn(new PageResponse<>(List.of(item), 0, 20, 1, 1, false));

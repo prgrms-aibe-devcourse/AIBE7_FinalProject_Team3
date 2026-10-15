@@ -109,6 +109,11 @@ class WishQueryServiceTest {
             public Instant getWishedAt() {
                 return Instant.parse("2026-09-18T05:00:00Z");
             }
+
+            @Override
+            public Instant getSaleStartsAt() {
+                return Instant.parse("2026-09-20T05:00:00Z");
+            }
         };
     }
 }

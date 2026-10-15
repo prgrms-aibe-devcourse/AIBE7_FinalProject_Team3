@@ -21,4 +21,6 @@ public interface WishListProjection {
     String getStatus();
 
     Instant getWishedAt();
+
+    Instant getSaleStartsAt();
 }
