@@ -1,4 +1,4 @@
-import { expect, test, toast } from './fixtures'
+import { expect, test, toast } from '../../fixtures'
 
 const row = (page: import('@playwright/test').Page, orderNumber: string) =>
   page.getByRole('article').filter({ hasText: orderNumber })

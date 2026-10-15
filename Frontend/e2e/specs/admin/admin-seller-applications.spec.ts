@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures'
+import { expect, test } from '../../fixtures'
 
 async function login(page: import('@playwright/test').Page, admin: boolean) {
   await page.goto('/#/admin/seller-applications')

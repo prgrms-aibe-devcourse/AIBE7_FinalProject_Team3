@@ -1,4 +1,4 @@
-import { expect, loginSeller, test } from './fixtures'
+import { expect, loginSeller, test } from '../../fixtures'
 
 test('비회원은 로그인으로, 일반 회원은 권한 안내로 보낸다', async ({
   page,

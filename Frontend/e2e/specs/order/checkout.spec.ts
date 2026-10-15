@@ -1,4 +1,4 @@
-import { expect, test, type Page } from './fixtures'
+import { expect, test, type Page } from '../../fixtures'
 
 async function openCheckout(page: Page, id: string) {
   await page.goto(`/#/checkout/${id}`)

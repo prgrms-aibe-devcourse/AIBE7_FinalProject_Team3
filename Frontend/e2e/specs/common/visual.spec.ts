@@ -1,6 +1,6 @@
-import { expect, loginSeller, test, type Page } from './fixtures'
-import { installCatalogScenario } from './mock/catalog'
-import { installHomeScenario } from './mock/home'
+import { expect, loginSeller, test, type Page } from '../../fixtures'
+import { installCatalogScenario } from '../../mock/catalog'
+import { installHomeScenario } from '../../mock/home'
 
 // 기준 이미지는 CI와 같은 Playwright Docker 이미지에서만 만든다(npm run e2e:docker).
 test.describe('화면 기준', { tag: '@visual' }, () => {

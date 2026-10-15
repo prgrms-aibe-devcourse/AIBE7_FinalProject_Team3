@@ -1,4 +1,4 @@
-import { expect, loginSeller, test } from './fixtures'
+import { expect, loginSeller, test } from '../../fixtures'
 
 test.beforeEach(async ({ page }) => {
   await loginSeller(page)

@@ -1,4 +1,4 @@
-import { expect, login, loginSeller, test, type Page } from './fixtures'
+import { expect, login, loginSeller, test, type Page } from '../../fixtures'
 import type { Locator } from '@playwright/test'
 
 // 페이지 전체에 가로 스크롤이 생기지 않는다. 표처럼 의도적으로 안쪽에서 스크롤하는 영역은 해당하지 않는다.

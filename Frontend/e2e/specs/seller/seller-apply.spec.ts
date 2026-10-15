@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures'
+import { expect, test } from '../../fixtures'
 
 test('직접 진입은 로그인 후 신청 화면으로 복귀하고 Mock 신청을 접수한다', async ({
   page,

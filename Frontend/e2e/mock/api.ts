@@ -1,11 +1,11 @@
 import type { Page, Route } from '@playwright/test'
 import { handleDropRoute } from './api/drop'
-import { CATEGORIES, datasetFor, type Scenario } from './api/dropFixtures'
+import { CATEGORIES, datasetFor, type Scenario } from './api/drop/fixtures'
 import { json, type ApiState } from './api/shared'
 import { handleWishRoute, initialWishesFor } from './api/wish'
 
-export { FIXED_NOW, LONG_PRODUCT_NAME } from './api/dropFixtures'
-export type { FixtureDrop } from './api/dropFixtures'
+export { FIXED_NOW, LONG_PRODUCT_NAME } from './api/drop/fixtures'
+export type { FixtureDrop } from './api/drop/fixtures'
 
 async function handleRoute(
   route: Route,

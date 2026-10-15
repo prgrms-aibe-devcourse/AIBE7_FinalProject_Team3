@@ -1,5 +1,5 @@
 import type { Route } from '@playwright/test'
-import type { FixtureDrop } from './dropFixtures'
+import type { FixtureDrop } from './drop/fixtures'
 
 export type ApiState = {
   drops: FixtureDrop[]

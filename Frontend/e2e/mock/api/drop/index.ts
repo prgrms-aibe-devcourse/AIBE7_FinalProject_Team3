@@ -5,8 +5,8 @@ import {
   WISH_NOTICE,
   type FixtureDrop,
   type Scenario,
-} from './dropFixtures'
-import { json, type ApiState } from './shared'
+} from './fixtures'
+import { json, type ApiState } from '../shared'
 
 const activeOptions = (drop: FixtureDrop) =>
   drop.options.filter((option) => option.active !== false)

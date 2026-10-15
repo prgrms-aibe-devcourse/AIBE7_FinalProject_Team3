@@ -42,7 +42,7 @@ npx playwright install chromium
 | `npm run e2e:docker -- --grep @visual`     | 시각 비교만                                                |
 | `npm run e2e:docker -- --update-snapshots` | 기준 이미지 갱신                                           |
 
-기준 이미지(`e2e/visual.spec.ts-snapshots/*-linux.png`)는 리눅스 Docker 환경 기준입니다. 맥·윈도에서는 글꼴 렌더링이 달라 맞지 않으므로 시각 비교는 `e2e:docker`로만 실행합니다. Docker 이미지 버전은 `package.json`의 `@playwright/test` 버전과 같아야 합니다.
+기준 이미지(`e2e/specs/common/visual.spec.ts-snapshots/*-linux.png`)는 리눅스 Docker 환경 기준입니다. 맥·윈도에서는 글꼴 렌더링이 달라 맞지 않으므로 시각 비교는 `e2e:docker`로만 실행합니다. Docker 이미지 버전은 `package.json`의 `@playwright/test` 버전과 같아야 합니다.
 
 ### 실패 분석
 

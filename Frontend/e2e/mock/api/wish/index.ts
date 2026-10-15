@@ -1,5 +1,5 @@
 import type { Route } from '@playwright/test'
-import { minPrice } from './drop'
+import { minPrice } from '../drop'
 import {
   daysAgo,
   FIXED_NOW,
@@ -7,8 +7,8 @@ import {
   WISH_NOTICE,
   type FixtureDrop,
   type Scenario,
-} from './dropFixtures'
-import { json, type ApiState } from './shared'
+} from '../drop/fixtures'
+import { json, type ApiState } from '../shared'
 
 const wishListItem = (drop: FixtureDrop) => ({
   dropId: drop.dropId,

@@ -1,4 +1,4 @@
-import { expect, loginSeller, test } from './fixtures'
+import { expect, loginSeller, test } from '../../fixtures'
 
 test('비회원은 로그인으로 이동하고 일반 회원은 판매자 안내를 본다', async ({
   page,
