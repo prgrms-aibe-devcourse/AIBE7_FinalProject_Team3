@@ -50,6 +50,21 @@ spring:
       max-request-size: 10MB
 
 grab:
+  # GR-110 구독 기반. SSE endpoint·전송 경로는 후속 단계에서 연결한다.
+  stock-stream:
+    coalesce-window: 1s
+    heartbeat-interval: 15s
+    connection-lifetime: 10m
+    send-timeout: 5s
+    max-pending-drops: 100
+    max-drop-ids: 100
+    max-connections: 200
+    max-connections-per-ip: 20
+    connect-rate-window: 60s
+    connect-rate-max: 30
+    retry-after: 60s
+    # 활성 연결이 없고 요청 창이 만료되면 제거한다. 임의 IP로 추적 메모리가 무한 증가하지 않게 한다.
+    max-tracked-ips: 10000
   # 메일 본문 등 서버가 만드는 링크가 가리키는 프런트엔드 주소. 기본값은 로컬 Vite 개발 서버다
   web:
     base-url: ${WEB_BASE_URL:http://localhost:5173}
