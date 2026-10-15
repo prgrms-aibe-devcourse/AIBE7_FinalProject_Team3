@@ -7,7 +7,6 @@ import useOrders from './features/order/logic/useOrders'
 import useWish from './features/wish/logic/useWish'
 import {
   demoSellerApplications,
-  newSellerApplication,
   reviewSellerApplication,
 } from './features/seller/mock/mockSellerApplications'
 import type { SellerDraft } from './features/seller/mock/mockSellerDrafts'
@@ -145,22 +144,7 @@ export default function App() {
           />
           <Route
             path="/seller/apply"
-            element={
-              <SellerApplyPage
-                account={account}
-                application={sellerApplications.find(
-                  (item) => item.applicantEmail === account?.email,
-                )}
-                onApply={(input) => {
-                  if (!account) return
-                  setSellerApplications((current) => [
-                    newSellerApplication(account.email, input),
-                    ...current,
-                  ])
-                }}
-                notify={notify}
-              />
-            }
+            element={<SellerApplyPage account={account} notify={notify} />}
           />
           <Route
             path="/admin/seller-applications"
