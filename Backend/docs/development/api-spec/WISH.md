@@ -83,6 +83,7 @@ GET /api/v1/users/me/wishes?page=0&size=20
         "thumbnailUrl": "https://example.com/image.jpg",
         "minPrice": 129000,
         "status": "WISH",
+        "saleStartsAt": "2026-09-20T14:00:00+09:00",
         "wishedAt": "2026-09-18T14:00:00+09:00"
       }
     ],
@@ -96,6 +97,13 @@ GET /api/v1/users/me/wishes?page=0&size=20
 ```
 
 `thumbnailUrl`은 GALLERY의 첫 이미지이며 DETAIL 이미지는 사용하지 않습니다.
+
+`status`는 DROP의 현재 저장 상태이며, WISH 이후 DROP이 `GRAB`·`ENDED`·`CANCELED`로 바뀌어도 활성 WISH는 목록에 남고 현재 `status`를 그대로 표시합니다.
+
+두 시각은 모두 ISO 8601 날짜·시각이며 같은 순간을 서로 다른 오프셋으로 나타내도 됩니다.
+
+- `saleStartsAt`: 해당 DROP의 판매 시작 예정 시각(`drops.sale_starts_at`)입니다. `wishedAt`이나 판매 시작 실제 시각(`grab_started_at`)으로 대체하지 않습니다.
+- `wishedAt`: 해당 사용자가 WISH를 최근 등록한 시각(`wishes.activated_at`)입니다.
 
 ### 1.4 DROP 활성 WISH 수 조회
 
