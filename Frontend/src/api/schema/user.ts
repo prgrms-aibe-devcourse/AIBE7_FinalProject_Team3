@@ -124,6 +124,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/users/me': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * 내 정보 조회
+     * @description 본인의 회원 정보를 반환한다. roles는 요청 Access Token의 권한이고, profileImageUrl은 없으면 null이다
+     */
+    get: operations['getMe']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/auth/csrf': {
     parameters: {
       query?: never
@@ -191,6 +211,21 @@ export interface components {
     EmailVerificationConfirmRequest: {
       email: string
       code: string
+    }
+    ApiResponseUserMeResponse: {
+      success?: boolean
+      data?: components['schemas']['UserMeResponse']
+      message?: string
+    }
+    UserMeResponse: {
+      /** Format: uuid */
+      userId?: string
+      email?: string
+      nickname?: string
+      roles?: string[]
+      profileImageUrl?: string
+      /** Format: date-time */
+      createdAt?: string
     }
   }
   responses: never
@@ -452,6 +487,53 @@ export interface operations {
           [name: string]: unknown
         }
         content?: never
+      }
+    }
+  }
+  getMe: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description 조회 성공 */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseUserMeResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED(쿠키 없음, 회원 없음·정지·탈퇴), INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseUserMeResponse']
+        }
+      }
+      /** @description ACCESS_DENIED */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseUserMeResponse']
+        }
+      }
+      /** @description INTERNAL_SERVER_ERROR */
+      500: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseUserMeResponse']
+        }
       }
     }
   }
