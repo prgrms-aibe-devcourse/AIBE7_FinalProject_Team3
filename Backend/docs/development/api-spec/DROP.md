@@ -604,3 +604,9 @@ GET /api/v1/seller/drops/{dropId}/stocks
 - `DROP_ACCESS_DENIED` — 다른 판매자의 DROP
 
 ---
+
+## 공개 DROP 변경 구독 (GR-109·미구현)
+
+`GET /api/v1/drops/stock-stream?dropIds=100,101`은 재고·판매량·상태 변경 후 기존 조회 API 재사용을 위한 단일·다중 상품 SSE다. 인증은 불필요하되 전달된 무효 인증 쿠키는 기존 JWT 정책상 401이다. 구독은 최대 100개 입력 ID를 허용하며, DRAFT·없는 ID가 하나라도 있으면 전체 404다. WISH·GRAB·ENDED·CANCELED는 허용한다.
+
+성공 응답은 일반 ApiResponse 대신 지속 스트림이다. `ready`, `drop-changed`, `stream-closed`의 필드·예시·오류·복구·조회 경합은 [실시간 변경 전달 계약](../REALTIME_STOCK.md) 6~9절을 정본으로 따른다. 기존 상세·목록·재고 조회 형식은 유지한다. 운영 수치는 4단계에서 확정하며 GR-110 구현 전 OpenAPI·생성 타입에 추가하지 않는다.

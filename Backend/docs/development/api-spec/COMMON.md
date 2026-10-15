@@ -43,6 +43,8 @@ CORS는 허용된 프론트엔드 Origin만 등록하고 Credential 요청을 �
 }
 ```
 
+SSE 지속 응답은 JSON 성공 래퍼의 예외다. `text/event-stream`의 이벤트별 data에 JSON 객체를 직접 담는다. 연결 전 오류는 아래 공통 JSON 형식을 사용하고, 응답 시작 후 오류는 HTTP 상태를 바꾸지 않고 스트림 종료로 처리한다. 공개 SSE의 출처·쿠키·종료·재연결 계약은 [실시간 변경 전달 계약](../REALTIME_STOCK.md) 6~9절을 따른다. 현재 미구현이며 운영 수치 확정 후 구현한다.
+
 ### 1.5 공통 오류 응답
 
 ```json
@@ -267,3 +269,7 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 | Refresh Token | Access Token 대신 `refresh_token` HttpOnly 쿠키로 확인. Access Token이 만료된 상태에서도 호출 가능 |
 | Refresh Token(선택) | `refresh_token` 쿠키가 있으면 사용하고, 없거나 무효여도 요청은 성공 |
 | PG 검증 | 사용자 토큰 대신 Webhook 서명 또는 별도 Secret 검증 |
+
+## SSE 구현 예정 오류 코드 (GR-109)
+
+`STOCK_STREAM_LIMIT_EXCEEDED`(429), `STOCK_STREAM_UNAVAILABLE`(503)는 [실시간 변경 전달 계약](../REALTIME_STOCK.md) 8절에 예약한 코드다. 현재 코드 enum에는 없으며 GR-110에서 구현하고 본문 오류 코드 표에 통합한다.
