@@ -9,7 +9,9 @@ import org.example.grab.domain.order.dto.SellerOrderDetailResponse;
 import org.example.grab.domain.order.dto.SellerOrderListResponse;
 import org.example.grab.domain.order.entity.OrderStatus;
 import org.example.grab.domain.order.service.SellerOrderService;
+import org.example.grab.domain.payment.dto.SellerPaymentHistoryResponse;
 import org.example.grab.domain.payment.entity.PaymentStatus;
+import org.example.grab.domain.payment.service.PaymentHistoryService;
 import org.example.grab.domain.shipment.dto.ShipmentRegisterRequest;
 import org.example.grab.domain.shipment.dto.ShipmentUpdateResponse;
 import org.example.grab.global.common.ApiResponse;
@@ -28,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 // 판매자 주문 조회 요청을 공통 응답으로 반환한다.
@@ -38,6 +41,7 @@ import java.util.UUID;
 public class SellerOrderController {
 
     private final SellerOrderService sellerOrderService;
+    private final PaymentHistoryService paymentHistoryService;
     private final CurrentSellerIdProvider currentSellerIdProvider;
 
     @Operation(summary = "판매자 주문 상세 조회", description = "본인 DROP의 주문만 조회할 수 있다")
@@ -50,6 +54,18 @@ public class SellerOrderController {
         UUID uuid = PublicIdParser.parse(orderId);
         return ApiResponse.success(
                 sellerOrderService.findOrder(currentSellerIdProvider.currentSellerId(), uuid));
+    }
+
+    @Operation(summary = "판매자 주문 결제 이력 조회",
+            description = "본인 DROP 주문의 결제 시도와 결과를 시도 순서대로 반환한다. PG 실패 사유는 구매자 정보라 반환하지 않는다")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "AUTHENTICATION_REQUIRED, INVALID_TOKEN")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "ACCESS_DENIED, ORDER_ACCESS_DENIED")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "RESOURCE_NOT_FOUND (UUID 형식 오류), ORDER_NOT_FOUND")
+    @GetMapping("/orders/{orderId}/payments")
+    public ApiResponse<List<SellerPaymentHistoryResponse>> findOrderPayments(@PathVariable String orderId) {
+        return ApiResponse.success(paymentHistoryService.findSellerHistory(
+                currentSellerIdProvider.currentSellerId(), PublicIdParser.parse(orderId)));
     }
 
     // Seller 인증 및 Drop 소유권 검증 후 order의 상태를 PAID -> PREPARING으로 전환

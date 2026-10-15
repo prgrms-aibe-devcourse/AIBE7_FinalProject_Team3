@@ -21,6 +21,9 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     // 진행 중인 결제(PENDING, UNKNOWN)가 있는지 확인해 같은 주문의 이중 결제를 막는다.
     List<Payment> findByOrderIdAndStatusInOrderByIdAsc(Long orderId, Collection<PaymentStatus> statuses);
 
+    // 주문 결제 이력을 시도 순서대로 읽는다(PAYMENT.md 1.3). uq_payments_order_client_idempotency가 order_id로 시작해 인덱스를 탄다.
+    List<Payment> findByOrderIdOrderByIdAsc(Long orderId);
+
     boolean existsByProviderAndProviderPaymentId(PaymentProvider provider, String providerPaymentId);
 
     // 승인됐지만 주문을 확정하지 못한 결제가 있으면 주문이 결제 대기로 남아도 새 결제를 받지 않는다.
