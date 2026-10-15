@@ -1,5 +1,6 @@
 package org.example.grab.domain.order.service;
 
+import org.example.grab.domain.drop.stream.service.StockChangePublisher;
 import org.example.grab.domain.order.dto.OrderCreateRequest;
 import org.example.grab.domain.order.entity.Order;
 import org.example.grab.domain.order.error.OrderErrorCode;
@@ -52,6 +53,7 @@ class OrderCreateTransactionServiceTest {
         orderNumberGenerator = mock(OrderNumberGenerator.class);
         given(orderNumberGenerator.generate()).willReturn("ORD-20260928-TEST");
         service = new OrderCreateTransactionService(
+                mock(StockChangePublisher.class),
                 inventoryRepository,
                 orderRepository,
                 orderItemRepository,

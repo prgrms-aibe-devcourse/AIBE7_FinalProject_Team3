@@ -1,6 +1,8 @@
 package org.example.grab.domain.drop.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.grab.domain.drop.stream.service.StockChangePublisher;
+import org.example.grab.domain.drop.stream.model.StockChange;
 import org.example.grab.domain.drop.dto.PublicDropListProjection;
 import org.example.grab.domain.drop.dto.PublicDropSort;
 import org.example.grab.domain.drop.dto.SellerDropListProjection;
@@ -64,6 +66,7 @@ public class DropService {
     private static final int MAX_GALLERY_IMAGES = 5;
     private static final int MAX_DETAIL_IMAGES = 15;
 
+    private final StockChangePublisher stockChangePublisher;
     private final DropRepository dropRepository;
     private final DropImageRepository dropImageRepository;
     private final CategoryService categoryService;
@@ -117,6 +120,7 @@ public class DropService {
         Drop drop = findOwnedDropForUpdate(sellerId, dropId);
         drop.cancel(reason, OffsetDateTime.now(ZoneOffset.UTC));
         eventPublisher.publishEvent(new DropCanceledEvent(dropId));
+        stockChangePublisher.publish(dropId, StockChange.STATUS);
         return drop;
     }
 

@@ -1,6 +1,7 @@
 package org.example.grab.domain.drop.service;
 
 import jakarta.persistence.EntityManager;
+import org.example.grab.domain.drop.stream.service.StockChangePublisher;
 import org.example.grab.global.common.ErrorResponse;
 import org.example.grab.global.config.JpaConfig;
 import org.example.grab.domain.drop.dto.request.DropDraftRequest;
@@ -54,7 +55,7 @@ import static org.assertj.core.api.Assertions.tuple;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
-@Import({JpaConfig.class, DropService.class, CategoryService.class, WishQueryService.class,
+@Import({StockChangePublisher.class, JpaConfig.class, DropService.class, CategoryService.class, WishQueryService.class,
         SellerProfileService.class, SupabaseStorageConfig.class})
 @Testcontainers
 class DropServiceIntegrationTest {

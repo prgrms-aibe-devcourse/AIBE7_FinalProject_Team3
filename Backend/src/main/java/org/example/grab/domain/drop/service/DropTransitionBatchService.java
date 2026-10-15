@@ -1,6 +1,8 @@
 package org.example.grab.domain.drop.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.grab.domain.drop.stream.service.StockChangePublisher;
+import org.example.grab.domain.drop.stream.model.StockChange;
 import org.example.grab.domain.drop.event.DropGrabStartedEvent;
 import org.example.grab.domain.drop.event.DropSaleStartingSoonEvent;
 import org.example.grab.domain.drop.repository.DropRepository;
@@ -24,6 +26,7 @@ public class DropTransitionBatchService {
     // drop_notifications.type. CHECK 제약(ck_drop_notifications_type)에 있는 값만 쓸 수 있다
     private static final String PRESALE_NOTICE_TYPE = "PRESALE_10M";
 
+    private final StockChangePublisher stockChangePublisher;
     private final DropRepository dropRepository;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -52,11 +55,14 @@ public class DropTransitionBatchService {
         if (!startedDropIds.isEmpty()) {
             eventPublisher.publishEvent(new DropGrabStartedEvent(startedDropIds));
         }
+        startedDropIds.forEach(id -> stockChangePublisher.publish(id, StockChange.STATUS));
         return startedDropIds;
     }
 
     @Transactional
     public int endGrabBatch(OffsetDateTime now, int batchSize) {
-        return dropRepository.endGrabBatch(now, batchSize);
+        List<Long> endedDropIds = dropRepository.endGrabBatchIds(now, batchSize);
+        endedDropIds.forEach(id -> stockChangePublisher.publish(id, StockChange.STATUS));
+        return endedDropIds.size();
     }
 }

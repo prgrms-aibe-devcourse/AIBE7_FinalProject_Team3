@@ -1,6 +1,16 @@
 package org.example.grab.domain.drop.stream.transport;
 
 import org.example.grab.domain.drop.stream.model.StockChange;
+import org.example.grab.domain.drop.service.DropTransitionBatchService;
+import org.example.grab.domain.order.service.OrderCreateTransactionService;
+import org.example.grab.domain.order.service.OrderPaymentService;
+import org.example.grab.domain.order.dto.OrderCreateRequest;
+import org.example.grab.domain.order.entity.Order;
+import org.example.grab.global.idempotency.IdempotencyKey;
+import org.example.grab.global.idempotency.RequestHash;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import java.time.OffsetDateTime;
 import org.example.grab.domain.drop.stream.service.StockStreamRegistry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -60,6 +70,17 @@ class StockStreamHttpIntegrationTest {
     @Autowired
     private StockStreamRegistry registry;
 
+    @Autowired
+    private OrderCreateTransactionService orders;
+    @Autowired
+    private OrderPaymentService payments;
+    @Autowired
+    private DropTransitionBatchService transitions;
+    @Autowired
+    private org.example.grab.domain.drop.service.DropService drops;
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
     private Long userId;
     private Long sellerId;
     private Long categoryId;
@@ -86,6 +107,10 @@ class StockStreamHttpIntegrationTest {
             stream.close();
         }
         await(() -> registry.countConnections() == 0);
+        jdbc.update("DELETE FROM stock_reservations WHERE order_item_id IN (SELECT id FROM order_items WHERE drop_id IN (?, ?))", first, second);
+        jdbc.update("DELETE FROM order_items WHERE drop_id IN (?, ?)", first, second);
+        jdbc.update("DELETE FROM orders WHERE drop_id IN (?, ?)", first, second);
+        jdbc.update("DELETE FROM drop_options WHERE drop_id IN (?, ?)", first, second);
         jdbc.update("DELETE FROM drops WHERE seller_id = ?", sellerId);
         jdbc.update("DELETE FROM sellers WHERE id = ?", sellerId);
         jdbc.update("DELETE FROM users WHERE id = ?", userId);
@@ -252,6 +277,137 @@ class StockStreamHttpIntegrationTest {
         } finally {
             connection.disconnect();
         }
+    }
+
+    @Test
+    @DisplayName("실제 주문 생성·결제·결제 취소 커밋이 두 구독자에게 종류별 신호를 전달한다")
+    void committedOrderLifecycleNotifiesSubscribers() throws Exception {
+        // given
+        Long option = insertOption();
+        Stream a = open(first.toString());
+        Stream b = open(first.toString());
+        assertThat(a.next()).contains("ready");
+        assertThat(b.next()).contains("ready");
+
+        // when / then
+        Order order = createOrder(option);
+        assertChange(a, "STOCK");
+        assertChange(b, "STOCK");
+        TransactionTemplate tx = new TransactionTemplate(transactionManager);
+        tx.executeWithoutResult(status -> payments.completePayment(
+                payments.lockForPaymentResult(order.getId()), order.getTotalAmount(), OffsetDateTime.now(), OffsetDateTime.now()));
+        assertChange(a, "SALES");
+        assertChange(b, "SALES");
+        tx.executeWithoutResult(status -> {
+            var locked = payments.lockForCancelResult(order.getId());
+            payments.requestPaidCancel(locked, UUID.randomUUID().toString(), "a".repeat(64), "테스트 취소");
+            payments.cancelPaid(locked, OffsetDateTime.now());
+        });
+        String canceled = a.nextChange();
+        assertThat(canceled).contains("STOCK", "SALES").doesNotContain("quantity", "buyerId", "orderId");
+        assertThat(b.nextChange()).contains("STOCK", "SALES");
+    }
+
+    @Test
+    @DisplayName("주문 생성은 커밋 전과 롤백 후에는 변경 이벤트를 보내지 않는다")
+    void rollbackDoesNotNotify() throws Exception {
+        // given
+        Long option = insertOption();
+        Stream stream = open(first.toString());
+        assertThat(stream.next()).contains("ready");
+
+        // when
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            createOrder(option);
+            try {
+                assertThat(stream.next()).contains(": heartbeat");
+            } catch (Exception exception) {
+                throw new RuntimeException(exception);
+            }
+            status.setRollbackOnly();
+        });
+
+        // then: 수명 종료까지 변경 프레임이 없어야 한다.
+        assertThat(stream.nextChange()).contains("stream-closed").doesNotContain("drop-changed");
+        assertThat(jdbc.queryForObject("SELECT reserved_quantity FROM drop_options WHERE id = ?", Integer.class, option)).isZero();
+    }
+
+    @Test
+    @DisplayName("만료 배치의 실제 반환만 STOCK 신호를 보내고 멱등 재실행은 보내지 않는다")
+    void expiryNotifiesOnlyActualChange() throws Exception {
+        // given
+        Order order = createOrder(insertOption());
+        Stream stream = open(first.toString());
+        assertThat(stream.next()).contains("ready");
+
+        // when / then
+        assertThat(payments.expireIfDue(order.getId(), order.getPaymentExpiresAt())).isTrue();
+        assertChange(stream, "STOCK");
+        assertThat(payments.expireIfDue(order.getId(), order.getPaymentExpiresAt())).isFalse();
+        assertThat(stream.nextChange()).contains("stream-closed");
+    }
+
+    @Test
+    @DisplayName("시작과 종료 배치는 실제로 전환한 상품의 STATUS를 커밋 이후 전달한다")
+    void transitionsNotifyChangedIds() throws Exception {
+        // given
+        Stream stream = open(first.toString());
+        assertThat(stream.next()).contains("ready");
+
+        // when / then
+        assertThat(transitions.startGrabBatch(OffsetDateTime.now().plusMinutes(1), 100)).contains(first);
+        assertChange(stream, "STATUS");
+        assertThat(transitions.endGrabBatch(OffsetDateTime.now().plusHours(2), 100)).isEqualTo(2);
+        assertChange(stream, "STATUS");
+        assertThat(transitions.endGrabBatch(OffsetDateTime.now().plusHours(2), 100)).isZero();
+        assertThat(stream.nextChange()).contains("stream-closed");
+    }
+
+    @Test
+    @DisplayName("미결제 취소는 반환 STOCK만 전달한다")
+    void unpaidCancellationNotifies() throws Exception {
+        // given
+        Order order = createOrder(insertOption());
+        Stream stream = open(first.toString());
+        assertThat(stream.next()).contains("ready");
+
+        // when
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> payments.cancelUnpaid(
+                payments.lockForCancel(userId, order.getUuid()), UUID.randomUUID().toString(), "a".repeat(64), "테스트 취소", OffsetDateTime.now()));
+
+        // then
+        assertThat(stream.nextChange()).contains("drop-changed", "STOCK").doesNotContain("SALES");
+    }
+
+    @Test
+    @DisplayName("판매자 취소는 STATUS를 전달하고 공개 구독을 유지한다")
+    void sellerCancellationNotifies() throws Exception {
+        // given
+        jdbc.update("UPDATE drops SET sale_starts_at = CURRENT_TIMESTAMP + INTERVAL '10 minutes' WHERE id = ?", first);
+        Stream stream = open(first.toString());
+        assertThat(stream.next()).contains("ready");
+
+        // when
+        drops.cancel(sellerId, first, "테스트 취소");
+
+        // then
+        assertChange(stream, "STATUS");
+        assertThat(stream.next()).contains(": heartbeat");
+    }
+
+    private void assertChange(Stream stream, String change) throws Exception {
+        assertThat(stream.nextChange()).contains("drop-changed", "\"dropId\":" + first, change);
+    }
+
+    private Long insertOption() {
+        jdbc.update("UPDATE drops SET sale_starts_at = CURRENT_TIMESTAMP - INTERVAL '1 minute' WHERE id = ?", first);
+        return jdbc.queryForObject("INSERT INTO drop_options (drop_id, unit_price, total_quantity) VALUES (?, 1000, 10) RETURNING id", Long.class, first);
+    }
+
+    private Order createOrder(Long option) {
+        return orders.create(userId, IdempotencyKey.from(UUID.randomUUID().toString()), RequestHash.from("a".repeat(64)),
+                new OrderCreateRequest(first, List.of(new OrderCreateRequest.Item(option, 1)),
+                        new OrderCreateRequest.ShippingAddress("구매자", "01012345678", "12345", "서울", "101호", null)));
     }
 
     private Long insertDrop(String status) {
