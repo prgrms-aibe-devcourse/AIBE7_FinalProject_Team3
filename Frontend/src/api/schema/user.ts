@@ -133,7 +133,7 @@ export interface paths {
     }
     /**
      * 내 정보 조회
-     * @description 본인의 회원 정보를 반환한다. roles는 요청 Access Token의 권한이고, profileImageUrl은 없으면 null이다
+     * @description 본인의 회원 정보를 반환한다. provider는 가입 방식, roles는 요청 Access Token의 권한이고, profileImageUrl은 없으면 null이다
      */
     get: operations['getMe']
     put?: never
@@ -222,6 +222,8 @@ export interface components {
       userId?: string
       email?: string
       nickname?: string
+      /** @enum {string} */
+      provider?: 'LOCAL' | 'KAKAO' | 'GOOGLE'
       roles?: string[]
       profileImageUrl?: string
       /** Format: date-time */
