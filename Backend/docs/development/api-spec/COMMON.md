@@ -81,6 +81,7 @@ SSE 지속 응답은 JSON 성공 래퍼의 예외다. `text/event-stream`의 이
 | 422 | 비즈니스 규칙 위반 |
 | 429 | 요청 횟수 제한 초과 |
 | 500 | 서버 내부 오류 |
+| 503 | 서비스 일시 이용 불가 |
 
 ### 1.7 페이지 응답
 
@@ -179,6 +180,8 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 | 오류 코드 | HTTP 상태 | 설명 |
 | --- | --- | --- |
 | `INVALID_REQUEST` | 400 | 요청 형식 오류 |
+| `STOCK_STREAM_LIMIT_EXCEEDED` | 429 | SSE IP 연결·요청 제한 초과. GR-110 구현 예정 |
+| `STOCK_STREAM_UNAVAILABLE` | 503 | SSE 서버 연결 상한·구독 기반 준비 불가. GR-110 구현 예정 |
 | `INVALID_IDEMPOTENCY_KEY` | 400 | `Idempotency-Key` 헤더 누락 또는 UUID 형식 오류 |
 | `VALIDATION_FAILED` | 400 | 필드 검증 실패 |
 | `INVALID_EMAIL` | 400 | 이메일 형식·길이 규칙 위반 |
@@ -269,7 +272,3 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 | Refresh Token | Access Token 대신 `refresh_token` HttpOnly 쿠키로 확인. Access Token이 만료된 상태에서도 호출 가능 |
 | Refresh Token(선택) | `refresh_token` 쿠키가 있으면 사용하고, 없거나 무효여도 요청은 성공 |
 | PG 검증 | 사용자 토큰 대신 Webhook 서명 또는 별도 Secret 검증 |
-
-## SSE 구현 예정 오류 코드 (GR-109)
-
-`STOCK_STREAM_LIMIT_EXCEEDED`(429), `STOCK_STREAM_UNAVAILABLE`(503)는 [실시간 변경 전달 계약](../REALTIME_STOCK.md) 8절에 예약한 코드다. 현재 코드 enum에는 없으며 GR-110에서 구현하고 본문 오류 코드 표에 통합한다.
