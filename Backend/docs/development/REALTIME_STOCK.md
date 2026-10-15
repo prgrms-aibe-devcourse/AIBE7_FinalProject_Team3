@@ -1,7 +1,7 @@
 # 공개 DROP 실시간 변경 전달 계약 (GR-109)
 
-> 상태: GR-109 명세 정의·문서 통합 완료. SSE는 미구현·성능 미실측이며 GR-110~113에서 구현·검증한다.
-> 이 문서를 전달 정책의 정본으로 사용한다. 현재 SSE API는 미구현이다.
+> 상태: GR-110 2단계 단일 서버 SSE endpoint·전송·수명 관리 구현. 실제 도메인 변경 연결은 3단계, 프론트·Redis·운영 부하 검증은 후속 이슈 범위다.
+> 이 문서를 전달 정책의 정본으로 사용한다. 전송 경로 구현과 도메인 알림 자동 발행·운영 성능 검증 완료를 구분한다.
 
 ## 1. 적용 범위
 
@@ -112,7 +112,7 @@ data: {"reason":"RECONNECT_REQUIRED","reconnect":true}
 
 ## 8. 오류와 종료
 
-스트림 시작 전 실패는 공통 JSON 오류 응답을 사용한다. 아래 추가 코드는 명세 예약이며 GR-110에서 구현한다.
+스트림 시작 전 실패는 공통 JSON 오류 응답을 사용한다. 아래 추가 코드는 GR-110 2단계에서 공통 예외 처리의 Retry-After 헤더와 함께 연결했다.
 
 | HTTP | 코드 | 조건 |
 | --- | --- | --- |
@@ -178,9 +178,9 @@ EventSource는 Axios 인증·401 인터셉터를 거치지 않고 onerror에 HTT
 
 ## 12. 초기 주기·제한과 설정 계약
 
-아래 값은 GR-109에서 정한 **초기 구현 기본값과 검증 목표**다. 운영 실측값이나 현 인프라의 수용 가능 판정이 아니다. GR-113에서 동일 값을 검증하고 미달하면 원인·수정값·재검증 결과를 정본에 남긴다. GR-109에서는 application.yml·프록시·프론트 코드를 변경하지 않았다. GR-110 1단계에서 서버 설정 바인딩·입력/공개 검증·구독 저장소·접속 제한 기반을 추가했으며 SSE endpoint·전송·도메인 이벤트는 아직 미구현이다.
+아래 값은 GR-109에서 정한 **초기 구현 기본값과 검증 목표**다. 운영 실측값이나 현 인프라의 수용 가능 판정이 아니다. GR-113에서 동일 값을 검증하고 미달하면 원인·수정값·재검증 결과를 정본에 남긴다. GR-109에서는 application.yml·프록시·프론트 코드를 변경하지 않았다. GR-110 1단계에서 서버 설정·검증·구독/접속 제한 기반을, 2단계에서 SSE endpoint·전송·수명 관리를 연결했다. 도메인 이벤트 발행은 3단계 구현 예정이다.
 
-백엔드 설정은 `application.yml`의 `grab.stock-stream.*`에 바인딩한다. 전송 관련 설정도 바인딩·검증하지만 실행은 GR-110 2단계에서 연결한다. 프론트 설정은 향후 `features/drop/logic/realtimeStockPolicy.ts`로 모으며 아직 미구현이다.
+백엔드 설정은 `application.yml`의 `grab.stock-stream.*`에 바인딩한다. 서버 전송 관련 설정은 GR-110 2단계에서 실행 경로에 연결했다. 프론트 설정은 향후 `features/drop/logic/realtimeStockPolicy.ts`로 모으며 아직 미구현이다.
 
 | 항목 | 기본값·단위 | 향후 설정 키/위치 | 이유 |
 | --- | --- | --- | --- |
@@ -310,7 +310,7 @@ SSE 연결 수·구독 수·ready 지연·종료 사유·제한 거절·병합 �
 | --- | --- |
 | [REQUIREMENTS](REQUIREMENTS.md) STOCK-VIEW-003~008 | 범위·공개 보호·복구·목록·부하 인수 조건 |
 | [TECHSTACK](TECHSTACK.md) | 단계별 도입, SSE/Redis/관측 역할 |
-| [COMMON](api-spec/COMMON.md)·[DROP](api-spec/DROP.md)·[API 안내](api-spec/README.md) | 지속 응답 예외·오류 코드·미구현 endpoint 안내 |
+| [COMMON](api-spec/COMMON.md)·[DROP](api-spec/DROP.md)·[API 안내](api-spec/README.md) | 지속 응답 예외·오류 코드·endpoint 구현 단계 안내 |
 | [INVENTORY](api-spec/INVENTORY.md) | 기존 공개 재고 API와 재조회 복구 관계 |
 | [ERD](ERD.md) | 스키마 변경·버전 영속 필드·마이그레이션 불필요 |
 | [상세](../../../Frontend/docs/pages/DropDetailPage.md)·[WISH](../../../Frontend/docs/pages/WishPage.md)·[GRAB](../../../Frontend/docs/pages/GrabPage.md) | 프론트 행동·갱신·실패·복구·인수 조건 |
@@ -339,4 +339,23 @@ GR-109는 문서만 변경하므로 실행 OpenAPI와 생성 타입에 SSE가 �
 ./gradlew test --tests '*StockStream*Test' --tests '*PublicDropSubscriptionServiceIntegrationTest' --tests '*PublicDropDetailIntegrationTest' --tests '*PublicEndpointSecurityTests' --tests '*SecurityFilterChainTests' --tests '*SwaggerEndpointTests'
 ```
 
-SSE endpoint·emitter·보안 경로·HTTP 오류 헤더·전송/heartbeat/수명 정리는 2단계, 실제 변경의 커밋 후 전달은 3단계에서 연결한다. 429/503 코드 enum은 추가했지만 HTTP로 반환하는 구독 API는 아직 없다. 전체 테스트·컨테이너 이미지 빌드는 단계 통합 검증에서 수행하며, 실제 SSE 수신/종료·두 브라우저·부하는 이 단계에서 실행하지 않았다. 프론트·OpenAPI 계약은 아직 변경되지 않아 생성 타입도 갱신하지 않았다.
+1단계 완료 시점에 SSE endpoint·emitter·보안 경로·HTTP 오류 헤더·전송/heartbeat/수명 정리는 2단계, 실제 변경의 커밋 후 전달은 3단계에서 연결한다. 429/503 코드 enum은 추가했지만 HTTP로 반환하는 구독 API는 아직 없다. 전체 테스트·컨테이너 이미지 빌드는 단계 통합 검증에서 수행하며, 실제 SSE 수신/종료·두 브라우저·부하는 이 단계에서 실행하지 않았다. 프론트·OpenAPI 계약은 아직 변경되지 않아 생성 타입도 갱신하지 않았다.
+
+
+### GR-110 2단계 — SSE API·전송과 수명 관리
+
+`GET /api/v1/drops/stock-stream`과 명세의 세 이벤트, 정확한 공개 GET/오류 dispatch 범위, 기존 JWT/CORS 정책, JSON 오류와 Retry-After를 연결했다. 실행 OpenAPI는 성공을 문자열 `text/event-stream`, 실패를 공통 JSON으로 구분한다. 생성 스냅샷·프론트 타입 갱신은 도메인 이벤트 연결 후 5단계에서 진행한다.
+
+Servlet async 시작 후 최초 onWritePossible 통지를 받은 연결만 활성화하고 ready를 처음 전송한다. SseEmitter와 Servlet 비차단 쓰기를 함께 사용해 소켓이 쓰기 불가 상태면 대기하지 않고 종료한다. 다른 HTTP 경로의 소켓 설정은 바꾸지 않는다. SseEmitter timeout=0은 무제한 보장의 의미가 아니라 자체 수명/정체 감시와 충돌하지 않기 위한 설정이다. 10분 수명·전송 정체 감시·heartbeat는 자체 pump가 관리한다.
+
+송신 스레드 8개·유한 대기 큐(연결 상한 크기)와 timer 2개를 사용한다. 전용 실행기는 소유자 빈 안에 두고 Executor/ScheduledExecutorService 타입으로 노출하지 않아 기존 공용 스케줄러 자동 설정을 대체하지 않는다. 연결마다 타이머나 상시 전용 스레드를 만들지 않는다. 50ms pump에서 연결별 상품 병합 창·수명·정체·IP TTL을 확인한다. 구독 ID 상한과 pending 한도를 설정 시 함께 검증하므로 상품별 pending 집합이 무한 증가하지 않는다. ready 전 변경도 이 집합에 합치고 ready 뒤 전달한다.
+
+동일 연결의 송신은 한 작업으로 직렬화하며, 종료·오류·not-ready·큐 거절은 멱등하게 emitter·인덱스·슬롯·대기 작업을 정리한다. 송신 전 공개 상태를 다시 확인해 DRAFT/삭제가 감지되면 데이터 대신 SUBSCRIPTION_INVALIDATED 종료를 시도한다. CANCELED·ENDED는 계속 공개로 취급한다. 서버 종료는 SmartLifecycle에서 웹 서버 graceful shutdown보다 먼저 종료 안내·정리를 수행한다.
+
+내부 `StockStreamHub.publish`는 로컬 변경 신호의 전달 진입점이다. 이번 단계에서는 테스트가 이를 호출하며, 주문·결제·배치가 자동으로 호출하지 않는다. 운영용 테스트 이벤트 API는 추가하지 않았다. 3단계에서 실제 변경의 커밋 후 전달을 연결한다.
+
+검증은 PostgreSQL Testcontainers와 실제 Tomcat HTTP/TCP에서 수행한다. 두 독립 연결·다중 구독·다른 상품 제외·ready/heartbeat/수명 종료, 연결 전 400/401/404/429/503·JSON/Retry-After, 비공개 감지, 반복 단절을 확인한다. 별도 TCP 시험은 작은 수신 버퍼에서 ready 후 읽기를 멈춰 전송 자원이 30초 연결 수명 전에 정리되는지 확인하며, 운영 피크 부하나 실제 프록시 검증을 대신하지 않는다. 단위 테스트는 병합·ready 경합·정체 감시·큐 거절·실패 격리·종료 정리를 검증한다.
+
+최종 검증: `./gradlew build` 전체 테스트 1,596건 성공·실패 0·건너뜀 0으로 통과했다(로컬 init script는 결과 요약 출력용). 기본 테스트 힙의 OOM을 재현해 테스트 JVM 힙을 1GiB로 명시했다. 실제 서버 시험은 전용 PostgreSQL 컨테이너·작은 DB 풀·클래스 종료 시 컨텍스트 정리로 격리한다. 기존 공용 스케줄러의 4개 스레드 설정 보존도 검증했다. 문서 상대 링크·JSON/SSE 예시·공백 검사도 통과했다.
+
+미실행: 실제 브라우저 화면 연동·커밋 후 도메인 이벤트·Redis/프록시·운영 피크 부하는 후속 단계/이슈 범위다. 컨테이너 재기동과 프론트 OpenAPI 스냅샷/생성 타입 갱신은 5단계에서 수행한다. 백엔드 jar 빌드는 위 build에 포함되며 배포 이미지 빌드는 이번 단계에서 실행하지 않았다.

@@ -34,7 +34,7 @@ public class StockStreamRegistry {
             state.attempts = 0;
         }
         if (state.attempts >= properties.connectRateMax()) {
-            throw new BusinessException(DropErrorCode.STOCK_STREAM_LIMIT_EXCEEDED);
+            throw new BusinessException(DropErrorCode.STOCK_STREAM_LIMIT_EXCEEDED, retryAfterSeconds());
         }
         state.attempts++;
     }
@@ -49,10 +49,10 @@ public class StockStreamRegistry {
         removeExpiredIps(now);
         IpState state = getIpState(remoteAddress, now);
         if (state.connections >= properties.maxConnectionsPerIp()) {
-            throw new BusinessException(DropErrorCode.STOCK_STREAM_LIMIT_EXCEEDED);
+            throw new BusinessException(DropErrorCode.STOCK_STREAM_LIMIT_EXCEEDED, retryAfterSeconds());
         }
         if (subscriptions.size() >= properties.maxConnections()) {
-            throw new BusinessException(DropErrorCode.STOCK_STREAM_UNAVAILABLE);
+            throw new BusinessException(DropErrorCode.STOCK_STREAM_UNAVAILABLE, retryAfterSeconds());
         }
         StockStreamSubscription subscription = new StockStreamSubscription(UUID.randomUUID(), dropIds);
         subscriptions.put(subscription.id(), new Entry(remoteAddress, subscription));
@@ -99,6 +99,10 @@ public class StockStreamRegistry {
         removeExpiredIps(clock.instant());
     }
 
+    private long retryAfterSeconds() {
+        return properties.retryAfter().getSeconds() + (properties.retryAfter().getNano() > 0 ? 1 : 0);
+    }
+
     private IpState getIpState(String remoteAddress, Instant now) {
         if (remoteAddress == null || remoteAddress.isBlank()) {
             throw new IllegalArgumentException("검증된 remoteAddr가 필요합니다.");
@@ -106,7 +110,7 @@ public class StockStreamRegistry {
         IpState state = ipStates.get(remoteAddress);
         if (state == null) {
             if (ipStates.size() >= properties.maxTrackedIps()) {
-                throw new BusinessException(DropErrorCode.STOCK_STREAM_UNAVAILABLE);
+                throw new BusinessException(DropErrorCode.STOCK_STREAM_UNAVAILABLE, retryAfterSeconds());
             }
             state = new IpState(now);
             ipStates.put(remoteAddress, state);

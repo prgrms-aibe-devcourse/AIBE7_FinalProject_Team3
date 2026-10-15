@@ -25,6 +25,28 @@ class PublicEndpointSecurityTests {
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private org.springframework.context.ApplicationContext applicationContext;
+
+    @Test
+    @DisplayName("SSE 전용 실행기가 기존 공용 스케줄러의 4개 스레드 설정을 대체하지 않는다")
+    void preservesApplicationScheduler() {
+        // when
+        var scheduler = applicationContext.getBean(org.springframework.scheduling.TaskScheduler.class);
+        // then
+        org.assertj.core.api.Assertions.assertThat(scheduler)
+                .isInstanceOfSatisfying(org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler.class,
+                        pool -> org.assertj.core.api.Assertions.assertThat(pool.getScheduledThreadPoolExecutor().getCorePoolSize()).isEqualTo(4));
+    }
+
+    @Test
+    @DisplayName("공개 SSE 경로의 필수 쿼리 오류는 상세 ID 변환이나 인증 오류가 아닌 400이다")
+    void exposesStockStreamValidationWithoutAuthentication() throws Exception {
+        mockMvc.perform(get("/api/v1/drops/stock-stream").accept("text/event-stream"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+    }
+
     @Test
     @DisplayName("비로그인 GET /api/v1/categories는 200")
     void exposesCategoriesWithoutAuthentication() throws Exception {
