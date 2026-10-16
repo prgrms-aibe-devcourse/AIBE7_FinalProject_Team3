@@ -14,12 +14,12 @@ import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.security.AuthRole;
 import org.example.grab.global.security.jwt.IssuedAccessToken;
 import org.example.grab.global.security.jwt.JwtProvider;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.RedisConnectionFailureException;
@@ -67,8 +67,14 @@ class LoginServiceTest {
     @Mock
     private RefreshTokenRepository refreshTokenRepository;
 
-    @InjectMocks
     private LoginService service;
+
+    // 세션 발급은 AuthSessionIssuer로 옮겼지만(GR-46 M00-08) LOCAL 로그인 흐름 전체를 그대로 검증하도록 실제 발급기를 끼운다
+    @BeforeEach
+    void setUp() {
+        service = new LoginService(userCredentialService, new AuthSessionIssuer(
+                authRoleCalculator, jwtProvider, refreshTokenGenerator, refreshTokenTtlCalculator, refreshTokenRepository));
+    }
 
     private void givenLoginPossible() {
         given(userCredentialService.authenticate(EMAIL, PASSWORD)).willReturn(USER);
