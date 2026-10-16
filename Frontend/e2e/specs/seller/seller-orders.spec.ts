@@ -30,23 +30,55 @@ test('결제 확인 중인 주문은 배송 준비로 바꿀 수 없다', async 
   await expect(order.getByRole('button', { name: '배송 준비' })).toHaveCount(0)
 })
 
-test('PAID·PREPARING 버튼은 조건대로 나오고 클릭하면 안내만 띄운다', async ({
-  page,
-}) => {
+test('배송 준비 후 송장을 검증하고 발송 처리한다', async ({ page }) => {
   const paid = row(page, 'ORD-20260918-000500')
   await paid.getByRole('button', { name: '배송 준비' }).click()
-  await expect(toast(page)).toHaveText('곧 지원 예정이에요.')
-  // 실제 상태는 바뀌지 않는다
-  await expect(row(page, 'ORD-20260918-000500')).toBeVisible()
+  await expect(toast(page)).toHaveText(
+    'ORD-20260918-000500 배송 준비로 전환했어요.',
+  )
 
   await page
     .getByRole('region', { name: '주문 필터' })
     .getByRole('button', { name: '배송 준비' })
     .click()
-  const preparing = row(page, 'ORD-20260917-000488')
+  const preparing = row(page, 'ORD-20260918-000500')
   await preparing.getByRole('button', { name: '송장 등록' }).click()
-  await expect(toast(page)).toHaveText('곧 지원 예정이에요.')
-  await expect(row(page, 'ORD-20260917-000488')).toBeVisible()
+
+  const form = preparing.locator('.shipment-form')
+  await form.getByRole('button', { name: '발송 처리' }).click()
+  await expect(form.getByRole('alert')).toBeVisible()
+
+  await form.getByLabel('택배사').fill('CJ대한통운')
+  await form.getByLabel('송장번호').fill('123456789012')
+  await form.getByRole('button', { name: '발송 처리' }).click()
+  await expect(toast(page)).toHaveText(
+    'ORD-20260918-000500 송장을 등록하고 발송 처리했어요.',
+  )
+
+  await page
+    .getByRole('region', { name: '주문 필터' })
+    .getByRole('button', { name: '배송 중' })
+    .click()
+  await expect(row(page, 'ORD-20260918-000500')).toBeVisible()
+})
+
+test('발송된 주문의 송장을 수정한다', async ({ page }) => {
+  await page
+    .getByRole('region', { name: '주문 필터' })
+    .getByRole('button', { name: '배송 중' })
+    .click()
+  const shipped = row(page, 'ORD-20260916-000433')
+  await shipped
+    .getByRole('button', { name: 'ORD-20260916-000433 주문 상세' })
+    .click()
+  await shipped.getByRole('button', { name: '송장 수정' }).click()
+
+  const form = shipped.locator('.shipment-form')
+  await expect(form.getByLabel('택배사')).toHaveValue('CJ대한통운')
+  await form.getByLabel('송장번호').fill('999900001111')
+  await form.getByRole('button', { name: '수정 저장' }).click()
+  await expect(toast(page)).toHaveText('ORD-20260916-000433 송장을 수정했어요.')
+  await expect(shipped).toContainText('999900001111')
 })
 
 test('상태·결제·DROP 필터와 페이지를 URL에서 복원한다', async ({ page }) => {
