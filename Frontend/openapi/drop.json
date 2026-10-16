@@ -1599,6 +1599,9 @@
           "soldStock": {
             "type": "integer",
             "format": "int32"
+          },
+          "active": {
+            "type": "boolean"
           }
         }
       },

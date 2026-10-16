@@ -12,16 +12,64 @@
   ],
   "tags": [
     {
-      "name": "결제",
-      "description": "토스페이먼츠 테스트 환경 Mock 결제 승인"
-    },
-    {
       "name": "주문 취소",
       "description": "구매자의 주문 취소와 결제 취소·재고 반환"
+    },
+    {
+      "name": "결제",
+      "description": "토스페이먼츠 테스트 환경 Mock 결제 승인과 주문 결제 이력 조회"
     }
   ],
   "paths": {
     "/api/v1/orders/{orderId}/payments": {
+      "get": {
+        "tags": ["결제"],
+        "summary": "주문 결제 이력 조회",
+        "description": "본인 주문의 모든 결제 시도와 결과를 시도 순서대로 반환한다. 시도가 없으면 빈 배열이다",
+        "operationId": "findPayments",
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "조회 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListPaymentHistoryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED, INVALID_TOKEN",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListPaymentHistoryResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (UUID 형식 오류), ORDER_NOT_FOUND",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListPaymentHistoryResponse"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": ["결제"],
         "summary": "Mock 결제 요청",
@@ -367,6 +415,67 @@
           "canceledAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseListPaymentHistoryResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentHistoryResponse"
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "PaymentHistoryResponse": {
+        "type": "object",
+        "properties": {
+          "paymentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "provider": {
+            "type": "string",
+            "enum": ["MOCK", "TOSS"]
+          },
+          "amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["PENDING", "SUCCEEDED", "FAILED", "UNKNOWN", "CANCELED"]
+          },
+          "reconciliationStatus": {
+            "type": "string",
+            "enum": ["NONE", "REQUIRED", "RESOLVED"]
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "canceledAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "failure": {
+            "$ref": "#/components/schemas/Failure"
           }
         }
       }
