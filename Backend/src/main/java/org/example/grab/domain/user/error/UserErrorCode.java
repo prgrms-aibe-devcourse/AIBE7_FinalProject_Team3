@@ -26,6 +26,8 @@ public enum UserErrorCode implements ErrorCode {
     UNSUPPORTED_OAUTH2_PROVIDER(HttpStatus.BAD_REQUEST, "지원하지 않는 소셜 로그인 제공자입니다."),
     OAUTH2_AUTHENTICATION_FAILED(HttpStatus.UNAUTHORIZED, "소셜 로그인에 실패했습니다."),
     OAUTH2_EMAIL_REQUIRED(HttpStatus.BAD_REQUEST, "소셜 계정의 검증된 이메일이 필요합니다."),
+    // 같은 이메일의 다른 가입 방식 계정을 자동으로 연결하지 않는다(AUTH-008). 콜백에서는 error 쿼리로만 전달된다
+    ACCOUNT_LINK_REQUIRED(HttpStatus.CONFLICT, "같은 이메일로 가입된 다른 계정이 있습니다."),
     EMAIL_VERIFICATION_ATTEMPTS_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "이메일 인증 코드 확인 시도 횟수를 초과했습니다."),
     EMAIL_VERIFICATION_RESEND_TOO_SOON(HttpStatus.TOO_MANY_REQUESTS, "이메일 인증 코드를 다시 요청할 수 없습니다. 잠시 후 다시 시도해 주세요.");
 
