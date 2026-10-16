@@ -30,6 +30,16 @@ test('결제 확인 중인 주문은 배송 준비로 바꿀 수 없다', async 
   await expect(order.getByRole('button', { name: '배송 준비' })).toHaveCount(0)
 })
 
+test('결제 확인 중인 배송 준비 주문은 발송할 수 없다', async ({ page }) => {
+  await page
+    .getByRole('region', { name: '주문 필터' })
+    .getByRole('button', { name: '배송 준비' })
+    .click()
+  const order = row(page, 'ORD-20260917-000471')
+  await expect(order).toContainText('결제 확인 중')
+  await expect(order.getByRole('button', { name: '송장 등록' })).toHaveCount(0)
+})
+
 test('배송 준비 후 송장을 검증하고 발송 처리한다', async ({ page }) => {
   const paid = row(page, 'ORD-20260918-000500')
   await paid.getByRole('button', { name: '배송 준비' }).click()

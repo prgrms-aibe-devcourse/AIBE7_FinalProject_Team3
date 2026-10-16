@@ -56,7 +56,7 @@ const SELLER_ORDERS_FIXTURE: SellerOrderRow[] = [
     productName: '슬로우 모닝 머그',
     sellerName: 'GR105테스트샵',
     orderStatus: 'PREPARING',
-    paymentStatus: 'SUCCEEDED',
+    paymentStatus: 'UNKNOWN',
     itemsAmount: 60000,
     shippingAmount: 3000,
     totalAmount: 63000,

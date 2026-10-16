@@ -287,16 +287,24 @@ export default function SellerOrdersPage({
                           배송 준비
                         </button>
                       ))}
-                    {order.orderStatus === 'PREPARING' && (
-                      <button
-                        className="secondary-button"
-                        type="button"
-                        disabled={busyId !== null}
-                        onClick={() => openShipmentForm(orderId)}
-                      >
-                        송장 등록
-                      </button>
-                    )}
+                    {order.orderStatus === 'PREPARING' &&
+                      (order.paymentStatus === 'UNKNOWN' ? (
+                        <span
+                          className="urgent-tag"
+                          title="결제 취소 결과가 확인되기 전에는 발송할 수 없습니다."
+                        >
+                          결제 확인 중
+                        </span>
+                      ) : (
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          disabled={busyId !== null}
+                          onClick={() => openShipmentForm(orderId)}
+                        >
+                          송장 등록
+                        </button>
+                      ))}
                   </div>
                   <button
                     className="order-toggle"
