@@ -201,6 +201,9 @@ class DropStockQueryIntegrationTest {
         // when & then: 소유자는 DRAFT도 조회한다
         SellerDropStockResponse seller = dropService.findSellerStocks(sellerId, draftId);
         assertThat(seller.options()).hasSize(3);
+        // sortOrder 2(린넨/롱)는 비활성 옵션이다
+        assertThat(findByOptionId(seller, optionId(draftId, 2)).active()).isFalse();
+        assertThat(findByOptionId(seller, optionId(draftId, 0)).active()).isTrue();
 
         // 공개는 DRAFT를 숨긴다
         assertThatThrownBy(() -> dropService.findPublicStocks(draftId))

@@ -14,7 +14,7 @@ public record SellerDropStockResponse(Long dropId, List<Option> options) {
     // 중첩 이름 Option이 다른 응답 DTO와 충돌하지 않도록 고유 스키마 이름을 지정한다(GR-98).
     @Schema(name = "SellerDropStockOption")
     public record Option(Long optionId, String optionName, int totalStock, int availableStock,
-                         int reservedStock, int soldStock) {
+                         int reservedStock, int soldStock, boolean active) {
     }
 
     // open-in-view=false이므로 컬렉션 접근과 DTO 변환은 서비스 트랜잭션 안에서 끝나야 한다.
@@ -32,7 +32,8 @@ public record SellerDropStockResponse(Long dropId, List<Option> options) {
                 option.getTotalQuantity(),
                 option.getAvailableQuantity(),
                 option.getReservedQuantity(),
-                option.getSoldQuantity());
+                option.getSoldQuantity(),
+                option.isActive());
     }
 
     // 값 매핑을 그룹 sortOrder 순으로 정렬한 뒤 값을 " / "로 연결한다. 매핑이 없으면 "기본"이다.
