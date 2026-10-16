@@ -52,6 +52,9 @@ class SwaggerEndpointTests {
             "payment,/api/v1/orders/{orderId}/payments",
             "user,/api/v1/auth/email-verification",
             "user,/api/v1/auth/csrf",
+            // GR-46: 소셜 로그인 시작·가입 완료. 콜백은 필터가 처리해 문서에 없다
+            "user,/api/v1/auth/oauth2/{provider}",
+            "user,/api/v1/auth/oauth2/signup",
             "user,/api/v1/users/me",
             "wish,/api/v1/drops/{dropId}/wish"
     })
