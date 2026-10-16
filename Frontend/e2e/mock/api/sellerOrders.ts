@@ -1,4 +1,5 @@
 import type { Route } from '@playwright/test'
+import { FIXED_NOW } from './drop/fixtures'
 import { json } from './shared'
 
 type SellerOrderRow = {
@@ -15,8 +16,11 @@ type SellerOrderRow = {
   orderedAt: string
 }
 
+// 라우트 핸들러는 Node 프로세스에서 실행돼 page.clock의 영향을 받지 않는다.
+// 실제 시각을 쓰면 스냅샷 생성 시점과 검증 시점의 "오후 HH:MM" 분이 달라져
+// 시각 비교가 실행할 때마다 미세하게 깨진다. FIXED_NOW를 기준으로 고정한다.
 const hoursAgo = (hours: number) =>
-  new Date(Date.now() - hours * 3_600_000).toISOString()
+  new Date(FIXED_NOW.getTime() - hours * 3_600_000).toISOString()
 
 export const SELLER_ORDERS: SellerOrderRow[] = [
   {
