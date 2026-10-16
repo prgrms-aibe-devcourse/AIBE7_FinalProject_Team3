@@ -257,6 +257,7 @@ export interface components {
       sellerName?: string
       orderStatus?: string
       paymentStatus?: string
+      cancellationInProgress?: boolean
       /** Format: int64 */
       itemsAmount?: number
       /** Format: int64 */

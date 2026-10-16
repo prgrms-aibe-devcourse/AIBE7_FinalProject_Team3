@@ -224,14 +224,19 @@ class OrderRepositoryTest {
                 .extracting(SellerOrderListProjection::getPaymentStatus).isEqualTo("SUCCEEDED");
 
         // 결제 취소가 진행 중이어도 최신 결제 상태와 별도 필드로 확인할 수 있다.
-        jdbcTemplate.update("UPDATE orders SET cancel_idempotency_key = ? WHERE public_id = ?",
-                "cancel-" + UUID.randomUUID(), orderId);
+        jdbcTemplate.update("""
+                UPDATE orders
+                SET cancel_idempotency_key = ?, cancel_request_hash = repeat('c', 64), cancel_reason = '취소 요청'
+                WHERE public_id = ?
+                """, "cancel-" + UUID.randomUUID(), orderId);
         entityManager.clear();
         var canceling = orderRepository.findSellerOrders(
                 sellerId, sellerDropId, "PAID", "SUCCEEDED", PageRequest.of(0, 10));
         assertThat(canceling.getContent()).singleElement()
                 .extracting(SellerOrderListProjection::getCancellationInProgress).isEqualTo(true);
-        jdbcTemplate.update("UPDATE orders SET status = 'CANCELED' WHERE public_id = ?", orderId);
+        jdbcTemplate.update("""
+                UPDATE orders SET status = 'CANCELED', canceled_at = CURRENT_TIMESTAMP WHERE public_id = ?
+                """, orderId);
         entityManager.clear();
         var canceled = orderRepository.findSellerOrders(
                 sellerId, sellerDropId, "CANCELED", "SUCCEEDED", PageRequest.of(0, 10));

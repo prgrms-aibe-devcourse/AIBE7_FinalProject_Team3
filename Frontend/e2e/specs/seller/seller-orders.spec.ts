@@ -191,10 +191,10 @@ test('페이지를 이동하고 목록 조회 실패를 다시 시도한다', as
 
 test('취소 처리 중 주문은 배송 작업을 막는다', async ({ page }) => {
   await page.route('**/api/v1/seller/orders?*', async (route) => {
-    if (
-      new URL(route.request().url()).searchParams.get('orderStatus') !==
-      'PREPARING'
-    ) {
+    const status = new URL(route.request().url()).searchParams.get(
+      'orderStatus',
+    )
+    if (status !== 'PREPARING' && status !== 'PAID') {
       await route.fallback()
       return
     }
@@ -204,17 +204,26 @@ test('취소 처리 중 주문은 배송 작업을 막는다', async ({ page }) 
         data: {
           content: [
             {
-              orderId: 'e5a7c9db-4f6b-4d8e-9fa0-2b3c4d5e6f70',
-              orderNumber: 'ORD-20260917-000488',
-              dropId: 201,
-              productName: '뮤직 클럽 티셔츠 · 리미티드',
+              orderId:
+                status === 'PREPARING'
+                  ? 'e5a7c9db-4f6b-4d8e-9fa0-2b3c4d5e6f70'
+                  : 'c3e5a7b9-2d4f-4b6c-9d8e-0f1a2b3c4d5e',
+              orderNumber:
+                status === 'PREPARING'
+                  ? 'ORD-20260917-000488'
+                  : 'ORD-20260918-000501',
+              dropId: status === 'PREPARING' ? 201 : 202,
+              productName:
+                status === 'PREPARING'
+                  ? '뮤직 클럽 티셔츠 · 리미티드'
+                  : '슬로우 모닝 머그',
               sellerName: 'GR105테스트샵',
-              orderStatus: 'PREPARING',
+              orderStatus: status,
               paymentStatus: 'SUCCEEDED',
               cancellationInProgress: true,
-              itemsAmount: 129000,
+              itemsAmount: status === 'PREPARING' ? 129000 : 39000,
               shippingAmount: 3000,
-              totalAmount: 132000,
+              totalAmount: status === 'PREPARING' ? 132000 : 42000,
               orderedAt: '2026-09-17T12:00:00Z',
             },
           ],
@@ -235,6 +244,16 @@ test('취소 처리 중 주문은 배송 작업을 막는다', async ({ page }) 
   const order = row(page, 'ORD-20260917-000488')
   await expect(order.getByText('취소 확인 중')).toBeVisible()
   await expect(order.getByRole('button', { name: '송장 등록' })).toHaveCount(0)
+
+  await page
+    .getByRole('region', { name: '주문 필터' })
+    .getByRole('button', { name: '결제 완료' })
+    .click()
+  const paidOrder = row(page, 'ORD-20260918-000501')
+  await expect(paidOrder.getByText('취소 확인 중')).toBeVisible()
+  await expect(
+    paidOrder.getByRole('button', { name: '배송 준비' }),
+  ).toHaveCount(0)
 })
 
 test('주문 상세 조회 실패를 구분하고 다시 조회한다', async ({ page }) => {
