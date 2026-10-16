@@ -189,6 +189,54 @@ test('페이지를 이동하고 목록 조회 실패를 다시 시도한다', as
   await expect(row(page, 'ORD-20260918-000500')).toBeVisible()
 })
 
+test('취소 처리 중 주문은 배송 작업을 막는다', async ({ page }) => {
+  await page.route('**/api/v1/seller/orders?*', async (route) => {
+    if (
+      new URL(route.request().url()).searchParams.get('orderStatus') !==
+      'PREPARING'
+    ) {
+      await route.fallback()
+      return
+    }
+    await route.fulfill({
+      json: {
+        success: true,
+        data: {
+          content: [
+            {
+              orderId: 'e5a7c9db-4f6b-4d8e-9fa0-2b3c4d5e6f70',
+              orderNumber: 'ORD-20260917-000488',
+              dropId: 201,
+              productName: '뮤직 클럽 티셔츠 · 리미티드',
+              sellerName: 'GR105테스트샵',
+              orderStatus: 'PREPARING',
+              paymentStatus: 'SUCCEEDED',
+              cancellationInProgress: true,
+              itemsAmount: 129000,
+              shippingAmount: 3000,
+              totalAmount: 132000,
+              orderedAt: '2026-09-17T12:00:00Z',
+            },
+          ],
+          page: 0,
+          size: 2,
+          totalElements: 1,
+          totalPages: 1,
+          hasNext: false,
+        },
+      },
+    })
+  })
+  await page
+    .getByRole('region', { name: '주문 필터' })
+    .getByRole('button', { name: '배송 준비' })
+    .click()
+
+  const order = row(page, 'ORD-20260917-000488')
+  await expect(order.getByText('취소 확인 중')).toBeVisible()
+  await expect(order.getByRole('button', { name: '송장 등록' })).toHaveCount(0)
+})
+
 test('주문 상세 조회 실패를 구분하고 다시 조회한다', async ({ page }) => {
   let shouldFail = true
   await page.route('**/api/v1/seller/orders/*', (route) => {

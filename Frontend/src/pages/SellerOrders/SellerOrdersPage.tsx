@@ -270,12 +270,15 @@ export default function SellerOrdersPage({
                   <b>{won(order.totalAmount ?? 0)}</b>
                   <div className="order-action">
                     {order.orderStatus === 'PAID' &&
-                      (order.paymentStatus === 'UNKNOWN' ? (
+                      (order.paymentStatus === 'UNKNOWN' ||
+                      order.cancellationInProgress ? (
                         <span
                           className="urgent-tag"
                           title="결제 취소 결과가 확인되기 전에는 배송 준비로 전환할 수 없습니다."
                         >
-                          결제 확인 중
+                          {order.cancellationInProgress
+                            ? '취소 확인 중'
+                            : '결제 확인 중'}
                         </span>
                       ) : (
                         <button
@@ -288,12 +291,15 @@ export default function SellerOrdersPage({
                         </button>
                       ))}
                     {order.orderStatus === 'PREPARING' &&
-                      (order.paymentStatus === 'UNKNOWN' ? (
+                      (order.paymentStatus === 'UNKNOWN' ||
+                      order.cancellationInProgress ? (
                         <span
                           className="urgent-tag"
                           title="결제 취소 결과가 확인되기 전에는 발송할 수 없습니다."
                         >
-                          결제 확인 중
+                          {order.cancellationInProgress
+                            ? '취소 확인 중'
+                            : '결제 확인 중'}
                         </span>
                       ) : (
                         <button

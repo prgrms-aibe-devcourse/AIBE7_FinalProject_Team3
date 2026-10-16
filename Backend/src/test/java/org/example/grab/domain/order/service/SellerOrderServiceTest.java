@@ -399,7 +399,8 @@ class SellerOrderServiceTest {
     void passesFiltersAndPaginationToRepositoryAndReturnsPageMetadata() {
         // given
         var order = new SellerOrderListResponse(UUID.randomUUID(), "GR-1", 42L, "상품", "판매자",
-                "PAID", "SUCCEEDED", 1000, 2500, 3500, OffsetDateTime.parse("2026-09-23T12:00:00Z"));
+                "PAID", "SUCCEEDED", true, 1000, 2500, 3500,
+                OffsetDateTime.parse("2026-09-23T12:00:00Z"));
         var pageRequest = PageRequest.of(2, 10);
         when(orderRepository.existsDrop(42L)).thenReturn(true);
         when(orderRepository.ownsDrop(SELLER_ID, 42L)).thenReturn(true);
@@ -439,6 +440,7 @@ class SellerOrderServiceTest {
             @Override public String getSellerName() { return response.sellerName(); }
             @Override public String getOrderStatus() { return response.orderStatus(); }
             @Override public String getPaymentStatus() { return response.paymentStatus(); }
+            @Override public boolean getCancellationInProgress() { return response.cancellationInProgress(); }
             @Override public long getItemsAmount() { return response.itemsAmount(); }
             @Override public long getShippingAmount() { return response.shippingAmount(); }
             @Override public long getTotalAmount() { return response.totalAmount(); }

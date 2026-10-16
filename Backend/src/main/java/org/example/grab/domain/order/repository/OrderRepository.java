@@ -25,6 +25,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             SELECT o.public_id AS "orderId", o.order_number AS "orderNumber", o.drop_id AS "dropId",
                    o.product_name_snapshot AS "productName", o.seller_name_snapshot AS "sellerName",
                    o.status AS "orderStatus", payment.status AS "paymentStatus",
+                   o.status IN ('PAYMENT_PENDING', 'PAID', 'PREPARING')
+                       AND o.cancel_idempotency_key IS NOT NULL AS "cancellationInProgress",
                    o.items_amount AS "itemsAmount", o.shipping_amount AS "shippingAmount",
                    o.total_amount AS "totalAmount", o.created_at AS "orderedAt"
             FROM orders o

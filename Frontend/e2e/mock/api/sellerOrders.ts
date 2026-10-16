@@ -10,6 +10,7 @@ type SellerOrderRow = {
   sellerName: string
   orderStatus: string
   paymentStatus: string
+  cancellationInProgress: boolean
   itemsAmount: number
   shippingAmount: number
   totalAmount: number
@@ -31,6 +32,7 @@ const SELLER_ORDERS_FIXTURE: SellerOrderRow[] = [
     sellerName: 'GR105테스트샵',
     orderStatus: 'DELIVERED',
     paymentStatus: 'SUCCEEDED',
+    cancellationInProgress: false,
     itemsAmount: 129000,
     shippingAmount: 3000,
     totalAmount: 132000,
@@ -44,6 +46,7 @@ const SELLER_ORDERS_FIXTURE: SellerOrderRow[] = [
     sellerName: 'GR105테스트샵',
     orderStatus: 'SHIPPED',
     paymentStatus: 'SUCCEEDED',
+    cancellationInProgress: false,
     itemsAmount: 88000,
     shippingAmount: 3000,
     totalAmount: 91000,
@@ -57,6 +60,7 @@ const SELLER_ORDERS_FIXTURE: SellerOrderRow[] = [
     sellerName: 'GR105테스트샵',
     orderStatus: 'PREPARING',
     paymentStatus: 'UNKNOWN',
+    cancellationInProgress: false,
     itemsAmount: 60000,
     shippingAmount: 3000,
     totalAmount: 63000,
@@ -70,6 +74,7 @@ const SELLER_ORDERS_FIXTURE: SellerOrderRow[] = [
     sellerName: 'GR105테스트샵',
     orderStatus: 'PREPARING',
     paymentStatus: 'SUCCEEDED',
+    cancellationInProgress: false,
     itemsAmount: 129000,
     shippingAmount: 3000,
     totalAmount: 132000,
@@ -83,6 +88,7 @@ const SELLER_ORDERS_FIXTURE: SellerOrderRow[] = [
     sellerName: 'GR105테스트샵',
     orderStatus: 'PAID',
     paymentStatus: 'UNKNOWN',
+    cancellationInProgress: false,
     itemsAmount: 85000,
     shippingAmount: 3000,
     totalAmount: 88000,
@@ -96,6 +102,7 @@ const SELLER_ORDERS_FIXTURE: SellerOrderRow[] = [
     sellerName: 'GR105테스트샵',
     orderStatus: 'PAID',
     paymentStatus: 'SUCCEEDED',
+    cancellationInProgress: false,
     itemsAmount: 39000,
     shippingAmount: 3000,
     totalAmount: 42000,
@@ -109,6 +116,7 @@ const SELLER_ORDERS_FIXTURE: SellerOrderRow[] = [
     sellerName: 'GR105테스트샵',
     orderStatus: 'PAID',
     paymentStatus: 'SUCCEEDED',
+    cancellationInProgress: false,
     itemsAmount: 258000,
     shippingAmount: 3000,
     totalAmount: 261000,

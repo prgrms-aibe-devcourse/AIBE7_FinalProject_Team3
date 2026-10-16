@@ -161,7 +161,8 @@ public class SellerOrderService {
         return new SellerOrderListResponse(
                 projection.getOrderId(), projection.getOrderNumber(), projection.getDropId(),
                 projection.getProductName(), projection.getSellerName(), projection.getOrderStatus(),
-                projection.getPaymentStatus(), projection.getItemsAmount(), projection.getShippingAmount(),
+                projection.getPaymentStatus(), projection.getCancellationInProgress(),
+                projection.getItemsAmount(), projection.getShippingAmount(),
                 projection.getTotalAmount(), projection.getOrderedAt().atOffset(ZoneOffset.UTC));
     }
 }

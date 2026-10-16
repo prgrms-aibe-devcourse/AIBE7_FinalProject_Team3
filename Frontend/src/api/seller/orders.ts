@@ -1,11 +1,22 @@
 import { api } from '../client'
-import type { paths } from '../schema/order'
+import type { components, paths } from '../schema/order'
 
 export type SellerOrdersQuery = NonNullable<
   paths['/api/v1/seller/orders']['get']['parameters']['query']
 >
-type SellerOrdersResponse =
-  paths['/api/v1/seller/orders']['get']['responses'][200]['content']['*/*']
+type SellerOrdersResponse = Omit<
+  paths['/api/v1/seller/orders']['get']['responses'][200]['content']['*/*'],
+  'data'
+> & {
+  data?: Omit<
+    components['schemas']['PageResponseSellerOrderListResponse'],
+    'content'
+  > & {
+    content?: (components['schemas']['SellerOrderListResponse'] & {
+      cancellationInProgress?: boolean
+    })[]
+  }
+}
 type SellerOrderDetailResponse =
   paths['/api/v1/seller/orders/{orderId}']['get']['responses'][200]['content']['*/*']
 type OrderStatusResponse =
