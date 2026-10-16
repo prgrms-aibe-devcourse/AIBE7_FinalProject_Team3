@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Optional;
 
 /*
-    결제 배치의 한 주기(GR-65·GR-87, ERD.md 3.2). 진행 중 결제 정리 → 결제 대기 만료 → 결제 취소 재요청 순서로 실행한다.
+    결제 배치의 한 주기(GR-65·GR-87·GR-88, ERD.md 3.2). 진행 중 결제 정리 → 결제 대기 만료 → 결제 취소 재요청 → 보정 환불 순서로 실행한다.
     이 클래스는 트랜잭션을 열지 않는다. 건별 처리는 다른 서비스의 별도 트랜잭션에서 하고, PG 호출은 그 사이 트랜잭션 밖에서 한다.
     한 건의 실패가 나머지 건을 막지 않도록 건 단위로 예외를 격리하고, 한 단계의 실패가 다음 단계를 막지 않도록 단계도 격리한다.
  */
@@ -40,13 +40,18 @@ public class PaymentBatchService {
     static final Duration CANCEL_RETRY_TIME_BUDGET = Duration.ofSeconds(5);
     // 생성 후 이만큼 지나도 진행 중인 취소는 운영자가 확인하도록 경고한다.
     static final Duration CANCEL_IN_PROGRESS_WARNING_AFTER = Duration.ofMinutes(10);
+    // 보정 환불: 주기당 기록 생성·선점 건수 상한과 환불 요청의 시간 예산. 기록 생성은 PG를 부르지 않아 예산에 넣지 않는다.
+    static final int COMPENSATION_BATCH_SIZE = 50;
+    static final Duration COMPENSATION_TIME_BUDGET = Duration.ofSeconds(5);
 
     private final PaymentTransactionService transactionService; // 정리 대상 선점, 값 조회, 결과 반영을 각각 트랜잭션에서 처리
     private final PaymentService paymentService; // PG 조회 및 승인 재요청 흐름을 처리
     private final OrderPaymentService orderPaymentService; // 만료 후보 조회와 주문별 만료를 처리
     private final OrderCancelTransactionService cancelTransactionService; // 취소 재요청 대상 선점과 값 조회
     private final OrderCancelService orderCancelService; // PG 취소 재요청과 결과 반영
-    private final Clock clock; // 정리·취소 재요청 시간 예산의 경과 시간을 잰다
+    private final CompensationRefundTransactionService compensationTransactionService; // 보정 환불 기록 생성·선점과 값 조회
+    private final CompensationRefundService compensationRefundService; // 보정 환불의 PG 조회·취소와 결과 반영
+    private final Clock clock; // 정리·취소 재요청·보정 환불 시간 예산의 경과 시간을 잰다
 
     @Autowired
     public PaymentBatchService(
@@ -54,10 +59,12 @@ public class PaymentBatchService {
             PaymentService paymentService,
             OrderPaymentService orderPaymentService,
             OrderCancelTransactionService cancelTransactionService,
-            OrderCancelService orderCancelService
+            OrderCancelService orderCancelService,
+            CompensationRefundTransactionService compensationTransactionService,
+            CompensationRefundService compensationRefundService
     ) {
         this(transactionService, paymentService, orderPaymentService, cancelTransactionService, orderCancelService,
-                Clock.systemUTC());
+                compensationTransactionService, compensationRefundService, Clock.systemUTC());
     }
 
     PaymentBatchService(
@@ -66,6 +73,8 @@ public class PaymentBatchService {
             OrderPaymentService orderPaymentService,
             OrderCancelTransactionService cancelTransactionService,
             OrderCancelService orderCancelService,
+            CompensationRefundTransactionService compensationTransactionService,
+            CompensationRefundService compensationRefundService,
             Clock clock
     ) {
         this.transactionService = transactionService;
@@ -73,13 +82,16 @@ public class PaymentBatchService {
         this.orderPaymentService = orderPaymentService;
         this.cancelTransactionService = cancelTransactionService;
         this.orderCancelService = orderCancelService;
+        this.compensationTransactionService = compensationTransactionService;
+        this.compensationRefundService = compensationRefundService;
         this.clock = clock;
     }
 
     /**
      * 한 주기를 실행한다. 정리를 만료보다 먼저 해, 마감 전에 승인된 결제를 먼저 주문 PAID로 반영한다.
      * 그러지 않으면 만료된 뒤 결제 SUCCEEDED·보정 REQUIRED로 남는다.
-     * 취소 재요청은 만료 뒤에 두어 PG 지연이 재고 반환을 늦추지 않게 한다. 앞 단계가 실패해도 다음 단계는 실행한다.
+     * 취소 재요청·보정 환불은 만료 뒤에 두어 PG 지연이 재고 반환을 늦추지 않게 한다. 앞 단계가 실패해도 다음 단계는 실행한다.
+     * 보정 환불을 마지막에 두어, 정리 단계에서 같은 주기에 보정 대상이 된 결제도 바로 환불한다.
      */
     public void run(OffsetDateTime now) {
         try {
@@ -96,6 +108,11 @@ public class PaymentBatchService {
             retryCancellations(now);
         } catch (Exception e) {
             log.error("결제 취소 재요청 실행 실패", e);
+        }
+        try {
+            refundCompensations(now);
+        } catch (Exception e) {
+            log.error("보정 환불 실행 실패", e);
         }
     }
 
@@ -299,6 +316,108 @@ public class PaymentBatchService {
         // 결과를 몰라 UNKNOWN으로 남았다
         UNSETTLED,
         // 선점한 뒤 다른 요청이 먼저 확정했다
+        ALREADY_SETTLED,
+        // 예외로 처리하지 못했다
+        FAILED
+    }
+
+    // ===== 보정 환불 =====
+
+    /**
+     * 주문을 확정하지 못한 승인(SUCCEEDED, 보정 REQUIRED)을 PG 결제 취소로 환불한다(GR-88, ERD.md 3.3).
+     * 기록 생성 → 환불 요청 순서로 실행해, 방금 만든 기록도 같은 주기에 환불을 요청한다. 성공·거절·주문번호 불일치로 확정한 수를 반환한다.
+     * 기록 생성이 실패해도 이미 있는 기록의 환불 요청은 실행한다.
+     */
+    int refundCompensations(OffsetDateTime now) {
+        try {
+            int created = compensationTransactionService.createRefunds(now, COMPENSATION_BATCH_SIZE);
+            if (created > 0) {
+                log.info("보정 환불 기록 생성: {}건", created);
+            }
+        } catch (Exception e) {
+            log.error("보정 환불 기록 생성 실패", e);
+        }
+        return requestCompensationRefunds(now);
+    }
+
+    // 시간 예산을 넘기면 남은 선점 기록은 처리하지 않는다. 선점 때 next_retry_at이 바뀌었으므로 1분 뒤 다시 선점된다.
+    private int requestCompensationRefunds(OffsetDateTime now) {
+        Instant deadline = clock.instant().plus(COMPENSATION_TIME_BUDGET);
+        List<Long> cancellationIds = compensationTransactionService.claimRefunds(now, COMPENSATION_BATCH_SIZE);
+        int succeeded = 0;
+        int rejected = 0;
+        int mismatched = 0;
+        int unsettled = 0;
+        int alreadySettled = 0;
+        int failed = 0;
+        int deferred = 0;
+        for (int i = 0; i < cancellationIds.size(); i++) {
+            if (clock.instant().isAfter(deadline)) {
+                deferred = cancellationIds.size() - i;
+                break;
+            }
+            switch (refundOne(cancellationIds.get(i), now)) {
+                case SUCCEEDED -> succeeded++;
+                case REJECTED -> rejected++;
+                case ORDER_MISMATCH -> mismatched++;
+                case UNSETTLED -> unsettled++;
+                case ALREADY_SETTLED -> alreadySettled++;
+                case FAILED -> failed++;
+            }
+        }
+        if (deferred > 0) {
+            log.warn("보정 환불이 시간 예산({}초)을 넘겨 {}건을 다음으로 넘김. PG 지연을 확인하세요.",
+                    COMPENSATION_TIME_BUDGET.toSeconds(), deferred);
+        }
+        if (!cancellationIds.isEmpty()) {
+            log.info("보정 환불: 성공 {}건, 거절 {}건, 주문번호 불일치 {}건, 미확정 {}건, 이미 확정 {}건, 실패 {}건, 넘김 {}건",
+                    succeeded, rejected, mismatched, unsettled, alreadySettled, failed, deferred);
+        }
+        return succeeded + rejected + mismatched;
+    }
+
+    // 실패한 기록은 next_retry_at이 선점 때 바뀌어 있으므로 1분 뒤 다시 선점된다.
+    private CompensationOutcome refundOne(Long cancellationId, OffsetDateTime now) {
+        try {
+            Optional<CompensationRefundTransactionService.RefundTarget> target =
+                    compensationTransactionService.findRefundTarget(cancellationId);
+            if (target.isEmpty()) {
+                // 선점한 뒤 다른 인스턴스가 먼저 결과를 확정했다.
+                return CompensationOutcome.ALREADY_SETTLED;
+            }
+            warnIfLongCompensating(target.get(), now);
+            return switch (compensationRefundService.refund(target.get())) {
+                case SUCCEEDED -> CompensationOutcome.SUCCEEDED;
+                case REJECTED -> CompensationOutcome.REJECTED;
+                case ORDER_MISMATCH -> CompensationOutcome.ORDER_MISMATCH;
+                case UNSETTLED -> CompensationOutcome.UNSETTLED;
+            };
+        } catch (Exception e) {
+            log.error("보정 환불 실패: cancellationId={}", cancellationId, e);
+            return CompensationOutcome.FAILED;
+        }
+    }
+
+    private void warnIfLongCompensating(CompensationRefundTransactionService.RefundTarget target, OffsetDateTime now) {
+        if (target.createdAt() == null) {
+            return;
+        }
+        if (!target.createdAt().plus(CANCEL_IN_PROGRESS_WARNING_AFTER).isAfter(now)) {
+            log.warn("생성 후 {}분이 지나도 보정 환불 결과를 확정하지 못함: cancellationId={}, createdAt={}",
+                    CANCEL_IN_PROGRESS_WARNING_AFTER.toMinutes(), target.cancellationId(), target.createdAt());
+        }
+    }
+
+    private enum CompensationOutcome {
+        // 환불 성공으로 확정했다
+        SUCCEEDED,
+        // PG가 취소를 거절해 FAILED로 확정했다
+        REJECTED,
+        // PG 결제의 주문번호가 서버 주문과 달라 환불하지 않고 FAILED로 확정했다
+        ORDER_MISMATCH,
+        // 결과를 몰라 진행 중으로 남았다
+        UNSETTLED,
+        // 선점한 뒤 다른 인스턴스가 먼저 확정했다
         ALREADY_SETTLED,
         // 예외로 처리하지 못했다
         FAILED

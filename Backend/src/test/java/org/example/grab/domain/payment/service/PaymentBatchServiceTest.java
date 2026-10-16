@@ -63,6 +63,12 @@ class PaymentBatchServiceTest {
     @Mock
     private OrderCancelService orderCancelService;
 
+    @Mock
+    private CompensationRefundTransactionService compensationTransactionService;
+
+    @Mock
+    private CompensationRefundService compensationRefundService;
+
     private StepClock clock;
     private PaymentBatchService batchService;
 
@@ -70,7 +76,8 @@ class PaymentBatchServiceTest {
     void setUp() {
         clock = new StepClock(NOW.toInstant());
         batchService = new PaymentBatchService(transactionService, paymentService, orderPaymentService,
-                cancelTransactionService, orderCancelService, clock);
+                cancelTransactionService, orderCancelService, compensationTransactionService,
+                compensationRefundService, clock);
     }
 
     @Nested
@@ -78,17 +85,22 @@ class PaymentBatchServiceTest {
     class Run {
 
         @Test
-        @DisplayName("진행 중 결제 정리 → 만료 → 취소 재요청 순서로 같은 now로 실행한다")
+        @DisplayName("진행 중 결제 정리 → 만료 → 취소 재요청 → 보정 환불 순서로 같은 now로 실행한다")
         void runsStepsInOrder() {
             // when
             batchService.run(NOW);
 
             // then
-            InOrder order = inOrder(transactionService, orderPaymentService, cancelTransactionService);
+            InOrder order = inOrder(transactionService, orderPaymentService, cancelTransactionService,
+                    compensationTransactionService);
             order.verify(transactionService).claimInProgress(NOW, PaymentBatchService.CLEANUP_BATCH_SIZE);
             order.verify(orderPaymentService)
                     .findPaymentExpiryCandidates(NOW, null, PaymentBatchService.EXPIRY_BATCH_SIZE);
             order.verify(cancelTransactionService).claimRetries(NOW, PaymentBatchService.CANCEL_RETRY_BATCH_SIZE);
+            order.verify(compensationTransactionService)
+                    .createRefunds(NOW, PaymentBatchService.COMPENSATION_BATCH_SIZE);
+            order.verify(compensationTransactionService)
+                    .claimRefunds(NOW, PaymentBatchService.COMPENSATION_BATCH_SIZE);
         }
 
         @Test
@@ -101,12 +113,16 @@ class PaymentBatchServiceTest {
                     .willThrow(new RuntimeException("일시적 DB 오류"));
             given(cancelTransactionService.claimRetries(any(), anyInt()))
                     .willThrow(new RuntimeException("일시적 DB 오류"));
+            given(compensationTransactionService.claimRefunds(any(), anyInt()))
+                    .willThrow(new RuntimeException("일시적 DB 오류"));
 
             // when & then
             assertThatCode(() -> batchService.run(NOW)).doesNotThrowAnyException();
             then(orderPaymentService).should()
                     .findPaymentExpiryCandidates(NOW, null, PaymentBatchService.EXPIRY_BATCH_SIZE);
             then(cancelTransactionService).should().claimRetries(NOW, PaymentBatchService.CANCEL_RETRY_BATCH_SIZE);
+            then(compensationTransactionService).should()
+                    .claimRefunds(NOW, PaymentBatchService.COMPENSATION_BATCH_SIZE);
         }
     }
 
@@ -363,6 +379,115 @@ class PaymentBatchServiceTest {
             given(cancelTransactionService.findRetryTarget(cancellationId)).willReturn(Optional.of(target));
             given(orderCancelService.retry(target)).willReturn(outcome);
         }
+    }
+
+    @Nested
+    @DisplayName("보정 환불")
+    class RefundCompensations {
+
+        @Test
+        @DisplayName("기록을 만든 뒤 선점한 기록의 환불을 요청하고, 성공·거절·주문번호 불일치로 확정한 수를 돌려준다")
+        void createsThenRefundsAndCountsDecided() {
+            // given
+            given(compensationTransactionService.claimRefunds(NOW, PaymentBatchService.COMPENSATION_BATCH_SIZE))
+                    .willReturn(List.of(1L, 2L, 3L, 4L));
+            givenRefund(1L, CompensationRefundService.RefundOutcome.SUCCEEDED);
+            givenRefund(2L, CompensationRefundService.RefundOutcome.REJECTED);
+            givenRefund(3L, CompensationRefundService.RefundOutcome.ORDER_MISMATCH);
+            givenRefund(4L, CompensationRefundService.RefundOutcome.UNSETTLED);
+
+            // when
+            int decided = batchService.refundCompensations(NOW);
+
+            // then
+            assertThat(decided).isEqualTo(3);
+            InOrder order = inOrder(compensationTransactionService);
+            order.verify(compensationTransactionService)
+                    .createRefunds(NOW, PaymentBatchService.COMPENSATION_BATCH_SIZE);
+            order.verify(compensationTransactionService)
+                    .claimRefunds(NOW, PaymentBatchService.COMPENSATION_BATCH_SIZE);
+        }
+
+        @Test
+        @DisplayName("기록 생성이 실패해도 이미 있는 기록의 환불을 요청한다")
+        void refundsEvenIfCreationFails() {
+            // given
+            given(compensationTransactionService.createRefunds(any(), anyInt()))
+                    .willThrow(new RuntimeException("일시적 DB 오류"));
+            given(compensationTransactionService.claimRefunds(NOW, PaymentBatchService.COMPENSATION_BATCH_SIZE))
+                    .willReturn(List.of(1L));
+            givenRefund(1L, CompensationRefundService.RefundOutcome.SUCCEEDED);
+
+            // when
+            int decided = batchService.refundCompensations(NOW);
+
+            // then
+            assertThat(decided).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("한 기록의 환불이 실패해도 나머지 기록을 계속 처리한다")
+        void isolatesFailurePerCancellation() {
+            // given
+            given(compensationTransactionService.claimRefunds(NOW, PaymentBatchService.COMPENSATION_BATCH_SIZE))
+                    .willReturn(List.of(1L, 2L));
+            given(compensationTransactionService.findRefundTarget(1L))
+                    .willThrow(new RuntimeException("일시적 DB 오류"));
+            givenRefund(2L, CompensationRefundService.RefundOutcome.SUCCEEDED);
+
+            // when
+            int decided = batchService.refundCompensations(NOW);
+
+            // then
+            assertThat(decided).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("시간 예산을 넘기면 남은 선점 기록은 처리하지 않고 넘긴다")
+        void defersRemainingAfterTimeBudget() {
+            // given: 첫 기록의 PG 처리가 예산보다 오래 걸린다
+            given(compensationTransactionService.claimRefunds(NOW, PaymentBatchService.COMPENSATION_BATCH_SIZE))
+                    .willReturn(List.of(1L, 2L));
+            CompensationRefundTransactionService.RefundTarget first = refundTarget(1L);
+            given(compensationTransactionService.findRefundTarget(1L)).willReturn(Optional.of(first));
+            given(compensationRefundService.refund(first)).willAnswer(invocation -> {
+                clock.advance(PaymentBatchService.COMPENSATION_TIME_BUDGET.plusSeconds(1));
+                return CompensationRefundService.RefundOutcome.UNSETTLED;
+            });
+
+            // when
+            batchService.refundCompensations(NOW);
+
+            // then
+            then(compensationTransactionService).should(never()).findRefundTarget(2L);
+        }
+
+        @Test
+        @DisplayName("선점한 뒤 다른 인스턴스가 먼저 결과를 확정했으면 PG를 호출하지 않는다")
+        void skipsAlreadySettled() {
+            // given
+            given(compensationTransactionService.claimRefunds(NOW, PaymentBatchService.COMPENSATION_BATCH_SIZE))
+                    .willReturn(List.of(1L));
+            given(compensationTransactionService.findRefundTarget(1L)).willReturn(Optional.empty());
+
+            // when
+            int decided = batchService.refundCompensations(NOW);
+
+            // then
+            assertThat(decided).isZero();
+            then(compensationRefundService).should(never()).refund(any());
+        }
+
+        private void givenRefund(Long cancellationId, CompensationRefundService.RefundOutcome outcome) {
+            CompensationRefundTransactionService.RefundTarget target = refundTarget(cancellationId);
+            given(compensationTransactionService.findRefundTarget(cancellationId)).willReturn(Optional.of(target));
+            given(compensationRefundService.refund(target)).willReturn(outcome);
+        }
+    }
+
+    private static CompensationRefundTransactionService.RefundTarget refundTarget(Long cancellationId) {
+        return new CompensationRefundTransactionService.RefundTarget(cancellationId, NOW.minusMinutes(2), "ORD-1",
+                new PaymentCancelCommand("payment-key", "환불", "server-key-" + cancellationId));
     }
 
     private static OrderCancelTransactionService.CancelRetryTarget retryTarget(Long cancellationId) {

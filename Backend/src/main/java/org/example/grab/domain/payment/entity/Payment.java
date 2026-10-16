@@ -167,6 +167,21 @@ public class Payment extends UUIDEntity {
         this.canceledAt = Objects.requireNonNull(canceledAt);
     }
 
+    // 주문을 확정하지 못한 승인(SUCCEEDED, 보정 REQUIRED). 보정 환불 배치의 대상이다(GR-88, ERD.md 3.3).
+    public boolean requiresCompensation() {
+        return status == PaymentStatus.SUCCEEDED && reconciliationStatus == ReconciliationStatus.REQUIRED;
+    }
+
+    // 주문을 확정하지 못한 승인을 PG가 전액 취소해 환불했다. 보정이 끝났으므로 RESOLVED로 바꾼다(GR-88).
+    public void cancelForCompensation(OffsetDateTime canceledAt) {
+        if (!requiresCompensation()) {
+            throw new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION);
+        }
+        this.status = PaymentStatus.CANCELED;
+        this.canceledAt = Objects.requireNonNull(canceledAt);
+        this.reconciliationStatus = ReconciliationStatus.RESOLVED;
+    }
+
     // UNKNOWN을 PG 조회로 확정하면 보정이 끝난 것이므로 RESOLVED로 바꾼다.
     private void resolve(PaymentStatus resolvedStatus) {
         requireInProgress();

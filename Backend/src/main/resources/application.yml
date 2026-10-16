@@ -61,7 +61,7 @@ grab:
   drop-transition:
     enabled: ${GRAB_DROP_TRANSITION_ENABLED:true}
     fixed-delay: 10s
-  # 결제 배치(GR-65·GR-87). 끄면 마감이 지난 주문의 재고가 반환되지 않고, 결과를 모르는 결제 취소도 다시 요청하지 않는다.
+  # 결제 배치(GR-65·GR-87·GR-88). 끄면 마감이 지난 주문의 재고가 반환되지 않고, 결과를 모르는 결제 취소와 주문을 확정하지 못한 결제의 환불도 요청하지 않는다.
   payment-batch:
     enabled: ${GRAB_PAYMENT_BATCH_ENABLED:true}
     fixed-delay: 10s

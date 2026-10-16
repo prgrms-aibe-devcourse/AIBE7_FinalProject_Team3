@@ -63,4 +63,29 @@ public interface PaymentCancellationRepository extends JpaRepository<PaymentCanc
             @Param("now") OffsetDateTime now,
             @Param("nextRetryAt") OffsetDateTime nextRetryAt,
             @Param("limit") int limit);
+
+    /*
+        보정 환불 배치의 환불 요청 대상을 선점한다(GR-88, ERD.md 3.3). 방식은 claimOrderCancelRetries와 같고 purpose만 다르다.
+        UPDATE ... RETURNING이라 결과를 읽어야 하므로 @Modifying 없이 조회로 실행한다. 호출하는 쪽의 트랜잭션이 필요하다.
+     */
+    @Query(value = """
+            WITH claimed AS (
+                SELECT id FROM payment_cancellations
+                WHERE purpose = 'LATE_APPROVAL_COMPENSATION'
+                  AND status IN ('REQUESTED', 'UNKNOWN')
+                  AND next_retry_at <= :now
+                ORDER BY next_retry_at, id
+                LIMIT :limit
+                FOR UPDATE SKIP LOCKED
+            )
+            UPDATE payment_cancellations c
+            SET next_retry_at = :nextRetryAt
+            FROM claimed
+            WHERE c.id = claimed.id
+            RETURNING c.id
+            """, nativeQuery = true)
+    List<Long> claimCompensationRefunds(
+            @Param("now") OffsetDateTime now,
+            @Param("nextRetryAt") OffsetDateTime nextRetryAt,
+            @Param("limit") int limit);
 }
