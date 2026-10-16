@@ -18,6 +18,13 @@ services:
       EMAIL_VERIFICATION_SECRET: ${EMAIL_VERIFICATION_SECRET}
       # JWT_SECRET과 같이 기본값을 두지 않는다. .env에 없으면 판매자 서류 봉투 암호화(GR-91)를 쓰는 시점에 기동에 실패한다
       SELLER_DOCUMENT_ENCRYPTION_MASTER_KEY: ${SELLER_DOCUMENT_ENCRYPTION_MASTER_KEY}
+      # KAKAO·GOOGLE 소셜 로그인(GR-46). 기본값을 두지 않는다. .env에 없으면 backend가 기동에 실패한다
+      KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID}
+      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      # 소셜 로그인 결과를 받을 프론트엔드 콜백 주소. 사용자의 브라우저가 여는 주소라 외부에서 닿는 값을 넣는다
+      OAUTH2_FRONTEND_CALLBACK_URL: ${OAUTH2_FRONTEND_CALLBACK_URL:-http://localhost:5173/#/auth/callback}
       # Supabase Storage(GR-51 이미지, GR-91 서류) 연동 설정. 비워 두면 업로드·다운로드 시 EXTERNAL_SERVICE_ERROR로 거부된다
       SUPABASE_URL: ${SUPABASE_URL:-}
       SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY:-}

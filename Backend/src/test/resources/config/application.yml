@@ -6,6 +6,15 @@ grab:
       # 테스트 전용 JWT 서명 키. 운영·개발 환경에서 절대 사용하지 않는다.
       # 디코딩하면 "grab-test-only-jwt-secret-not-for-production"(44바이트)이다.
       secret: Z3JhYi10ZXN0LW9ubHktand0LXNlY3JldC1ub3QtZm9yLXByb2R1Y3Rpb24=
+    # 테스트 전용 소셜 로그인 클라이언트 값(GR-46). 실제 제공자에 등록된 값이 아니며 제공자 응답은 테스트에서 대역한다
+    oauth2:
+      frontend-callback-url: http://localhost:5173/#/auth/callback
+      kakao:
+        client-id: test-kakao-client-id
+        client-secret: test-kakao-client-secret
+      google:
+        client-id: test-google-client-id
+        client-secret: test-google-client-secret
     email-verification:
       # 테스트 전용 이메일 인증 HMAC 키. 운영·개발 환경에서 절대 사용하지 않는다.
       # 디코딩하면 "grab-test-only-email-verification-secret"(40바이트)이다.
