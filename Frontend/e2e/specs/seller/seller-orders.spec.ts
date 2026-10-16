@@ -50,10 +50,9 @@ test('PAID·PREPARING 버튼은 조건대로 나오고 클릭하면 안내만 �
 })
 
 test('상태·결제·DROP 필터와 페이지를 URL에서 복원한다', async ({ page }) => {
-  const dropFilter = page.getByLabel('DROP 필터')
-  await dropFilter.fill('201')
-  await dropFilter.press('Tab')
-  await expect(page).toHaveURL(/dropId=201/)
+  // dropId는 DROP 상세 등에서 링크로만 전달된다(사용자가 직접 입력하지 않는다)
+  await page.goto('/#/seller/orders?dropId=201')
+  await expect(page.getByText('DROP #201 주문')).toBeVisible()
   await page
     .getByRole('region', { name: '주문 필터' })
     .getByRole('button', { name: '배송 준비' })
@@ -66,7 +65,7 @@ test('상태·결제·DROP 필터와 페이지를 URL에서 복원한다', async
   await expect(page.getByLabel('결제 상태 필터')).toHaveValue('')
   await expect(row(page, 'ORD-20260917-000488')).toBeVisible()
   await page.reload()
-  await expect(page.getByLabel('DROP 필터')).toHaveValue('201')
+  await expect(page.getByText('DROP #201 주문')).toBeVisible()
   await expect(row(page, 'ORD-20260917-000488')).toBeVisible()
 })
 

@@ -56,10 +56,7 @@ export default function SellerOrdersPage({
   const selectedStatus = result?.orderStatus ?? 'PAID'
   const orders = listQuery.data?.content ?? []
 
-  const setFilter = (
-    key: 'orderStatus' | 'paymentStatus' | 'dropId',
-    value: string,
-  ) => {
+  const setFilter = (key: 'orderStatus' | 'paymentStatus', value: string) => {
     setParams(changeSellerOrderParams(params, key, value))
     setOpenId(null)
   }
@@ -120,17 +117,6 @@ export default function SellerOrdersPage({
           ))}
         </div>
         <div className="seller-order-selects">
-          <label>
-            DROP 필터
-            <input
-              key={dropId}
-              type="number"
-              min="1"
-              placeholder="전체 DROP"
-              defaultValue={dropId}
-              onBlur={(event) => setFilter('dropId', event.target.value)}
-            />
-          </label>
           <label>
             결제 상태 필터
             <select
