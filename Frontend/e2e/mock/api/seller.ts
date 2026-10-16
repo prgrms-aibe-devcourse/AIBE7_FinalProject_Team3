@@ -42,7 +42,11 @@ export async function handleSellerDashboardRoute(
     return true
   }
   if (url.pathname === '/api/v1/seller/dashboard/upcoming-drops') {
-    await json(route, { success: true, data: UPCOMING })
+    const eventType = url.searchParams.get('eventType')
+    await json(route, {
+      success: true,
+      data: eventType === 'END' ? [] : UPCOMING,
+    })
     return true
   }
   return false
