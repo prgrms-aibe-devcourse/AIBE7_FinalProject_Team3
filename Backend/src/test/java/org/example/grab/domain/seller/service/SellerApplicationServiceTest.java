@@ -255,6 +255,20 @@ class SellerApplicationServiceTest {
 
         assertThat(response.brandName()).isEqualTo("길동상점");
         assertThat(response.status()).isEqualTo(SellerStatus.PENDING);
+        assertThat(response.rejectedReason()).isNull();
+    }
+
+    @Test
+    @DisplayName("반려된 신청을 조회하면 반려 사유가 함께 내려온다")
+    void findsMyApplicationIncludesRejectedReason() {
+        Seller seller = Seller.apply(USER_ID, "길동상점", "seller@example.com", BRN, "설명", now());
+        seller.reject(99L, now(), "서류 미비");
+        given(sellerRepository.findByUserId(USER_ID)).willReturn(Optional.of(seller));
+
+        MySellerApplicationResponse response = service.findMyApplication(USER_ID);
+
+        assertThat(response.status()).isEqualTo(SellerStatus.REJECTED);
+        assertThat(response.rejectedReason()).isEqualTo("서류 미비");
     }
 
     private static SellerDocument usableDocument(UUID id, Long uploadedBy, DocumentType documentType) {

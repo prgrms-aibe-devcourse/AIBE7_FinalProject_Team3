@@ -97,7 +97,8 @@ public class SellerApplicationService {
         Seller seller = sellerRepository.findByUserId(userId)
                 .orElseThrow(() -> new BusinessException(SellerErrorCode.SELLER_APPLICATION_NOT_FOUND));
         return new MySellerApplicationResponse(seller.getUuid(), seller.getBrandName(), seller.getContactEmail(),
-                seller.getBusinessRegistrationNumber(), seller.getDescription(), seller.getStatus(), seller.getSubmittedAt());
+                seller.getBusinessRegistrationNumber(), seller.getDescription(), seller.getStatus(),
+                seller.getSubmittedAt(), seller.getRejectionReason());
     }
 
     /*
