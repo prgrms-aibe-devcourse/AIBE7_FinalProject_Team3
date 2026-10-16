@@ -36,7 +36,7 @@ import static org.awaitility.Awaitility.await;
 @Testcontainers
 class EmailSignupContextRepositoryIntegrationTest {
 
-    // EmailSignupTokenGenerator가 만드는 형식(43자 Base64URL)의 테스트 값
+    // SignupTokenGenerator가 만드는 형식(43자 Base64URL)의 테스트 값
     private static final String TOKEN = "Xk3_vQ9aT1mZ0bR7cY2wL5nP8sD4fH6jK1gE3uA9qWo";
     private static final String OTHER_TOKEN = "Qp7_mR2bW9xN4cT1vY8zL3kH6sD0fJ5gA2eU7iO4nBt";
     private static final String EMAIL = "user@example.com";

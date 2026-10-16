@@ -8,7 +8,7 @@ import org.example.grab.domain.user.repository.EmailSignupContextRepository;
 import org.example.grab.domain.user.repository.EmailVerificationCodeRepository;
 import org.example.grab.domain.user.repository.EmailVerificationSendLimitRepository;
 import org.example.grab.domain.user.repository.UserRepository;
-import org.example.grab.domain.user.support.EmailSignupTokenGenerator;
+import org.example.grab.domain.user.support.SignupTokenGenerator;
 import org.example.grab.domain.user.support.EmailVerificationCodeGenerator;
 import org.example.grab.domain.user.support.EmailVerificationHasher;
 import org.example.grab.domain.user.support.EmailVerificationMailFactory;
@@ -36,7 +36,7 @@ public class EmailVerificationService {
     private final AsyncEmailDispatcher emailDispatcher;
     private final EmailVerificationHasher hasher;
     private final UserRepository userRepository;
-    private final EmailSignupTokenGenerator signupTokenGenerator;
+    private final SignupTokenGenerator signupTokenGenerator;
     private final EmailSignupContextRepository signupContextRepository;
 
     /*

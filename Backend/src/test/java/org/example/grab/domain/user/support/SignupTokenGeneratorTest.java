@@ -9,10 +9,10 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// GR-61 M02-03: 가입 컨텍스트 토큰 원문은 43자 Base64URL이고, 생성할 때마다 다르다
-class EmailSignupTokenGeneratorTest {
+// GR-61 M02-03: 가입 컨텍스트 토큰 원문은 43자 Base64URL이고, 생성할 때마다 다르다(LOCAL·소셜 가입 공용, GR-46)
+class SignupTokenGeneratorTest {
 
-    private final EmailSignupTokenGenerator generator = new EmailSignupTokenGenerator();
+    private final SignupTokenGenerator generator = new SignupTokenGenerator();
 
     @Test
     @DisplayName("원문은 패딩 없는 Base64URL 문자로만 된 43자이고, 디코딩하면 32바이트다")
