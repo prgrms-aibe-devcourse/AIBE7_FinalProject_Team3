@@ -28,6 +28,8 @@ public enum UserErrorCode implements ErrorCode {
     OAUTH2_EMAIL_REQUIRED(HttpStatus.BAD_REQUEST, "소셜 계정의 검증된 이메일이 필요합니다."),
     // 같은 이메일의 다른 가입 방식 계정을 자동으로 연결하지 않는다(AUTH-008). 콜백에서는 error 쿼리로만 전달된다
     ACCOUNT_LINK_REQUIRED(HttpStatus.CONFLICT, "같은 이메일로 가입된 다른 계정이 있습니다."),
+    // 만료·없음·재사용·조작을 구분하지 않는다(GR-46 M00-06, EMAIL_SIGNUP_CONTEXT_INVALID와 같은 이유)
+    OAUTH2_SIGNUP_CONTEXT_INVALID(HttpStatus.UNAUTHORIZED, "소셜 가입 컨텍스트가 유효하지 않습니다."),
     EMAIL_VERIFICATION_ATTEMPTS_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "이메일 인증 코드 확인 시도 횟수를 초과했습니다."),
     EMAIL_VERIFICATION_RESEND_TOO_SOON(HttpStatus.TOO_MANY_REQUESTS, "이메일 인증 코드를 다시 요청할 수 없습니다. 잠시 후 다시 시도해 주세요.");
 
