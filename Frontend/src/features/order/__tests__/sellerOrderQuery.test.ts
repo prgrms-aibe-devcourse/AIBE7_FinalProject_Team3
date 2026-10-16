@@ -1,24 +1,26 @@
 import { describe, expect, it } from 'vitest'
 import {
   changeSellerOrderParams,
-  querySellerOrders,
   readSellerOrderQuery,
 } from '../logic/sellerOrderQuery'
-import { sellerOrders } from '../mock/mockSellerOrders'
 
 describe('판매자 주문 조회 조건', () => {
-  it('상태·결제·DROP을 함께 적용하고 페이지를 자른다', () => {
-    const params = new URLSearchParams(
-      'orderStatus=PAID&paymentStatus=SUCCEEDED&dropId=201',
-    )
-    const result = querySellerOrders(sellerOrders, params)
-    expect(result.totalElements).toBe(1)
-    expect(result.content.map((order) => order.orderNumber)).toEqual([
-      'ORD-20260918-000500',
-    ])
+  it('상태·결제·DROP·페이지를 읽고 기본값(orderStatus=PAID)을 적용한다', () => {
     expect(
-      querySellerOrders(sellerOrders, new URLSearchParams('page=1')).content,
-    ).toHaveLength(1)
+      readSellerOrderQuery(
+        new URLSearchParams(
+          'orderStatus=SHIPPED&paymentStatus=SUCCEEDED&dropId=201&page=1',
+        ),
+      ),
+    ).toEqual({
+      orderStatus: 'SHIPPED',
+      paymentStatus: 'SUCCEEDED',
+      dropId: '201',
+      page: 1,
+    })
+    expect(readSellerOrderQuery(new URLSearchParams('')).orderStatus).toBe(
+      'PAID',
+    )
   })
 
   it('필터 변경 시 페이지를 초기화하고 다른 조건을 보존한다', () => {
