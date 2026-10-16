@@ -92,8 +92,9 @@ test('페이지를 이동하고 목록 조회 실패를 다시 시도한다', as
   await expect(row(page, 'ORD-20260918-000502')).toBeVisible()
 
   let shouldFail = true
-  await page.route('**/api/v1/seller/orders?*', (route) => {
-    if (shouldFail) {
+  await page.route('**/api/v1/seller/orders*', (route) => {
+    const url = new URL(route.request().url())
+    if (shouldFail && url.pathname === '/api/v1/seller/orders') {
       shouldFail = false
       return route.fulfill({
         status: 500,
