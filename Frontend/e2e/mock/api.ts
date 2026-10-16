@@ -2,6 +2,7 @@ import type { Page, Route } from '@playwright/test'
 import { handleDropRoute } from './api/drop'
 import { CATEGORIES, datasetFor, type Scenario } from './api/drop/fixtures'
 import { handleSellerDashboardRoute } from './api/seller'
+import { handleSellerDropStatsRoute } from './api/sellerDropStats'
 import { json, type ApiState } from './api/shared'
 import { handleWishRoute, initialWishesFor } from './api/wish'
 
@@ -22,6 +23,7 @@ async function handleRoute(
   if (await handleWishRoute(route, state, url)) return
   if (await handleDropRoute(route, state, scenario, failureStatus, url)) return
   if (await handleSellerDashboardRoute(route, url)) return
+  if (await handleSellerDropStatsRoute(route, url)) return
   await route.fallback()
 }
 
