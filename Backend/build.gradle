@@ -80,6 +80,8 @@ dependencyManagement {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // 기본 512MB에서는 전체 실행 때 캐시된 Spring 컨텍스트가 힙을 채워, Argon2(해시당 19MiB) 동시 가입 테스트가 OutOfMemoryError로 실패한다(GR-46)
+    maxHeapSize = '1g'
     // 스케줄러 자동 실행을 끄고, 검증 시 transition(fixedNow)을 직접 호출한다.
     systemProperty 'grab.drop-transition.enabled', 'false'
     systemProperty 'grab.payment-batch.enabled', 'false'
