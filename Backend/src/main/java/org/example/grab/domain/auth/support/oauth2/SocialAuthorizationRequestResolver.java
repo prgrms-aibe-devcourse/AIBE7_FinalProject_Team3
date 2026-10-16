@@ -21,7 +21,7 @@ public class SocialAuthorizationRequestResolver implements OAuth2AuthorizationRe
 
     private static final String REGISTRATION_ID = "registrationId";
 
-    // 요청이 GET이고 /api/v1/auth/oauth2/[registrationId} 형태인지 검사하는 RequestMatcher
+    // 요청이 GET이고 /api/v1/auth/oauth2/{registrationId} 형태인지 검사하는 RequestMatcher
     private final RequestMatcher startRequestMatcher = PathPatternRequestMatcher.withDefaults()
             .matcher(HttpMethod.GET, SocialProviders.AUTHORIZATION_BASE_URI + "/{" + REGISTRATION_ID + "}");
     // 인가 요청 생성을 맡길 Spring 기본 Resolver -> 제공자를 확인하고 카카오, 구글로 보낼 인가 요청 정보 생성하는 역할
