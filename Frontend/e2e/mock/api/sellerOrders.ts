@@ -10,6 +10,7 @@ type SellerOrderRow = {
   sellerName: string
   orderStatus: string
   paymentStatus: string
+  cancellationInProgress: boolean
   itemsAmount: number
   shippingAmount: number
   totalAmount: number
@@ -22,7 +23,7 @@ type SellerOrderRow = {
 const hoursAgo = (hours: number) =>
   new Date(FIXED_NOW.getTime() - hours * 3_600_000).toISOString()
 
-export const SELLER_ORDERS: SellerOrderRow[] = [
+const SELLER_ORDERS_FIXTURE: SellerOrderRow[] = [
   {
     orderId: 'b8daec07-7c9e-40b1-c2d3-5e6f70819203',
     orderNumber: 'ORD-20260914-000390',
@@ -31,6 +32,7 @@ export const SELLER_ORDERS: SellerOrderRow[] = [
     sellerName: 'GR105테스트샵',
     orderStatus: 'DELIVERED',
     paymentStatus: 'SUCCEEDED',
+    cancellationInProgress: false,
     itemsAmount: 129000,
     shippingAmount: 3000,
     totalAmount: 132000,
@@ -44,6 +46,7 @@ export const SELLER_ORDERS: SellerOrderRow[] = [
     sellerName: 'GR105테스트샵',
     orderStatus: 'SHIPPED',
     paymentStatus: 'SUCCEEDED',
+    cancellationInProgress: false,
     itemsAmount: 88000,
     shippingAmount: 3000,
     totalAmount: 91000,
@@ -56,7 +59,8 @@ export const SELLER_ORDERS: SellerOrderRow[] = [
     productName: '슬로우 모닝 머그',
     sellerName: 'GR105테스트샵',
     orderStatus: 'PREPARING',
-    paymentStatus: 'SUCCEEDED',
+    paymentStatus: 'UNKNOWN',
+    cancellationInProgress: false,
     itemsAmount: 60000,
     shippingAmount: 3000,
     totalAmount: 63000,
@@ -70,6 +74,7 @@ export const SELLER_ORDERS: SellerOrderRow[] = [
     sellerName: 'GR105테스트샵',
     orderStatus: 'PREPARING',
     paymentStatus: 'SUCCEEDED',
+    cancellationInProgress: false,
     itemsAmount: 129000,
     shippingAmount: 3000,
     totalAmount: 132000,
@@ -83,6 +88,7 @@ export const SELLER_ORDERS: SellerOrderRow[] = [
     sellerName: 'GR105테스트샵',
     orderStatus: 'PAID',
     paymentStatus: 'UNKNOWN',
+    cancellationInProgress: false,
     itemsAmount: 85000,
     shippingAmount: 3000,
     totalAmount: 88000,
@@ -96,6 +102,7 @@ export const SELLER_ORDERS: SellerOrderRow[] = [
     sellerName: 'GR105테스트샵',
     orderStatus: 'PAID',
     paymentStatus: 'SUCCEEDED',
+    cancellationInProgress: false,
     itemsAmount: 39000,
     shippingAmount: 3000,
     totalAmount: 42000,
@@ -109,6 +116,7 @@ export const SELLER_ORDERS: SellerOrderRow[] = [
     sellerName: 'GR105테스트샵',
     orderStatus: 'PAID',
     paymentStatus: 'SUCCEEDED',
+    cancellationInProgress: false,
     itemsAmount: 258000,
     shippingAmount: 3000,
     totalAmount: 261000,
@@ -116,7 +124,7 @@ export const SELLER_ORDERS: SellerOrderRow[] = [
   },
 ]
 
-const SHIPPING: Record<
+const SHIPPING_FIXTURE: Record<
   string,
   { carrier: string; trackingNumber: string; deliveredAt: string | null }
 > = {
@@ -153,10 +161,150 @@ const ITEMS: Record<
   ],
 }
 
+type Shipping = {
+  carrier: string
+  trackingNumber: string
+  deliveredAt: string | null
+}
+
+export type SellerOrdersFixture = {
+  orders: SellerOrderRow[]
+  shipping: Record<string, Shipping>
+  // Idempotency-Key별로 마지막 성공 응답을 기억해 재시도 시 그대로 돌려준다(ORDER.md 2.4).
+  idempotency: Map<
+    string,
+    { body: string; status: { orderId: string; status: string } }
+  >
+}
+
+// 테스트마다 독립된 상태를 쓰도록 매번 새로 복제한다(상태 전이가 다른 테스트로 새지 않게).
+export function createSellerOrdersFixture(): SellerOrdersFixture {
+  return {
+    orders: SELLER_ORDERS_FIXTURE.map((order) => ({ ...order })),
+    shipping: structuredClone(SHIPPING_FIXTURE),
+    idempotency: new Map(),
+  }
+}
+
+function statusResponse(order: SellerOrderRow) {
+  return { orderId: order.orderId, status: order.orderStatus }
+}
+
 export async function handleSellerOrdersRoute(
   route: Route,
   url: URL,
+  fixture: SellerOrdersFixture,
 ): Promise<boolean> {
+  const SELLER_ORDERS = fixture.orders
+  const SHIPPING = fixture.shipping
+  const IDEMPOTENCY_CACHE = fixture.idempotency
+  const prepareMatch = url.pathname.match(
+    /^\/api\/v1\/seller\/orders\/([0-9a-f-]+)\/prepare-shipment$/,
+  )
+  if (prepareMatch && route.request().method() === 'POST') {
+    const order = SELLER_ORDERS.find((item) => item.orderId === prepareMatch[1])
+    if (!order) {
+      await json(route, { success: false, message: 'ORDER_NOT_FOUND' }, 404)
+      return true
+    }
+    if (order.orderStatus !== 'PAID') {
+      await json(
+        route,
+        { success: false, message: 'ORDER_STATUS_CONFLICT' },
+        409,
+      )
+      return true
+    }
+    order.orderStatus = 'PREPARING'
+    await json(route, { success: true, data: statusResponse(order) })
+    return true
+  }
+
+  const shipmentMatch = url.pathname.match(
+    /^\/api\/v1\/seller\/orders\/([0-9a-f-]+)\/shipment$/,
+  )
+  if (shipmentMatch && route.request().method() === 'POST') {
+    const orderId = shipmentMatch[1]
+    const order = SELLER_ORDERS.find((item) => item.orderId === orderId)
+    if (!order) {
+      await json(route, { success: false, message: 'ORDER_NOT_FOUND' }, 404)
+      return true
+    }
+    const idempotencyKey = route.request().headers()['idempotency-key']
+    const requestBody = route.request().postData() ?? ''
+    const cached = idempotencyKey
+      ? IDEMPOTENCY_CACHE.get(idempotencyKey)
+      : undefined
+    if (cached) {
+      if (cached.body !== requestBody) {
+        await json(
+          route,
+          { success: false, message: 'DUPLICATE_IDEMPOTENCY_KEY' },
+          409,
+        )
+        return true
+      }
+      await json(route, { success: true, data: cached.status })
+      return true
+    }
+    if (order.orderStatus !== 'PREPARING') {
+      await json(
+        route,
+        { success: false, message: 'ORDER_STATUS_CONFLICT' },
+        409,
+      )
+      return true
+    }
+    const { carrier, trackingNumber } = JSON.parse(requestBody) as {
+      carrier: string
+      trackingNumber: string
+    }
+    order.orderStatus = 'SHIPPED'
+    SHIPPING[orderId] = { carrier, trackingNumber, deliveredAt: null }
+    const status = statusResponse(order)
+    if (idempotencyKey) {
+      IDEMPOTENCY_CACHE.set(idempotencyKey, { body: requestBody, status })
+    }
+    await json(route, { success: true, data: status })
+    return true
+  }
+
+  if (shipmentMatch && route.request().method() === 'PATCH') {
+    const orderId = shipmentMatch[1]
+    const order = SELLER_ORDERS.find((item) => item.orderId === orderId)
+    if (!order) {
+      await json(route, { success: false, message: 'ORDER_NOT_FOUND' }, 404)
+      return true
+    }
+    if (order.orderStatus !== 'SHIPPED') {
+      await json(
+        route,
+        { success: false, message: 'ORDER_STATUS_CONFLICT' },
+        409,
+      )
+      return true
+    }
+    const { carrier, trackingNumber } = JSON.parse(
+      route.request().postData() ?? '{}',
+    ) as { carrier: string; trackingNumber: string }
+    const previous = SHIPPING[orderId]
+    SHIPPING[orderId] = {
+      carrier,
+      trackingNumber,
+      deliveredAt: previous?.deliveredAt ?? null,
+    }
+    await json(route, {
+      success: true,
+      data: {
+        orderId: order.orderId,
+        status: order.orderStatus,
+        carrier,
+        trackingNumber,
+      },
+    })
+    return true
+  }
+
   if (url.pathname === '/api/v1/seller/orders') {
     const dropId = url.searchParams.get('dropId')
     const orderStatus = url.searchParams.get('orderStatus')

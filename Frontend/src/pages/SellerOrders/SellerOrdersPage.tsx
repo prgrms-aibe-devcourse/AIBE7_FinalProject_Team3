@@ -2,16 +2,24 @@ import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import EmptyState from '../../components/EmptyState/EmptyState'
 import type { SellerOrderStatus } from '../../features/order/mock/mockSellerOrders'
+import type { ShipmentRequest } from '../../api/seller/orders'
 import {
   changeSellerOrderParams,
   readSellerOrderQuery,
 } from '../../features/order/logic/sellerOrderQuery'
 import {
+  usePrepareShipment,
+  useRegisterShipment,
   useSellerOrder,
   useSellerOrders,
+  useUpdateShipment,
 } from '../../features/order/logic/useSellerOrders'
-import { sellerOrderErrorMessage } from '../../features/order/logic/sellerOrderState'
+import {
+  sellerOrderErrorMessage,
+  shipmentErrorMessage,
+} from '../../features/order/logic/sellerOrderState'
 import SellerOrderDetail from '../../features/order/components/SellerOrderDetail'
+import ShipmentForm from '../../features/order/components/ShipmentForm'
 import { dateLabel } from '../../utils/date'
 import { won } from '../../utils/price'
 
@@ -31,6 +39,20 @@ export default function SellerOrdersPage({
 }) {
   const [params, setParams] = useSearchParams()
   const [openId, setOpenId] = useState<string | null>(null)
+  const [editing, setEditing] = useState(false)
+  const [formKey, setFormKey] = useState(0)
+  const [actionError, setActionError] = useState('')
+  const [busyId, setBusyId] = useState<string | null>(null)
+  // 같은 본문으로 재시도할 때만 Idempotency-Key를 재사용한다(ORDER.md 2.4).
+  // 내용을 바꿔 다시 보내면 새 키를 발급해 409 DUPLICATE_IDEMPOTENCY_KEY를 피한다.
+  const [lastAttempt, setLastAttempt] = useState<{
+    key: string
+    body: ShipmentRequest
+  } | null>(null)
+
+  const prepareShipmentMutation = usePrepareShipment()
+  const registerShipmentMutation = useRegisterShipment()
+  const updateShipmentMutation = useUpdateShipment()
 
   let result: ReturnType<typeof readSellerOrderQuery> | null = null
   try {
@@ -63,6 +85,73 @@ export default function SellerOrdersPage({
 
   const toggleDetail = (orderId: string) => {
     setOpenId((current) => (current === orderId ? null : orderId))
+    setEditing(false)
+    setActionError('')
+  }
+
+  const openShipmentForm = (orderId: string) => {
+    setOpenId(orderId)
+    setEditing(true)
+    setFormKey((current) => current + 1)
+    setLastAttempt(null)
+    setActionError('')
+  }
+
+  const prepare = (order: { orderId?: string; orderNumber?: string }) => {
+    const orderId = order.orderId ?? ''
+    setActionError('')
+    setBusyId(orderId)
+    prepareShipmentMutation.mutate(orderId, {
+      onSuccess: () => {
+        setBusyId(null)
+        notify(`${order.orderNumber} 배송 준비로 전환했어요.`)
+      },
+      onError: (error) => {
+        setBusyId(null)
+        setActionError(shipmentErrorMessage(error))
+      },
+    })
+  }
+
+  const saveShipment = (
+    order: { orderId?: string; orderNumber?: string; orderStatus?: string },
+    body: ShipmentRequest,
+  ) => {
+    const orderId = order.orderId ?? ''
+    const isUpdate = order.orderStatus === 'SHIPPED'
+    setActionError('')
+    setBusyId(orderId)
+    const onSettledSuccess = () => {
+      setBusyId(null)
+      setEditing(false)
+      notify(
+        isUpdate
+          ? `${order.orderNumber} 송장을 수정했어요.`
+          : `${order.orderNumber} 송장을 등록하고 발송 처리했어요.`,
+      )
+    }
+    const onSettledError = (error: unknown) => {
+      setBusyId(null)
+      setActionError(shipmentErrorMessage(error))
+    }
+    if (isUpdate) {
+      updateShipmentMutation.mutate(
+        { orderId, body },
+        { onSuccess: onSettledSuccess, onError: onSettledError },
+      )
+      return
+    }
+    const sameAsLastAttempt =
+      lastAttempt?.body.carrier === body.carrier &&
+      lastAttempt?.body.trackingNumber === body.trackingNumber
+    const idempotencyKey = sameAsLastAttempt
+      ? lastAttempt.key
+      : crypto.randomUUID()
+    setLastAttempt({ key: idempotencyKey, body })
+    registerShipmentMutation.mutate(
+      { orderId, idempotencyKey, body },
+      { onSuccess: onSettledSuccess, onError: onSettledError },
+    )
   }
 
   const detail = detailQuery.data && {
@@ -181,31 +270,47 @@ export default function SellerOrdersPage({
                   <b>{won(order.totalAmount ?? 0)}</b>
                   <div className="order-action">
                     {order.orderStatus === 'PAID' &&
-                      (order.paymentStatus === 'UNKNOWN' ? (
+                      (order.paymentStatus === 'UNKNOWN' ||
+                      order.cancellationInProgress ? (
                         <span
                           className="urgent-tag"
                           title="결제 취소 결과가 확인되기 전에는 배송 준비로 전환할 수 없습니다."
                         >
-                          결제 확인 중
+                          {order.cancellationInProgress
+                            ? '취소 확인 중'
+                            : '결제 확인 중'}
                         </span>
                       ) : (
                         <button
                           className="secondary-button"
                           type="button"
-                          onClick={() => notify('곧 지원 예정이에요.')}
+                          disabled={busyId !== null}
+                          onClick={() => prepare(order)}
                         >
                           배송 준비
                         </button>
                       ))}
-                    {order.orderStatus === 'PREPARING' && (
-                      <button
-                        className="secondary-button"
-                        type="button"
-                        onClick={() => notify('곧 지원 예정이에요.')}
-                      >
-                        송장 등록
-                      </button>
-                    )}
+                    {order.orderStatus === 'PREPARING' &&
+                      (order.paymentStatus === 'UNKNOWN' ||
+                      order.cancellationInProgress ? (
+                        <span
+                          className="urgent-tag"
+                          title="결제 취소 결과가 확인되기 전에는 발송할 수 없습니다."
+                        >
+                          {order.cancellationInProgress
+                            ? '취소 확인 중'
+                            : '결제 확인 중'}
+                        </span>
+                      ) : (
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          disabled={busyId !== null}
+                          onClick={() => openShipmentForm(orderId)}
+                        >
+                          송장 등록
+                        </button>
+                      ))}
                   </div>
                   <button
                     className="order-toggle"
@@ -241,9 +346,43 @@ export default function SellerOrdersPage({
                       detail={detail}
                       onEditShipment={
                         order.orderStatus === 'SHIPPED'
-                          ? () => notify('곧 지원 예정이에요.')
+                          ? () => openShipmentForm(orderId)
                           : undefined
                       }
+                    />
+                  )}
+                  {open && actionError && (
+                    <div className="seller-order-error" role="alert">
+                      <p>{actionError}</p>
+                      <button
+                        type="button"
+                        className="text-link"
+                        onClick={() => setActionError('')}
+                      >
+                        닫기
+                      </button>
+                    </div>
+                  )}
+                  {open && busyId === orderId && (
+                    <p className="seller-order-progress" role="status">
+                      배송 작업을 처리하는 중이에요.
+                    </p>
+                  )}
+                  {open && editing && detail && (
+                    <ShipmentForm
+                      key={formKey}
+                      initial={{
+                        carrier: detail.shipping?.carrier ?? '',
+                        trackingNumber: detail.shipping?.trackingNumber ?? '',
+                      }}
+                      submitLabel={
+                        order.orderStatus === 'SHIPPED'
+                          ? '수정 저장'
+                          : '발송 처리'
+                      }
+                      disabled={busyId !== null}
+                      onSubmit={(shipment) => saveShipment(order, shipment)}
+                      onCancel={() => setEditing(false)}
                     />
                   )}
                 </article>

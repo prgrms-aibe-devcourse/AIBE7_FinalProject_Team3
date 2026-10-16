@@ -19,6 +19,8 @@ public interface SellerOrderListProjection {
 
     String getPaymentStatus();
 
+    boolean getCancellationInProgress();
+
     long getItemsAmount();
 
     long getShippingAmount();

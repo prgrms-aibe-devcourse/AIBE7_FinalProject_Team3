@@ -1,7 +1,11 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   getSellerOrder,
   getSellerOrders,
+  prepareShipment,
+  registerShipment,
+  updateShipment,
+  type ShipmentRequest,
   type SellerOrdersQuery,
 } from '../../../api/seller/orders'
 import { sellerOrderKeys } from './sellerOrderQueryKeys'
@@ -20,5 +24,52 @@ export function useSellerOrder(orderId: string | null) {
     queryKey: orderId ? sellerOrderKeys.detail(orderId) : sellerOrderKeys.all,
     queryFn: () => getSellerOrder(orderId as string),
     enabled: orderId !== null,
+  })
+}
+
+// 배송 액션 성공 후에는 목록·상세를 다시 불러와 바뀐 상태를 반영한다(GR-86 자동 진행 포함).
+function useInvalidateOrders() {
+  const queryClient = useQueryClient()
+  return () => queryClient.invalidateQueries({ queryKey: sellerOrderKeys.all })
+}
+
+export function usePrepareShipment() {
+  const invalidate = useInvalidateOrders()
+  return useMutation({
+    mutationFn: (orderId: string) => prepareShipment(orderId),
+    onSuccess: () => invalidate(),
+    onError: () => invalidate(),
+  })
+}
+
+export function useRegisterShipment() {
+  const invalidate = useInvalidateOrders()
+  return useMutation({
+    mutationFn: ({
+      orderId,
+      idempotencyKey,
+      body,
+    }: {
+      orderId: string
+      idempotencyKey: string
+      body: ShipmentRequest
+    }) => registerShipment(orderId, idempotencyKey, body),
+    onSuccess: () => invalidate(),
+    onError: () => invalidate(),
+  })
+}
+
+export function useUpdateShipment() {
+  const invalidate = useInvalidateOrders()
+  return useMutation({
+    mutationFn: ({
+      orderId,
+      body,
+    }: {
+      orderId: string
+      body: ShipmentRequest
+    }) => updateShipment(orderId, body),
+    onSuccess: () => invalidate(),
+    onError: () => invalidate(),
   })
 }

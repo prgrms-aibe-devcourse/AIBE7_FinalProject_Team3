@@ -1021,6 +1021,9 @@
           "paymentStatus": {
             "type": "string"
           },
+          "cancellationInProgress": {
+            "type": "boolean"
+          },
           "itemsAmount": {
             "type": "integer",
             "format": "int64"
