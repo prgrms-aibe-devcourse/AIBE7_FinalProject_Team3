@@ -5,10 +5,12 @@ import {
   dashboardDropStatuses,
   dashboardOrderStatuses,
   dashboardPaymentStatuses,
-  mockDashboardSummary,
-  mockUpcomingDrops,
-} from '../../features/seller/mock/mockDashboard'
-import type { SellerMockDrop } from '../../features/seller/mock/mockSellerDrops'
+} from '../../features/seller/logic/dashboardStatuses'
+import {
+  useDashboardSummary,
+  useUpcomingDrops,
+} from '../../features/seller/logic/useDashboard'
+import { applicationErrorMessage } from '../../features/seller/logic/sellerApplicationState'
 import { dateLabel, inputDate } from '../../utils/date'
 
 const PRESETS = [
@@ -17,18 +19,27 @@ const PRESETS = [
   { key: 'WEEK', label: '7일', days: 6 },
 ] as const
 
-export default function SellerDashboardPage({
-  drops,
-  ownerEmail,
-}: {
-  drops: SellerMockDrop[]
-  ownerEmail: string
-}) {
+type UpcomingDrop = {
+  dropId: number
+  name?: string
+  status?: string
+  upcomingAt?: string
+}
+
+export default function SellerDashboardPage() {
   const [preset, setPreset] = useState<string>('ALL')
   const [range, setRange] = useState({ from: '', to: '' })
-  const summary = mockDashboardSummary(drops, ownerEmail, range.from, range.to)
-  const starting = mockUpcomingDrops(drops, ownerEmail, 'START')
-  const ending = mockUpcomingDrops(drops, ownerEmail, 'END')
+  const from = range.from
+    ? new Date(`${range.from}T00:00:00`).toISOString()
+    : undefined
+  const to = range.to
+    ? new Date(`${range.to}T23:59:59.999`).toISOString()
+    : undefined
+
+  const summaryQuery = useDashboardSummary(from, to)
+  const startingQuery = useUpcomingDrops('START')
+  const endingQuery = useUpcomingDrops('END')
+  const summary = summaryQuery.data
 
   const applyPreset = (key: string, days: number | null) => {
     setPreset(key)
@@ -47,25 +58,27 @@ export default function SellerDashboardPage({
     setRange(next)
   }
 
-  const upcomingPanel = (
-    title: string,
-    items: ReturnType<typeof mockUpcomingDrops>,
-  ) => (
+  const upcomingPanel = (title: string, query: typeof startingQuery) => (
     <section className="panel dashboard-upcoming-panel">
       <div className="panel-heading">
         <div>
           <h2>{title}</h2>
-          <p>24시간 이내 일정 · 최대 3개</p>
+          <p>24시간 이내 일정</p>
         </div>
       </div>
-      {items.length ? (
+      {query.isLoading ? (
+        <p>불러오는 중...</p>
+      ) : query.isError ? (
+        <p role="alert">{applicationErrorMessage(query.error)}</p>
+      ) : query.data && query.data.length > 0 ? (
         <div className="dashboard-upcoming-list">
-          {items.map((drop) => (
+          {(query.data as UpcomingDrop[]).map((drop) => (
             <article key={drop.dropId}>
               <div>
                 <strong>{drop.name}</strong>
                 <small>
-                  {drop.status} · {dateLabel(drop.upcomingAt)}
+                  {drop.status} ·{' '}
+                  {drop.upcomingAt ? dateLabel(drop.upcomingAt) : ''}
                 </small>
               </div>
               <Link className="text-link" to={`/seller/drops/${drop.dropId}`}>
@@ -92,143 +105,153 @@ export default function SellerDashboardPage({
           ＋ 새 DROP 만들기
         </Link>
       </div>
-      <p className="dashboard-mock-note">
-        예시 데이터 · 실제 집계 및 실시간 수치가 아닙니다.
-      </p>
 
-      <section
-        aria-label="현재 DROP 상태"
-        className="stats-grid dashboard-drop-grid"
-      >
-        {dashboardDropStatuses.map((status) => (
-          <Link key={status} to={`/seller/drops?status=${status}&page=0`}>
-            <span>{status}</span>
-            <strong>
-              {summary.dropCounts[status]}
-              <em>개</em>
-            </strong>
-            <small>해당 목록 ↗</small>
-          </Link>
-        ))}
-      </section>
-      <p className="dashboard-sales-entry">
-        <Link className="text-link" to="/seller/sales?status=ENDED&page=0">
-          판매 완료 DROP 실적 보기 ↗
-        </Link>
-      </p>
-
-      <section
-        aria-label="현재 재고와 처리할 일"
-        className="stats-grid dashboard-current-grid"
-      >
-        <Link to="/seller/inventory">
-          <span>가용 · 확보 · 판매 재고</span>
-          <strong className="dashboard-stock-count">
-            {summary.stockSummary.available} · {summary.stockSummary.reserved} ·{' '}
-            {summary.stockSummary.sold}
-          </strong>
-          <small>재고 현황 ↗</small>
-        </Link>
-        <Link to="/seller/orders?orderStatus=PAID">
-          <span>발송 대기 · PAID 주문</span>
-          <strong>
-            {summary.orderCounts.PAID}
-            <em>건</em>
-          </strong>
-          <small>결제 완료 주문 ↗</small>
-        </Link>
-        <article
-          className={summary.reconciliationRequired ? 'warning' : undefined}
-        >
-          <span>보정 필요 결제</span>
-          <strong>
-            {summary.reconciliationRequired}
-            <em>건</em>
-          </strong>
-          <small>전용 목록 준비 중 · 상세 링크 없음</small>
-        </article>
-      </section>
-
-      <div className="dashboard-upcoming-grid">
-        {upcomingPanel('시작 임박', starting)}
-        {upcomingPanel('종료 임박', ending)}
-      </div>
-
-      <section className="panel period-panel">
-        <div className="panel-heading">
-          <div>
-            <h2>기간 주문·결제 건수</h2>
-            <p>
-              기간 선택은 이 영역에만 적용됩니다. 주문과 결제 시도는 다른
-              건수입니다.
-            </p>
-          </div>
-        </div>
-        <div className="period-picker">
-          <div className="chips">
-            {PRESETS.map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                className={preset === item.key ? 'active' : undefined}
-                aria-pressed={preset === item.key}
-                onClick={() => applyPreset(item.key, item.days)}
-              >
-                {item.label}
-              </button>
+      {summaryQuery.isLoading ? (
+        <p>불러오는 중...</p>
+      ) : summaryQuery.isError ? (
+        <p role="alert">{applicationErrorMessage(summaryQuery.error)}</p>
+      ) : summary ? (
+        <>
+          <section
+            aria-label="현재 DROP 상태"
+            className="stats-grid dashboard-drop-grid"
+          >
+            {dashboardDropStatuses.map((status) => (
+              <Link key={status} to={`/seller/drops?status=${status}&page=0`}>
+                <span>{status}</span>
+                <strong>
+                  {summary.dropCounts?.[status] ?? 0}
+                  <em>개</em>
+                </strong>
+                <small>해당 목록 ↗</small>
+              </Link>
             ))}
+          </section>
+          <p className="dashboard-sales-entry">
+            <Link className="text-link" to="/seller/sales?status=ENDED&page=0">
+              판매 완료 DROP 실적 보기 ↗
+            </Link>
+          </p>
+
+          <section
+            aria-label="현재 재고와 처리할 일"
+            className="stats-grid dashboard-current-grid"
+          >
+            <Link to="/seller/inventory">
+              <span>가용 · 확보 · 판매 재고</span>
+              <strong className="dashboard-stock-count">
+                {summary.stockSummary?.available ?? 0} ·{' '}
+                {summary.stockSummary?.reserved ?? 0} ·{' '}
+                {summary.stockSummary?.sold ?? 0}
+              </strong>
+              <small>재고 현황 ↗</small>
+            </Link>
+            <Link to="/seller/orders?orderStatus=PAID">
+              <span>발송 대기 · PAID 주문</span>
+              <strong>
+                {summary.orderCounts?.PAID ?? 0}
+                <em>건</em>
+              </strong>
+              <small>결제 완료 주문 ↗</small>
+            </Link>
+            <article
+              className={summary.reconciliationRequired ? 'warning' : undefined}
+            >
+              <span>보정 필요 결제</span>
+              <strong>
+                {summary.reconciliationRequired ?? 0}
+                <em>건</em>
+              </strong>
+              <small>전용 목록 준비 중 · 상세 링크 없음</small>
+            </article>
+          </section>
+
+          <div className="dashboard-upcoming-grid">
+            {upcomingPanel('시작 임박', startingQuery)}
+            {upcomingPanel('종료 임박', endingQuery)}
           </div>
-          <input
-            type="date"
-            aria-label="시작일"
-            value={range.from}
-            max={range.to || undefined}
-            onChange={(event) =>
-              editRange({ from: event.target.value, to: range.to })
-            }
-          />
-          <span aria-hidden="true">~</span>
-          <input
-            type="date"
-            aria-label="종료일"
-            value={range.to}
-            min={range.from || undefined}
-            onChange={(event) =>
-              editRange({ from: range.from, to: event.target.value })
-            }
-          />
-        </div>
-        <h3 className="count-label">주문 상태별 건수</h3>
-        <div className="count-grid">
-          {dashboardOrderStatuses.map((status) => (
-            <div key={status}>
-              <small>{status}</small>
-              <b
-                className={
-                  summary.orderCounts[status] === 0 ? 'zero' : undefined
-                }
-              >
-                {summary.orderCounts[status]}
-              </b>
+
+          <section className="panel period-panel">
+            <div className="panel-heading">
+              <div>
+                <h2>기간 주문·결제 건수</h2>
+                <p>
+                  기간 선택은 이 영역에만 적용됩니다. 주문과 결제 시도는 다른
+                  건수입니다.
+                </p>
+              </div>
             </div>
-          ))}
-        </div>
-        <h3 className="count-label">결제 시도 상태별 건수</h3>
-        <div className="count-grid">
-          {dashboardPaymentStatuses.map((status) => (
-            <div key={status}>
-              <small>{status}</small>
-              <b
-                className={
-                  summary.paymentCounts[status] === 0 ? 'zero' : undefined
+            <div className="period-picker">
+              <div className="chips">
+                {PRESETS.map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    className={preset === item.key ? 'active' : undefined}
+                    aria-pressed={preset === item.key}
+                    onClick={() => applyPreset(item.key, item.days)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="date"
+                aria-label="시작일"
+                value={range.from}
+                max={range.to || undefined}
+                onChange={(event) =>
+                  editRange({ from: event.target.value, to: range.to })
                 }
-              >
-                {summary.paymentCounts[status]}
-              </b>
+              />
+              <span aria-hidden="true">~</span>
+              <input
+                type="date"
+                aria-label="종료일"
+                value={range.to}
+                min={range.from || undefined}
+                onChange={(event) =>
+                  editRange({ from: range.from, to: event.target.value })
+                }
+              />
             </div>
-          ))}
-        </div>
-      </section>
+            <h3 className="count-label">주문 상태별 건수</h3>
+            <div className="count-grid">
+              {dashboardOrderStatuses.map((status) => (
+                <div key={status}>
+                  <small>{status}</small>
+                  <b
+                    className={
+                      (summary.orderCounts?.[status] ?? 0) === 0
+                        ? 'zero'
+                        : undefined
+                    }
+                  >
+                    {summary.orderCounts?.[status] ?? 0}
+                  </b>
+                </div>
+              ))}
+            </div>
+            <h3 className="count-label">결제 시도 상태별 건수</h3>
+            <div className="count-grid">
+              {dashboardPaymentStatuses.map((status) => (
+                <div key={status}>
+                  <small>{status}</small>
+                  <b
+                    className={
+                      (summary.paymentCounts?.[status] ?? 0) === 0
+                        ? 'zero'
+                        : undefined
+                    }
+                  >
+                    {summary.paymentCounts?.[status] ?? 0}
+                  </b>
+                </div>
+              ))}
+            </div>
+          </section>
+        </>
+      ) : null}
     </section>
   )
 }

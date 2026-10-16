@@ -124,15 +124,7 @@ export default function App() {
             element={<LoginPage login={login} notify={notify} />}
           />
           <Route path="/signup" element={<SignupPage notify={notify} />} />
-          <Route
-            path="/seller"
-            element={
-              <SellerDashboardPage
-                drops={sellerDrops}
-                ownerEmail={user?.email ?? 'grab@example.com'}
-              />
-            }
-          />
+          <Route path="/seller" element={<SellerDashboardPage />} />
           <Route
             path="/seller/apply"
             element={
