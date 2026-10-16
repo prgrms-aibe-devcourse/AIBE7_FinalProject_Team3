@@ -151,25 +151,11 @@ export default function App() {
           />
           <Route
             path="/seller/inventory"
-            element={
-              <SellerInventoryPage
-                user={user}
-                authStatus={status}
-                drops={sellerDrops}
-                ownerEmail={user?.email ?? 'grab@example.com'}
-              />
-            }
+            element={<SellerInventoryPage user={user} authStatus={status} />}
           />
           <Route
             path="/seller/sales"
-            element={
-              <SellerSalesPage
-                user={user}
-                authStatus={status}
-                drops={sellerDrops}
-                ownerEmail={user?.email ?? 'grab@example.com'}
-              />
-            }
+            element={<SellerSalesPage user={user} authStatus={status} />}
           />
           <Route
             path="/seller/drops"
