@@ -12,6 +12,7 @@ public record DropStatsResponse(
         long reservedStock,
         long soldStock,
         long orderCount,
+        long soldQuantity,
         long salesAmount
 ) {
 
@@ -19,6 +20,6 @@ public record DropStatsResponse(
         return new DropStatsResponse(projection.dropId(), projection.name(), projection.status(),
                 projection.saleEndsAt(), projection.activeWishCount(), projection.availableStock(),
                 projection.reservedStock(), projection.soldStock(), projection.orderCount(),
-                projection.salesAmount());
+                projection.soldQuantity(), projection.salesAmount());
     }
 }

@@ -51,7 +51,7 @@ public class SellerDashboardController {
     }
 
     @Operation(summary = "DROP별 통계 조회",
-            description = "DROP별 WISH·주문·판매·재고 통계를 최근 생성순으로 반환한다. 집계 기준은 SELLER.md 2.2 참고")
+            description = "DROP별 WISH·주문·판매·재고 통계를 최근 생성순으로 반환한다. dropId를 지정하면 해당 1건만 반환한다. 집계 기준은 SELLER.md 2.2 참고")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "INVALID_REQUEST")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "AUTHENTICATION_REQUIRED, INVALID_TOKEN")
@@ -59,13 +59,14 @@ public class SellerDashboardController {
     @GetMapping("/drops")
     public ApiResponse<PageResponse<DropStatsResponse>> findDropStats(
             @RequestParam(required = false) DropStatus status,
+            @RequestParam(required = false) Long dropId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         if (page < 0 || size < 1 || size > 100) {
             throw new BusinessException(CommonErrorCode.INVALID_REQUEST);
         }
         return ApiResponse.success(sellerDashboardService.findDropStats(
-                currentSellerIdProvider.currentSellerId(), status, page, size));
+                currentSellerIdProvider.currentSellerId(), status, dropId, page, size));
     }
 
     @Operation(summary = "대시보드 요약 조회",
