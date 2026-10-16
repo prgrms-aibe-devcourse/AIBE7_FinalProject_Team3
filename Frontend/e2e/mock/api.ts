@@ -3,6 +3,7 @@ import { handleDropRoute } from './api/drop'
 import { CATEGORIES, datasetFor, type Scenario } from './api/drop/fixtures'
 import { handleSellerDashboardRoute } from './api/seller'
 import { handleSellerDropStatsRoute } from './api/sellerDropStats'
+import { handleSellerOrdersRoute } from './api/sellerOrders'
 import { json, type ApiState } from './api/shared'
 import { handleWishRoute, initialWishesFor } from './api/wish'
 
@@ -24,6 +25,7 @@ async function handleRoute(
   if (await handleDropRoute(route, state, scenario, failureStatus, url)) return
   if (await handleSellerDashboardRoute(route, url)) return
   if (await handleSellerDropStatsRoute(route, url)) return
+  if (await handleSellerOrdersRoute(route, url)) return
   await route.fallback()
 }
 
