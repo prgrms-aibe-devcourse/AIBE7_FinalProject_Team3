@@ -40,6 +40,40 @@ test('결제 확인 중인 배송 준비 주문은 발송할 수 없다', async 
   await expect(order.getByRole('button', { name: '송장 등록' })).toHaveCount(0)
 })
 
+test('송장 등록 상태 충돌 뒤 주문 목록을 다시 조회한다', async ({ page }) => {
+  await page
+    .getByRole('region', { name: '주문 필터' })
+    .getByRole('button', { name: '배송 준비' })
+    .click()
+  const order = row(page, 'ORD-20260917-000488')
+  await order.getByRole('button', { name: '송장 등록' }).click()
+
+  let listRequests = 0
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/api/v1/seller/orders') {
+      listRequests += 1
+    }
+  })
+  await page.route('**/api/v1/seller/orders/*/shipment', (route) =>
+    route.fulfill({
+      status: 409,
+      json: {
+        success: false,
+        error: { code: 'ORDER_STATUS_CONFLICT', message: '주문 상태 충돌' },
+      },
+    }),
+  )
+
+  const form = order.locator('.shipment-form')
+  await form.getByLabel('택배사').fill('CJ대한통운')
+  await form.getByLabel('송장번호').fill('123456789012')
+  await form.getByRole('button', { name: '발송 처리' }).click()
+  await expect(order.getByRole('alert')).toContainText(
+    '주문 상태가 바뀌었어요.',
+  )
+  await expect.poll(() => listRequests).toBeGreaterThan(0)
+})
+
 test('배송 준비 후 송장을 검증하고 발송 처리한다', async ({ page }) => {
   const paid = row(page, 'ORD-20260918-000500')
   await paid.getByRole('button', { name: '배송 준비' }).click()

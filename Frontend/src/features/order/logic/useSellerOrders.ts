@@ -38,6 +38,7 @@ export function usePrepareShipment() {
   return useMutation({
     mutationFn: (orderId: string) => prepareShipment(orderId),
     onSuccess: () => invalidate(),
+    onError: () => invalidate(),
   })
 }
 
@@ -54,6 +55,7 @@ export function useRegisterShipment() {
       body: ShipmentRequest
     }) => registerShipment(orderId, idempotencyKey, body),
     onSuccess: () => invalidate(),
+    onError: () => invalidate(),
   })
 }
 
@@ -68,5 +70,6 @@ export function useUpdateShipment() {
       body: ShipmentRequest
     }) => updateShipment(orderId, body),
     onSuccess: () => invalidate(),
+    onError: () => invalidate(),
   })
 }
