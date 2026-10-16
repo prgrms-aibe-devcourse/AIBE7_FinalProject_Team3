@@ -27,13 +27,17 @@ export default function SellerSalesPage({
   const [params, setParams] = useSearchParams()
   const { status, page, dropId } = readSalesQuery(params)
   const dropIdNum = dropId ? Number(dropId) : undefined
+  const seller = isSeller(user)
 
-  const query = useDropStats({
-    status: status === 'ALL' ? undefined : status,
-    dropId: dropIdNum,
-    page,
-    size: salesPageSize,
-  })
+  const query = useDropStats(
+    {
+      status: status === 'ALL' ? undefined : status,
+      dropId: dropIdNum,
+      page,
+      size: salesPageSize,
+    },
+    seller,
+  )
 
   if (authStatus === 'loading') return <AuthLoading />
   if (!user)
@@ -44,7 +48,7 @@ export default function SellerSalesPage({
         replace
       />
     )
-  if (!isSeller(user))
+  if (!seller)
     return (
       <EmptyState
         title="판매자 권한이 필요해요."

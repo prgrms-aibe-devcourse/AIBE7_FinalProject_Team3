@@ -22,14 +22,18 @@ export function useUpcomingDrops(eventType: 'START' | 'END') {
   })
 }
 
-export function useDropStats(query: {
-  status?: DropStatus
-  dropId?: number
-  page?: number
-  size?: number
-}) {
+export function useDropStats(
+  query: {
+    status?: DropStatus
+    dropId?: number
+    page?: number
+    size?: number
+  },
+  enabled = true,
+) {
   return useQuery({
     queryKey: dashboardKeys.dropStats(query),
     queryFn: () => getDropStats(query),
+    enabled,
   })
 }

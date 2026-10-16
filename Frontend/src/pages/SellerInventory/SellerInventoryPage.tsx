@@ -35,14 +35,17 @@ export default function SellerInventoryPage({
 
   const seller = isSeller(user)
 
-  const listQuery = useDropStats({
-    status: status === 'ALL' ? undefined : status,
-    page,
-    size: inventoryPageSize,
-    // 선택한 상품이 현재 페이지에 없어도 제목을 보여줄 수 있게 넉넉히 받는다
-  })
+  const listQuery = useDropStats(
+    {
+      status: status === 'ALL' ? undefined : status,
+      page,
+      size: inventoryPageSize,
+    },
+    seller,
+  )
   const selectedQuery = useDropStats(
-    dropIdNum ? { dropId: dropIdNum } : { dropId: undefined },
+    { dropId: dropIdNum ?? undefined },
+    seller && dropIdNum !== null,
   )
   const stocksQuery = useSellerDropStocks(seller ? dropIdNum : null)
 
@@ -77,7 +80,7 @@ export default function SellerInventoryPage({
         replace
       />
     )
-  if (!isSeller(user))
+  if (!seller)
     return (
       <EmptyState
         title="판매자 권한이 필요해요."
