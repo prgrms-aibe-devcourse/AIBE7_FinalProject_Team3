@@ -45,7 +45,9 @@
 MVP 회원가입은 `LOCAL` 및 소셜 로그인 `KAKAO`, `GOOGLE`을 구현한다. 회원 휴대폰 번호는 수집·저장하지 않으며, 배송 연락처는 주문 시 `orders.recipient_phone`으로 받는다.
 
 소셜 회원은 이메일이 아니라 `provider`와 `provider_user_id`로 식별한다. 제공자 쪽 이메일이 바뀌어도 같은 회원으로 로그인하며, 저장된 `email`은 갱신하지 않는다.
-- `LOCAL` 회원은 `provider_user_id`가 NULL이고, 소셜 회원은 필수이며 `password_hash`가 NULL이다(`ck_users_social_identifier`).
+- `LOCAL` 회원은 `provider_user_id`가 NULL이고, 소셜 회원은 필수다(`ck_users_social_identifier`).
+- 소셜 회원은 `password_hash`를 저장하지 않는다. DB 제약은 LOCAL의 해시 필수(`ck_users_local_password`)뿐이고,
+  소셜 회원의 NULL은 가입 코드(`User.createSocial`)가 보장한다.
 - 한 회원은 하나의 제공자에만 속한다. 같은 이메일의 다른 가입 방식 계정은 자동으로 연결하지 않는다(`ACCOUNT_LINK_REQUIRED`). `email` UQ도 이를 보장한다.
 
 `nickname`은 회원이 직접 정하는 닉네임이며 본명이 아니다. 기존 `display_name` 컬럼의 이름을 바꾼 것이다. 회원 본명은 수집하지 않으며, 배송에 필요한 수령인 이름은 주문 시 `orders.recipient_name`으로 받는다.

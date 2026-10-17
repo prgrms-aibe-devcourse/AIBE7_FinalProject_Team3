@@ -312,7 +312,7 @@ Location: <provider-authorization-uri>
 서버가 OAuth2 Authorization Code 요청과 `state`를 생성해 해당 제공자의 인증 화면으로 이동시킨다. 리다이렉트 대상은 서버 설정으로 관리하며 요청에서 임의의 반환 URL을 받지 않는다.
 
 - 두 제공자 모두 OpenID Connect로 인증한다. 요청 스코프는 GOOGLE `openid email`, KAKAO `openid account_email`이며 제공자 프로필(이름·닉네임·사진)은 받지 않는다.
-- 인가 요청(`state`, `nonce`)은 로그인 왕복 동안 서버 세션에 저장하고 콜백 처리 후 폐기한다. 로그인 상태는 세션이 아니라 1.3절의 인증 쿠키로만 판단한다.
+- 인가 요청(`state`, `nonce`, PKCE `code_verifier`)은 로그인 왕복 동안 서버 세션에 저장하고 콜백 처리 후 폐기한다. PKCE는 `S256`이다. 로그인 상태는 세션이 아니라 1.3절의 인증 쿠키로만 판단한다.
 - `GET`이면서 `provider`가 `kakao` 또는 `google`일 때만 소셜 로그인을 시작한다. 그 밖의 `provider`는 `UNSUPPORTED_OAUTH2_PROVIDER`(400)로 거부한다.
 
 **오류 코드:**

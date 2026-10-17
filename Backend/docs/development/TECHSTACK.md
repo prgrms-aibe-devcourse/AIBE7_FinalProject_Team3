@@ -11,7 +11,7 @@
 | Framework | Spring Boot | 4.1.x | 웹, 보안, 데이터 접근, 모니터링 환경을 일관되게 구성한다. |
 | Web | Spring MVC | Boot 관리 | REST API 구현에 사용하며 블로킹 방식의 JPA 환경에 적합하다. SSE는 MVP 이후 필요할 때 추가한다. |
 | ORM | Spring Data JPA / Hibernate | Boot 관리 | 주문·옵션·결제 도메인의 관계 매핑과 트랜잭션을 관리한다. 복잡한 조회는 DTO Projection 또는 별도 쿼리로 처리한다. |
-| Security | Spring Security | Boot 관리 | HttpOnly 쿠키 기반 JWT 인증, CSRF 보호, Argon2id 비밀번호 해시, USER·SELLER·ADMIN 권한 및 리소스 소유권을 검증한다. |
+| Security | Spring Security | Boot 관리 | HttpOnly 쿠키 기반 JWT 인증, CSRF 보호, KAKAO·GOOGLE OpenID Connect 소셜 로그인(OAuth2 Client), Argon2id 비밀번호 해시, USER·SELLER·ADMIN 권한 및 리소스 소유권을 검증한다. |
 | Validation | Jakarta Bean Validation | Boot 관리 | 요청 DTO와 상태별 필수값을 검증한다. |
 | Mail | Spring Boot Starter Mail (`JavaMailSender`) | Boot 관리 | LOCAL 회원가입의 이메일 인증 코드를 SMTP로 발송한다. 발송 인터페이스 뒤에 두어 운영 발송 서비스를 설정으로 교체한다(4.3절). |
 | Build | Gradle Wrapper | 8.14+ 또는 9.x | 로컬과 CI에서 동일한 빌드 도구 버전을 사용한다. |
@@ -83,7 +83,7 @@
 | 구분 | 기술 | 도입 시점 | 용도 및 선정 이유 |
 | --- | --- | --- | --- |
 | RDBMS | PostgreSQL | MVP | 회원·DROP·주문·재고·결제 데이터를 저장하는 영속 원장이다. 트랜잭션, 행 잠금, 인덱스 및 향후 pgvector 확장이 가능하다. |
-| In-memory Store | Redis | MVP | Refresh Token 해시와 이메일 인증 코드·가입 컨텍스트 해시를 TTL과 함께 저장한다. 조회 캐시는 병목 확인 후 도입하며 주문과 재고의 최종 원장으로 사용하지 않는다. |
+| In-memory Store | Redis | MVP | Refresh Token 해시와 이메일 인증 코드·LOCAL/소셜 가입 컨텍스트 해시를 TTL과 함께 저장한다. 조회 캐시는 병목 확인 후 도입하며 주문과 재고의 최종 원장으로 사용하지 않는다. |
 | Migration | Flyway | MVP | ERD 변경 이력을 SQL 마이그레이션으로 관리하고 환경별 스키마를 일치시킨다. |
 
 재고 정합성은 PostgreSQL 트랜잭션과 행 잠금으로 먼저 보장한다. Redis는 MVP에서 Refresh Token과 이메일 인증 임시 데이터(인증 코드, 가입 컨텍스트, 발송 제한 횟수) 저장에만 사용하고 조회 캐시는 부하 테스트로 병목이 확인된 후 도입한다.
@@ -113,7 +113,7 @@
 - `.github/workflows/frontend-ci.yml`: `main` 또는 `deploy` 대상 PR과 두 브랜치의 푸시에서 Frontend lint·Vitest·build와 Playwright E2E·시각 비교 검증. 실패 시 리포트·trace를 산출물로 보관
 - `.github/workflows/publish-backend.yml`: Backend 이미지를 빌드해 GHCR에 `latest`, 커밋 SHA 태그로 게시. 운영 기준은 `deploy` 푸시지만 현재 트리거는 `main`이므로 변경이 필요하다.
 
-Actuator와 Prometheus의 로컬 메트릭 수집 연결은 완료됐다. Redis 연결 설정과 Refresh Token 저장소(생성·해시·TTL·저장·조회·삭제)는 구현됐고, LOCAL 로그인 API가 Refresh Token을 저장하고 Access·Refresh Token을 HttpOnly 쿠키로 발급하며, 재발급 API가 Refresh Token Rotation(재사용 탐지 포함)으로 두 토큰을 교체한다. 로그아웃 API는 Refresh Token이 속한 세션(이미 교체된 토큰이면 사용됨 표식으로 찾은 세션)을 Redis에서 폐기하고 두 인증 쿠키를 만료시킨다. Access Token은 서버에 저장하지 않으므로 로그아웃 후에도 만료 시각까지 유효할 수 있다. 내 정보 조회 API는 회원 정보를 DB에서 읽고 `roles`는 요청 Access Token의 권한을 돌려주며, 정지·탈퇴 회원은 401로 거부한다. Grafana·Loki·Alloy는 실행 틀만 마련된 상태다.
+Actuator와 Prometheus의 로컬 메트릭 수집 연결은 완료됐다. Redis 연결 설정과 Refresh Token 저장소(생성·해시·TTL·저장·조회·삭제)는 구현됐고, LOCAL 로그인 API가 Refresh Token을 저장하고 Access·Refresh Token을 HttpOnly 쿠키로 발급하며, 재발급 API가 Refresh Token Rotation(재사용 탐지 포함)으로 두 토큰을 교체한다. 로그아웃 API는 Refresh Token이 속한 세션(이미 교체된 토큰이면 사용됨 표식으로 찾은 세션)을 Redis에서 폐기하고 두 인증 쿠키를 만료시킨다. Access Token은 서버에 저장하지 않으므로 로그아웃 후에도 만료 시각까지 유효할 수 있다. 내 정보 조회 API는 회원 정보를 DB에서 읽고 `roles`는 요청 Access Token의 권한을 돌려주며, 정지·탈퇴 회원은 401로 거부한다. KAKAO·GOOGLE 소셜 로그인은 OpenID Connect로 구현됐다. 인가 요청은 로그인 왕복 동안만 서버 세션에 두고, 최초 인증은 Redis 가입 컨텍스트(15분)를 거쳐 닉네임 입력 후 회원을 만들며, 로그인 결과는 LOCAL과 같은 HttpOnly 인증 쿠키로 발급한다. 실제 제공자 왕복 확인은 남아 있다. Grafana·Loki·Alloy는 실행 틀만 마련된 상태다.
 
 ### 4.2 목표 운영 구성
 
