@@ -18,7 +18,8 @@ import org.springframework.security.oauth2.core.oidc.IdTokenClaimNames;
 /*
     KAKAO·GOOGLE OpenID Connect Client 등록(MEMBER_AUTH 1.4·1.5, GR-46 M01-02, M00-04·09).
     - issuerUri를 함께 넣어 ID 토큰의 iss를 검증하게 한다. 서명(RS256·JWKS)·aud·exp·nonce 검증은 Spring 표준 그대로다
-    - 사용자 정보 엔드포인트를 두지 않아 ID 토큰의 sub·email·email_verified만 쓴다. 제공자 프로필은 받지 않는다
+    - GOOGLE은 사용자 정보 엔드포인트를 두지 않아 ID 토큰의 sub·email·email_verified만 쓴다.
+      KAKAO는 ID 토큰에 email_verified가 없어 OIDC userinfo에서 email·email_verified를 받는다(GR-46 M03-04). 제공자 프로필은 받지 않는다
     Client ID·Secret은 SocialLoginProperties로 환경변수에서만 받는다.
     SecurityConfig(global)는 도메인을 참조하지 않으므로 oauth2Login 설정을 Customizer 빈으로 넘긴다(GR-46 M01-03).
  */
@@ -75,6 +76,8 @@ public class OAuth2LoginConfig {
                 .authorizationUri("https://kauth.kakao.com/oauth/authorize") // 카카오 로그인 화면의 주소
                 .tokenUri("https://kauth.kakao.com/oauth/token") // 백엔드가 인가 코드를 토큰으로 교환
                 .jwkSetUri("https://kauth.kakao.com/.well-known/jwks.json") // ID 토큰 서명 검증에 사용할 공개키 조회
+                // ID 토큰에 email_verified가 없어 userinfo에서 받는다. Spring이 userinfo의 sub가 ID 토큰과 같은지 확인한다
+                .userInfoUri("https://kapi.kakao.com/v1/oidc/userinfo")
                 .issuerUri("https://kauth.kakao.com") // ID 토큰이 기대한 발급자에게서 왔는지 확인할 때 사용되는 주소
                 .userNameAttributeName(IdTokenClaimNames.SUB) // ID 토큰 안의 카카오 사용자 고유 식별자를 사용자 식별 기준으로 사용하도록 지정
                 .clientName("Kakao")

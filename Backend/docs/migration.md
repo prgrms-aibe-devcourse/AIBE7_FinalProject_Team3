@@ -399,7 +399,7 @@ curl.exe -s -w "`n%{http_code}`n" http://localhost:8080/api/v1/auth/oauth2/naver
 ### 8.3 최초 인증(브라우저)
 
 1. 브라우저 개발자 도구를 열고 `http://localhost:8080/api/v1/auth/oauth2/kakao`로 이동해 제공자 화면에서 로그인·동의한다.
-2. 주소창이 `.../#/auth/callback?result=signup_required`이면 성공이다. 개발자 도구 > Application > Cookies > `http://localhost:8080`에서 `oauth2_signup_token`(`Path=/api/v1/auth/oauth2/signup`, 15분, `HttpOnly`·`Secure`)을 확인하고 값을 복사한다. `JSESSIONID`는 남지 않아야 한다.
+2. 주소창이 `.../#/auth/callback?result=signup_required`이면 성공이다. 개발자 도구 > Application > Cookies > `http://localhost:8080`에서 `oauth2_signup_token`(`Path=/api/v1/auth/oauth2/signup`, 15분, `HttpOnly`·`Secure`)을 확인하고 값을 복사한다. 시작 때 받은 `JSESSIONID` 쿠키는 브라우저에 남지만, 서버 세션(인가 요청)은 콜백 처리 후 무효화돼 더는 쓰이지 않는다. 로그인 상태는 인증 쿠키로만 판단한다.
 3. 회원이 아직 없고 가입 컨텍스트만 있는지 확인한다.
 
 ```powershell
