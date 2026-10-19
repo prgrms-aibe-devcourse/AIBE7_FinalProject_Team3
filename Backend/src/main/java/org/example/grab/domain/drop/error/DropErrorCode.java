@@ -5,6 +5,8 @@ import org.springframework.http.HttpStatus;
 
 public enum DropErrorCode implements ErrorCode {
 
+    STOCK_STREAM_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "재고 구독 연결 또는 요청 제한을 초과했습니다."),
+    STOCK_STREAM_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "재고 구독을 일시적으로 사용할 수 없습니다."),
     DROP_NOT_FOUND(HttpStatus.NOT_FOUND, "DROP을 찾을 수 없습니다."),
     DROP_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 DROP에 대한 권한이 없습니다."),
     DROP_NOT_EDITABLE(HttpStatus.CONFLICT, "수정할 수 없는 상태의 DROP입니다."),

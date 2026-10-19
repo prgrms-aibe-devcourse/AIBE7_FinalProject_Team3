@@ -20,6 +20,9 @@ import java.util.Optional;
 
 public interface DropRepository extends JpaRepository<Drop, Long> {
 
+    @Query("SELECT COUNT(d) FROM Drop d WHERE d.id IN :dropIds AND d.status <> org.example.grab.domain.drop.entity.DropStatus.DRAFT")
+    long countPublicDropsForSubscription(@Param("dropIds") List<Long> dropIds);
+
     @EntityGraph(attributePaths = "options")
     Optional<Drop> findWithOptionsById(Long id);
 
