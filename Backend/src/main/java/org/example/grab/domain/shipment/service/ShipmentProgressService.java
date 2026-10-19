@@ -24,7 +24,7 @@ public class ShipmentProgressService {
 
     public ShipmentProgressService(
             ShipmentProgressBatchService batchService,
-            @Value("${grab.mock-delivery.stage-interval:10s}") Duration stageInterval) {
+            @Value("${grab.mock-delivery.stage-interval:30s}") Duration stageInterval) {
         if (stageInterval.isZero() || stageInterval.isNegative()) {
             throw new IllegalArgumentException(
                     "grab.mock-delivery.stage-interval은 양수여야 합니다: " + stageInterval);
