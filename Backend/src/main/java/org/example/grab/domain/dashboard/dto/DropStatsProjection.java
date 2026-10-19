@@ -13,6 +13,7 @@ public record DropStatsProjection(
         long reservedStock,
         long soldStock,
         long orderCount,
+        long soldQuantity,
         long salesAmount
 ) {
 }

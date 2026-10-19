@@ -59,7 +59,7 @@
 | GET | `/api/v1/drops/{dropId}` | 불필요 | DROP 상세, 옵션, 일정 및 배송 정보 조회 |
 | GET | `/api/v1/drops/{dropId}/stocks` | 불필요 | 옵션별 현재 가용 재고 조회 |
 
-> SSE 재고 구독 API는 MVP 이후 도입 후보이며 위 MVP API 수에는 포함하지 않습니다.
+> SSE 구독 API는 GR-109에서 명세를 정의했으며 현재 미구현입니다. 변경 알림 후 기존 조회 API를 재사용하는 정책은 [실시간 변경 전달 계약](../REALTIME_STOCK.md)을 따릅니다. 구독 경로는 `GET /api/v1/drops/stock-stream?dropIds=100,101`이며 인증은 불필요합니다(전달된 무효 쿠키는 기존 정책상 401). 세부 계약은 정본 6~9절을 따르고 초기 운영 기본값·검증 목표는 정본 11~13절을 따르며 성능 미실측입니다. 위 구현 API 수에는 포함하지 않습니다.
 
 **목록 API 지원 파라미터:**
 - 상태 필터: `status`
@@ -117,7 +117,7 @@
 | Method | Endpoint | 인증 | 용도 |
 | --- | --- | --- | --- |
 | POST | `/api/v1/orders/{orderId}/payments` | USER | 결제창 인증 결과(`paymentKey`)로 토스페이먼츠 테스트 결제 승인 |
-| GET | `/api/v1/orders/{orderId}/payments` | USER/SELLER | 주문에 대한 결제 시도 및 결과 이력 조회 |
+| GET | `/api/v1/orders/{orderId}/payments` | USER | 본인 주문의 결제 시도 및 결과 이력 조회 |
 | POST | `/api/v1/payments/toss/webhook` | 토스 조회 재확인 | 토스페이먼츠 결제 상태 변경 웹훅 수신 (후속 구현) |
 
 > Mock 결제는 토스페이먼츠 테스트 환경(테스트 API 키)으로 진행하며 실제 결제는 일어나지 않습니다.
@@ -129,6 +129,7 @@
 | --- | --- | --- | --- |
 | GET | `/api/v1/seller/orders` | SELLER | 본인 DROP에 접수된 주문 목록 조회 |
 | GET | `/api/v1/seller/orders/{orderId}` | SELLER | 본인 DROP의 주문 상세 조회 |
+| GET | `/api/v1/seller/orders/{orderId}/payments` | SELLER | 본인 DROP 주문의 결제 시도 및 결과 이력 조회 (PG 실패 사유 제외) |
 | POST | `/api/v1/seller/orders/{orderId}/prepare-shipment` | SELLER | 결제 완료 주문을 배송 준비 상태로 변경 |
 | POST | `/api/v1/seller/orders/{orderId}/shipment` | SELLER | 택배사와 송장번호를 등록하고 발송 처리 |
 | PATCH | `/api/v1/seller/orders/{orderId}/shipment` | SELLER | 등록한 택배사·송장번호 수정 (`SHIPPED`만) |
@@ -154,6 +155,12 @@
 > 발급된 `uploadUrl`로 클라이언트가 Supabase Storage에 이미지를 직접 업로드하고, 응답의 `{ imageId, imageUrl }`을 DROP 생성·수정 요청의 GALLERY `images` 또는 DETAIL `detailImages`에 사용합니다. DROP당 GALLERY는 최대 5개, DETAIL은 최대 15개입니다.
 
 ---
+
+### 구현 예정 공개 SSE API (구현 API 수에서 제외)
+
+| Method | Endpoint | 인증 | 용도 |
+| --- | --- | --- | --- |
+| GET | `/api/v1/drops/stock-stream?dropIds=100,101` | 불필요. 무효 쿠키는 401 | 단일·다중 상품의 재고·판매량·상태 변경 알림. GR-110 구현 예정 |
 
 ## 3. 전체 API 간단 요약
 

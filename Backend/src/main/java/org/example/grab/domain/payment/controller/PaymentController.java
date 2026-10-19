@@ -4,12 +4,15 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.example.grab.domain.payment.dto.PaymentHistoryResponse;
 import org.example.grab.domain.payment.dto.PaymentRequest;
 import org.example.grab.domain.payment.dto.PaymentResponse;
+import org.example.grab.domain.payment.service.PaymentHistoryService;
 import org.example.grab.domain.payment.service.PaymentService;
 import org.example.grab.global.common.ApiResponse;
 import org.example.grab.global.common.PublicIdParser;
 import org.example.grab.global.security.identity.CurrentUserIdProvider;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -17,13 +20,16 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/orders")
-@Tag(name = "결제", description = "토스페이먼츠 테스트 환경 Mock 결제 승인")
+@Tag(name = "결제", description = "토스페이먼츠 테스트 환경 Mock 결제 승인과 주문 결제 이력 조회")
 public class PaymentController {
 
     private final PaymentService paymentService;
+    private final PaymentHistoryService paymentHistoryService;
     private final CurrentUserIdProvider currentUserIdProvider;
 
     // 결제 시도가 만들어진 뒤의 결과(SUCCEEDED, FAILED, UNKNOWN)는 모두 200으로 응답하고 status로 구분한다(PAYMENT.md 1.1).
@@ -48,5 +54,16 @@ public class PaymentController {
                 idempotencyKey,
                 request
         ));
+    }
+
+    @Operation(summary = "주문 결제 이력 조회",
+            description = "본인 주문의 모든 결제 시도와 결과를 시도 순서대로 반환한다. 시도가 없으면 빈 배열이다")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "AUTHENTICATION_REQUIRED, INVALID_TOKEN")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "RESOURCE_NOT_FOUND (UUID 형식 오류), ORDER_NOT_FOUND")
+    @GetMapping("/{orderId}/payments")
+    public ApiResponse<List<PaymentHistoryResponse>> findPayments(@PathVariable String orderId) {
+        return ApiResponse.success(paymentHistoryService.findBuyerHistory(
+                currentUserIdProvider.currentUserId(), PublicIdParser.parse(orderId)));
     }
 }

@@ -91,10 +91,13 @@ GET /api/v1/seller-applications/me
     "businessRegistrationNumber": "1234567890",
     "description": "한정판 상품 판매점",
     "status": "PENDING",
-    "appliedAt": "2026-09-18T14:00:00+09:00"
+    "appliedAt": "2026-09-18T14:00:00+09:00",
+    "rejectedReason": null
   }
 }
 ```
+
+- `rejectedReason`은 `status`가 `REJECTED`일 때만 값이 있고, 그 외에는 `null`이다.
 
 ### 1.4 판매자 신청 목록 조회
 

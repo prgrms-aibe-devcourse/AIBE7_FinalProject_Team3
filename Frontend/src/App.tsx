@@ -5,10 +5,6 @@ import Header from './components/Header/Header'
 import useAuth from './features/auth/logic/useAuth'
 import useOrders from './features/order/logic/useOrders'
 import useWish from './features/wish/logic/useWish'
-import {
-  demoSellerApplications,
-  reviewSellerApplication,
-} from './features/seller/mock/mockSellerApplications'
 import type { SellerDraft } from './features/seller/mock/mockSellerDrafts'
 import {
   demoSellerDrops,
@@ -44,9 +40,6 @@ export default function App() {
   const { user, status, authenticated, login, logout } = useAuth()
   const { wishes, wishesReady, toggleWish } = useWish(authenticated, notify)
   const { orders, buyerOrders, addOrder, updateBuyerOrder } = useOrders()
-  const [sellerApplications, setSellerApplications] = useState(
-    demoSellerApplications,
-  )
   const [sellerDrafts, setSellerDrafts] = useState<Record<string, SellerDraft>>(
     {},
   )
@@ -131,15 +124,7 @@ export default function App() {
             element={<LoginPage login={login} notify={notify} />}
           />
           <Route path="/signup" element={<SignupPage notify={notify} />} />
-          <Route
-            path="/seller"
-            element={
-              <SellerDashboardPage
-                drops={sellerDrops}
-                ownerEmail={user?.email ?? 'grab@example.com'}
-              />
-            }
-          />
+          <Route path="/seller" element={<SellerDashboardPage />} />
           <Route
             path="/seller/apply"
             element={
@@ -156,12 +141,6 @@ export default function App() {
               <AdminSellerApplicationsPage
                 user={user}
                 authStatus={status}
-                applications={sellerApplications}
-                onReview={(id, status, reason) =>
-                  setSellerApplications((current) =>
-                    reviewSellerApplication(current, id, status, reason),
-                  )
-                }
                 notify={notify}
               />
             }
@@ -172,25 +151,11 @@ export default function App() {
           />
           <Route
             path="/seller/inventory"
-            element={
-              <SellerInventoryPage
-                user={user}
-                authStatus={status}
-                drops={sellerDrops}
-                ownerEmail={user?.email ?? 'grab@example.com'}
-              />
-            }
+            element={<SellerInventoryPage user={user} authStatus={status} />}
           />
           <Route
             path="/seller/sales"
-            element={
-              <SellerSalesPage
-                user={user}
-                authStatus={status}
-                drops={sellerDrops}
-                ownerEmail={user?.email ?? 'grab@example.com'}
-              />
-            }
+            element={<SellerSalesPage user={user} authStatus={status} />}
           />
           <Route
             path="/seller/drops"

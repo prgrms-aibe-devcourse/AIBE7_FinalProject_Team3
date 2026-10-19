@@ -143,7 +143,68 @@ POST /api/v1/payments/toss/webhook
 GET /api/v1/orders/{orderId}/payments
 ```
 
-- **인증**: 주문 소유자 또는 해당 주문의 판매자
+- **인증**: 주문 소유자 (`USER`)
+
+> 주문의 모든 결제 시도와 결과를 반환합니다(PAY-005). 판매자는 1.4를 사용합니다.
+
+**응답:**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "paymentId": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      "orderId": "b2d4f6a8-1c3e-4a5b-8c7d-9e0f1a2b3c4d",
+      "provider": "TOSS",
+      "amount": 261000,
+      "status": "FAILED",
+      "reconciliationStatus": "NONE",
+      "requestedAt": "2026-09-18T14:01:00+09:00",
+      "paidAt": null,
+      "canceledAt": null,
+      "failure": {
+        "code": "REJECT_CARD_PAYMENT",
+        "message": "한도초과 혹은 잔액부족으로 결제에 실패했습니다."
+      }
+    },
+    {
+      "paymentId": "e7d6c5b4-a392-4817-b6a5-4d3c2b1a0f9e",
+      "orderId": "b2d4f6a8-1c3e-4a5b-8c7d-9e0f1a2b3c4d",
+      "provider": "TOSS",
+      "amount": 261000,
+      "status": "SUCCEEDED",
+      "reconciliationStatus": "NONE",
+      "requestedAt": "2026-09-18T14:02:50+09:00",
+      "paidAt": "2026-09-18T14:03:00+09:00",
+      "canceledAt": null,
+      "failure": null
+    }
+  ]
+}
+```
+
+- 결제 시도 순서(오래된 시도 먼저)로 정렬하며, 페이지를 나누지 않습니다. 결제 시도가 없으면 빈 배열입니다.
+- `provider`: 결제 PG (`payments.provider`). 결제수단(카드·간편결제 등)은 저장하지 않으므로 응답에 포함하지 않습니다.
+- `status`: `PENDING`, `SUCCEEDED`, `FAILED`, `UNKNOWN`, `CANCELED`. `reconciliationStatus`는 1.1과 같은 의미이며, `SUCCEEDED`여도 `REQUIRED`면 주문이 확정되지 않은 상태입니다.
+- `requestedAt`: 결제 시도를 만든 시각(`payments.created_at`)입니다.
+- `paidAt`: PG 승인 시각(`payments.approved_at`)입니다. 승인된 적이 있는 `SUCCEEDED`, `CANCELED`에서 값이 있고, 그 외에는 `null`입니다.
+- `canceledAt`: PG 결제 취소 시각(`payments.canceled_at`)으로, `CANCELED`일 때만 값이 있습니다. 환불 요청 진행 상태(`payment_cancellations`)는 반환하지 않습니다.
+- `failure`: 1.1과 같은 형식으로, `FAILED`일 때만 값이 있고 그 외에는 `null`입니다.
+
+**오류 코드:**
+- `ORDER_NOT_FOUND` (404): 주문이 없거나 다른 사용자의 주문인 경우. 주문 존재 여부를 노출하지 않도록 두 경우를 구분하지 않습니다.
+- `RESOURCE_NOT_FOUND` (404): 주문 ID 형식이 올바르지 않은 경우
+
+### 1.4 판매자 주문 결제 이력 조회
+
+```http
+GET /api/v1/seller/orders/{orderId}/payments
+```
+
+- **인증**: `SELLER`
+
+> 해당 주문에 포함된 DROP의 소유권을 검증합니다(ORDER.md 2.2와 같음).
 
 **응답:**
 
@@ -157,13 +218,23 @@ GET /api/v1/orders/{orderId}/payments
       "provider": "TOSS",
       "amount": 261000,
       "status": "SUCCEEDED",
-      "paidAt": "2026-09-18T14:03:00+09:00"
+      "reconciliationStatus": "NONE",
+      "requestedAt": "2026-09-18T14:02:50+09:00",
+      "paidAt": "2026-09-18T14:03:00+09:00",
+      "canceledAt": null
     }
   ]
 }
 ```
 
-- `provider`: 결제 PG (`payments.provider`). 결제수단(카드·간편결제 등)은 저장하지 않으므로 응답에 포함하지 않습니다.
+- 정렬과 각 필드는 1.3과 같습니다.
+- `failure`(PG 실패 코드·메시지)는 구매자의 결제 정보이므로 반환하지 않습니다. 실패한 시도는 `status`와 `requestedAt`으로 확인합니다.
+
+**오류 코드:**
+- `ORDER_NOT_FOUND` (404): 주문이 없는 경우
+- `RESOURCE_NOT_FOUND` (404): 주문 ID 형식이 올바르지 않은 경우
+- `ORDER_ACCESS_DENIED` (403): 본인 DROP의 주문이 아닌 경우
+- `ACCESS_DENIED` (403): `SELLER` 권한이 없거나 승인된 판매자가 아닌 경우
 
 ---
 

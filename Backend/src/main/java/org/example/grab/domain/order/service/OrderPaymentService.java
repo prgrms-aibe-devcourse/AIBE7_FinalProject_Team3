@@ -68,6 +68,30 @@ public class OrderPaymentService {
     }
 
     /**
+     * 구매자의 결제 이력 조회 대상 주문을 읽는다(PAYMENT.md 1.3). 잠그지 않는다.
+     * 다른 구매자의 주문은 존재 여부를 숨기고 ORDER_NOT_FOUND로 응답한다.
+     */
+    @Transactional(propagation = Propagation.MANDATORY, readOnly = true)
+    public PayableOrder findForBuyerPaymentHistory(long buyerId, UUID orderId) {
+        return PayableOrder.from(orderRepository.findByUuidAndBuyerId(orderId, buyerId)
+                .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND)));
+    }
+
+    /**
+     * 판매자의 결제 이력 조회 대상 주문을 읽는다(PAYMENT.md 1.4). 잠그지 않는다.
+     * 판매자 주문 상세와 같이 본인 DROP의 주문이 아니면 ORDER_ACCESS_DENIED로 응답한다.
+     */
+    @Transactional(propagation = Propagation.MANDATORY, readOnly = true)
+    public PayableOrder findForSellerPaymentHistory(long sellerId, UUID orderId) {
+        Order order = orderRepository.findByUuid(orderId)
+                .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+        if (!orderRepository.ownsDrop(sellerId, order.getDropId())) {
+            throw new BusinessException(OrderErrorCode.ORDER_ACCESS_DENIED);
+        }
+        return PayableOrder.from(order);
+    }
+
+    /**
      * 결제 전 주문을 취소하고 선점 재고를 가용 재고로 되돌린다(ERD.md 3.3). 진행 중인 결제 확인은 호출하는 결제 도메인이
      * 같은 트랜잭션에서 먼저 한다.
      *

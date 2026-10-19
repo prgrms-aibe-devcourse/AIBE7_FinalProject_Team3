@@ -9,7 +9,7 @@
 | --- | --- | --- | --- |
 | Language | Java | 17 | 팀의 학습 경험과 라이브러리 호환성이 안정적이며 Spring Boot 4.1의 최소 요구 버전을 충족한다. |
 | Framework | Spring Boot | 4.1.x | 웹, 보안, 데이터 접근, 모니터링 환경을 일관되게 구성한다. |
-| Web | Spring MVC | Boot 관리 | REST API 구현에 사용하며 블로킹 방식의 JPA 환경에 적합하다. SSE는 MVP 이후 필요할 때 추가한다. |
+| Web | Spring MVC | Boot 관리 | REST API 구현에 사용하며 블로킹 방식의 JPA 환경에 적합하다. SSE는 GR-109 계약 확정 후 GR-110~113에서 단계적으로 도입한다. |
 | ORM | Spring Data JPA / Hibernate | Boot 관리 | 주문·옵션·결제 도메인의 관계 매핑과 트랜잭션을 관리한다. 복잡한 조회는 DTO Projection 또는 별도 쿼리로 처리한다. |
 | Security | Spring Security | Boot 관리 | HttpOnly 쿠키 기반 JWT 인증, CSRF 보호, KAKAO·GOOGLE OpenID Connect 소셜 로그인(OAuth2 Client), Argon2id 비밀번호 해시, USER·SELLER·ADMIN 권한 및 리소스 소유권을 검증한다. |
 | Validation | Jakarta Bean Validation | Boot 관리 | 요청 DTO와 상태별 필수값을 검증한다. |
@@ -213,6 +213,8 @@ Mock 결제(`PAYMENT.md` 1.1절)는 토스페이먼츠 **테스트 환경**으�
 
 MVP 초기에는 Actuator와 Prometheus를 연결해 JVM·HTTP·DB Connection Pool 메트릭을 수집한다. Grafana 대시보드와 Alloy·Loki 로그 파이프라인은 배포 환경과 핵심 API가 안정된 뒤 단계적으로 완성한다.
 
+SSE의 초기 연결·조회 주기·부하 조건과 수용 기준은 [실시간 변경 전달 계약](REALTIME_STOCK.md) 11~13절을 따른다. 일반 HTTP 지연과 지속 연결 수명을 분리하고, 실제 인프라 용량·프록시·Redis 다중 서버 동작은 GR-113에서 실측한다. 문서의 초기 목표를 운영 성능 검증 결과로 취급하지 않는다.
+
 ## 7. Testing
 
 | 구분 | 기술 | 용도 및 범위 |
@@ -260,12 +262,14 @@ MVP 초기에는 Actuator와 Prometheus를 연결해 JVM·HTTP·DB Connection Po
 ### 문제를 확인한 뒤 적용
 
 - Redis 조회 캐시와 분산 환경 보조 기능
-- SSE 실시간 재고 전달
+- SSE 실시간 재고·상태 변경 알림: GR-109에서 기존 API 재조회 방식을 채택했으며, 명세에 따라 GR-110~113에서 구현·검증한다. 범위·복구 정책·초기 운영 목표는 [실시간 변경 전달 계약](REALTIME_STOCK.md)을 따른다.
 - Grafana 대시보드와 Alloy·Loki 로그 파이프라인
 - EC2 자동 배포와 Blue/Green 전환
 - Amazon SES 발송 전환 (실사용자 오픈 또는 발송량 증가 시)
 - 고부하 상황의 재고 처리 최적화
 - pgvector 기반 개인화 추천
+
+Redis Pub/Sub은 GR-113에서 다중 서버 간 변경 신호 전달에만 사용한다. 로컬 전달과 Redis 전달을 동시에 사용자에게 송신하지 않으며, 재고 원장·이벤트 이력·재생 저장소로 사용하지 않는다. 단일 서버→다중 서버 전환 경계는 [실시간 변경 전달 계약](REALTIME_STOCK.md) 14절을 따른다.
 
 ## 10. 기술 선정 기준
 

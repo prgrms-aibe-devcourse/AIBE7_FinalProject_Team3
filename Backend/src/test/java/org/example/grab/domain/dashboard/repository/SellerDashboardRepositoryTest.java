@@ -196,13 +196,16 @@ class SellerDashboardRepositoryTest {
     void findDropStats_aggregatesOwnDropsOnly() {
         // given
         Long dropId = insertDrop(sellerId, "ENDED", "집계 대상", now.minusDays(3), now.minusDays(1));
-        insertOption(dropId, 100, 10, 20, 5, true);
+        Long optionId = insertOption(dropId, 100, 10, 20, 5, true);
         insertOption(dropId, 50, 0, 10, 0, false);
         insertWish(dropId, false);
         insertWish(dropId, false);
         insertWish(dropId, true);
-        insertOrder(dropId, "PAID", now.minusDays(2));
-        insertOrder(dropId, "DELIVERED", now.minusDays(2));
+        Long paidOrder = insertOrder(dropId, "PAID", now.minusDays(2));
+        Long deliveredOrder = insertOrder(dropId, "DELIVERED", now.minusDays(2));
+        // 주문 건수(2건)와 판매 수량(품목 수량 합, 3+2=5)은 다른 값이어야 구분이 검증된다
+        insertOrderItem(paidOrder, dropId, optionId, 3);
+        insertOrderItem(deliveredOrder, dropId, optionId, 2);
         insertOrder(dropId, "PAYMENT_PENDING", now.minusDays(2));
         insertOrder(dropId, "EXPIRED", now.minusDays(2));
         insertOrder(dropId, "CANCELED", now.minusDays(2));
@@ -216,7 +219,7 @@ class SellerDashboardRepositoryTest {
 
         // when
         Page<DropStatsProjection> page = sellerDashboardRepository.findDropStats(
-                sellerId, null, PageRequest.of(0, 20));
+                sellerId, null, null, PageRequest.of(0, 20));
 
         // then
         assertThat(page.getTotalElements()).isEqualTo(1);
@@ -232,6 +235,8 @@ class SellerDashboardRepositoryTest {
         // 주문 단가는 1000이고 결제 확정·미취소인 PAID·DELIVERED 두 건만 센다
         assertThat(stats.orderCount()).isEqualTo(2);
         assertThat(stats.salesAmount()).isEqualTo(2000);
+        // 판매 수량은 같은 두 주문의 품목 수량 합(3+2)이라 주문 건수와는 다른 값이다
+        assertThat(stats.soldQuantity()).isEqualTo(5);
     }
 
     @Test
@@ -244,9 +249,9 @@ class SellerDashboardRepositoryTest {
 
         // when
         Page<DropStatsProjection> firstPage = sellerDashboardRepository.findDropStats(
-                sellerId, "ENDED", PageRequest.of(0, 1));
+                sellerId, "ENDED", null, PageRequest.of(0, 1));
         Page<DropStatsProjection> secondPage = sellerDashboardRepository.findDropStats(
-                sellerId, "ENDED", PageRequest.of(1, 1));
+                sellerId, "ENDED", null, PageRequest.of(1, 1));
 
         // then
         assertThat(firstPage.getTotalElements()).isEqualTo(2);
@@ -254,6 +259,25 @@ class SellerDashboardRepositoryTest {
         assertThat(firstPage.getContent()).extracting(DropStatsProjection::dropId).containsExactly(lastEnded);
         assertThat(secondPage.getContent()).extracting(DropStatsProjection::dropId).containsExactly(firstEnded);
         assertThat(secondPage.hasNext()).isFalse();
+    }
+
+    @Test
+    @DisplayName("dropId를 지정하면 본인 DROP 중 해당 1건만, 다른 판매자 DROP이면 빈 목록을 반환한다")
+    void findDropStats_filtersByDropId() {
+        // given
+        Long target = insertDrop(sellerId, "ENDED", "조회 대상", now.minusDays(3), now.minusDays(1));
+        insertDrop(sellerId, "ENDED", "다른 내 상품", now.minusDays(5), now.minusDays(4));
+        Long otherDropId = insertDrop(otherSellerId, "ENDED", "다른 판매자", now.minusDays(3), now.minusDays(1));
+
+        // when
+        Page<DropStatsProjection> own = sellerDashboardRepository.findDropStats(
+                sellerId, null, target, PageRequest.of(0, 20));
+        Page<DropStatsProjection> notOwned = sellerDashboardRepository.findDropStats(
+                sellerId, null, otherDropId, PageRequest.of(0, 20));
+
+        // then
+        assertThat(own.getContent()).extracting(DropStatsProjection::dropId).containsExactly(target);
+        assertThat(notOwned.getContent()).isEmpty();
     }
 
     @Test
@@ -266,7 +290,7 @@ class SellerDashboardRepositoryTest {
 
         // when
         Page<DropStatsProjection> page = sellerDashboardRepository.findDropStats(
-                sellerId, null, PageRequest.of(0, 20));
+                sellerId, null, null, PageRequest.of(0, 20));
 
         // then
         assertThat(page.getContent()).hasSize(1);
@@ -317,14 +341,26 @@ class SellerDashboardRepositoryTest {
                 status, saleStartsAt, status, status);
     }
 
-    private void insertOption(Long dropId, int total, int reserved, int sold, int withheld, boolean active) {
-        jdbcTemplate.update(
+    private Long insertOption(Long dropId, int total, int reserved, int sold, int withheld, boolean active) {
+        return jdbcTemplate.queryForObject(
                 """
                 INSERT INTO drop_options (drop_id, unit_price, total_quantity, reserved_quantity,
                                           sold_quantity, withheld_quantity, is_active, sort_order)
                 VALUES (?, 1000, ?, ?, ?, ?, ?, 0)
+                RETURNING id
                 """,
+                Long.class,
                 dropId, total, reserved, sold, withheld, active);
+    }
+
+    private void insertOrderItem(Long orderId, Long dropId, Long optionId, int quantity) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO order_items (order_id, drop_id, option_id, option_name_snapshot,
+                                         unit_price, quantity)
+                VALUES (?, ?, ?, '옵션', 1000, ?)
+                """,
+                orderId, dropId, optionId, quantity);
     }
 
     private Long insertOrder(Long dropId, String status, OffsetDateTime createdAt) {

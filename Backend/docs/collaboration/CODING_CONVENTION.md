@@ -68,7 +68,7 @@ org.example.grab
 
 - 트랜잭션은 Service에만 선언한다. 조회 메서드는 `@Transactional(readOnly = true)`를 사용한다.
 - 의존성은 `final` 필드 + `@RequiredArgsConstructor` 생성자 주입만 사용한다. `@Autowired` 필드 주입은 사용하지 않는다.
-- Controller는 항상 `ApiResponse`로 감싼 응답을 반환한다. 형식은 [공통 API 규칙](../development/api-spec/COMMON.md) 1.3·1.4를 따른다.
+- Controller의 JSON 성공 응답은 `ApiResponse`로 감싼다. SSE 지속 응답은 이벤트 data에 JSON을 직접 담는 예외이며, 연결 전 오류는 공통 오류 응답을 사용한다. 형식은 [공통 API 규칙](../development/api-spec/COMMON.md) 1.4·1.5를 따른다.
 - 새 API에는 클래스에 `@Tag(name, description)`, 메서드에 `@Operation(summary, description)`과 성공·주요 오류 상태별 `@ApiResponse`(설명에 오류 코드 나열)를 단다. 세부 규칙은 api-spec 문서에 두고 Swagger에는 요약만 적는다. 공통 `ApiResponse`와 이름이 겹치면 `@io.swagger.v3.oas.annotations.responses.ApiResponse`로 쓴다.
 
 ### 2.4 Entity
@@ -106,10 +106,10 @@ org.example.grab
 
 - 테스트는 `given / when / then` 주석으로 구분하고, 검증은 AssertJ(`assertThat`)를 사용한다.
 - 단위 테스트는 Spring 컨텍스트를 띄우지 않는다. 필요할 때만 `@DataJpaTest`, `@SpringBootTest`를 쓴다.
-- 테스트 범위와 도구는 [TECHSTACK.md](TECHSTACK.md) 7장을 따른다.
+- 테스트 범위와 도구는 [TECHSTACK.md](../development/TECHSTACK.md) 7장을 따른다.
 
 ### 2.9 Flyway 마이그레이션
 
 - 파일명은 `V{번호}__{설명}.sql` (예: `V1__create_user.sql`), 위치는 `src/main/resources/db/migration`.
 - 번호는 팀에서 이어서 증가시키고, 이미 병합된 마이그레이션 파일은 수정하지 않는다. 변경은 새 파일로 추가한다.
-- 스키마 정의의 기준은 [ERD.md](ERD.md)다.
+- 스키마 정의의 기준은 [ERD.md](../development/ERD.md)다.

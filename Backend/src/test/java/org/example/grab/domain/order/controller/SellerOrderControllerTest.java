@@ -5,7 +5,11 @@ import org.example.grab.domain.order.dto.OrderShippingResponse;
 import org.example.grab.domain.order.dto.SellerOrderDetailResponse;
 import org.example.grab.domain.order.entity.OrderStatus;
 import org.example.grab.domain.order.service.SellerOrderService;
+import org.example.grab.domain.payment.dto.SellerPaymentHistoryResponse;
+import org.example.grab.domain.payment.entity.PaymentProvider;
 import org.example.grab.domain.payment.entity.PaymentStatus;
+import org.example.grab.domain.payment.entity.ReconciliationStatus;
+import org.example.grab.domain.payment.service.PaymentHistoryService;
 import org.example.grab.global.error.GlobalExceptionHandler;
 import org.example.grab.global.error.ValidationErrorCodeResolver;
 import org.example.grab.global.security.identity.CurrentSellerIdProvider;
@@ -18,18 +22,22 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class SellerOrderControllerTest {
 
     private final SellerOrderService sellerOrderService = mock(SellerOrderService.class);
+    private final PaymentHistoryService paymentHistoryService = mock(PaymentHistoryService.class);
     private final CurrentSellerIdProvider currentSellerIdProvider = mock(CurrentSellerIdProvider.class);
     private final MockMvc mockMvc = MockMvcBuilders
-            .standaloneSetup(new SellerOrderController(sellerOrderService, currentSellerIdProvider))
+            .standaloneSetup(new SellerOrderController(sellerOrderService, paymentHistoryService, currentSellerIdProvider))
             .setControllerAdvice(new GlobalExceptionHandler(new ValidationErrorCodeResolver(List.of())))
             .build();
 
@@ -110,5 +118,31 @@ class SellerOrderControllerTest {
         result
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("판매자 결제 이력은 시도 순서대로 반환하고 PG 실패 사유 필드를 담지 않는다")
+    void findsOrderPayments() throws Exception {
+        // given
+        UUID orderId = UUID.randomUUID();
+        UUID paymentId = UUID.randomUUID();
+        given(currentSellerIdProvider.currentSellerId()).willReturn(7L);
+        given(paymentHistoryService.findSellerHistory(7L, orderId)).willReturn(List.of(
+                new SellerPaymentHistoryResponse(paymentId, orderId, PaymentProvider.TOSS, 33000,
+                        PaymentStatus.FAILED, ReconciliationStatus.NONE,
+                        OffsetDateTime.parse("2026-10-15T01:00:00Z"), null, null)));
+
+        // when
+        var result = mockMvc.perform(get("/api/v1/seller/orders/{orderId}/payments", orderId));
+
+        // then
+        result
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].paymentId").value(paymentId.toString()))
+                .andExpect(jsonPath("$.data[0].orderId").value(orderId.toString()))
+                .andExpect(jsonPath("$.data[0].provider").value("TOSS"))
+                .andExpect(jsonPath("$.data[0].status").value("FAILED"))
+                .andExpect(jsonPath("$.data[0].requestedAt").exists())
+                .andExpect(content().string(not(containsString("failure"))));
     }
 }
