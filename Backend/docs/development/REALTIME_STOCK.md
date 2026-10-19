@@ -367,3 +367,32 @@ Servlet async 시작 후 최초 onWritePossible 통지를 받은 연결만 활�
 주문 생성·미결제 취소·만료는 STOCK, 결제 확정은 SALES, 결제 완료 취소는 STOCK+SALES다. 판매 시작·종료·판매자 취소는 STATUS다. 기존 메일 이벤트와 PG 결과 처리·멱등 판정은 유지한다. 종료 배치는 시작 배치와 같이 SKIP LOCKED로 ID를 확보한 뒤 같은 트랜잭션에서 갱신하며 외부 건수 반환은 유지한다. 조회 API는 변경하지 않았다.
 
 실제 PostgreSQL·Tomcat 통합 테스트로 두 HTTP 구독자의 주문·결제·취소 수신, 커밋 전 미전달·롤백 미전달, 만료·종료 재실행 미발행을 확인했다. HTTP 클라이언트 검증과 별도로 실제 두 브라우저 수신은 4단계에서 확인한다.
+
+### 4단계 — 브라우저·회귀 검증과 관측
+
+격리된 PostgreSQL Testcontainers와 실제 Tomcat에서 주문 커밋·롤백, 취소·만료·상태 전환, 연결 제한·반복 정리·느린 수신자를 검증한다. `StockStreamHttpIntegrationTest.twoBrowsersReceiveCommittedOrder`는 서로 다른 두 Chromium 프로세스의 EventSource와 별도 상품 구독을 사용한다. 테스트 데이터는 전용 DB에만 만들며 브라우저와 프로세스는 finally에서 종료한다. 브라우저 의존성은 Frontend의 기존 Playwright를 사용한다.
+
+```bash
+# Frontend 의존성과 Playwright Chromium이 설치된 개발 환경에서, Backend 디렉터리 실행
+GRAB_SSE_BROWSER_TEST=true ./gradlew build
+```
+
+위 전체 검증은 1,608건 성공·실패/건너뜀 0건이다. 환경변수가 없는 일반 CI 실행에서는 브라우저 설치가 필요한 테스트 1건만 건너뛰며, HTTP·TCP·커밋 경계 테스트는 계속 실행한다. 운영 200연결 부하·Redis·프록시 검증을 대체하지 않는다.
+
+`StockStreamMetricsConfig`는 SSE 경로의 `http.server.requests`를 제외해 지속 연결 수명이 일반 API 지연 통계에 섞이지 않게 한다. SSE는 다음 전용 지표로 관측한다. 상품·IP·회원·연결 ID 태그는 없다.
+
+| Micrometer 이름 | 의미 |
+| --- | --- |
+| `grab.stock.stream.connections` | 활성 연결 수 |
+| `grab.stock.stream.subscriptions` | 연결별 상품 구독 수 합계 |
+| `grab.stock.stream.pending` | 전송 대기 중인 상품 항목 수 합계 |
+| `grab.stock.stream.rejected` | admission 거절 누계. reason은 rate/ip/capacity/tracking 4개 고정 값 |
+| `grab.stock.stream.disposed` | 실제 해제한 연결 누계. 중복 해제 제외 |
+| `grab.stock.stream.signals` | hub가 받은 변경 신호 누계 |
+| `grab.stock.stream.merged` | 연결별 기존 대기 상품에 추가 병합한 신호 누계 |
+| `grab.stock.stream.sent` | 전송한 SSE 프레임 누계. ready·주석·종료 포함 |
+| `grab.stock.stream.failures` | 전송 작업 실패 누계 |
+| `grab.stock.stream.timeouts` | 준비/전송 정체로 종료한 연결 누계 |
+| `grab.stock.stream.queue.rejected` | 전송 큐 거절 누계 |
+
+Prometheus에서는 점을 밑줄로 바꾸고 카운터에 `_total`을 붙인 이름으로 노출한다. `sent`는 브라우저 수신 확인이나 화면 반영 완료를 의미하지 않는다.
