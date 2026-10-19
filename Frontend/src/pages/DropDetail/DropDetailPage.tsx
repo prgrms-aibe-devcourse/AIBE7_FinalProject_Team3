@@ -57,12 +57,13 @@ export default function DropDetailPage({
         <EmptyState title="상품 정보를 불러오는 중이에요." variant="block" />
       </div>
     )
+  if (
+    detailQuery.isError &&
+    axios.isAxiosError(detailQuery.error) &&
+    detailQuery.error.response?.status === 404
+  )
+    return <NotFoundPage />
   if (detailQuery.isError && !detailQuery.data) {
-    if (
-      axios.isAxiosError(detailQuery.error) &&
-      detailQuery.error.response?.status === 404
-    )
-      return <NotFoundPage />
     return (
       <div className="catalog-error" role="alert">
         <EmptyState
