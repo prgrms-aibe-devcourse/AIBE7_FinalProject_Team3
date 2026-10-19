@@ -371,7 +371,7 @@ Remove-Item signup-cookie.txt, other-cookie.txt
 
 ## 8. 소셜 로그인 확인
 
-KAKAO·GOOGLE 소셜 로그인(MEMBER_AUTH 1.4~1.6)을 실제 제공자로 확인한다. 제공자 인증 화면을 거치므로 시작·콜백은 브라우저로, 가입 완료와 DB·Redis 확인은 6절과 같은 PowerShell로 한다. 자동 테스트(`SocialLoginApiIntegrationTest`)는 제공자 응답을 대역하므로 아래 8.3의 두 항목은 이 절차로만 확인된다.
+KAKAO·GOOGLE 소셜 로그인(MEMBER_AUTH 1.4~1.6)을 실제 제공자로 확인한다. 제공자 인증 화면을 거치므로 시작·콜백은 브라우저로, 가입 완료와 DB·Redis 확인은 6절과 같은 PowerShell로 한다. 자동 테스트(`SocialLoginApiIntegrationTest`)는 제공자 응답(토큰 교환·KAKAO userinfo)을 대역하므로, 콘솔 설정과 실제 제공자 응답은 이 절차로만 확인된다.
 
 ### 8.1 제공자 앱과 환경 변수
 
@@ -407,12 +407,15 @@ docker compose exec -T postgres psql -U grab -d grab -c "SELECT count(*) FROM us
 docker compose exec -T redis redis-cli --scan --pattern 'auth:oauth2-signup-context:*'
 ```
 
-`error=...`로 끝나면 백엔드 로그에서 사유 종류를 본다(`docker compose logs backend | Select-String "소셜"`). 실제 키로 처음 확인할 때 먼저 볼 것은 다음 두 가지다(GR-46 M03-04).
+`error=...`로 끝나면 백엔드 로그에서 사유 종류를 본다(`docker compose logs backend | Select-String "소셜"`). KAKAO는 ID 토큰에 `email_verified`가 없어 OIDC userinfo에서 이메일을 받고, 두 제공자 모두 PKCE와 함께 토큰 교환이 된다(GR-46 M03-04, 2026-10-17 실제 키 확인).
 
 | 증상 | 원인 후보 | 조치 |
 | --- | --- | --- |
-| 이메일 동의를 했는데 KAKAO만 `error=OAUTH2_EMAIL_REQUIRED` | 카카오 ID 토큰에 `email_verified`가 없다 | 결과를 기록하고 카카오의 검증 이메일 기준을 다시 정한다(GR-46 M00-04) |
-| KAKAO만 `error=OAUTH2_AUTHENTICATION_FAILED`, 로그 `reason=invalid_grant` 등 토큰 교환 오류 | 카카오가 PKCE(`code_verifier`)를 받아들이지 않는다 | 결과를 기록하고 카카오 등록만 PKCE를 끈다(GR-46 M00-03) |
+| 제공자 화면에서 `redirect_uri_mismatch` 등 Redirect URI 오류 | 콘솔에 등록한 주소와 접속 주소가 다르다(`127.0.0.1`과 `localhost`, 포트, 끝의 `/`) | 8.1의 Redirect URI를 그대로 등록하고 `http://localhost:8080`으로 접속한다 |
+| `error=OAUTH2_EMAIL_REQUIRED` | KAKAO: 동의항목 카카오계정(이메일)이 꺼져 있거나 사용자가 동의하지 않았다. 이메일이 인증되지 않은 계정이다 | 동의항목을 켜고, 8.6처럼 앱 연결을 끊은 뒤 다시 동의한다 |
+| KAKAO만 `error=OAUTH2_AUTHENTICATION_FAILED`, 로그 `reason=invalid_user_info_response` | userinfo 조회가 실패했거나 응답의 `sub`가 ID 토큰과 다르다. OpenID Connect가 꺼져 있으면 ID 토큰부터 발급되지 않는다 | 카카오 로그인 > OpenID Connect 활성화를 확인한다 |
+| `error=OAUTH2_AUTHENTICATION_FAILED`, 로그 `reason=invalid_client`·`invalid_grant` 등 토큰 교환 오류 | Client ID·Secret 오타, `.env` 변경 후 컨테이너를 다시 만들지 않았다, KAKAO Client Secret이 사용 안 함이다 | 값을 확인하고 `docker compose up -d backend`로 컨테이너를 다시 만든다(`restart`는 `.env`를 다시 읽지 않는다) |
+| GOOGLE 화면에서 `403 access_denied`·앱 테스트 중 안내 | 동의 화면이 테스트 상태이고 계정이 테스트 사용자에 없다 | Google Auth Platform > 대상 > 테스트 사용자에 계정을 추가한다 |
 
 GOOGLE도 `http://localhost:8080/api/v1/auth/oauth2/google`로 같은 순서를 확인한다.
 

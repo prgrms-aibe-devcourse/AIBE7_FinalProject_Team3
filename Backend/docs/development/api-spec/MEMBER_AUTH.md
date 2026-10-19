@@ -330,6 +330,7 @@ GET /api/v1/auth/oauth2/{provider}/callback
 클라이언트가 직접 호출하는 API가 아니다. 서버는 인가 코드와 `state`를 검증하고, ID 토큰(서명·`nonce`)을 검증해 제공자의 고유 사용자 식별자(`sub`)와 검증된 이메일을 얻는다. 제공자 이메일은 1.2절과 동일한 규칙으로 정규화한다.
 
 - 검증된 이메일은 `email_verified`가 `true`인 `email`이다. 이메일이 없거나 검증되지 않았으면 `OAUTH2_EMAIL_REQUIRED`로 거부한다.
+- GOOGLE은 ID 토큰의 `email`·`email_verified`를 쓴다. KAKAO는 ID 토큰에 `email_verified`가 없으므로 토큰 교환에서 받은 Access Token으로 OIDC userinfo를 조회해 `email`·`email_verified`를 받는다. userinfo의 `sub`가 ID 토큰의 `sub`와 다르면 그 응답을 쓰지 않고 거부한다.
 
 **판정 순서:**
 1. 제공자와 고유 사용자 식별자로 회원을 조회한다. 있으면 계정 상태가 `ACTIVE`인지 확인하고(아니면 `ACCOUNT_DISABLED`) 로그인시킨다.
@@ -368,7 +369,7 @@ Location: <frontend-auth-callback>?error=<error-code>
 ```
 
 **오류 코드:** (`error` 쿼리로 전달)
-- `OAUTH2_AUTHENTICATION_FAILED`: 사용자 취소, `state` 불일치, 인가 코드·토큰 교환 실패, ID 토큰 검증 실패, 지원하지 않는 제공자
+- `OAUTH2_AUTHENTICATION_FAILED`: 사용자 취소, `state` 불일치, 인가 코드·토큰 교환 실패, ID 토큰 검증 실패, userinfo 조회 실패·`sub` 불일치, 지원하지 않는 제공자
 - `OAUTH2_EMAIL_REQUIRED`
 - `ACCOUNT_LINK_REQUIRED`
 - `ACCOUNT_DISABLED`

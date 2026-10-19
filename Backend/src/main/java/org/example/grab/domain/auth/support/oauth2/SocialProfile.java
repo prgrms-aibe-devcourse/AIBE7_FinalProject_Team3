@@ -9,9 +9,9 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 
 /*
     제공자 인증 결과에서 콜백 판정에 쓰는 값만 꺼낸다(MEMBER_AUTH 1.5, GR-46 M00-04).
-    두 제공자 모두 OIDC이므로 ID 토큰의 sub와 email·email_verified를 같은 방식으로 읽는다. 프로필(이름·사진)은 쓰지 않는다.
+    두 제공자 모두 OIDC이므로 OidcUser의 sub와 email·email_verified를 같은 방식으로 읽는다. 프로필(이름·사진)은 쓰지 않는다.
+    GOOGLE은 ID 토큰의 값이고, KAKAO는 ID 토큰에 email_verified가 없어 OIDC userinfo의 값이다(M00-04, OAuth2LoginConfig).
     이메일은 email_verified가 true일 때만 인정하고 1.2절 규칙(EmailNormalizer)으로 정규화한다.
-    카카오 ID 토큰에 email_verified가 실제로 오는지는 실제 키로 확인한다(M00-04 확인 필요). 오지 않으면 모두 OAUTH2_EMAIL_REQUIRED가 된다.
     toString()은 식별자·이메일을 가린다(NFR-010).
  */
 public record SocialProfile(

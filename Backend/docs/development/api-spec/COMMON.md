@@ -224,7 +224,7 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 
 | 오류 코드 | 설명 |
 | --- | --- |
-| `OAUTH2_AUTHENTICATION_FAILED` | 사용자 취소, `state` 불일치, 인가 코드·토큰 교환 실패, ID 토큰 검증 실패, 지원하지 않는 제공자 |
+| `OAUTH2_AUTHENTICATION_FAILED` | 사용자 취소, `state` 불일치, 인가 코드·토큰 교환 실패, ID 토큰 검증 실패, userinfo 조회 실패·`sub` 불일치, 지원하지 않는 제공자 |
 | `OAUTH2_EMAIL_REQUIRED` | 제공자가 검증된 이메일을 주지 않음 |
 | `ACCOUNT_LINK_REQUIRED` | 같은 이메일의 `LOCAL` 또는 다른 소셜 계정이 있어 자동으로 연결하지 않음 |
 | `ACCOUNT_DISABLED` | 정지·탈퇴 등 이용할 수 없는 계정 |
