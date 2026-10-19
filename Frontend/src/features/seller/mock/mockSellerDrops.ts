@@ -2,7 +2,7 @@ import { optionCombinations } from '../../drop/logic/option'
 import { drops } from '../../drop/mock/mockDrops'
 import { endedDrops } from '../../drop/mock/mockEndedDrops'
 import type { DropStatus, OptionGroup, Sku } from '../../../types/drop'
-import type { SellerDraft } from './mockSellerDrafts'
+import type { SellerDraft } from '../logic/sellerDropForm'
 
 export type SellerMockDrop = {
   id: string

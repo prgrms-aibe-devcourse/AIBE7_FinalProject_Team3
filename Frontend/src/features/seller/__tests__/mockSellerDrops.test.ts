@@ -5,7 +5,7 @@ import {
   readSellerDropQuery,
   transitionSellerDrop,
 } from '../mock/mockSellerDrops'
-import type { SellerDraft } from '../mock/mockSellerDrafts'
+import type { SellerDraft } from '../logic/sellerDropForm'
 
 describe('판매자 DROP Mock 목록', () => {
   it('상태와 0부터 시작하는 페이지를 URL에서 읽는다', () => {

@@ -6,8 +6,8 @@ import OptionGroupBuilder from '../../features/seller/OptionGroupBuilder'
 import {
   defaultGroups,
   existingSellerDraft,
-  type SellerDraft,
 } from '../../features/seller/mock/mockSellerDrafts'
+import type { SellerDraft } from '../../features/seller/logic/sellerDropForm'
 
 type Props = {
   drafts: Record<string, SellerDraft>

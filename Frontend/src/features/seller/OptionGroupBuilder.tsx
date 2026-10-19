@@ -1,7 +1,7 @@
 import { useMemo, type Dispatch, type SetStateAction } from 'react'
 import { optionCombinations, selectionLabel } from '../drop/logic/option'
 import type { OptionGroup } from '../../types/drop'
-import type { DraftGroup } from './mock/mockSellerDrafts'
+import type { DraftGroup } from './logic/sellerDropForm'
 
 export default function OptionGroupBuilder({
   groups,

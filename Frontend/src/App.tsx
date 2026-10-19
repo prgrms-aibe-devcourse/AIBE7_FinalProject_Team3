@@ -5,7 +5,7 @@ import Header from './components/Header/Header'
 import useAuth from './features/auth/logic/useAuth'
 import useOrders from './features/order/logic/useOrders'
 import useWish from './features/wish/logic/useWish'
-import type { SellerDraft } from './features/seller/mock/mockSellerDrafts'
+import type { SellerDraft } from './features/seller/logic/sellerDropForm'
 import {
   demoSellerDrops,
   dropFromDraft,

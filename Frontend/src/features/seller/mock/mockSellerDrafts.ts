@@ -1,28 +1,10 @@
 import { drops } from '../../drop/mock/mockDrops'
-import type { OptionGroup } from '../../../types/drop'
-
-const inputDateTime = (value: string) => {
-  const date = new Date(value)
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
-  return local.toISOString().slice(0, 16)
-}
-
-export type DraftImage = {
-  id: string
-  url: string
-  altText: string
-  failed?: boolean
-}
-
-export type DraftGroup = OptionGroup & { rawValues: string }
-
-export type SellerDraft = {
-  id: string
-  values: Record<string, string>
-  groups: DraftGroup[]
-  gallery: DraftImage[]
-  detail: DraftImage[]
-}
+import { inputDateTime } from '../../../utils/date'
+import type {
+  DraftGroup,
+  DraftImage,
+  SellerDraft,
+} from '../logic/sellerDropForm'
 
 export const defaultGroups: DraftGroup[] = [
   {
@@ -47,8 +29,8 @@ export function existingSellerDraft(id: string): SellerDraft | undefined {
       name: drop.name,
       description: drop.description,
       category: drop.category,
-      saleStartsAt: inputDateTime(drop.saleStartsAt),
-      saleEndsAt: inputDateTime(drop.saleEndsAt),
+      saleStartsAt: inputDateTime(drop.saleStartsAt).slice(0, 16),
+      saleEndsAt: inputDateTime(drop.saleEndsAt).slice(0, 16),
       shippingFee: String(drop.shippingFee),
       shippingNotice: drop.shippingNotice,
       ...Object.fromEntries(

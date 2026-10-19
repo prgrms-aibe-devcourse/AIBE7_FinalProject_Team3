@@ -1,9 +1,6 @@
 import { useState, type ChangeEvent } from 'react'
-import {
-  imageError,
-  moveImage,
-  type DraftImage,
-} from '../mock/mockSellerDrafts'
+import { imageError, moveImage } from '../mock/mockSellerDrafts'
+import type { DraftImage } from '../logic/sellerDropForm'
 
 type Props = {
   kind: 'GALLERY' | 'DETAIL'
