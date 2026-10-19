@@ -395,6 +395,35 @@ class StockStreamHttpIntegrationTest {
         assertThat(stream.next()).contains(": heartbeat");
     }
 
+    @Test
+    @org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named = "GRAB_SSE_BROWSER_TEST", matches = "true")
+    @DisplayName("서로 다른 두 Chromium 브라우저가 실제 주문 커밋 신호를 수신한다")
+    void twoBrowsersReceiveCommittedOrder() throws Exception {
+        // given: CI 기본 실행은 브라우저 설치를 요구하지 않는다. 개발 검증 시 환경변수로 별도 실행한다.
+        Long option = insertOption();
+        Process browser = new ProcessBuilder("node", "src/test/resources/sse/two-browsers.mjs",
+                Integer.toString(port), first.toString(), second.toString()).redirectErrorStream(true).start();
+        try (BufferedReader output = new BufferedReader(new InputStreamReader(browser.getInputStream(), StandardCharsets.UTF_8))) {
+            long deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos();
+            while (!output.ready() && browser.isAlive() && System.nanoTime() < deadline) {
+                Thread.sleep(10);
+            }
+            assertThat(output.ready()).isTrue();
+            assertThat(output.readLine()).isEqualTo("READY");
+
+            // when
+            createOrder(option);
+
+            // then
+            assertThat(browser.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            String result = output.lines().collect(java.util.stream.Collectors.joining("\n"));
+            assertThat(browser.exitValue()).as(result).isZero();
+            assertThat(result).contains("PASS: two independent browsers");
+        } finally {
+            browser.destroyForcibly();
+        }
+    }
+
     private void assertChange(Stream stream, String change) throws Exception {
         assertThat(stream.nextChange()).contains("drop-changed", "\"dropId\":" + first, change);
     }

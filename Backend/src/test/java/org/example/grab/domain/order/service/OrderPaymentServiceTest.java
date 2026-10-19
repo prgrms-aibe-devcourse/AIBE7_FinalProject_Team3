@@ -38,6 +38,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@org.springframework.test.context.event.RecordApplicationEvents
 @Transactional
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
@@ -60,6 +61,9 @@ class OrderPaymentServiceTest {
 
     @Autowired
     private EntityManager entityManager;
+
+    @Autowired
+    private org.springframework.test.context.event.ApplicationEvents events;
 
     private Long buyerId;
     private Long dropId;
@@ -126,6 +130,9 @@ class OrderPaymentServiceTest {
 
         // then
         assertThat(result).isEqualTo(PaymentCompletionResult.COMPLETED);
+        assertThat(events.stream(org.example.grab.domain.drop.stream.model.StockChangedEvent.class).toList())
+                .containsExactly(new org.example.grab.domain.drop.stream.model.StockChangedEvent(dropId,
+                        java.util.Set.of(org.example.grab.domain.drop.stream.model.StockChange.SALES)));
         Order found = orderRepository.findById(order.getId()).orElseThrow();
         assertThat(found.getStatus()).isEqualTo(OrderStatus.PAID);
         assertThat(found.getPaidAt()).isEqualTo(approvedAt);
@@ -154,6 +161,7 @@ class OrderPaymentServiceTest {
         assertThat(expired).isEqualTo(PaymentCompletionResult.EXPIRED);
         assertThat(mismatch).isEqualTo(PaymentCompletionResult.AMOUNT_MISMATCH);
         assertThat(canceled).isEqualTo(PaymentCompletionResult.NOT_PAYABLE);
+        assertThat(events.stream(org.example.grab.domain.drop.stream.model.StockChangedEvent.class)).isEmpty();
         assertThat(reservations()).extracting(StockReservation::getStatus).containsOnly(ReservationStatus.HELD);
         assertThat(quantities(firstOptionId)).containsEntry("reserved_quantity", 2).containsEntry("sold_quantity", 0);
     }
