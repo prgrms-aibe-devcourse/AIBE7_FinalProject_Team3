@@ -16,6 +16,7 @@ import {
   useDropDetail,
   useDropStocks,
 } from '../../features/drop/logic/useDrops'
+import { useDropStockStream } from '../../features/drop/logic/useDropStockStream'
 import type { SharedProps } from '../../types/store'
 import { dateLabel, daysUntil } from '../../utils/date'
 import { won } from '../../utils/price'
@@ -45,6 +46,7 @@ export default function DropDetailPage({
 
   const detailQuery = useDropDetail(id)
   const stocksQuery = useDropStocks(id)
+  useDropStockStream(id)
   const [selected, setSelected] = useState<Record<string, string>>({})
   const [quantity, setQuantity] = useState(1)
 
@@ -55,7 +57,7 @@ export default function DropDetailPage({
         <EmptyState title="상품 정보를 불러오는 중이에요." variant="block" />
       </div>
     )
-  if (detailQuery.isError) {
+  if (detailQuery.isError && !detailQuery.data) {
     if (
       axios.isAxiosError(detailQuery.error) &&
       detailQuery.error.response?.status === 404
