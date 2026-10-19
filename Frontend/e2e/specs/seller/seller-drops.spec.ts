@@ -54,14 +54,15 @@ test('조회 실패·빈 결과를 구분하고 서버에 저장한 DRAFT가 목
   page,
 }) => {
   await loginSeller(page)
-  let failed = false
-  await page.route('**/api/v1/seller/drops?*', (route) => {
-    if (failed) return route.fallback()
-    failed = true
-    return route.fulfill({ status: 500, json: { success: false } })
-  })
+  let failing = true
+  await page.route('**/api/v1/seller/drops?*', (route) =>
+    failing
+      ? route.fulfill({ status: 500, json: { success: false } })
+      : route.fallback(),
+  )
   await page.goto('/#/seller/drops')
   await expect(page.getByText('DROP 목록을 불러오지 못했어요.')).toBeVisible()
+  failing = false
   await page.getByRole('button', { name: '다시 시도' }).click()
   await expect(
     page.getByRole('link', { name: '오버핏 니트 가디건' }),

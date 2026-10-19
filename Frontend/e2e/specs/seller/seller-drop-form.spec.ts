@@ -283,14 +283,15 @@ test('비회원·일반 회원은 편집 상세 API를 호출하지 않는다', 
 test('카테고리 조회 실패를 재시도하고 서버 필드 오류가 입력 가까이 표시된다', async ({
   page,
 }) => {
-  let failed = false
-  await page.route('**/api/v1/categories', (route) => {
-    if (failed) return route.fallback()
-    failed = true
-    return route.fulfill({ status: 500, json: { success: false } })
-  })
+  let failing = true
+  await page.route('**/api/v1/categories', (route) =>
+    failing
+      ? route.fulfill({ status: 500, json: { success: false } })
+      : route.fallback(),
+  )
   await page.goto('/#/seller/drops/401/edit')
   await expect(page.getByText('카테고리를 불러오지 못했어요.')).toBeVisible()
+  failing = false
   await page.getByRole('button', { name: '다시 시도' }).click()
   await expect(page.getByLabel('카테고리')).toBeEnabled()
   await page.route('**/api/v1/seller/drops/401', (route) => {
