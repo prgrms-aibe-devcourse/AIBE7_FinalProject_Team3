@@ -590,7 +590,8 @@ GET /api/v1/seller/drops/{dropId}/stocks
         "totalStock": 10,
         "availableStock": 4,
         "reservedStock": 2,
-        "soldStock": 4
+        "soldStock": 4,
+        "active": true
       }
     ]
   }
@@ -598,6 +599,7 @@ GET /api/v1/seller/drops/{dropId}/stocks
 ```
 
 - `optionName`은 값 매핑을 그룹 `sortOrder` 순으로 정렬한 뒤 선택값을 ` / `로 연결한다. 값 매핑이 없는 기본 SKU는 `기본`이다.
+- `active`는 신규 주문을 받는지 여부다(`is_active` 컬럼 그대로). `false`여도 재고 수량은 그대로 집계한다.
 
 **오류 코드:**
 - `DROP_NOT_FOUND` — 없는 DROP

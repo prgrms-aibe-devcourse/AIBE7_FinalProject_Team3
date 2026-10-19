@@ -496,7 +496,7 @@ class SellerDropControllerTest {
         // given
         given(currentSellerIdProvider.currentSellerId()).willReturn(1L);
         SellerDropStockResponse response = new SellerDropStockResponse(100L,
-                List.of(new SellerDropStockResponse.Option(1001L, "코튼 / 롱", 10, 4, 2, 4)));
+                List.of(new SellerDropStockResponse.Option(1001L, "코튼 / 롱", 10, 4, 2, 4, false)));
         given(dropService.findSellerStocks(1L, 100L)).willReturn(response);
 
         // when & then
@@ -509,7 +509,8 @@ class SellerDropControllerTest {
                 .andExpect(jsonPath("$.data.options[0].totalStock").value(10))
                 .andExpect(jsonPath("$.data.options[0].availableStock").value(4))
                 .andExpect(jsonPath("$.data.options[0].reservedStock").value(2))
-                .andExpect(jsonPath("$.data.options[0].soldStock").value(4));
+                .andExpect(jsonPath("$.data.options[0].soldStock").value(4))
+                .andExpect(jsonPath("$.data.options[0].active").value(false));
     }
 
     @Test

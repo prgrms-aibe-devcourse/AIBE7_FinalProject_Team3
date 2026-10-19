@@ -12,6 +12,7 @@ public record SellerOrderListResponse(
         String sellerName,
         String orderStatus,
         String paymentStatus,
+        boolean cancellationInProgress,
         long itemsAmount,
         long shippingAmount,
         long totalAmount,

@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import EmptyState from '../../components/EmptyState/EmptyState'
 import AuthLoading from '../../features/auth/components/AuthLoading'
@@ -12,29 +11,33 @@ import {
   readSalesQuery,
   salesPageSize,
 } from '../../features/seller/logic/sales'
-import { mockSellerSales } from '../../features/seller/mock/mockSellerSales'
-import {
-  sellerDropStatuses,
-  type SellerMockDrop,
-} from '../../features/seller/mock/mockSellerDrops'
+import { sellerDropStatuses } from '../../features/seller/mock/mockSellerDrops'
+import { useDropStats } from '../../features/seller/logic/useDashboard'
+import { applicationErrorMessage } from '../../features/seller/logic/sellerApplicationState'
 import { won } from '../../utils/price'
-
-type Result = 'READY' | 'LOADING' | 'ERROR' | 'EMPTY'
 
 export default function SellerSalesPage({
   user,
   authStatus,
-  drops,
-  ownerEmail,
 }: {
   user: AuthUser | null
   authStatus: AuthStatus
-  drops: SellerMockDrop[]
-  ownerEmail: string
 }) {
   const location = useLocation()
   const [params, setParams] = useSearchParams()
-  const [result, setResult] = useState<Result>('READY')
+  const { status, page, dropId } = readSalesQuery(params)
+  const dropIdNum = dropId ? Number(dropId) : undefined
+  const seller = isSeller(user)
+
+  const query = useDropStats(
+    {
+      status: status === 'ALL' ? undefined : status,
+      dropId: dropIdNum,
+      page,
+      size: salesPageSize,
+    },
+    seller,
+  )
 
   if (authStatus === 'loading') return <AuthLoading />
   if (!user)
@@ -45,7 +48,7 @@ export default function SellerSalesPage({
         replace
       />
     )
-  if (!isSeller(user))
+  if (!seller)
     return (
       <EmptyState
         title="판매자 권한이 필요해요."
@@ -55,16 +58,8 @@ export default function SellerSalesPage({
       />
     )
 
-  const { status, page, dropId } = readSalesQuery(params)
-  const owned = drops.filter((drop) => drop.ownerEmail === ownerEmail)
-  const selected = owned.find((drop) => drop.id === dropId)
-  const sales = mockSellerSales(drops, ownerEmail).filter(
-    (sale) =>
-      (status === 'ALL' || sale.status === status) &&
-      (!dropId || sale.dropId === dropId),
-  )
-  const visible = sales.slice(page * salesPageSize, (page + 1) * salesPageSize)
-  const totalPages = Math.max(1, Math.ceil(sales.length / salesPageSize))
+  const sales = query.data?.content ?? []
+  const totalPages = Math.max(1, query.data?.totalPages ?? 1)
   const setQuery = (nextStatus: string, nextDropId: string, nextPage: number) =>
     setParams({
       status: nextStatus,
@@ -81,10 +76,6 @@ export default function SellerSalesPage({
           <p>상품별 누적 주문과 판매 결과를 확인합니다.</p>
         </div>
       </div>
-      <p className="seller-sales-note">
-        예시 데이터 · 결제 확정·미취소 주문 기준 · 누적 매출은 배송비를
-        포함합니다.
-      </p>
 
       <section
         className="panel seller-sales-panel"
@@ -110,34 +101,21 @@ export default function SellerSalesPage({
               </button>
             ))}
           </div>
-          <label className="seller-drops-demo">
-            DROP 선택
-            <select
-              value={selected?.id ?? ''}
-              onChange={(event) => setQuery(status, event.target.value, 0)}
-            >
-              <option value="">전체 DROP</option>
-              {owned.map((drop) => (
-                <option key={drop.id} value={drop.id}>
-                  {drop.name || '이름 없는 DROP'}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="seller-drops-demo">
-            목록 결과 예시
-            <select
-              value={result}
-              onChange={(event) => setResult(event.target.value as Result)}
-            >
-              <option value="READY">조회 성공</option>
-              <option value="LOADING">불러오는 중</option>
-              <option value="ERROR">조회 실패</option>
-              <option value="EMPTY">빈 결과</option>
-            </select>
-          </label>
         </div>
-        {dropId && !selected ? (
+        {query.isLoading ? (
+          <EmptyState title="판매 실적을 불러오는 중이에요." />
+        ) : query.isError ? (
+          <div className="seller-sales-result">
+            <EmptyState title={applicationErrorMessage(query.error)} />
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => query.refetch()}
+            >
+              다시 시도
+            </button>
+          </div>
+        ) : dropId && sales.length === 0 ? (
           <div className="seller-sales-result">
             <EmptyState title="선택한 DROP을 찾을 수 없거나 관리 권한이 없어요." />
             <button
@@ -148,40 +126,16 @@ export default function SellerSalesPage({
               상품 필터 해제
             </button>
           </div>
-        ) : result === 'LOADING' ? (
-          <EmptyState title="판매 실적을 불러오는 중이에요." />
-        ) : result === 'ERROR' ? (
-          <div className="seller-sales-result">
-            <EmptyState title="판매 실적을 불러오지 못했어요." />
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => setResult('READY')}
-            >
-              다시 시도
-            </button>
-          </div>
-        ) : result === 'EMPTY' || sales.length === 0 ? (
+        ) : sales.length === 0 ? (
           <EmptyState title="조건에 맞는 판매 실적이 없어요." />
-        ) : visible.length === 0 ? (
-          <div className="seller-sales-result">
-            <EmptyState title="해당 페이지에 DROP이 없어요." />
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => setQuery(status, dropId ?? '', 0)}
-            >
-              첫 페이지
-            </button>
-          </div>
         ) : (
           <>
             <div className="seller-sales-list">
-              {visible.map((sale) => (
+              {sales.map((sale) => (
                 <article key={sale.dropId} className="seller-sales-row">
                   <div className="seller-sales-product">
                     <span
-                      className={`status-pill ${sale.status.toLowerCase()}`}
+                      className={`status-pill ${(sale.status ?? '').toLowerCase()}`}
                     >
                       {sale.status}
                     </span>
@@ -192,15 +146,15 @@ export default function SellerSalesPage({
                   <dl className="seller-sales-metrics">
                     <div>
                       <dt>주문</dt>
-                      <dd>{sale.orderCount}건</dd>
+                      <dd>{sale.orderCount ?? 0}건</dd>
                     </div>
                     <div>
                       <dt>판매</dt>
-                      <dd>{sale.soldQuantity}개</dd>
+                      <dd>{sale.soldQuantity ?? 0}개</dd>
                     </div>
                     <div>
                       <dt>누적 매출</dt>
-                      <dd>{won(sale.salesAmount)}</dd>
+                      <dd>{won(sale.salesAmount ?? 0)}</dd>
                     </div>
                   </dl>
                   <Link
@@ -228,7 +182,7 @@ export default function SellerSalesPage({
                 <button
                   type="button"
                   className="secondary-button"
-                  disabled={page + 1 >= totalPages}
+                  disabled={!query.data?.hasNext}
                   onClick={() => setQuery(status, dropId ?? '', page + 1)}
                 >
                   다음

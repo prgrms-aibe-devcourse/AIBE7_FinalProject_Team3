@@ -53,7 +53,7 @@ export interface paths {
     }
     /**
      * DROP별 통계 조회
-     * @description DROP별 WISH·주문·판매·재고 통계를 최근 생성순으로 반환한다. 집계 기준은 SELLER.md 2.2 참고
+     * @description DROP별 WISH·주문·판매·재고 통계를 최근 생성순으로 반환한다. dropId를 지정하면 해당 1건만 반환한다. 집계 기준은 SELLER.md 2.2 참고
      */
     get: operations['findDropStats']
     put?: never
@@ -132,6 +132,8 @@ export interface components {
       soldStock?: number
       /** Format: int64 */
       orderCount?: number
+      /** Format: int64 */
+      soldQuantity?: number
       /** Format: int64 */
       salesAmount?: number
     }
@@ -260,6 +262,7 @@ export interface operations {
     parameters: {
       query?: {
         status?: 'DRAFT' | 'WISH' | 'GRAB' | 'ENDED' | 'CANCELED'
+        dropId?: number
         page?: number
         size?: number
       }

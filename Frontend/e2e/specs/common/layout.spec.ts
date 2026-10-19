@@ -76,9 +76,12 @@ const pages: {
     name: '판매자 주문',
     path: '/#/seller/orders',
     actions: (page) => [
-      page.getByRole('button', { name: '결제 완료 3' }),
-      page.getByRole('button', { name: '배송 완료 1' }),
-      page.getByRole('button', { name: '배송 준비', exact: true }).first(),
+      page.getByRole('button', { name: '결제 완료' }),
+      page.getByRole('button', { name: '배송 완료' }),
+      page
+        .getByRole('article')
+        .getByRole('button', { name: '배송 준비', exact: true })
+        .first(),
       page.getByRole('button', { name: 'ORD-20260918-000500 주문 상세' }),
     ],
   },

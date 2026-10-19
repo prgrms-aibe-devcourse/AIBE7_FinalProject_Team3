@@ -6,7 +6,7 @@
 
 ## Mock 화면 범위 (GR-81)
 
-주문 상태·결제 상태·DROP 필터와 페이지를 URL에 남기고 Mock 목록·상세에 적용한다. 배송 준비·송장 등록·송장 수정은 화면 안의 예시 상태만 바꾼다. 실제 요청, 인증 쿠키·CSRF, 송장 발송 및 주문 상태 저장은 전체 페이지 구조가 완성된 뒤 별도 API 연동 이슈에서 구현한다. 연동 시 `GET /api/v1/seller/orders`에 `orderStatus`, `paymentStatus`, `dropId`, `page`, `size`를 전달한다.
+주문 상태·결제 상태·DROP 필터와 페이지를 URL에 남긴다. 판매자 주문 API를 사용하며, `cancellationInProgress`가 참이면 배송 준비·송장 등록을 막는다. API는 `orderStatus`, `paymentStatus`, `dropId`, `page`, `size` 필터를 지원한다.
 
 ## 화면 구성
 

@@ -97,10 +97,10 @@ class SellerDashboardControllerTest {
     @DisplayName("상태와 페이지를 넘기면 DROP별 통계를 페이지 응답으로 반환한다")
     void findDropStats_withStatus() throws Exception {
         // given
-        given(sellerDashboardService.findDropStats(3L, DropStatus.ENDED, 0, 20))
+        given(sellerDashboardService.findDropStats(3L, DropStatus.ENDED, null, 0, 20))
                 .willReturn(new PageResponse<>(List.of(new DropStatsResponse(
                         100L, "한정판 스니커즈", "ENDED", OffsetDateTime.parse("2026-09-18T08:00:00Z"),
-                        152L, 4L, 2L, 14L, 10L, 1806000L)), 0, 20, 1, 1, false));
+                        152L, 4L, 2L, 14L, 10L, 14L, 1806000L)), 0, 20, 1, 1, false));
 
         // when & then
         mockMvc.perform(get("/api/v1/seller/dashboard/drops").param("status", "ENDED"))
@@ -108,23 +108,37 @@ class SellerDashboardControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.content[0].dropId").value(100))
                 .andExpect(jsonPath("$.data.content[0].activeWishCount").value(152))
+                .andExpect(jsonPath("$.data.content[0].soldQuantity").value(14))
                 .andExpect(jsonPath("$.data.content[0].salesAmount").value(1806000))
                 .andExpect(jsonPath("$.data.hasNext").value(false));
-        verify(sellerDashboardService).findDropStats(3L, DropStatus.ENDED, 0, 20);
+        verify(sellerDashboardService).findDropStats(3L, DropStatus.ENDED, null, 0, 20);
     }
 
     @Test
     @DisplayName("상태를 생략하면 전체 DROP을 기본 페이지 크기로 조회한다")
     void findDropStats_usesDefaults() throws Exception {
         // given
-        given(sellerDashboardService.findDropStats(3L, null, 0, 20))
+        given(sellerDashboardService.findDropStats(3L, null, null, 0, 20))
                 .willReturn(new PageResponse<>(List.of(), 0, 20, 0, 0, false));
 
         // when & then
         mockMvc.perform(get("/api/v1/seller/dashboard/drops"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content").isEmpty());
-        verify(sellerDashboardService).findDropStats(3L, null, 0, 20);
+        verify(sellerDashboardService).findDropStats(3L, null, null, 0, 20);
+    }
+
+    @Test
+    @DisplayName("dropId를 넘기면 그대로 Service에 전달한다")
+    void findDropStats_withDropId() throws Exception {
+        // given
+        given(sellerDashboardService.findDropStats(3L, null, 100L, 0, 20))
+                .willReturn(new PageResponse<>(List.of(), 0, 20, 0, 0, false));
+
+        // when & then
+        mockMvc.perform(get("/api/v1/seller/dashboard/drops").param("dropId", "100"))
+                .andExpect(status().isOk());
+        verify(sellerDashboardService).findDropStats(3L, null, 100L, 0, 20);
     }
 
     @Test

@@ -12,6 +12,7 @@ public record MySellerApplicationResponse(
         String businessRegistrationNumber,
         String description,
         SellerStatus status,
-        OffsetDateTime appliedAt
+        OffsetDateTime appliedAt,
+        String rejectedReason
 ) {
 }
