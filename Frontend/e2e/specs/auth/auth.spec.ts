@@ -162,7 +162,8 @@ test('소셜 결과 예시는 세션을 만들지 않고 안내한다', async ({
   )
   await page.getByLabel('소셜 결과 예시').selectOption('new')
   await page.getByRole('button', { name: 'GOOGLE' }).click()
+  await expect(page).toHaveURL(/#\/signup\?type=social$/)
   await expect(
-    page.getByRole('heading', { name: 'GOOGLE 첫 가입' }),
+    page.getByRole('heading', { name: '소셜 계정으로 가입' }),
   ).toBeVisible()
 })

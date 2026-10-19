@@ -43,9 +43,10 @@ export default function LoginPage({ login, notify }: Props) {
   }
 
   // 소셜 로그인은 GR-47에서 실제 리다이렉트로 연동한다. 지금은 결과 안내만 한다.
-  const socialLogin = (provider: 'KAKAO' | 'GOOGLE') => {
+  // 가입 화면은 type 쿼리로 소셜 폼을 고르고 제공자 이름은 표시하지 않는다(GR-31 M00-01).
+  const socialLogin = () => {
     if (socialResult === 'new') {
-      navigate('/signup', { state: { provider } })
+      navigate('/signup?type=social')
       return
     }
     if (socialResult === 'existing') {
@@ -125,14 +126,14 @@ export default function LoginPage({ login, notify }: Props) {
             <button
               type="button"
               className="secondary-button"
-              onClick={() => socialLogin('KAKAO')}
+              onClick={socialLogin}
             >
               KAKAO
             </button>
             <button
               type="button"
               className="secondary-button"
-              onClick={() => socialLogin('GOOGLE')}
+              onClick={socialLogin}
             >
               GOOGLE
             </button>
