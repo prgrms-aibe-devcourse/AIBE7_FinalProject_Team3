@@ -45,35 +45,49 @@ class SellerDashboardServiceTest {
         // given
         DropStatsProjection projection = new DropStatsProjection(
                 10L, "종료 상품", "ENDED", OffsetDateTime.parse("2026-10-01T01:00:00Z"),
-                152L, 4L, 2L, 14L, 10L, 1806000L);
-        given(sellerDashboardRepository.findDropStats(3L, "ENDED", PageRequest.of(0, 20)))
+                152L, 4L, 2L, 14L, 10L, 14L, 1806000L);
+        given(sellerDashboardRepository.findDropStats(3L, "ENDED", null, PageRequest.of(0, 20)))
                 .willReturn(new PageImpl<>(List.of(projection), PageRequest.of(0, 20), 1));
 
         // when
         PageResponse<DropStatsResponse> result = sellerDashboardService.findDropStats(
-                3L, DropStatus.ENDED, 0, 20);
+                3L, DropStatus.ENDED, null, 0, 20);
 
         // then
         assertThat(result.totalElements()).isEqualTo(1);
         assertThat(result.hasNext()).isFalse();
         assertThat(result.content()).containsExactly(new DropStatsResponse(
                 10L, "종료 상품", "ENDED", OffsetDateTime.parse("2026-10-01T01:00:00Z"),
-                152L, 4L, 2L, 14L, 10L, 1806000L));
+                152L, 4L, 2L, 14L, 10L, 14L, 1806000L));
     }
 
     @Test
     @DisplayName("상태를 생략하면 Repository에 상태 없이 조회한다")
     void findDropStats_withoutStatus() {
         // given
-        given(sellerDashboardRepository.findDropStats(3L, null, PageRequest.of(1, 5)))
+        given(sellerDashboardRepository.findDropStats(3L, null, null, PageRequest.of(1, 5)))
                 .willReturn(new PageImpl<>(List.of(), PageRequest.of(1, 5), 0));
 
         // when
-        PageResponse<DropStatsResponse> result = sellerDashboardService.findDropStats(3L, null, 1, 5);
+        PageResponse<DropStatsResponse> result = sellerDashboardService.findDropStats(3L, null, null, 1, 5);
 
         // then
         assertThat(result.content()).isEmpty();
-        verify(sellerDashboardRepository).findDropStats(3L, null, PageRequest.of(1, 5));
+        verify(sellerDashboardRepository).findDropStats(3L, null, null, PageRequest.of(1, 5));
+    }
+
+    @Test
+    @DisplayName("dropId를 지정하면 Repository에 그대로 넘긴다")
+    void findDropStats_withDropId() {
+        // given
+        given(sellerDashboardRepository.findDropStats(3L, null, 10L, PageRequest.of(0, 20)))
+                .willReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+        // when
+        sellerDashboardService.findDropStats(3L, null, 10L, 0, 20);
+
+        // then
+        verify(sellerDashboardRepository).findDropStats(3L, null, 10L, PageRequest.of(0, 20));
     }
 
     @Test

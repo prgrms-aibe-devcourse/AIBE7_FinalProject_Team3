@@ -216,6 +216,8 @@ class OrderRepositoryTest {
             assertThat(order.getOrderStatus()).isEqualTo("PAID");
             assertThat(order.getPaymentStatus()).isEqualTo("SUCCEEDED");
             assertThat(order.getTotalAmount()).isEqualTo(3500);
+            // 네이티브 쿼리 프로젝션이 Instant 변환에 실패하지 않는지 확인한다(회귀 방지)
+            assertThat(order.getOrderedAt()).isNotNull();
         });
         assertThat(unfiltered.getContent()).singleElement()
                 .extracting(SellerOrderListProjection::getPaymentStatus).isEqualTo("SUCCEEDED");

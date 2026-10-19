@@ -1,22 +1,21 @@
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import EmptyState from '../../components/EmptyState/EmptyState'
-import type {
-  SellerOrder,
-  SellerOrderStatus,
-} from '../../features/order/mock/mockSellerOrders'
-import {
-  orderDetails,
-  sellerOrders,
-} from '../../features/order/mock/mockSellerOrders'
+import type { SellerOrderStatus } from '../../features/order/mock/mockSellerOrders'
 import {
   changeSellerOrderParams,
-  querySellerOrders,
+  readSellerOrderQuery,
 } from '../../features/order/logic/sellerOrderQuery'
+import {
+  useSellerOrder,
+  useSellerOrders,
+} from '../../features/order/logic/useSellerOrders'
+import { sellerOrderErrorMessage } from '../../features/order/logic/sellerOrderState'
 import SellerOrderDetail from '../../features/order/components/SellerOrderDetail'
-import ShipmentForm from '../../features/order/components/ShipmentForm'
 import { dateLabel } from '../../utils/date'
 import { won } from '../../utils/price'
+
+const SELLER_ORDERS_PAGE_SIZE = 2
 
 const TABS: { key: SellerOrderStatus; label: string }[] = [
   { key: 'PAID', label: '결제 완료' },
@@ -31,125 +30,59 @@ export default function SellerOrdersPage({
   notify: (message: string) => void
 }) {
   const [params, setParams] = useSearchParams()
-  const [orders, setOrders] = useState(sellerOrders)
-  const [details, setDetails] = useState(orderDetails)
   const [openId, setOpenId] = useState<string | null>(null)
-  const [editing, setEditing] = useState(false)
-  const [listResult, setListResult] = useState<
-    'READY' | 'LOADING' | 'ERROR' | 'FORBIDDEN'
-  >('READY')
-  const [detailResult, setDetailResult] = useState<'READY' | 'ERROR'>('READY')
-  const [actionResult, setActionResult] = useState<
-    'SUCCESS' | 'FAILURE' | 'CONFLICT'
-  >('SUCCESS')
-  const [error, setError] = useState('')
-  const [busyId, setBusyId] = useState<string | null>(null)
-  // 송장 버튼을 다시 누르면 입력을 저장된 값으로 되돌린다. key를 바꿔 폼을 새로 그린다.
-  const [formKey, setFormKey] = useState(0)
 
-  let result: ReturnType<typeof querySellerOrders> | null = null
+  let result: ReturnType<typeof readSellerOrderQuery> | null = null
   try {
-    result = querySellerOrders(orders, params)
+    result = readSellerOrderQuery(params)
   } catch (error) {
     if (!(error instanceof RangeError)) throw error
   }
-  const dropId = params.get('dropId')
-  const paymentStatus = params.get('paymentStatus') ?? ''
-  const selectedStatus = result?.orderStatus ?? 'PAID'
-  const matching = orders.filter(
-    (order) => !dropId || String(order.dropId) === dropId,
-  )
-  const countOf = (status: SellerOrderStatus) =>
-    matching.filter(
-      (order) =>
-        order.orderStatus === status &&
-        (!paymentStatus || order.paymentStatus === paymentStatus),
-    ).length
-  const setFilter = (
-    key: 'orderStatus' | 'paymentStatus' | 'dropId',
-    value: string,
-  ) => {
-    setParams(changeSellerOrderParams(params, key, value))
-    close()
-    setError('')
-  }
+  const dropId = result?.dropId || ''
+  const dropIdNum = dropId ? Number(dropId) : undefined
 
-  const close = () => {
+  const listQuery = useSellerOrders(
+    {
+      dropId: dropIdNum,
+      orderStatus: result?.orderStatus,
+      paymentStatus: result?.paymentStatus || undefined,
+      page: result?.page,
+      size: SELLER_ORDERS_PAGE_SIZE,
+    },
+    result !== null,
+  )
+  const detailQuery = useSellerOrder(openId)
+
+  const selectedStatus = result?.orderStatus ?? 'PAID'
+  const orders = listQuery.data?.content ?? []
+
+  const setFilter = (key: 'orderStatus' | 'paymentStatus', value: string) => {
+    setParams(changeSellerOrderParams(params, key, value))
     setOpenId(null)
-    setEditing(false)
   }
 
   const toggleDetail = (orderId: string) => {
-    if (openId === orderId) return close()
-    setOpenId(orderId)
-    setEditing(false)
-    setError('')
+    setOpenId((current) => (current === orderId ? null : orderId))
   }
 
-  const setStatus = (orderId: string, orderStatus: SellerOrderStatus) =>
-    setOrders((current) =>
-      current.map((item) =>
-        item.orderId === orderId ? { ...item, orderStatus } : item,
-      ),
-    )
-
-  const finishAction = async (order: SellerOrder, done: () => void) => {
-    setBusyId(order.orderId)
-    setError('')
-    await new Promise((resolve) => window.setTimeout(resolve, 300))
-    setBusyId(null)
-    if (actionResult !== 'SUCCESS') {
-      setError(
-        actionResult === 'CONFLICT'
-          ? '주문 상태가 바뀌었어요. 목록을 다시 확인해주세요.'
-          : '배송 작업을 처리하지 못했어요. 다시 시도해주세요.',
-      )
-      setOpenId(order.orderId)
-      return
-    }
-    done()
-  }
-
-  const prepare = (order: SellerOrder) => {
-    void finishAction(order, () => {
-      setStatus(order.orderId, 'PREPARING')
-      close()
-      notify(`${order.orderNumber} 배송 준비로 전환했어요.`)
-    })
-  }
-
-  const openShipmentForm = (order: SellerOrder) => {
-    setOpenId(order.orderId)
-    setEditing(true)
-    setFormKey((current) => current + 1)
-  }
-
-  const saveShipment = (
-    order: SellerOrder,
-    { carrier, trackingNumber }: { carrier: string; trackingNumber: string },
-  ) => {
-    void finishAction(order, () => {
-      const isUpdate = order.orderStatus === 'SHIPPED'
-      setDetails((current) => ({
-        ...current,
-        [order.orderId]: {
-          ...current[order.orderId],
-          shipping: {
-            carrier,
-            trackingNumber,
-            deliveredAt: current[order.orderId]?.shipping?.deliveredAt ?? null,
-          },
-        },
-      }))
-      if (!isUpdate) setStatus(order.orderId, 'SHIPPED')
-      if (isUpdate) setEditing(false)
-      else close()
-      notify(
-        isUpdate
-          ? `${order.orderNumber} 송장을 수정했어요.`
-          : `${order.orderNumber} 송장을 등록하고 발송 처리했어요.`,
-      )
-    })
+  const detail = detailQuery.data && {
+    items: (detailQuery.data.items ?? []).map((item) => ({
+      productName: item.productName ?? '',
+      optionName: item.optionName ?? '',
+      unitPrice: item.unitPrice ?? 0,
+      quantity: item.quantity ?? 0,
+      subtotal: item.subtotal ?? 0,
+    })),
+    itemsAmount: detailQuery.data.itemsAmount ?? 0,
+    shippingAmount: detailQuery.data.shippingAmount ?? 0,
+    totalAmount: detailQuery.data.totalAmount ?? 0,
+    shipping: detailQuery.data.shipping?.carrier
+      ? {
+          carrier: detailQuery.data.shipping.carrier,
+          trackingNumber: detailQuery.data.shipping.trackingNumber ?? '',
+          deliveredAt: detailQuery.data.shipping.deliveredAt ?? null,
+        }
+      : null,
   }
 
   return (
@@ -158,10 +91,7 @@ export default function SellerOrdersPage({
         <div>
           <p className="eyebrow">ORDER DESK</p>
           <h1>주문·배송</h1>
-          <p>
-            본인 DROP의 주문과 발송 작업을 확인합니다. 화면의 배송 처리는
-            예시입니다.
-          </p>
+          <p>본인 DROP의 주문과 발송 작업을 확인합니다.</p>
           {dropId && (
             <p>
               DROP #{dropId} 주문 ·{' '}
@@ -182,29 +112,15 @@ export default function SellerOrdersPage({
               aria-pressed={selectedStatus === item.key}
               onClick={() => setFilter('orderStatus', item.key)}
             >
-              {item.label} {countOf(item.key)}
+              {item.label}
             </button>
           ))}
         </div>
         <div className="seller-order-selects">
           <label>
-            DROP 필터
-            <select
-              value={dropId ?? ''}
-              onChange={(event) => setFilter('dropId', event.target.value)}
-            >
-              <option value="">전체 DROP</option>
-              {[...new Set(orders.map((order) => order.dropId))].map((id) => (
-                <option value={id} key={id}>
-                  DROP #{id}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
             결제 상태 필터
             <select
-              value={paymentStatus}
+              value={result?.paymentStatus ?? ''}
               onChange={(event) =>
                 setFilter('paymentStatus', event.target.value)
               }
@@ -212,47 +128,6 @@ export default function SellerOrdersPage({
               <option value="">전체 결제 상태</option>
               <option value="SUCCEEDED">결제 성공</option>
               <option value="UNKNOWN">결제 확인 중</option>
-            </select>
-          </label>
-        </div>
-        <div className="seller-order-examples">
-          <label>
-            목록 결과 예시
-            <select
-              value={listResult}
-              onChange={(event) =>
-                setListResult(event.target.value as typeof listResult)
-              }
-            >
-              <option value="READY">정상</option>
-              <option value="LOADING">조회 중</option>
-              <option value="ERROR">조회 실패</option>
-              <option value="FORBIDDEN">권한 오류</option>
-            </select>
-          </label>
-          <label>
-            상세 결과 예시
-            <select
-              value={detailResult}
-              onChange={(event) =>
-                setDetailResult(event.target.value as typeof detailResult)
-              }
-            >
-              <option value="READY">정상</option>
-              <option value="ERROR">조회 실패</option>
-            </select>
-          </label>
-          <label>
-            배송 결과 예시
-            <select
-              value={actionResult}
-              onChange={(event) =>
-                setActionResult(event.target.value as typeof actionResult)
-              }
-            >
-              <option value="SUCCESS">성공</option>
-              <option value="FAILURE">처리 실패</option>
-              <option value="CONFLICT">상태 충돌</option>
             </select>
           </label>
         </div>
@@ -267,36 +142,33 @@ export default function SellerOrdersPage({
             link="/seller/orders"
             label="조건 초기화"
           />
-        ) : listResult === 'LOADING' ? (
+        ) : listQuery.isLoading ? (
           <div role="status">
             <EmptyState title="주문 목록을 불러오는 중이에요." />
           </div>
-        ) : listResult === 'FORBIDDEN' ? (
-          <div role="alert">
-            <EmptyState title="판매자 주문을 볼 권한이 없어요." />
-          </div>
-        ) : listResult === 'ERROR' ? (
+        ) : listQuery.isError ? (
           <div role="alert" className="seller-order-error">
-            <EmptyState title="주문 목록을 불러오지 못했어요." />
+            <EmptyState title={sellerOrderErrorMessage(listQuery.error)} />
             <button
               type="button"
               className="secondary-button"
-              onClick={() => setListResult('READY')}
+              onClick={() => listQuery.refetch()}
             >
               다시 시도
             </button>
           </div>
-        ) : result.content.length ? (
+        ) : orders.length ? (
           <div className="order-list">
-            {result.content.map((order) => {
-              const open = openId === order.orderId
-              const detail = details[order.orderId]
+            {orders.map((order) => {
+              const orderId = order.orderId ?? ''
+              const open = openId === orderId
               return (
-                <article className="order-row" key={order.orderId}>
+                <article className="order-row" key={orderId}>
                   <div className="order-main">
                     <strong>{order.productName}</strong>
                     <small>
-                      {order.orderNumber} · {dateLabel(order.orderedAt)}
+                      {order.orderNumber} ·{' '}
+                      {order.orderedAt ? dateLabel(order.orderedAt) : ''}
                     </small>
                     <small>
                       {order.orderStatus} ·{' '}
@@ -306,7 +178,7 @@ export default function SellerOrdersPage({
                       · DROP #{order.dropId}
                     </small>
                   </div>
-                  <b>{won(order.totalAmount)}</b>
+                  <b>{won(order.totalAmount ?? 0)}</b>
                   <div className="order-action">
                     {order.orderStatus === 'PAID' &&
                       (order.paymentStatus === 'UNKNOWN' ? (
@@ -320,8 +192,7 @@ export default function SellerOrdersPage({
                         <button
                           className="secondary-button"
                           type="button"
-                          disabled={busyId !== null}
-                          onClick={() => prepare(order)}
+                          onClick={() => notify('곧 지원 예정이에요.')}
                         >
                           배송 준비
                         </button>
@@ -330,8 +201,7 @@ export default function SellerOrdersPage({
                       <button
                         className="secondary-button"
                         type="button"
-                        disabled={busyId !== null}
-                        onClick={() => openShipmentForm(order)}
+                        onClick={() => notify('곧 지원 예정이에요.')}
                       >
                         송장 등록
                       </button>
@@ -342,67 +212,38 @@ export default function SellerOrdersPage({
                     type="button"
                     aria-expanded={open}
                     aria-label={`${order.orderNumber} 주문 상세`}
-                    onClick={() => toggleDetail(order.orderId)}
+                    onClick={() => toggleDetail(orderId)}
                   >
                     {open ? '▴' : '▾'}
                   </button>
-                  {open && detailResult === 'ERROR' && (
+                  {open && detailQuery.isLoading && (
+                    <p className="seller-order-progress" role="status">
+                      주문 상세를 불러오는 중이에요.
+                    </p>
+                  )}
+                  {open && detailQuery.isError && (
                     <div
                       className="order-detail seller-order-error"
                       role="alert"
                     >
-                      <p>주문 상세를 불러오지 못했어요.</p>
+                      <p>{sellerOrderErrorMessage(detailQuery.error)}</p>
                       <button
                         type="button"
                         className="secondary-button"
-                        onClick={() => setDetailResult('READY')}
+                        onClick={() => detailQuery.refetch()}
                       >
                         다시 시도
                       </button>
                     </div>
                   )}
-                  {open && detail && detailResult === 'READY' && (
+                  {open && detail && (
                     <SellerOrderDetail
                       detail={detail}
                       onEditShipment={
                         order.orderStatus === 'SHIPPED'
-                          ? () => openShipmentForm(order)
+                          ? () => notify('곧 지원 예정이에요.')
                           : undefined
                       }
-                    />
-                  )}
-                  {open && error && (
-                    <div className="seller-order-error" role="alert">
-                      <p>{error}</p>
-                      <button
-                        type="button"
-                        className="text-link"
-                        onClick={() => setError('')}
-                      >
-                        목록 다시 확인
-                      </button>
-                    </div>
-                  )}
-                  {open && busyId === order.orderId && (
-                    <p className="seller-order-progress" role="status">
-                      배송 작업을 처리하는 중이에요.
-                    </p>
-                  )}
-                  {open && editing && detailResult === 'READY' && (
-                    <ShipmentForm
-                      key={formKey}
-                      initial={{
-                        carrier: detail?.shipping?.carrier ?? '',
-                        trackingNumber: detail?.shipping?.trackingNumber ?? '',
-                      }}
-                      submitLabel={
-                        order.orderStatus === 'SHIPPED'
-                          ? '수정 저장'
-                          : '발송 처리'
-                      }
-                      disabled={busyId !== null}
-                      onSubmit={(shipment) => saveShipment(order, shipment)}
-                      onCancel={() => setEditing(false)}
                     />
                   )}
                 </article>
@@ -416,7 +257,7 @@ export default function SellerOrdersPage({
             label="대시보드로"
           />
         )}
-        {result && result.totalPages > 1 && listResult === 'READY' && (
+        {result && listQuery.data && (listQuery.data.totalPages ?? 0) > 1 && (
           <nav
             className="seller-order-pagination"
             aria-label="주문 목록 페이지"
@@ -424,7 +265,7 @@ export default function SellerOrdersPage({
             {result.page > 0 ? (
               <Link
                 className="secondary-button"
-                to={`/seller/orders?${changeSellerOrderParams(params, 'page', String(result.page - 1))}`}
+                to={`/seller/orders?${changeSellerOrderParams(params, 'page', String(result.page - 1)).toString()}`}
               >
                 이전
               </Link>
@@ -434,12 +275,12 @@ export default function SellerOrdersPage({
               </button>
             )}
             <span>
-              {result.page + 1} / {result.totalPages} 페이지
+              {result.page + 1} / {listQuery.data.totalPages} 페이지
             </span>
-            {result.page + 1 < result.totalPages ? (
+            {listQuery.data.hasNext ? (
               <Link
                 className="secondary-button"
-                to={`/seller/orders?${changeSellerOrderParams(params, 'page', String(result.page + 1))}`}
+                to={`/seller/orders?${changeSellerOrderParams(params, 'page', String(result.page + 1)).toString()}`}
               >
                 다음
               </Link>

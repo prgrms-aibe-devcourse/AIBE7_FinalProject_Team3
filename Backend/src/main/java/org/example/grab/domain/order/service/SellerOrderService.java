@@ -26,6 +26,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -161,6 +162,6 @@ public class SellerOrderService {
                 projection.getOrderId(), projection.getOrderNumber(), projection.getDropId(),
                 projection.getProductName(), projection.getSellerName(), projection.getOrderStatus(),
                 projection.getPaymentStatus(), projection.getItemsAmount(), projection.getShippingAmount(),
-                projection.getTotalAmount(), projection.getOrderedAt());
+                projection.getTotalAmount(), projection.getOrderedAt().atOffset(ZoneOffset.UTC));
     }
 }

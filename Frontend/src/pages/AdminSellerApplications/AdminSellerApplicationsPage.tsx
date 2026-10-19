@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import EmptyState from '../../components/EmptyState/EmptyState'
 import AuthLoading from '../../features/auth/components/AuthLoading'
@@ -7,37 +7,102 @@ import {
   type AuthStatus,
   type AuthUser,
 } from '../../features/auth/logic/authUser'
-import type {
-  SellerApplication,
-  SellerApplicationStatus,
-} from '../../features/seller/mock/mockSellerApplications'
+import type { AdminApplicationStatus } from '../../api/seller/adminApplications'
+import type { SellerDocumentType } from '../../api/seller/applications'
+import {
+  useAdminSellerApplications,
+  useApproveSellerApplication,
+  useRejectSellerApplication,
+} from '../../features/seller/logic/useAdminSellerApplications'
+import { useViewSellerDocument } from '../../features/seller/logic/useViewSellerDocument'
+import {
+  adminApplicationErrorMessage,
+  documentViewErrorMessage,
+} from '../../features/seller/logic/sellerApplicationState'
 import { dateLabel } from '../../utils/date'
 
 type Props = {
   user: AuthUser | null
   authStatus: AuthStatus
-  applications: SellerApplication[]
-  onReview: (
-    id: string,
-    status: 'APPROVED' | 'REJECTED',
-    reason?: string,
-  ) => void
   notify: (message: string) => void
 }
 
-const PAGE_SIZE = 2
-const statuses: SellerApplicationStatus[] = ['PENDING', 'APPROVED', 'REJECTED']
-const statusText: Record<SellerApplicationStatus, string> = {
+const PAGE_SIZE = 20
+const statuses: AdminApplicationStatus[] = ['PENDING', 'APPROVED', 'REJECTED']
+const statusText: Record<AdminApplicationStatus, string> = {
   PENDING: '대기',
   APPROVED: '승인',
   REJECTED: '반려',
+}
+const DOCUMENT_FIELDS: { type: SellerDocumentType; label: string }[] = [
+  { type: 'BUSINESS_LICENSE', label: '사업자등록증 사본' },
+  { type: 'ID_CARD', label: '신분증 사본' },
+  { type: 'BANKBOOK', label: '통장 사본' },
+  { type: 'MAIL_ORDER_BUSINESS_REPORT', label: '통신판매업신고증' },
+]
+
+// 서류 1종의 열람 버튼 + 이미지. 열람할 때마다 서버에 재요청하고 브라우저 캐시를 쓰지 않는다.
+function DocumentViewerField({
+  applicationId,
+  type,
+  label,
+}: {
+  applicationId: string
+  type: SellerDocumentType
+  label: string
+}) {
+  const view = useViewSellerDocument()
+  const [open, setOpen] = useState(false)
+  const imageUrl = useMemo(
+    () => (open && view.data ? URL.createObjectURL(view.data) : null),
+    [open, view.data],
+  )
+  useEffect(() => {
+    return () => {
+      if (imageUrl) URL.revokeObjectURL(imageUrl)
+    }
+  }, [imageUrl])
+
+  const toggle = () => {
+    // 이미 열람 중이면 다시 눌렀을 때 닫기만 한다(재요청하지 않는다).
+    if (open) {
+      setOpen(false)
+      return
+    }
+    setOpen(true)
+    view.mutate({ applicationId, documentType: type })
+  }
+
+  return (
+    <div className="admin-document-viewer-field">
+      <button
+        type="button"
+        className="secondary-button"
+        disabled={view.isPending}
+        onClick={toggle}
+      >
+        {open ? `${label} 닫기` : `${label} 열람`}
+      </button>
+      {open && view.isPending && <small>불러오는 중...</small>}
+      {open && view.isError && (
+        <small role="alert">{documentViewErrorMessage(view.error)}</small>
+      )}
+      {imageUrl && (
+        <img
+          className="admin-document-viewer-image"
+          src={imageUrl}
+          alt={`${label} 열람 이미지`}
+          draggable={false}
+          onContextMenu={(event) => event.preventDefault()}
+        />
+      )}
+    </div>
+  )
 }
 
 export default function AdminSellerApplicationsPage({
   user,
   authStatus,
-  applications,
-  onReview,
   notify,
 }: Props) {
   const location = useLocation()
@@ -47,13 +112,20 @@ export default function AdminSellerApplicationsPage({
   const [confirming, setConfirming] = useState<'APPROVED' | 'REJECTED' | null>(
     null,
   )
-  const [reviewResult, setReviewResult] = useState<
-    'SUCCESS' | 'FAILURE' | 'CONFLICT'
-  >('SUCCESS')
-  const [listResult, setListResult] = useState<'READY' | 'LOADING' | 'ERROR'>(
-    'READY',
-  )
   const [error, setError] = useState('')
+
+  const status =
+    statuses.find((item) => item === params.get('status')) ?? 'PENDING'
+  const rawPage = Number(params.get('page') ?? 0)
+  const page = Number.isInteger(rawPage) && rawPage >= 0 ? rawPage : 0
+
+  const query = useAdminSellerApplications(
+    { status, page, size: PAGE_SIZE },
+    authStatus === 'authenticated' && isAdmin(user),
+  )
+  const approve = useApproveSellerApplication()
+  const reject = useRejectSellerApplication()
+  const submitting = approve.isPending || reject.isPending
 
   if (authStatus === 'loading') return <AuthLoading />
   if (!user)
@@ -68,15 +140,10 @@ export default function AdminSellerApplicationsPage({
       />
     )
 
-  const status =
-    statuses.find((item) => item === params.get('status')) ?? 'PENDING'
-  const rawPage = Number(params.get('page') ?? 0)
-  const page = Number.isInteger(rawPage) && rawPage >= 0 ? rawPage : 0
-  const filtered = applications.filter((item) => item.status === status)
-  const pageItems = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  const pageItems = query.data?.content ?? []
+  const hasNext = query.data?.hasNext ?? false
   const selected =
-    pageItems.find((item) => item.id === selectedId) ?? pageItems[0]
-  const hasNext = (page + 1) * PAGE_SIZE < filtered.length
+    pageItems.find((item) => item.applicationId === selectedId) ?? pageItems[0]
 
   const changePage = (nextPage: number) => {
     setParams({ status, page: String(nextPage) })
@@ -86,7 +153,8 @@ export default function AdminSellerApplicationsPage({
   }
 
   const review = (decision: 'APPROVED' | 'REJECTED') => {
-    if (!selected || selected.status !== 'PENDING') return
+    if (!selected || selected.status !== 'PENDING' || !selected.applicationId)
+      return
     if (decision === 'REJECTED' && !reason.trim()) {
       setError('반려 사유를 입력해주세요.')
       return
@@ -96,24 +164,32 @@ export default function AdminSellerApplicationsPage({
       setError('')
       return
     }
-    if (reviewResult !== 'SUCCESS') {
-      setError(
-        reviewResult === 'CONFLICT'
-          ? '이미 심사된 신청입니다. 목록을 다시 확인해주세요.'
-          : '심사 결과를 저장하지 못했어요. 다시 시도해주세요.',
-      )
-      setConfirming(null)
-      return
+    const applicationId = selected.applicationId
+    const onSettled = {
+      onSuccess: () => {
+        notify(
+          decision === 'APPROVED' ? '신청을 승인했어요.' : '신청을 반려했어요.',
+        )
+        setSelectedId(null)
+        setReason('')
+        setConfirming(null)
+        setError('')
+      },
+      onError: (submitError: unknown) => {
+        setError(adminApplicationErrorMessage(submitError))
+        setConfirming(null)
+        // 동시 심사로 상태가 바뀐 경우(409) 등을 반영하기 위해 목록을 다시 불러온다.
+        void query.refetch()
+      },
     }
-    onReview(selected.id, decision, reason)
-    notify('Mock 심사 결과를 표시했어요. 실제 권한은 변경되지 않았습니다.')
-    setSelectedId(null)
-    setReason('')
-    setConfirming(null)
-    setError('')
+    if (decision === 'APPROVED') {
+      approve.mutate(applicationId, onSettled)
+    } else {
+      reject.mutate({ applicationId, reason }, onSettled)
+    }
   }
 
-  const reject = (event: FormEvent<HTMLFormElement>) => {
+  const handleRejectSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     review('REJECTED')
   }
@@ -141,32 +217,19 @@ export default function AdminSellerApplicationsPage({
             </button>
           ))}
         </div>
-        <label>
-          목록 결과 예시
-          <select
-            value={listResult}
-            onChange={(event) =>
-              setListResult(event.target.value as typeof listResult)
-            }
-          >
-            <option value="READY">조회 성공</option>
-            <option value="LOADING">불러오는 중</option>
-            <option value="ERROR">조회 실패</option>
-          </select>
-        </label>
       </section>
       <div className="seller-review-layout">
         <section className="panel seller-review-list">
           <h2>신청 목록</h2>
-          {listResult === 'LOADING' ? (
+          {query.isLoading ? (
             <EmptyState title="신청 목록을 불러오는 중이에요." />
-          ) : listResult === 'ERROR' ? (
+          ) : query.isError ? (
             <div>
               <EmptyState title="신청 목록을 불러오지 못했어요." />
               <button
                 type="button"
                 className="secondary-button"
-                onClick={() => setListResult('READY')}
+                onClick={() => void query.refetch()}
               >
                 다시 시도
               </button>
@@ -176,12 +239,14 @@ export default function AdminSellerApplicationsPage({
               <div className="seller-review-items">
                 {pageItems.map((item) => (
                   <button
-                    key={item.id}
+                    key={item.applicationId}
                     type="button"
                     className="seller-review-item"
-                    aria-pressed={selected?.id === item.id}
+                    aria-pressed={
+                      selected?.applicationId === item.applicationId
+                    }
                     onClick={() => {
-                      setSelectedId(item.id)
+                      setSelectedId(item.applicationId ?? null)
                       setReason('')
                       setConfirming(null)
                       setError('')
@@ -189,8 +254,8 @@ export default function AdminSellerApplicationsPage({
                   >
                     <strong>{item.brandName}</strong>
                     <small>
-                      {item.contactEmail} · {dateLabel(item.appliedAt)} ·{' '}
-                      {statusText[item.status]}
+                      {item.contactEmail} · {dateLabel(item.appliedAt ?? '')} ·{' '}
+                      {item.status && statusText[item.status]}
                     </small>
                   </button>
                 ))}
@@ -221,45 +286,41 @@ export default function AdminSellerApplicationsPage({
         </section>
         <section className="panel seller-review-detail">
           <h2>선택 신청 심사</h2>
-          {listResult !== 'READY' || !selected ? (
+          {!query.isSuccess || !selected ? (
             <p className="seller-review-note">신청을 선택해주세요.</p>
           ) : (
             <>
               <strong>{selected.brandName}</strong>
               <p>{selected.contactEmail}</p>
-              <small>신청일 {dateLabel(selected.appliedAt)}</small>
+              <small>신청일 {dateLabel(selected.appliedAt ?? '')}</small>
               <p className="seller-review-note">
                 브랜드 소개는 현재 목록 조회 계약에 포함되지 않습니다.
               </p>
+              <div
+                key={selected.applicationId}
+                className="admin-document-viewer"
+              >
+                <h3>제출 서류</h3>
+                {DOCUMENT_FIELDS.map((field) => (
+                  <DocumentViewerField
+                    key={field.type}
+                    applicationId={selected.applicationId ?? ''}
+                    type={field.type}
+                    label={field.label}
+                  />
+                ))}
+              </div>
               {selected.status === 'PENDING' ? (
                 <div className="seller-review-actions">
-                  <label>
-                    심사 결과 예시
-                    <select
-                      value={reviewResult}
-                      onChange={(event) => {
-                        setReviewResult(
-                          event.target.value as typeof reviewResult,
-                        )
-                        setConfirming(null)
-                        setError('')
-                      }}
-                    >
-                      <option value="SUCCESS">처리 성공</option>
-                      <option value="FAILURE">제출 실패</option>
-                      <option value="CONFLICT">중복 심사</option>
-                    </select>
-                  </label>
                   <button
                     type="button"
                     className="primary-button"
+                    disabled={submitting}
                     onClick={() => review('APPROVED')}
                   >
-                    {confirming === 'APPROVED'
-                      ? 'Mock 승인 결과 보기'
-                      : '승인 확인'}
+                    {confirming === 'APPROVED' ? '승인 처리 확정' : '승인 확인'}
                   </button>
-                  <form onSubmit={reject}>
+                  <form onSubmit={handleRejectSubmit}>
                     <label>
                       반려 사유 (필수)
                       <textarea
@@ -272,17 +333,21 @@ export default function AdminSellerApplicationsPage({
                         }}
                       />
                     </label>
-                    <button type="submit" className="secondary-button">
+                    <button
+                      type="submit"
+                      className="secondary-button"
+                      disabled={submitting}
+                    >
                       {confirming === 'REJECTED'
-                        ? 'Mock 반려 결과 보기'
+                        ? '반려 처리 확정'
                         : '반려 확인'}
                     </button>
                   </form>
                   {confirming && (
                     <p className="seller-review-note" aria-live="polite">
                       {selected.brandName} 신청을{' '}
-                      {confirming === 'APPROVED' ? '승인' : '반려'}하는 Mock
-                      결과를 표시할까요?
+                      {confirming === 'APPROVED' ? '승인' : '반려'}
+                      하시겠어요? 다시 누르면 확정됩니다.
                     </p>
                   )}
                   {error && (
@@ -293,14 +358,14 @@ export default function AdminSellerApplicationsPage({
                 </div>
               ) : (
                 <p className="seller-review-note">
-                  이미 {statusText[selected.status]} 처리된 신청입니다.
+                  이미 {selected.status && statusText[selected.status]} 처리된
+                  신청입니다.
                 </p>
               )}
             </>
           )}
         </section>
       </div>
-      <small>심사와 권한 변경은 이 화면의 Mock 예시입니다.</small>
     </section>
   )
 }

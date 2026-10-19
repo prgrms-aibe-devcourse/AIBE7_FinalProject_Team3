@@ -1,6 +1,4 @@
-import type { SellerOrder, SellerOrderStatus } from '../mock/mockSellerOrders'
-
-export const SELLER_ORDER_PAGE_SIZE = 2
+import type { SellerOrderStatus } from '../mock/mockSellerOrders'
 
 export const sellerOrderStatuses: SellerOrderStatus[] = [
   'PAID',
@@ -27,7 +25,7 @@ export function readSellerOrderQuery(params: URLSearchParams) {
   }
   return {
     orderStatus: orderStatus as SellerOrderStatus,
-    paymentStatus,
+    paymentStatus: paymentStatus as '' | 'SUCCEEDED' | 'UNKNOWN',
     dropId,
     page,
   }
@@ -43,31 +41,4 @@ export function changeSellerOrderParams(
   else next.delete(key)
   if (key !== 'page') next.delete('page')
   return next
-}
-
-export function querySellerOrders(
-  orders: SellerOrder[],
-  params: URLSearchParams,
-) {
-  const { orderStatus, paymentStatus, dropId, page } =
-    readSellerOrderQuery(params)
-  const filtered = orders.filter(
-    (order) =>
-      order.orderStatus === orderStatus &&
-      (!paymentStatus || order.paymentStatus === paymentStatus) &&
-      (!dropId || String(order.dropId) === dropId),
-  )
-  return {
-    content: filtered.slice(
-      page * SELLER_ORDER_PAGE_SIZE,
-      (page + 1) * SELLER_ORDER_PAGE_SIZE,
-    ),
-    totalPages: Math.max(
-      1,
-      Math.ceil(filtered.length / SELLER_ORDER_PAGE_SIZE),
-    ),
-    totalElements: filtered.length,
-    page,
-    orderStatus,
-  }
 }

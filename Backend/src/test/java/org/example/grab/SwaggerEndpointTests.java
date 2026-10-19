@@ -167,7 +167,7 @@ class SwaggerEndpointTests {
 
         JsonNode sellerStock = schemas.path("SellerDropStockOption").path("properties");
         assertThat(propertyNames(sellerStock)).containsExactlyInAnyOrder(
-                "optionId", "optionName", "totalStock", "availableStock", "reservedStock", "soldStock");
+                "optionId", "optionName", "totalStock", "availableStock", "reservedStock", "soldStock", "active");
     }
 
     /*

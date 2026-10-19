@@ -631,6 +631,66 @@
         }
       }
     },
+    "/api/v1/seller/orders/{orderId}/payments": {
+      "get": {
+        "tags": ["판매자 주문·배송"],
+        "summary": "판매자 주문 결제 이력 조회",
+        "description": "본인 DROP 주문의 결제 시도와 결과를 시도 순서대로 반환한다. PG 실패 사유는 구매자 정보라 반환하지 않는다",
+        "operationId": "findOrderPayments",
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "조회 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListSellerPaymentHistoryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED, INVALID_TOKEN",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListSellerPaymentHistoryResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED, ORDER_ACCESS_DENIED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListSellerPaymentHistoryResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (UUID 형식 오류), ORDER_NOT_FOUND",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListSellerPaymentHistoryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/orders/{orderId}": {
       "get": {
         "tags": ["주문"],
@@ -1091,6 +1151,64 @@
             "$ref": "#/components/schemas/OrderShippingResponse"
           },
           "orderedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseListSellerPaymentHistoryResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SellerPaymentHistoryResponse"
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "SellerPaymentHistoryResponse": {
+        "type": "object",
+        "properties": {
+          "paymentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "provider": {
+            "type": "string",
+            "enum": ["MOCK", "TOSS"]
+          },
+          "amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["PENDING", "SUCCEEDED", "FAILED", "UNKNOWN", "CANCELED"]
+          },
+          "reconciliationStatus": {
+            "type": "string",
+            "enum": ["NONE", "REQUIRED", "RESOLVED"]
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "canceledAt": {
             "type": "string",
             "format": "date-time"
           }

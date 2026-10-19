@@ -128,9 +128,13 @@ public class SellerDashboardRepository {
      * 재고 계산식은 sumStock과 같지만 여기서는 CANCELED DROP도 목록에 포함한다.
      * 매출은 결제가 확정되고(paid_at) 취소되지 않은 주문만 센다. 상태 이름을 나열하지 않아
      * 주문 상태가 늘어도 집계 기준이 흔들리지 않는다.
+     * soldQuantity(order_items.quantity 합)는 order_items를 orders에 직접 JOIN하면 주문당 여러
+     * 품목이 있을 때 order_count·salesAmount가 행 수만큼 부풀므로, 상관 서브쿼리로 주문별 합계를
+     * 구한 뒤 SUM으로 다시 더한다.
      */
-    public Page<DropStatsProjection> findDropStats(long sellerId, String status, Pageable pageable) {
+    public Page<DropStatsProjection> findDropStats(long sellerId, String status, Long dropId, Pageable pageable) {
         String statusCondition = "AND (CAST(:status AS TEXT) IS NULL OR d.status = :status)\n";
+        String dropIdCondition = "AND (CAST(:dropId AS BIGINT) IS NULL OR d.id = :dropId)\n";
         String sql = """
                 SELECT d.id AS "dropId", d.name AS "name", d.status AS "status",
                        d.sale_ends_at AS "saleEndsAt",
@@ -138,7 +142,8 @@ public class SellerDashboardRepository {
                          WHERE w.drop_id = d.id AND w.canceled_at IS NULL) AS "activeWishCount",
                        st.available AS "availableStock", st.reserved AS "reservedStock",
                        st.sold AS "soldStock",
-                       ord.order_count AS "orderCount", ord.sales_amount AS "salesAmount"
+                       ord.order_count AS "orderCount", ord.sold_quantity AS "soldQuantity",
+                       ord.sales_amount AS "salesAmount"
                 FROM drops d
                 LEFT JOIN LATERAL (
                     SELECT COALESCE(SUM(op.total_quantity - op.reserved_quantity
@@ -148,18 +153,21 @@ public class SellerDashboardRepository {
                     FROM drop_options op WHERE op.drop_id = d.id
                 ) st ON TRUE
                 LEFT JOIN LATERAL (
-                    SELECT COUNT(*) AS order_count, COALESCE(SUM(o.total_amount), 0) AS sales_amount
+                    SELECT COUNT(*) AS order_count, COALESCE(SUM(o.total_amount), 0) AS sales_amount,
+                           COALESCE(SUM((SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi
+                                         WHERE oi.order_id = o.id)), 0) AS sold_quantity
                     FROM orders o
                     WHERE o.drop_id = d.id AND o.paid_at IS NOT NULL AND o.canceled_at IS NULL
                 ) ord ON TRUE
                 WHERE d.seller_id = :sellerId
-                """ + statusCondition + """
+                """ + statusCondition + dropIdCondition + """
                 ORDER BY d.id DESC
                 LIMIT :size OFFSET :offset
                 """;
         MapSqlParameterSource parameters = new MapSqlParameterSource()
                 .addValue("sellerId", sellerId)
                 .addValue("status", status, Types.VARCHAR)
+                .addValue("dropId", dropId, Types.BIGINT)
                 .addValue("size", pageable.getPageSize())
                 .addValue("offset", pageable.getOffset());
         List<DropStatsProjection> content = jdbcTemplate.query(sql, parameters,
@@ -173,9 +181,11 @@ public class SellerDashboardRepository {
                         resultSet.getLong("reservedStock"),
                         resultSet.getLong("soldStock"),
                         resultSet.getLong("orderCount"),
+                        resultSet.getLong("soldQuantity"),
                         resultSet.getLong("salesAmount")));
         // 총 건수는 집계가 필요 없으므로 LATERAL 없이 센다.
-        String countSql = "SELECT COUNT(*) FROM drops d WHERE d.seller_id = :sellerId\n" + statusCondition;
+        String countSql = "SELECT COUNT(*) FROM drops d WHERE d.seller_id = :sellerId\n"
+                + statusCondition + dropIdCondition;
         Long total = jdbcTemplate.queryForObject(countSql, parameters, Long.class);
         return new PageImpl<>(content, pageable, Objects.requireNonNullElse(total, 0L));
     }

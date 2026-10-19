@@ -34,10 +34,12 @@ public class SellerDashboardService {
     }
 
     // status는 enum으로 받아 Repository에는 이름만 넘긴다. 생략하면 전체 DROP을 센다.
+    // dropId를 지정하면 본인 DROP 중 해당 1건만(다른 판매자 소유면 빈 목록) 반환한다.
     @Transactional(readOnly = true)
-    public PageResponse<DropStatsResponse> findDropStats(long sellerId, DropStatus status, int page, int size) {
+    public PageResponse<DropStatsResponse> findDropStats(
+            long sellerId, DropStatus status, Long dropId, int page, int size) {
         return PageResponse.from(sellerDashboardRepository
-                .findDropStats(sellerId, status == null ? null : status.name(), PageRequest.of(page, size))
+                .findDropStats(sellerId, status == null ? null : status.name(), dropId, PageRequest.of(page, size))
                 .map(DropStatsResponse::from));
     }
 

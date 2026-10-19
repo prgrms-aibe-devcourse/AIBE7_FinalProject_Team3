@@ -461,6 +461,7 @@ export interface components {
       reservedStock?: number
       /** Format: int32 */
       soldStock?: number
+      active?: boolean
     }
     SellerDropStockResponse: {
       /** Format: int64 */

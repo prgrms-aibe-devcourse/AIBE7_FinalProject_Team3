@@ -24,6 +24,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -441,7 +442,7 @@ class SellerOrderServiceTest {
             @Override public long getItemsAmount() { return response.itemsAmount(); }
             @Override public long getShippingAmount() { return response.shippingAmount(); }
             @Override public long getTotalAmount() { return response.totalAmount(); }
-            @Override public OffsetDateTime getOrderedAt() { return response.orderedAt(); }
+            @Override public Instant getOrderedAt() { return response.orderedAt().toInstant(); }
         };
     }
 }
