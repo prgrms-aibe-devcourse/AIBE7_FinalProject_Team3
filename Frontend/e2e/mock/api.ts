@@ -13,6 +13,14 @@ import { handleWishRoute, initialWishesFor } from './api/wish'
 export { FIXED_NOW, LONG_PRODUCT_NAME } from './api/drop/fixtures'
 export type { FixtureDrop } from './api/drop/fixtures'
 
+const publicApiStates = new WeakMap<Page, ApiState>()
+
+export function getPublicApiState(page: Page) {
+  const state = publicApiStates.get(page)
+  if (!state) throw new Error('공개 API fixture가 설치되지 않았습니다.')
+  return state
+}
+
 async function handleRoute(
   route: Route,
   state: ApiState,
@@ -40,6 +48,7 @@ export async function installPublicApi(page: Page) {
     wished: initialWishesFor('base'),
     sellerOrders: createSellerOrdersFixture(),
   }
+  publicApiStates.set(page, state)
   await page.route('**/api/v1/**', (route) =>
     handleRoute(route, state, 'base', null),
   )
