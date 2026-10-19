@@ -42,7 +42,7 @@ function SellerDropForm({
   const [groups, setGroups] = useState(draft?.groups ?? defaultGroups)
   const [gallery, setGallery] = useState(draft?.gallery ?? [])
   const [detail, setDetail] = useState(draft?.detail ?? [])
-  const [uploading, setUploading] = useState(false)
+  const uploading = [...gallery, ...detail].some((image) => image.uploading)
   const [error, setError] = useState('')
   const values = draft?.values ?? {}
 
@@ -52,7 +52,7 @@ function SellerDropForm({
       .submitter as HTMLButtonElement | null
     const publish = submitter?.value === 'publish'
     if (uploading) {
-      setError('이미지를 불러오는 동안에는 저장할 수 없어요.')
+      setError('이미지를 업로드하는 동안에는 저장할 수 없어요.')
       return
     }
     if (
@@ -154,20 +154,12 @@ function SellerDropForm({
           <DropImageField
             kind="GALLERY"
             images={gallery}
-            totalCount={gallery.length + detail.length}
             onChange={setGallery}
-            onUploading={setUploading}
           />
-          <DropImageField
-            kind="DETAIL"
-            images={detail}
-            totalCount={gallery.length + detail.length}
-            onChange={setDetail}
-            onUploading={setUploading}
-          />
+          <DropImageField kind="DETAIL" images={detail} onChange={setDetail} />
         </div>
         <p className="form-image-hint">
-          두 용도 합계 10장 · 파일당 5MB · JPEG/PNG/WebP
+          GALLERY 최대 5장 · DETAIL 최대 15장 · 파일당 5MB · JPEG/PNG/WebP
         </p>
         <section className="form-card">
           <div className="section-number">04</div>

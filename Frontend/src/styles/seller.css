@@ -660,16 +660,6 @@
 .drop-image-picker input {
   max-width: 100%;
 }
-.drop-image-demo {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--muted);
-  font-size: 12px;
-}
-.drop-image-demo input {
-  min-height: auto;
-}
 .drop-image-list {
   display: grid;
   gap: 14px;

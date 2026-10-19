@@ -1,10 +1,6 @@
 import { drops } from '../../drop/mock/mockDrops'
 import { inputDateTime } from '../../../utils/date'
-import type {
-  DraftGroup,
-  DraftImage,
-  SellerDraft,
-} from '../logic/sellerDropForm'
+import type { DraftGroup, SellerDraft } from '../logic/sellerDropForm'
 
 export const defaultGroups: DraftGroup[] = [
   {
@@ -55,24 +51,4 @@ export function existingSellerDraft(id: string): SellerDraft | undefined {
     ],
     detail: [],
   }
-}
-
-export function imageError(file: File, count: number): string {
-  if (count >= 10) return '이미지는 두 용도 합계 10장까지 추가할 수 있어요.'
-  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type))
-    return 'JPEG, PNG, WebP 이미지만 추가할 수 있어요.'
-  if (file.size > 5 * 1024 * 1024) return '파일당 5MB 이하만 추가할 수 있어요.'
-  return ''
-}
-
-export function moveImage(
-  images: DraftImage[],
-  index: number,
-  direction: -1 | 1,
-) {
-  const nextIndex = index + direction
-  if (nextIndex < 0 || nextIndex >= images.length) return images
-  const next = [...images]
-  ;[next[index], next[nextIndex]] = [next[nextIndex], next[index]]
-  return next
 }

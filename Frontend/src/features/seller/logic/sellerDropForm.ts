@@ -10,6 +10,7 @@ export type DraftImage = {
   url: string
   altText: string
   failed?: boolean
+  uploading?: boolean
 }
 
 export type DraftGroup = OptionGroup & { rawValues: string }
@@ -119,6 +120,7 @@ export function toSellerDropRequest(
     items.map((image) => {
       if (
         image.failed ||
+        image.uploading ||
         !image.id ||
         !image.url ||
         /^(data|blob):/.test(image.url)
