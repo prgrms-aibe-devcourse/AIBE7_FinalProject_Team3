@@ -11,7 +11,7 @@ import {
   readSalesQuery,
   salesPageSize,
 } from '../../features/seller/logic/sales'
-import { sellerDropStatuses } from '../../features/seller/mock/mockSellerDrops'
+import { sellerDropStatuses } from '../../features/seller/logic/sellerDropQuery'
 import { useDropStats } from '../../features/seller/logic/useDashboard'
 import { applicationErrorMessage } from '../../features/seller/logic/sellerApplicationState'
 import { won } from '../../utils/price'

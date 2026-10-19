@@ -4,6 +4,8 @@ import type {
 } from '../../../api/seller/drops'
 import type { OptionGroup } from '../../../types/drop'
 import { inputDateTime } from '../../../utils/date'
+import { optionCombinations } from '../../drop/logic/option'
+import type { DropFieldError } from './sellerDropErrors'
 
 export type DraftImage = {
   id: string
@@ -90,6 +92,7 @@ export function toSellerDropRequest(
       const unitPrice = integer(price, key)
       const stockKey = `${key.slice(0, -5)}stock`
       const totalQuantity = integer(values[stockKey], stockKey)
+      if (unitPrice === undefined && totalQuantity === undefined) return null
       if (
         unitPrice === undefined ||
         totalQuantity === undefined ||
@@ -115,6 +118,7 @@ export function toSellerDropRequest(
         sortOrder,
       }
     })
+    .filter((option) => option !== null)
 
   const images = (items: DraftImage[], field: string) =>
     items.map((image) => {
@@ -153,6 +157,77 @@ export function toSellerDropRequest(
     })),
     options,
   }
+}
+
+export function rebuildSkuValues(
+  groups: DraftGroup[],
+  values: Record<string, string>,
+) {
+  const next = Object.fromEntries(
+    Object.entries(values).filter(([key]) => !key.startsWith('sku:')),
+  )
+  const combinations = groups.some((group) => !group.values.length)
+    ? []
+    : optionCombinations(groups)
+  for (const selections of combinations) {
+    const key = `sku:${JSON.stringify(selections)}`
+    next[`${key}:price`] = values[`${key}:price`] ?? ''
+    next[`${key}:stock`] = values[`${key}:stock`] ?? ''
+    next[`${key}:active`] = values[`${key}:active`] ?? 'true'
+  }
+  return next
+}
+
+export function validateDropPublish(
+  input: SellerDropDraftInput,
+): DropFieldError[] {
+  const errors: DropFieldError[] = []
+  const required: Array<[string, unknown]> = [
+    ['name', input.name?.trim()],
+    ['description', input.description?.trim()],
+    ['categoryId', input.categoryId],
+    ['saleStartsAt', input.saleStartsAt],
+    ['saleEndsAt', input.saleEndsAt],
+    ['shipping.shippingFee', input.shipping?.shippingFee],
+    ['shipping.shippingNotice', input.shipping?.shippingNotice?.trim()],
+  ]
+  for (const [field, value] of required)
+    if (value === undefined || value === '')
+      errors.push({ field, reason: '공개하려면 입력해주세요.' })
+  if (!input.images?.length)
+    errors.push({
+      field: 'images',
+      reason: '공개하려면 GALLERY 이미지를 1장 이상 추가해주세요.',
+    })
+  if (
+    !input.options?.some(
+      (option) => option.active !== false && option.totalQuantity > 0,
+    )
+  )
+    errors.push({
+      field: 'options',
+      reason: '판매 가능한 SKU가 1개 이상 필요해요.',
+    })
+  const names = new Set<string>()
+  for (const [index, group] of (input.optionGroups ?? []).entries()) {
+    if (!group.name.trim() || names.has(group.name.trim()))
+      errors.push({
+        field: `optionGroups[${index}]`,
+        reason: '그룹명을 입력하고 중복을 제거해주세요.',
+      })
+    names.add(group.name.trim())
+    const values = (group.values ?? []).map((value) => value.value.trim())
+    if (
+      !values.length ||
+      values.some((value) => !value) ||
+      new Set(values).size !== values.length
+    )
+      errors.push({
+        field: `optionGroups[${index}]`,
+        reason: '선택값을 입력하고 중복을 제거해주세요.',
+      })
+  }
+  return errors
 }
 
 export function toSellerDraft(detail: SellerDropDetail): SellerDraft {
@@ -226,6 +301,8 @@ export function toSellerDraft(detail: SellerDropDetail): SellerDraft {
     values[`${key}:stock`] = String(option.totalQuantity)
     values[`${key}:active`] = String(option.active ?? true)
   }
+  if (!detail.options?.length)
+    Object.assign(values, rebuildSkuValues(groups, values))
   const images = (items: SellerDropDetail['images']): DraftImage[] =>
     (items ?? []).map((image) => {
       if (!image.imageId || !image.imageUrl)

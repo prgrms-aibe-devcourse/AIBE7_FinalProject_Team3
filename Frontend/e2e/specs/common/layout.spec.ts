@@ -112,7 +112,11 @@ const pages: {
 
 for (const { name, path, actions } of pages) {
   test(`${name}: 가로 넘침 없이 핵심 버튼에 닿는다`, async ({ page }) => {
-    if (name === '판매자 DROP 상세' || name === '판매자 DROP 목록') {
+    if (
+      name === '판매자 DROP 상세' ||
+      name === '판매자 DROP 목록' ||
+      name === 'DROP 등록'
+    ) {
       await loginSeller(page)
       await page.evaluate((hash) => {
         window.location.hash = hash
@@ -186,6 +190,7 @@ test('키보드 포커스가 입력란에 보인다', async ({ page }) => {
   await page.getByRole('button', { name: '로그인', exact: true }).click()
   await expectFocusRing(page.getByLabel('받는 분'))
 
+  await loginSeller(page)
   await page.goto('/#/seller/drops/new')
   await expectFocusRing(page.getByLabel('상품명'))
   await expectFocusRing(page.getByLabel('상품 설명'))

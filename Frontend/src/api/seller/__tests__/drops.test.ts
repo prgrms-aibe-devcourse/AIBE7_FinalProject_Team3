@@ -6,9 +6,64 @@ import {
   getSellerDropStocks,
   publishSellerDrop,
   updateSellerDrop,
+  getSellerDrops,
+  cancelSellerDrop,
+  getSellerDropWishCount,
 } from '../drops'
 
 afterEach(() => vi.restoreAllMocks())
+
+test('목록에 서버 상태·페이지·크기를 전달하고 페이지 응답을 확인한다', async () => {
+  const page = {
+    content: [{ dropId: 100, status: 'DRAFT' }],
+    totalElements: 1,
+    totalPages: 1,
+    hasNext: false,
+  }
+  const get = vi
+    .spyOn(api, 'get')
+    .mockResolvedValue({ data: { success: true, data: page } })
+  const params = { status: 'DRAFT' as const, page: 0, size: 20 }
+  await expect(getSellerDrops(params)).resolves.toEqual(page)
+  expect(get).toHaveBeenCalledWith('/seller/drops', {
+    params,
+    signal: undefined,
+  })
+  get.mockResolvedValue({
+    data: { success: true, data: { ...page, content: [{ dropId: -1 }] } },
+  })
+  await expect(getSellerDrops(params)).rejects.toThrow('목록 응답 형식')
+})
+
+test('취소 사유를 보내고 CANCELED 상태 응답을 확인한다', async () => {
+  const post = vi.spyOn(api, 'post').mockResolvedValue({
+    data: { success: true, data: { dropId: 100, status: 'CANCELED' } },
+  })
+  await expect(cancelSellerDrop(100, '일정 변경')).resolves.toMatchObject({
+    status: 'CANCELED',
+  })
+  expect(post).toHaveBeenCalledWith('/seller/drops/100/cancel', {
+    reason: '일정 변경',
+  })
+  post.mockResolvedValue({
+    data: { success: true, data: { dropId: 101, status: 'CANCELED' } },
+  })
+  await expect(cancelSellerDrop(100, '일정 변경')).rejects.toThrow(
+    '취소 응답 형식',
+  )
+})
+
+test('판매자 WISH 수는 해당 DROP의 음수가 아닌 정수만 반환한다', async () => {
+  const get = vi.spyOn(api, 'get').mockResolvedValue({
+    data: { success: true, data: { dropId: 100, activeWishCount: 0 } },
+  })
+  await expect(getSellerDropWishCount(100)).resolves.toBe(0)
+  expect(get).toHaveBeenCalledWith('/seller/drops/100/wish-count')
+  get.mockResolvedValue({
+    data: { success: true, data: { dropId: 100, activeWishCount: -1 } },
+  })
+  await expect(getSellerDropWishCount(100)).rejects.toThrow('WISH 수 응답 형식')
+})
 
 test('판매자 상세 요청에 취소 신호를 전달한다', async () => {
   const detail = {

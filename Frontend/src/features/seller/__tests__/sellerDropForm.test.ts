@@ -5,6 +5,8 @@ import {
   toSellerDraft,
   toSellerDropRequest,
   type SellerDraft,
+  rebuildSkuValues,
+  validateDropPublish,
 } from '../logic/sellerDropForm'
 
 afterEach(() => vi.unstubAllEnvs())
@@ -93,6 +95,58 @@ const emptyDraft = (): SellerDraft => ({
   groups: [],
   gallery: [],
   detail: [],
+})
+
+test('새 기본 SKU의 가격·재고가 모두 비면 빈 DRAFT로 저장한다', () => {
+  const draft = emptyDraft()
+  draft.values = rebuildSkuValues([], {})
+  expect(toSellerDropRequest(draft).options).toEqual([])
+  expect(Object.keys(draft.values)).toContain('sku:{}:price')
+})
+
+test('조합을 재구성하면 유지된 조합의 가격·재고·활성을 보존하고 제거한 조합은 지운다', () => {
+  const draft = toSellerDraft(detail)
+  const kept = draft.groups.map((group) => ({
+    ...group,
+    values: group.values.slice(0, 1),
+  }))
+  const values = rebuildSkuValues(kept, draft.values)
+  expect(
+    toSellerDropRequest({ ...draft, groups: kept, values }).options,
+  ).toMatchObject([{ unitPrice: 39000, totalQuantity: 10, active: true }])
+  expect(
+    Object.keys(values).filter((key) => key.endsWith(':price')),
+  ).toHaveLength(1)
+})
+
+test('공개 필수값은 모두 안내하되 배송비 0은 유효하다', () => {
+  const errors = validateDropPublish({ shipping: { shippingFee: 0 } })
+  expect(errors.map((error) => error.field)).toEqual(
+    expect.arrayContaining([
+      'name',
+      'description',
+      'categoryId',
+      'images',
+      'options',
+      'saleStartsAt',
+      'saleEndsAt',
+    ]),
+  )
+  expect(errors.some((error) => error.field === 'shipping.shippingFee')).toBe(
+    false,
+  )
+})
+
+test('옵션 이름·값 중복과 판매 가능한 SKU 누락을 공개 전에 안내한다', () => {
+  const request = toSellerDropRequest(toSellerDraft(detail))
+  request.optionGroups![1].name = request.optionGroups![0].name
+  request.optionGroups![0].values!.push(request.optionGroups![0].values![0])
+  request.options!.forEach((option) => {
+    option.active = false
+  })
+  expect(validateDropPublish(request).map((error) => error.field)).toEqual(
+    expect.arrayContaining(['optionGroups[0]', 'optionGroups[1]', 'options']),
+  )
 })
 
 test('상세를 폼과 요청으로 왕복해 이미지·조합·총재고·비활성 상태를 보존한다', () => {
