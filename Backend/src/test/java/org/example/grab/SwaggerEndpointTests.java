@@ -71,6 +71,8 @@ class SwaggerEndpointTests {
                 .andExpect(jsonPath("$.paths['/api/v1/drops/stock-stream'].get.responses['429'].headers['Retry-After']").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/drops/stock-stream'].get.responses['404'].content['application/json']").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/drops/stock-stream'].get.parameters[0].name").value("dropIds"));
+        assertThat(readApiDoc("/v3/api-docs/drop").path("tags").findValuesAsText("name"))
+                .containsOnlyOnce("공개 DROP");
     }
 
     // GR-97: 내 정보 조회의 Authentication 파라미터는 서버가 채우므로 문서 입력란에 나오지 않는다

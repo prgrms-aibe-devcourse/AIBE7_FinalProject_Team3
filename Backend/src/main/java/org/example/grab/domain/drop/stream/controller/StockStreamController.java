@@ -26,7 +26,7 @@ import java.util.Arrays;
 
 @RestController
 @RequiredArgsConstructor
-@Tag(name = "공개 DROP", description = "로그인 없이 호출하는 DROP 목록·상세·재고 조회와 변경 구독")
+@Tag(name = "공개 DROP", description = "로그인 없이 호출하는 DROP 목록·상세·재고 조회")
 public class StockStreamController {
 
     private final StockStreamSubscriptionService subscriptions;

@@ -12,10 +12,6 @@
   ],
   "tags": [
     {
-      "name": "공개 DROP",
-      "description": "로그인 없이 호출하는 DROP 목록·상세·재고 조회와 변경 구독"
-    },
-    {
       "name": "판매자 DROP",
       "description": "본인 DROP의 임시 저장·수정·공개·취소와 현황 조회. 403 ACCESS_DENIED는 SELLER 권한 없음 또는 CSRF 토큰 누락, DROP_ACCESS_DENIED는 다른 판매자의 DROP"
     },
