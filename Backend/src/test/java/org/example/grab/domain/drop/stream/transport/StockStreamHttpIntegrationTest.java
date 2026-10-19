@@ -339,11 +339,14 @@ class StockStreamHttpIntegrationTest {
         Order order = createOrder(insertOption());
         Stream stream = open(first.toString());
         assertThat(stream.next()).contains("ready");
+        // PostgreSQL에 저장된 마이크로초 정밀도의 마감 시각으로 경계값을 검증한다.
+        OffsetDateTime expiresAt = jdbc.queryForObject("SELECT payment_expires_at FROM orders WHERE id = ?",
+                OffsetDateTime.class, order.getId());
 
         // when / then
-        assertThat(payments.expireIfDue(order.getId(), order.getPaymentExpiresAt())).isTrue();
+        assertThat(payments.expireIfDue(order.getId(), expiresAt)).isTrue();
         assertChange(stream, "STOCK");
-        assertThat(payments.expireIfDue(order.getId(), order.getPaymentExpiresAt())).isFalse();
+        assertThat(payments.expireIfDue(order.getId(), expiresAt)).isFalse();
         assertThat(stream.nextChange()).contains("stream-closed");
     }
 
