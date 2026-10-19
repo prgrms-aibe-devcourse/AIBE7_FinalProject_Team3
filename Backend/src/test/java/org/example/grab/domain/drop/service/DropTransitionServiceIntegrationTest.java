@@ -1,6 +1,7 @@
 package org.example.grab.domain.drop.service;
 
 import jakarta.persistence.EntityManager;
+import org.example.grab.domain.drop.stream.service.StockChangePublisher;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.global.config.JpaConfig;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,7 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
-@Import({JpaConfig.class, DropTransitionService.class, DropTransitionBatchService.class})
+@Import({StockChangePublisher.class, JpaConfig.class, DropTransitionService.class, DropTransitionBatchService.class})
 @Testcontainers
 class DropTransitionServiceIntegrationTest {
 

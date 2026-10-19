@@ -1,6 +1,8 @@
 package org.example.grab.domain.order.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.grab.domain.drop.stream.service.StockChangePublisher;
+import org.example.grab.domain.drop.stream.model.StockChange;
 import org.example.grab.domain.order.dto.CancelableOrder;
 import org.example.grab.domain.order.dto.PayableOrder;
 import org.example.grab.domain.order.dto.PaymentCompletionResult;
@@ -40,6 +42,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class OrderPaymentService {
 
+    private final StockChangePublisher stockChangePublisher;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final StockReservationRepository stockReservationRepository;
@@ -151,6 +154,7 @@ public class OrderPaymentService {
             requireOneRow(inventoryRepository.returnSoldQuantity(
                     reservation.getOrderItem().getOptionId(), reservation.getOrderItem().getQuantity()));
         }
+        stockChangePublisher.publish(order.getDropId(), StockChange.STOCK, StockChange.SALES);
         return CancelableOrder.from(order);
     }
 
@@ -223,6 +227,7 @@ public class OrderPaymentService {
             requireOneRow(inventoryRepository.commitReservedQuantity(
                     reservation.getOrderItem().getOptionId(), reservation.getOrderItem().getQuantity()));
         }
+        stockChangePublisher.publish(order.getDropId(), StockChange.SALES);
         return PaymentCompletionResult.COMPLETED;
     }
 
@@ -282,6 +287,7 @@ public class OrderPaymentService {
             requireOneRow(inventoryRepository.releaseReservedQuantity(
                     reservation.getOrderItem().getOptionId(), reservation.getOrderItem().getQuantity()));
         }
+        stockChangePublisher.publish(order.getDropId(), StockChange.STOCK);
     }
 
     // 주문 생성은 주문 항목마다 HELD 예약을 하나씩 만든다. 수가 다르거나 이미 확정·해제된 예약이 있으면 원장이 어긋난 것이다.

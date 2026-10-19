@@ -1,6 +1,8 @@
 package org.example.grab.domain.order.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.grab.domain.drop.stream.service.StockChangePublisher;
+import org.example.grab.domain.drop.stream.model.StockChange;
 import org.example.grab.domain.order.dto.OrderCreateRequest;
 import org.example.grab.domain.order.entity.Order;
 import org.example.grab.domain.order.entity.OrderItem;
@@ -34,6 +36,7 @@ public class OrderCreateTransactionService {
 
     private static final long PAYMENT_WAIT_MINUTES = 10;
 
+    private final StockChangePublisher stockChangePublisher;
     private final OrderInventoryRepository inventoryRepository;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
@@ -106,6 +109,7 @@ public class OrderCreateTransactionService {
         stockReservationRepository.saveAll(orderItems.stream()
                 .map(item -> StockReservation.hold(item, paymentExpiresAt))
                 .toList());
+        stockChangePublisher.publish(order.getDropId(), StockChange.STOCK);
         return order;
     }
 

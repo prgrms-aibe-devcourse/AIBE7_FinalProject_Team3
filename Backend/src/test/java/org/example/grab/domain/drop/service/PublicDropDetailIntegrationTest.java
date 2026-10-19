@@ -1,6 +1,7 @@
 package org.example.grab.domain.drop.service;
 
 import jakarta.persistence.EntityManager;
+import org.example.grab.domain.drop.stream.service.StockChangePublisher;
 import jakarta.persistence.EntityManagerFactory;
 import org.example.grab.domain.category.service.CategoryService;
 import org.example.grab.domain.drop.dto.request.DropDraftRequest;
@@ -51,7 +52,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
-@Import({JpaConfig.class, DropService.class, CategoryService.class, WishQueryService.class,
+@Import({StockChangePublisher.class, JpaConfig.class, DropService.class, CategoryService.class, WishQueryService.class,
         SellerProfileService.class, SupabaseStorageConfig.class})
 @TestPropertySource(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
 @Testcontainers

@@ -1,5 +1,6 @@
 package org.example.grab.domain.drop.service;
 
+import org.example.grab.domain.drop.stream.service.StockChangePublisher;
 import org.example.grab.domain.drop.dto.PublicDropSort;
 import org.example.grab.domain.drop.dto.request.DropDraftRequest;
 import org.example.grab.domain.drop.dto.request.DropImageRequest;
@@ -105,6 +106,7 @@ class DropServiceTest {
     @BeforeEach
     void setUp() {
         dropService = new DropService(
+                org.mockito.Mockito.mock(StockChangePublisher.class),
                 dropRepository, dropImageRepository, categoryService, wishQueryService, sellerProfileService,
                 imageStorage, eventPublisher);
     }
