@@ -180,8 +180,8 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 | 오류 코드 | HTTP 상태 | 설명 |
 | --- | --- | --- |
 | `INVALID_REQUEST` | 400 | 요청 형식 오류 |
-| `STOCK_STREAM_LIMIT_EXCEEDED` | 429 | SSE IP 연결·요청 제한 초과. GR-110 구현 예정 |
-| `STOCK_STREAM_UNAVAILABLE` | 503 | SSE 서버 연결 상한·구독 기반 준비 불가. GR-110 구현 예정 |
+| `STOCK_STREAM_LIMIT_EXCEEDED` | 429 | SSE IP 연결·요청 제한 초과. GR-110 1단계 enum 구현, HTTP 연동 예정 |
+| `STOCK_STREAM_UNAVAILABLE` | 503 | SSE 서버 연결 상한·구독 기반 준비 불가. GR-110 1단계 enum 구현, HTTP 연동 예정 |
 | `INVALID_IDEMPOTENCY_KEY` | 400 | `Idempotency-Key` 헤더 누락 또는 UUID 형식 오류 |
 | `VALIDATION_FAILED` | 400 | 필드 검증 실패 |
 | `INVALID_EMAIL` | 400 | 이메일 형식·길이 규칙 위반 |

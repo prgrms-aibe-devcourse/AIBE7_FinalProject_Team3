@@ -178,9 +178,9 @@ EventSource는 Axios 인증·401 인터셉터를 거치지 않고 onerror에 HTT
 
 ## 12. 초기 주기·제한과 설정 계약
 
-아래 값은 GR-109에서 정한 **초기 구현 기본값과 검증 목표**다. 운영 실측값이나 현 인프라의 수용 가능 판정이 아니다. GR-113에서 동일 값을 검증하고 미달하면 원인·수정값·재검증 결과를 정본에 남긴다. 이번에는 application.yml·프록시·프론트 코드를 변경하지 않는다.
+아래 값은 GR-109에서 정한 **초기 구현 기본값과 검증 목표**다. 운영 실측값이나 현 인프라의 수용 가능 판정이 아니다. GR-113에서 동일 값을 검증하고 미달하면 원인·수정값·재검증 결과를 정본에 남긴다. GR-109에서는 application.yml·프록시·프론트 코드를 변경하지 않았다. GR-110 1단계에서 서버 설정 바인딩·입력/공개 검증·구독 저장소·접속 제한 기반을 추가했으며 SSE endpoint·전송·도메인 이벤트는 아직 미구현이다.
 
-백엔드 설정 위치는 향후 `application.yml`의 `grab.stock-stream.*`, 프론트는 향후 `features/drop/logic/realtimeStockPolicy.ts`로 모은다. 아래 키는 그 위치에 구현할 계약이며 현재 존재하는 설정으로 간주하지 않는다.
+백엔드 설정은 `application.yml`의 `grab.stock-stream.*`에 바인딩한다. 전송 관련 설정도 바인딩·검증하지만 실행은 GR-110 2단계에서 연결한다. 프론트 설정은 향후 `features/drop/logic/realtimeStockPolicy.ts`로 모으며 아직 미구현이다.
 
 | 항목 | 기본값·단위 | 향후 설정 키/위치 | 이유 |
 | --- | --- | --- | --- |
@@ -202,6 +202,7 @@ EventSource는 Axios 인증·401 인터셉터를 거치지 않고 onerror에 HTT
 | IP 연결 상한 | 인스턴스 내 remoteAddr당 20개 | `max-connections-per-ip=20` | 다중 탭·공유망 일부 허용. NAT 제한 영향은 GR-113 기록 |
 | 구독 요청 제한 | 인스턴스 내 remoteAddr당 60초 고정 창 30회, 최초 요청부터 계산 | `connect-rate-window`, `connect-rate-max` | 실패·구독 교체·재접속 모두 포함. 신규 IP 상태도 유한한 TTL/용량으로 관리 |
 | Retry-After | 429·503에서 60초 | `retry-after=60s` | HTTP 클라이언트 진단용. EventSource가 읽는다고 가정하지 않음 |
+| IP 추적 상태 상한 | 인스턴스당 10,000개, 활성 연결이 없고 요청 창 만료 시 제거 | `max-tracked-ips=10000` | 임의 IP로 메모리 증가 방지. 남은 추적 용량이 없으면 503 |
 
 재연결·구독 교체는 같은 제어기에서 처리한다. 실패 후 n번째 대기는 `균등(0.5*b, b)`초, `b=min(60, 5*2^(n-1))`로 한다. 성공 ready 후 실패 횟수를 초기화한다. 정상 수명 종료·구독 집합 변경·화면 복귀도 직전 연결 시작부터 최소 5초를 지키며 균등 0~5초를 추가한다. 화면 복귀의 HTTP 조회는 연결 대기를 기다리지 않고 즉시 예약하되 키별 2초 간격을 지킨다. offline에서는 재접속하지 않는다.
 
@@ -325,3 +326,17 @@ GR-109는 문서만 변경하므로 실행 OpenAPI와 생성 타입에 SSE가 �
 백엔드 테스트·빌드, 프론트 lint·test·build·e2e·시각 비교, 부하 테스트, 백엔드 재기동·OpenAPI 생성은 문서 작업 범위이므로 미실행이다. 화면·설정·생성 타입·마이그레이션은 변경하지 않는다. 구현·실측 검증 책임은 위 후속 이슈에 있다.
 
 현재 저장소의 backend-ci.yml·frontend-ci.yml은 main/deploy 대상 PR·push에서 각 영역 경로 변경 시 동작한다. 이 작업 브랜치 push 자체는 두 CI의 자동 트리거 대상이 아니며 체크가 없다고 통과로 기록하지 않는다. main 대상 PR 생성 후 실제 실행 결과를 확인해야 한다. 이 문서는 PR 생성·Linear 이슈 상태 변경을 수행한 기록이 아니다.
+
+## 17. GR-110 단계별 구현 기록
+
+1단계에서 `grab.stock-stream.*` 설정 바인딩·기동 검증, 원문 쿼리 파싱, 공개 상품 집합 검증, 상품별 구독 저장소, 인스턴스/IP 연결 제한과 고정 창 요청 제한을 구현했다. IP 추적 상태도 최대 10,000개로 제한하며 연결이 없고 요청 창이 만료된 상태는 다음 접근/명시적 정리에서 제거한다. 구독 해제는 멱등하고 슬롯과 상품 인덱스를 함께 반환한다. 공개 검증 실패·잘못된 요청도 요청 횟수에는 포함하되 연결 슬롯은 점유하지 않는다.
+
+검증: 신규 설정·쿼리·구독·제한/동시성 테스트, PostgreSQL Testcontainers 공개 상태/혼합 요청 통합 테스트, 기존 공개 상세·공개 endpoint/보안·Swagger 회귀를 포함해 118건이 통과했다. 기존 조회 API와 재고 원장 코드는 변경하지 않았다.
+
+실행 명령(Backend):
+
+```bash
+./gradlew test --tests '*StockStream*Test' --tests '*PublicDropSubscriptionServiceIntegrationTest' --tests '*PublicDropDetailIntegrationTest' --tests '*PublicEndpointSecurityTests' --tests '*SecurityFilterChainTests' --tests '*SwaggerEndpointTests'
+```
+
+SSE endpoint·emitter·보안 경로·HTTP 오류 헤더·전송/heartbeat/수명 정리는 2단계, 실제 변경의 커밋 후 전달은 3단계에서 연결한다. 429/503 코드 enum은 추가했지만 HTTP로 반환하는 구독 API는 아직 없다. 전체 테스트·컨테이너 이미지 빌드는 단계 통합 검증에서 수행하며, 실제 SSE 수신/종료·두 브라우저·부하는 이 단계에서 실행하지 않았다. 프론트·OpenAPI 계약은 아직 변경되지 않아 생성 타입도 갱신하지 않았다.
