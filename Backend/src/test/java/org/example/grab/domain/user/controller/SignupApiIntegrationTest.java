@@ -4,7 +4,7 @@ import com.jayway.jsonpath.JsonPath;
 import jakarta.servlet.http.Cookie;
 import org.example.grab.domain.user.repository.EmailSignupContextRepository;
 import org.example.grab.domain.user.support.EmailSignupTokenCookie;
-import org.example.grab.domain.user.support.EmailSignupTokenGenerator;
+import org.example.grab.domain.user.support.SignupTokenGenerator;
 import org.example.grab.support.TestcontainersConfiguration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -74,7 +74,7 @@ class SignupApiIntegrationTest {
     private EmailSignupContextRepository signupContextRepository;
 
     @Autowired
-    private EmailSignupTokenGenerator tokenGenerator;
+    private SignupTokenGenerator tokenGenerator;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;

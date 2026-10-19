@@ -56,14 +56,19 @@ public class User extends UUIDEntity {
     @Column(nullable = false, length = 20)
     private AuthProvider provider;
 
-    // 생성자는 정적 팩토리 createLocal로 접근 가능
+    // 소셜 회원의 제공자 고유 사용자 식별자(OIDC sub). LOCAL은 null이다(V22 ck_users_social_identifier, GR-46 M00-01)
+    @Column(name = "provider_user_id", length = 255)
+    private String providerUserId;
+
+    // 생성자는 정적 팩토리 createLocal·createSocial로 접근 가능
     private User(
             String email,
             String passwordHash,
             String nickname,
             UserRole role,
             UserStatus status,
-            AuthProvider provider
+            AuthProvider provider,
+            String providerUserId
     ) {
         this.email = Objects.requireNonNull(email);
         this.passwordHash = passwordHash;
@@ -71,6 +76,7 @@ public class User extends UUIDEntity {
         this.role = Objects.requireNonNull(role);
         this.status = Objects.requireNonNull(status);
         this.provider = Objects.requireNonNull(provider);
+        this.providerUserId = providerUserId;
     }
 
     // 이메일 정규화와 비밀번호 해싱은 호출자(GR-28·GR-29)를 통해 데이터 처리를 끝낸 값을 받는다.
@@ -90,7 +96,30 @@ public class User extends UUIDEntity {
                 nickname,
                 UserRole.USER,
                 UserStatus.ACTIVE,
-                AuthProvider.LOCAL
+                AuthProvider.LOCAL,
+                null
+        );
+    }
+
+    /*
+        소셜 회원(MEMBER_AUTH.md 1.6). 비밀번호 해시는 저장하지 않고 제공자와 고유 사용자 식별자를 저장한다.
+        이메일 정규화와 닉네임 검증은 호출자가 끝낸 값을 받는다. 가입 시 USER·ACTIVE다.
+     */
+    public static User createSocial(String normalizedEmail, AuthProvider provider, String providerUserId, String nickname) {
+        if (provider == null || provider == AuthProvider.LOCAL) {
+            throw new IllegalArgumentException("소셜 회원의 제공자는 KAKAO 또는 GOOGLE이어야 합니다.");
+        }
+        if (providerUserId == null || providerUserId.isBlank()) {
+            throw new IllegalArgumentException("소셜 회원은 제공자 고유 사용자 식별자가 필요합니다.");
+        }
+        return new User(
+                normalizedEmail,
+                null,
+                nickname,
+                UserRole.USER,
+                UserStatus.ACTIVE,
+                provider,
+                providerUserId
         );
     }
 }

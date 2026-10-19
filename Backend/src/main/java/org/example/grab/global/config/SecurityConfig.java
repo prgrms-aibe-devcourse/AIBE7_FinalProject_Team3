@@ -14,11 +14,13 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.annotation.web.configurers.oauth2.client.OAuth2LoginConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.authentication.session.NullAuthenticatedSessionStrategy;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -31,7 +33,9 @@ import java.util.List;
 public class SecurityConfig {
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http, JwtProvider jwtProvider, RestAuthenticationEntryPoint authenticationEntryPoint, RestAccessDeniedHandler accessDeniedHandler) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http, JwtProvider jwtProvider, RestAuthenticationEntryPoint authenticationEntryPoint, RestAccessDeniedHandler accessDeniedHandler,
+                                            // 소셜 로그인 설정은 auth 도메인(OAuth2LoginConfig)이 만든다. global은 도메인을 참조하지 않으므로 Customizer로 받는다(GR-46)
+                                            Customizer<OAuth2LoginConfigurer<HttpSecurity>> oauth2LoginCustomizer) throws Exception {
         return http
                 // 인증 근거는 access_token 쿠키의 JWT 하나다. 세션에 SecurityContext를 저장하지 않는다(M00-10)
                 .sessionManagement(session ->
@@ -44,9 +48,12 @@ public class SecurityConfig {
                 // 모든 상태 변경 요청(POST·PUT·PATCH·DELETE)에 예외 없이 CSRF를 적용한다
                 // spa()는 XSRF-TOKEN 쿠키를 JavaScript가 읽을 수 있게 하고, 쿠키 값을 그대로 담은 X-XSRF-TOKEN 헤더를 받는다.
                 // spa()의 저장소에는 Secure·SameSite가 없어 명세 속성을 붙인 저장소로 바꾼다. spa()가 저장소를 덮어쓰므로 순서를 지킨다(M00-01)
+                // JWT 필터는 요청마다 인증을 다시 세우고 STATELESS라 세션에 남지 않는다. 기본 전략은 이를 매번 새 로그인으로 보고
+                // XSRF-TOKEN을 지우고 다시 발급해, 먼저 읽어 둔 토큰의 상태 변경 요청이 403이 된다. 로그인도 토큰을 교체하지 않으므로(MEMBER_AUTH 1.3) 끈다
                 .csrf(csrf -> csrf
                         .spa()
                         .csrfTokenRepository(csrfTokenRepository())
+                        .sessionAuthenticationStrategy(new NullAuthenticatedSessionStrategy())
                 )
                 .authorizeHttpRequests(requests -> requests
                         // SSE의 오류 dispatch만 허용한다. 다른 보호 API의 ERROR/ASYNC를 일괄 공개하지 않는다.
@@ -86,6 +93,13 @@ public class SecurityConfig {
                         // CSRF 예외는 두지 않는다(MEMBER_AUTH 1.8, GR-36 M00-01)
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout")
                         .permitAll()
+                        // 소셜 로그인 시작·콜백은 로그인 전 단계라 연다. kakao·google 시작과 모든 콜백은 OAuth2 필터가 먼저 처리하고,
+                        // 그 밖의 provider GET은 Controller가 400 UNSUPPORTED_OAUTH2_PROVIDER로 응답한다(MEMBER_AUTH 1.4·1.5, GR-46 M00-02)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/auth/oauth2/*", "/api/v1/auth/oauth2/*/callback")
+                        .permitAll()
+                        // 소셜 가입 완료는 oauth2_signup_token 쿠키의 가입 컨텍스트로 확인한다. CSRF 예외는 두지 않는다(MEMBER_AUTH 1.6)
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/oauth2/signup")
+                        .permitAll()
                         // 판매자 API는 URL에서 SELLER를 먼저 거르고, 승인 상태는 CurrentSellerIdProvider가 DB로 다시 확인한다.
                         // 세그먼트 단위 매칭이라 /api/v1/seller-applications(USER의 판매자 신청)에는 걸리지 않는다.
                         .requestMatchers("/api/v1/seller/**").hasRole("SELLER")
@@ -100,6 +114,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/uploads/**").hasRole("SELLER")
                         .anyRequest().authenticated()
                 )
+                .oauth2Login(oauth2LoginCustomizer)
                 // 인증되지 않은 사용자가 보호된 api에 접근하면 authenticationEntryPoint가,
                 // 인증됐지만 인가 규칙에 막히면 accessDeniedHandler가 공통 오류 형식으로 응답 생성
                 .exceptionHandling(exceptions -> exceptions

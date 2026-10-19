@@ -187,11 +187,13 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 | `INVALID_EMAIL` | 400 | 이메일 형식·길이 규칙 위반 |
 | `INVALID_PASSWORD` | 400 | 비밀번호 길이·공백·허용 문자·문자 조합 규칙 위반 |
 | `INVALID_NICKNAME` | 400 | 닉네임 길이·허용 문자 규칙 위반 |
+| `UNSUPPORTED_OAUTH2_PROVIDER` | 400 | 지원하지 않는 소셜 로그인 제공자 (`kakao`·`google` 외) |
 | `EMAIL_VERIFICATION_CODE_MISMATCH` | 400 | 이메일 인증 코드 불일치 |
 | `EMAIL_VERIFICATION_CODE_EXPIRED` | 400 | 유효한 이메일 인증 코드 없음 (만료·미요청·사용 완료) |
 | `AUTHENTICATION_REQUIRED` | 401 | 인증 필요 |
 | `INVALID_TOKEN` | 401 | 유효하지 않은 토큰 |
 | `EMAIL_SIGNUP_CONTEXT_INVALID` | 401 | 이메일 가입 컨텍스트 없음·만료·이미 사용됨 |
+| `OAUTH2_SIGNUP_CONTEXT_INVALID` | 401 | 소셜 가입 컨텍스트 없음·만료·이미 사용됨·조작됨 |
 | `INVALID_CREDENTIALS` | 401 | 로그인 이메일 또는 비밀번호 불일치 (계정 존재 여부를 구분하지 않음) |
 | `ACCESS_DENIED` | 403 | 권한 없음 |
 | `ACCOUNT_DISABLED` | 403 | 정지·탈퇴 등 이용할 수 없는 계정 |
@@ -222,6 +224,16 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 | `INTERNAL_SERVER_ERROR` | 500 | 처리하지 못한 서버 오류 (Redis·DB 장애 등). 인증 실패가 아니므로 클라이언트는 로그아웃하지 않는다 |
 | `EXTERNAL_SERVICE_ERROR` | 502 | 외부 연동 서비스(스토리지 등) 호출 실패 |
 | `PAYMENT_CANCEL_FAILED` | 502 | PG가 결제 취소를 거절함 |
+
+소셜 로그인 콜백(MEMBER_AUTH 1.5)은 JSON 오류 응답 대신 프론트엔드 콜백 주소로 302 리다이렉트하고 `error` 쿼리에 아래 코드만 담는다.
+
+| 오류 코드 | 설명 |
+| --- | --- |
+| `OAUTH2_AUTHENTICATION_FAILED` | 사용자 취소, `state` 불일치, 인가 코드·토큰 교환 실패, ID 토큰 검증 실패, userinfo 조회 실패·`sub` 불일치, 지원하지 않는 제공자 |
+| `OAUTH2_EMAIL_REQUIRED` | 제공자가 검증된 이메일을 주지 않음 |
+| `ACCOUNT_LINK_REQUIRED` | 같은 이메일의 `LOCAL` 또는 다른 소셜 계정이 있어 자동으로 연결하지 않음 |
+| `ACCOUNT_DISABLED` | 정지·탈퇴 등 이용할 수 없는 계정 |
+| `INTERNAL_SERVER_ERROR` | Redis·DB 장애 등 서버 오류. 인증 실패가 아니다 |
 
 ---
 

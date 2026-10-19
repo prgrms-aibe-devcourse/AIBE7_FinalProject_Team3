@@ -132,6 +132,46 @@ class PaymentTest {
                 .isEqualTo(CommonErrorCode.INVALID_STATE_TRANSITION);
     }
 
+    @Test
+    @DisplayName("주문을 확정하지 못한 승인을 보정 환불하면 CANCELED와 취소 시각을 기록하고 보정을 RESOLVED로 끝낸다")
+    void cancelForCompensation() {
+        // given
+        Payment payment = createPayment();
+        payment.succeedRequiringReconciliation(APPROVED_AT, "결제 마감 후 승인");
+        OffsetDateTime canceledAt = APPROVED_AT.plusMinutes(1);
+
+        // when
+        payment.cancelForCompensation(canceledAt);
+
+        // then
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CANCELED);
+        assertThat(payment.getCanceledAt()).isEqualTo(canceledAt);
+        assertThat(payment.getReconciliationStatus()).isEqualTo(ReconciliationStatus.RESOLVED);
+        assertThat(payment.requiresCompensation()).isFalse();
+    }
+
+    @Test
+    @DisplayName("보정이 필요 없는 승인이나 결과를 모르는 결제는 보정 환불할 수 없다")
+    void rejectsCancelForCompensationWithoutRequiredApproval() {
+        // given: 주문을 확정한 승인, 결과 불명(UNKNOWN·보정 REQUIRED)
+        Payment approved = createPayment();
+        approved.succeed(APPROVED_AT);
+        Payment unknown = createPayment();
+        unknown.markUnknown("PG 승인 결과 확인 불가");
+
+        // when & then
+        assertThat(approved.requiresCompensation()).isFalse();
+        assertThat(unknown.requiresCompensation()).isFalse();
+        assertThatThrownBy(() -> approved.cancelForCompensation(APPROVED_AT))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(CommonErrorCode.INVALID_STATE_TRANSITION);
+        assertThatThrownBy(() -> unknown.cancelForCompensation(APPROVED_AT))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(CommonErrorCode.INVALID_STATE_TRANSITION);
+    }
+
     private Payment createPayment() {
         return Payment.request(1L, PaymentProvider.TOSS, "client-key", "a".repeat(64), "payment-key", 33000);
     }

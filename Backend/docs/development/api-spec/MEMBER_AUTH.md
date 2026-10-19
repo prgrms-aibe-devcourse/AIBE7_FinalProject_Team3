@@ -311,6 +311,10 @@ Location: <provider-authorization-uri>
 
 서버가 OAuth2 Authorization Code 요청과 `state`를 생성해 해당 제공자의 인증 화면으로 이동시킨다. 리다이렉트 대상은 서버 설정으로 관리하며 요청에서 임의의 반환 URL을 받지 않는다.
 
+- 두 제공자 모두 OpenID Connect로 인증한다. 요청 스코프는 GOOGLE `openid email`, KAKAO `openid account_email`이며 제공자 프로필(이름·닉네임·사진)은 받지 않는다.
+- 인가 요청(`state`, `nonce`, PKCE `code_verifier`)은 로그인 왕복 동안 서버 세션에 저장하고 콜백 처리 후 폐기한다. PKCE는 `S256`이다. 로그인 상태는 세션이 아니라 1.3절의 인증 쿠키로만 판단한다.
+- `GET`이면서 `provider`가 `kakao` 또는 `google`일 때만 소셜 로그인을 시작한다. 그 밖의 `provider`는 `UNSUPPORTED_OAUTH2_PROVIDER`(400)로 거부한다.
+
 **오류 코드:**
 - `UNSUPPORTED_OAUTH2_PROVIDER`
 
@@ -323,7 +327,20 @@ GET /api/v1/auth/oauth2/{provider}/callback
 - **인증**: 불필요
 - **호출 주체**: KAKAO 또는 GOOGLE OAuth2 제공자
 
-클라이언트가 직접 호출하는 API가 아니다. 서버는 인가 코드와 `state`를 검증하고 제공자의 고유 사용자 식별자와 검증된 이메일을 조회한다. 제공자 이메일은 1.2절과 동일한 규칙으로 정규화한 뒤 기존 회원 여부를 판단하고 가입 컨텍스트에 저장한다.
+클라이언트가 직접 호출하는 API가 아니다. 서버는 인가 코드와 `state`를 검증하고, ID 토큰(서명·`nonce`)을 검증해 제공자의 고유 사용자 식별자(`sub`)와 검증된 이메일을 얻는다. 제공자 이메일은 1.2절과 동일한 규칙으로 정규화한다.
+
+- 검증된 이메일은 `email_verified`가 `true`인 `email`이다. 이메일이 없거나 검증되지 않았으면 `OAUTH2_EMAIL_REQUIRED`로 거부한다.
+- GOOGLE은 ID 토큰의 `email`·`email_verified`를 쓴다. KAKAO는 ID 토큰에 `email_verified`가 없으므로 토큰 교환에서 받은 Access Token으로 OIDC userinfo를 조회해 `email`·`email_verified`를 받는다. userinfo의 `sub`가 ID 토큰의 `sub`와 다르면 그 응답을 쓰지 않고 거부한다.
+
+**판정 순서:**
+1. 제공자와 고유 사용자 식별자로 회원을 조회한다. 있으면 계정 상태가 `ACTIVE`인지 확인하고(아니면 `ACCOUNT_DISABLED`) 로그인시킨다.
+   - 제공자 쪽 이메일이 바뀌었어도 같은 회원이다. 저장된 이메일은 갱신하지 않는다.
+2. 없으면 정규화한 이메일로 회원을 조회한다. 같은 이메일의 회원(`LOCAL`, 다른 제공자, 같은 제공자의 다른 식별자)이 있으면 `ACCOUNT_LINK_REQUIRED`로 거부한다.
+3. 없으면 가입 컨텍스트를 발급하고 닉네임 입력 화면으로 이동시킨다.
+
+- 계정 상태는 제공자 인증이 성공한 뒤에만 판정한다. 로그인·거부 모두 기존 회원 데이터를 변경하지 않는다.
+
+**프론트엔드 콜백 주소:** 서버 설정으로 관리한다. 결과는 `result` 또는 `error` 쿼리 하나만 붙인다. 프론트엔드가 해시 라우터를 쓰므로 쿼리는 해시 뒤에 붙는다(예: `http://localhost:5173/#/auth/callback?result=success`).
 
 기존 소셜 회원이면 Access Token과 Refresh Token을 1.3절과 동일한 HttpOnly 쿠키로 발급하고 프론트엔드 콜백 화면으로 이동시킨다.
 
@@ -338,9 +355,11 @@ Location: <frontend-auth-callback>?result=success
 
 ```http
 HTTP/1.1 302 Found
-Set-Cookie: oauth2_signup_token=<one-time-token>; HttpOnly; Secure; SameSite=Lax; Path=/api/v1/auth/oauth2/signup; Max-Age=<signup-ttl>
+Set-Cookie: oauth2_signup_token=<one-time-token>; HttpOnly; Secure; SameSite=Lax; Path=/api/v1/auth/oauth2/signup; Max-Age=900
 Location: <frontend-auth-callback>?result=signup_required
 ```
+
+가입 컨텍스트에는 제공자, 고유 사용자 식별자, 정규화한 이메일을 담는다. 발급 후 15분간 유효하며 토큰 원문이 아닌 해시로 Redis에 저장한다.
 
 동일 이메일의 `LOCAL` 또는 다른 소셜 제공자 회원이 존재하면 자동으로 연결하거나 제공자를 변경하지 않는다. 실패 시 인가 코드, 토큰, 이메일 등 민감 정보를 프론트엔드 리다이렉트 URL에 포함하지 않고 안전한 오류 코드만 전달한다.
 
@@ -349,11 +368,14 @@ HTTP/1.1 302 Found
 Location: <frontend-auth-callback>?error=<error-code>
 ```
 
-**오류 코드:**
-- `OAUTH2_AUTHENTICATION_FAILED`
+**오류 코드:** (`error` 쿼리로 전달)
+- `OAUTH2_AUTHENTICATION_FAILED`: 사용자 취소, `state` 불일치, 인가 코드·토큰 교환 실패, ID 토큰 검증 실패, userinfo 조회 실패·`sub` 불일치, 지원하지 않는 제공자
 - `OAUTH2_EMAIL_REQUIRED`
 - `ACCOUNT_LINK_REQUIRED`
 - `ACCOUNT_DISABLED`
+- `INTERNAL_SERVER_ERROR`: Redis·DB 장애 등 서버 오류. 인증 실패가 아니다
+
+실패 시 인증 쿠키와 가입 컨텍스트 쿠키를 발급하지 않는다.
 
 ### 1.6 소셜 회원가입 완료
 
@@ -398,16 +420,21 @@ Set-Cookie: refresh_token=<token>; HttpOnly; Secure; SameSite=Lax; Path=/api/v1/
 }
 ```
 
-가입 컨텍스트는 성공 시 한 번만 소비하고 만료·재사용된 토큰은 거부한다. 소셜 회원가입 시 `password_hash`를 저장하지 않는다.
+소셜 회원가입 시 `password_hash`를 저장하지 않고 제공자와 고유 사용자 식별자를 저장한다. 회원은 `USER`·`ACTIVE`로 생성한다.
+
+**가입 컨텍스트:**
+- 요청 본문을 검증하기 전에 가입 컨텍스트를 먼저 확인한다.
+- 쿠키가 없거나 알 수 없는·만료된·이미 사용한·조작된 토큰이면 `OAUTH2_SIGNUP_CONTEXT_INVALID`로 거부한다. 만료된 컨텍스트는 Redis에서 삭제되어 없는 컨텍스트와 구분할 수 없으므로 만료를 별도 코드로 구분하지 않는다(1.2.3과 같음).
+- 가입에 성공하거나 `DUPLICATE_EMAIL`(콜백 이후 같은 이메일의 회원이 생김)이면 컨텍스트를 소비한다.
+- 요청 값 오류(`INVALID_REQUEST`, `VALIDATION_FAILED`, `INVALID_NICKNAME`)와 `DUPLICATE_NICKNAME`은 컨텍스트를 소비하지 않는다. 사용자는 컨텍스트가 만료되기 전까지 닉네임을 바꿔 다시 요청할 수 있다.
 
 **오류 코드:**
 - `OAUTH2_SIGNUP_CONTEXT_INVALID`
-- `OAUTH2_SIGNUP_CONTEXT_EXPIRED`
+- `INVALID_REQUEST`
+- `VALIDATION_FAILED`
 - `DUPLICATE_EMAIL`
 - `INVALID_NICKNAME`
 - `DUPLICATE_NICKNAME`
-
-닉네임 오류(`INVALID_NICKNAME`, `DUPLICATE_NICKNAME`)는 가입 컨텍스트를 소비하지 않는다. 사용자는 컨텍스트가 만료되기 전까지 닉네임을 바꿔 다시 요청할 수 있다.
 
 ### 1.7 토큰 재발급
 

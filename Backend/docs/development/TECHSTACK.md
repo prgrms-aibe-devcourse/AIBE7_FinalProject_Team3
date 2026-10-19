@@ -11,13 +11,13 @@
 | Framework | Spring Boot | 4.1.x | 웹, 보안, 데이터 접근, 모니터링 환경을 일관되게 구성한다. |
 | Web | Spring MVC | Boot 관리 | REST API 구현에 사용하며 블로킹 방식의 JPA 환경에 적합하다. SSE는 GR-110에서 단일 서버·커밋 후 알림을 구현했고 프론트 연동·다중 서버는 GR-111~113에서 진행한다. |
 | ORM | Spring Data JPA / Hibernate | Boot 관리 | 주문·옵션·결제 도메인의 관계 매핑과 트랜잭션을 관리한다. 복잡한 조회는 DTO Projection 또는 별도 쿼리로 처리한다. |
-| Security | Spring Security | Boot 관리 | HttpOnly 쿠키 기반 JWT 인증, CSRF 보호, Argon2id 비밀번호 해시, USER·SELLER·ADMIN 권한 및 리소스 소유권을 검증한다. |
+| Security | Spring Security | Boot 관리 | HttpOnly 쿠키 기반 JWT 인증, CSRF 보호, KAKAO·GOOGLE OpenID Connect 소셜 로그인(OAuth2 Client), Argon2id 비밀번호 해시, USER·SELLER·ADMIN 권한 및 리소스 소유권을 검증한다. |
 | Validation | Jakarta Bean Validation | Boot 관리 | 요청 DTO와 상태별 필수값을 검증한다. |
 | Mail | Spring Boot Starter Mail (`JavaMailSender`) | Boot 관리 | LOCAL 회원가입의 이메일 인증 코드를 SMTP로 발송한다. 발송 인터페이스 뒤에 두어 운영 발송 서비스를 설정으로 교체한다(4.3절). |
 | Build | Gradle Wrapper | 8.14+ 또는 9.x | 로컬과 CI에서 동일한 빌드 도구 버전을 사용한다. |
 | API Docs | SpringDoc OpenAPI / Swagger UI | 3.1.0 | Spring Boot 4 기반 API 명세를 자동 생성하고 프론트엔드와 공유한다. |
 | Monitoring Endpoint | Spring Boot Actuator | Boot 관리 | 상태 확인, 메트릭 노출 및 배포 성공 여부를 검증한다. |
-| Scheduling | Spring `@Scheduled` + PostgreSQL 인덱스 폴링 | Boot 관리 | DROP 상태(WISH→GRAB→ENDED) 자동 전환, 결제 배치(진행 중 결제 정리·결제 대기 만료·결제 취소 재요청), 배송 단계 Mock 진행. 별도 스케줄러 인프라 없이 기존 DB·인덱스만 사용한다(1.1절, 1.2절). 스케줄러 스레드는 4개(`spring.task.scheduling.pool.size`)로 두어 작업끼리 서로를 기다리지 않게 한다. 기본값 1이면 결제 배치의 PG 지연이 DROP 판매 시작 전환까지 늦춘다. |
+| Scheduling | Spring `@Scheduled` + PostgreSQL 인덱스 폴링 | Boot 관리 | DROP 상태(WISH→GRAB→ENDED) 자동 전환, 결제 배치(진행 중 결제 정리·결제 대기 만료·결제 취소 재요청·보정 환불), 배송 단계 Mock 진행. 별도 스케줄러 인프라 없이 기존 DB·인덱스만 사용한다(1.1절, 1.2절). 스케줄러 스레드는 4개(`spring.task.scheduling.pool.size`)로 두어 작업끼리 서로를 기다리지 않게 한다. 기본값 1이면 결제 배치의 PG 지연이 DROP 판매 시작 전환까지 늦춘다. |
 
 ### 1.1 DROP 상태 자동 전환 선정 이유 (GR-18)
 
@@ -51,7 +51,7 @@
   - 저장 상태나 알림 이벤트에 서브초 SLA가 요구됨
 - Redis를 추가하더라도 PostgreSQL을 원본으로 유지하고 Redis 전체 유실 후 DB에서 재구축할 수 있어야 한다.
 
-### 1.2 결제 대기 만료 배치 선정 이유 (GR-22, GR-65, GR-87)
+### 1.2 결제 대기 만료 배치 선정 이유 (GR-22, GR-65, GR-87, GR-88)
 
 결제 가능 여부는 저장 상태가 아니라 **서버 시각과 `payment_expires_at`** 기준으로 판정한다. 만료 배치는 마감이 지난 주문을 `EXPIRED`로 바꾸고 선점 재고를 가용 재고로 돌려주는 역할만 담당하므로, 배치 지연은 재고 반환 시점에만 영향을 준다. 1.1절과 같이 `@Scheduled` 10초 폴링을 쓰되, 만료는 주문·예약·재고를 함께 바꾸므로 처리 단위가 다르다.
 
@@ -74,7 +74,8 @@
 - 재고 반환은 마감 후 최대 약 10초 늦고, 대상이 많거나 결제가 주문을 잠그고 있으면 더 늦어질 수 있다. 그동안 반환 대기 수량은 가용 재고에 잡히지 않는다.
 - 진행 중인 결제가 있어도 마감이 지나면 만료하므로, 마감 직전 승인은 결제 `SUCCEEDED`, 보정 `REQUIRED`로 남을 수 있다(PAY-004). 이를 줄이려고 한 주기에서 진행 중 결제 정리를 만료보다 먼저 실행한다(ERD.md 3.2).
 - 진행 중 결제 정리는 PG를 호출하므로 주기당 50건과 시간 예산 5초로 제한하고, 대상을 `SKIP LOCKED`로 선점하며 `updated_at`을 갱신해 다중 인스턴스가 같은 결제를 함께 조회하는 경우를 줄인다. 예산을 넘기면 남은 선점 결제는 60초 뒤로 넘기고 만료를 실행한다. 이미 시작한 한 건은 끝까지 기다리므로(PG 호출 최대 3번, 호출당 연결 3초·응답 10초), PG 장애 때 만료는 최대 약 45초 늦어진다. 예산 초과 경고가 계속되면 PG 상태를 먼저 확인하고 건수 상한이나 예산을 조정한다.
-- 결제 취소 재요청(GR-87)도 같은 방식(주기당 50건, 시간 예산 5초, `SKIP LOCKED` 선점)이며 만료 뒤에 실행해 재고 반환을 늦추지 않는다. 대신 PG 장애 때는 두 단계의 대기가 더해져 다음 주기 시작이 늦어진다(취소 호출은 최대 2번이라 단계당 최대 약 30초).
+- 결제 취소 재요청(GR-87)과 보정 환불(GR-88)도 같은 방식(주기당 50건, 시간 예산 5초, `SKIP LOCKED` 선점)이며 만료 뒤에 실행해 재고 반환을 늦추지 않는다. 대신 PG 장애 때는 단계마다 대기가 더해져 다음 주기 시작이 늦어진다(취소 호출은 최대 2번이라 취소 재요청은 단계당 최대 약 30초, 보정 환불은 결제 조회가 앞에 붙어 그보다 길다).
+- 보정 환불은 운영자 확인 없이 자동으로 한다. 승인됐지만 주문을 확정하지 못한 결제는 고객 돈이 묶인 상태이고, 운영자 화면은 아직 없다. 다만 PG 응답의 주문번호가 주문과 다른 결제는 다른 주문의 정상 결제일 수 있어 자동 환불에서 빼고 운영자가 확인한다(ERD.md 3.3).
 - 스케줄러 스레드가 작업마다 따로 돌므로 결제 배치가 PG를 기다려도 DROP 상태 전환과 배송 단계 진행은 늦어지지 않는다. 서로 다른 작업이 동시에 실행되지만, 각 작업은 다중 인스턴스와 같은 조건(`SKIP LOCKED`, 상태 조건 재확인)으로 설계돼 있어 결과가 바뀌지 않는다. `@Scheduled` 작업을 추가하면 스레드 수를 함께 확인한다.
 - 한 주기의 만료 처리가 10초 안에 끝나지 않거나 후보 조회 지연이 계속 늘면 배치 크기·주기를 먼저 조정한다.
 
@@ -83,7 +84,7 @@
 | 구분 | 기술 | 도입 시점 | 용도 및 선정 이유 |
 | --- | --- | --- | --- |
 | RDBMS | PostgreSQL | MVP | 회원·DROP·주문·재고·결제 데이터를 저장하는 영속 원장이다. 트랜잭션, 행 잠금, 인덱스 및 향후 pgvector 확장이 가능하다. |
-| In-memory Store | Redis | MVP | Refresh Token 해시와 이메일 인증 코드·가입 컨텍스트 해시를 TTL과 함께 저장한다. 조회 캐시는 병목 확인 후 도입하며 주문과 재고의 최종 원장으로 사용하지 않는다. |
+| In-memory Store | Redis | MVP | Refresh Token 해시와 이메일 인증 코드·LOCAL/소셜 가입 컨텍스트 해시를 TTL과 함께 저장한다. 조회 캐시는 병목 확인 후 도입하며 주문과 재고의 최종 원장으로 사용하지 않는다. |
 | Migration | Flyway | MVP | ERD 변경 이력을 SQL 마이그레이션으로 관리하고 환경별 스키마를 일치시킨다. |
 
 재고 정합성은 PostgreSQL 트랜잭션과 행 잠금으로 먼저 보장한다. Redis는 MVP에서 Refresh Token과 이메일 인증 임시 데이터(인증 코드, 가입 컨텍스트, 발송 제한 횟수) 저장에만 사용하고 조회 캐시는 부하 테스트로 병목이 확인된 후 도입한다.
@@ -113,7 +114,7 @@
 - `.github/workflows/frontend-ci.yml`: `main` 또는 `deploy` 대상 PR과 두 브랜치의 푸시에서 Frontend lint·Vitest·build와 Playwright E2E·시각 비교 검증. 실패 시 리포트·trace를 산출물로 보관
 - `.github/workflows/publish-backend.yml`: Backend 이미지를 빌드해 GHCR에 `latest`, 커밋 SHA 태그로 게시. 운영 기준은 `deploy` 푸시지만 현재 트리거는 `main`이므로 변경이 필요하다.
 
-Actuator와 Prometheus의 로컬 메트릭 수집 연결은 완료됐다. Redis 연결 설정과 Refresh Token 저장소(생성·해시·TTL·저장·조회·삭제)는 구현됐고, LOCAL 로그인 API가 Refresh Token을 저장하고 Access·Refresh Token을 HttpOnly 쿠키로 발급하며, 재발급 API가 Refresh Token Rotation(재사용 탐지 포함)으로 두 토큰을 교체한다. 로그아웃 API는 Refresh Token이 속한 세션(이미 교체된 토큰이면 사용됨 표식으로 찾은 세션)을 Redis에서 폐기하고 두 인증 쿠키를 만료시킨다. Access Token은 서버에 저장하지 않으므로 로그아웃 후에도 만료 시각까지 유효할 수 있다. 내 정보 조회 API는 회원 정보를 DB에서 읽고 `roles`는 요청 Access Token의 권한을 돌려주며, 정지·탈퇴 회원은 401로 거부한다. Grafana·Loki·Alloy는 실행 틀만 마련된 상태다.
+Actuator와 Prometheus의 로컬 메트릭 수집 연결은 완료됐다. Redis 연결 설정과 Refresh Token 저장소(생성·해시·TTL·저장·조회·삭제)는 구현됐고, LOCAL 로그인 API가 Refresh Token을 저장하고 Access·Refresh Token을 HttpOnly 쿠키로 발급하며, 재발급 API가 Refresh Token Rotation(재사용 탐지 포함)으로 두 토큰을 교체한다. 로그아웃 API는 Refresh Token이 속한 세션(이미 교체된 토큰이면 사용됨 표식으로 찾은 세션)을 Redis에서 폐기하고 두 인증 쿠키를 만료시킨다. Access Token은 서버에 저장하지 않으므로 로그아웃 후에도 만료 시각까지 유효할 수 있다. 내 정보 조회 API는 회원 정보를 DB에서 읽고 `roles`는 요청 Access Token의 권한을 돌려주며, 정지·탈퇴 회원은 401로 거부한다. KAKAO·GOOGLE 소셜 로그인은 OpenID Connect로 구현됐다. 인가 요청은 로그인 왕복 동안만 서버 세션에 두고, 최초 인증은 Redis 가입 컨텍스트(15분)를 거쳐 닉네임 입력 후 회원을 만들며, 로그인 결과는 LOCAL과 같은 HttpOnly 인증 쿠키로 발급한다. 실제 제공자 왕복 확인은 남아 있다. Grafana·Loki·Alloy는 실행 틀만 마련된 상태다.
 
 ### 4.2 목표 운영 구성
 

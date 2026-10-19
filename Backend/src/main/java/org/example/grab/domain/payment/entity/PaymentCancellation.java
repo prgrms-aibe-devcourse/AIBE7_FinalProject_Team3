@@ -88,7 +88,7 @@ public class PaymentCancellation extends UUIDEntity {
             PaymentCancellationPurpose purpose,
             long amount,
             String reason,
-            OffsetDateTime now
+            OffsetDateTime nextRetryAt
     ) {
         if (amount < 0) {
             throw new IllegalArgumentException("취소 금액은 0 이상이어야 합니다.");
@@ -100,15 +100,23 @@ public class PaymentCancellation extends UUIDEntity {
         this.amount = amount;
         this.reason = Objects.requireNonNull(reason);
         this.status = PaymentCancellationStatus.REQUESTED;
-        // PG 응답을 기다리는 사용자 요청과 겹치지 않도록 재요청 배치는 RETRY_AFTER가 지난 뒤에 고른다(ERD.md 3.3).
-        this.nextRetryAt = now.plus(RETRY_AFTER);
+        this.nextRetryAt = Objects.requireNonNull(nextRetryAt);
     }
 
     // 소비자 주문 취소로 결제를 전액 취소한다. MVP는 전액 취소만 지원한다.
+    // PG 응답을 기다리는 사용자 요청과 겹치지 않도록 재요청 배치는 RETRY_AFTER가 지난 뒤에 고른다(ERD.md 3.3).
     public static PaymentCancellation requestOrderCancel(
             Long paymentId, Long buyerId, long amount, String reason, OffsetDateTime now) {
         return new PaymentCancellation(paymentId, Objects.requireNonNull(buyerId),
-                PaymentCancellationPurpose.ORDER_CANCEL, amount, reason, Objects.requireNonNull(now));
+                PaymentCancellationPurpose.ORDER_CANCEL, amount, reason, now.plus(RETRY_AFTER));
+    }
+
+    // 주문을 확정하지 못한 승인을 전액 환불한다(GR-88). 시스템 보정이라 요청자가 없다.
+    // 기다리는 사용자 요청이 없으므로 같은 배치 주기의 환불 요청 단계가 바로 고르도록 next_retry_at을 now로 둔다.
+    public static PaymentCancellation requestCompensation(
+            Long paymentId, long amount, String reason, OffsetDateTime now) {
+        return new PaymentCancellation(paymentId, null,
+                PaymentCancellationPurpose.LATE_APPROVAL_COMPENSATION, amount, reason, now);
     }
 
     // PG 응답을 기다리거나 결과를 알 수 없는 요청. 이 요청이 끝날 때까지 주문의 배송 처리와 다른 취소 요청을 막는다.
@@ -126,6 +134,17 @@ public class PaymentCancellation extends UUIDEntity {
 
     public void fail(String failureCode, OffsetDateTime completedAt) {
         recordAttempt();
+        this.status = PaymentCancellationStatus.FAILED;
+        this.failureCode = truncate(failureCode);
+        this.completedAt = Objects.requireNonNull(completedAt);
+        this.nextRetryAt = null;
+    }
+
+    // PG에 취소를 요청하지 않고 끝낸다. 요청하지 않았으므로 시도 횟수를 늘리지 않는다(GR-88 PG 주문번호 불일치).
+    public void abandon(String failureCode, OffsetDateTime completedAt) {
+        if (!isInProgress()) {
+            throw new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION);
+        }
         this.status = PaymentCancellationStatus.FAILED;
         this.failureCode = truncate(failureCode);
         this.completedAt = Objects.requireNonNull(completedAt);

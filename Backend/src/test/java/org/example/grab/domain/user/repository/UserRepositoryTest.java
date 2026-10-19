@@ -227,13 +227,13 @@ class  UserRepositoryTest {
         assertThat(userRepository.existsByNicknameIgnoreCase("Grab")).isFalse();
     }
 
-    // createLocal은 null 해시를 먼저 거부하고 소셜 팩토리는 GR-46 범위라, DB 제약은 SQL로 직접 검증한다.
+    // createLocal은 null 해시를 먼저 거부하므로, DB 제약은 SQL로 직접 검증한다.
     @Test
     @DisplayName("LOCAL 회원은 비밀번호 해시 없이 DB에 저장할 수 없다")
     void rejectsLocalUserWithoutPasswordHash() {
         // when & then
         // PostgreSQL은 제약 위반 뒤 트랜잭션을 중단 상태로 두므로 이후 조회를 이어가지 않는다.
-        assertThatThrownBy(() -> insertUserWithoutPasswordHash("local@example.com", "LOCAL"))
+        assertThatThrownBy(() -> insertUserWithoutPasswordHash("local@example.com", "LOCAL", null))
                 .isInstanceOf(DataIntegrityViolationException.class)
                 .rootCause()
                 .hasMessageContaining("ck_users_local_password");
@@ -241,23 +241,92 @@ class  UserRepositoryTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"KAKAO", "GOOGLE"})
-    @DisplayName("소셜 회원은 비밀번호 해시 없이 DB에 저장할 수 있다")
+    @DisplayName("소셜 회원은 비밀번호 해시 없이 제공자 식별자와 함께 DB에 저장할 수 있다")
     void savesSocialUserWithoutPasswordHash(String provider) {
         // given
-        insertUserWithoutPasswordHash("social@example.com", provider);
+        insertUserWithoutPasswordHash("social@example.com", provider, "sub-1");
 
         // when
         User found = userRepository.findByEmail("social@example.com").orElseThrow();
 
         // then
         assertThat(found.getProvider()).isEqualTo(AuthProvider.valueOf(provider));
+        assertThat(found.getProviderUserId()).isEqualTo("sub-1");
         assertThat(found.getPasswordHash()).isNull();
     }
 
-    private void insertUserWithoutPasswordHash(String email, String provider) {
+    // GR-46 M00-01: 소셜 회원은 제공자 식별자로 찾는다. 이메일은 식별에 쓰지 않는다
+    @Test
+    @DisplayName("createSocial로 저장한 회원을 제공자와 식별자로 조회하고, 제공자나 식별자가 다르면 찾지 않는다")
+    void findsSocialUserByProviderAndProviderUserId() {
+        // given
+        User user = userRepository.save(User.createSocial("kakao@example.com", AuthProvider.KAKAO, "sub-1", "드롭헌터"));
+        entityManager.flush();
+        entityManager.clear();
+
+        // when & then
+        User found = userRepository.findByProviderAndProviderUserId(AuthProvider.KAKAO, "sub-1").orElseThrow();
+        assertThat(found.getId()).isEqualTo(user.getId());
+        assertThat(found.getPasswordHash()).isNull();
+        assertThat(found.getRole()).isEqualTo(UserRole.USER);
+        assertThat(found.getStatus()).isEqualTo(UserStatus.ACTIVE);
+        assertThat(userRepository.findByProviderAndProviderUserId(AuthProvider.GOOGLE, "sub-1")).isEmpty();
+        assertThat(userRepository.findByProviderAndProviderUserId(AuthProvider.KAKAO, "sub-2")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("같은 제공자의 같은 식별자로 두 번 저장하면 uq_users_provider_user 위반이다")
+    void rejectsDuplicateProviderUserId() {
+        // given
+        userRepository.saveAndFlush(User.createSocial("first@example.com", AuthProvider.GOOGLE, "sub-1", "첫번째"));
+        User duplicate = User.createSocial("second@example.com", AuthProvider.GOOGLE, "sub-1", "두번째");
+
+        // when & then
+        assertThatThrownBy(() -> userRepository.saveAndFlush(duplicate))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .rootCause()
+                .hasMessageContaining("uq_users_provider_user");
+    }
+
+    @Test
+    @DisplayName("다른 제공자라면 같은 식별자 값을 함께 저장할 수 있다")
+    void allowsSameProviderUserIdAcrossProviders() {
+        // when
+        userRepository.saveAndFlush(User.createSocial("kakao@example.com", AuthProvider.KAKAO, "sub-1", "카카오"));
+        userRepository.saveAndFlush(User.createSocial("google@example.com", AuthProvider.GOOGLE, "sub-1", "구글"));
+
+        // then
+        assertThat(userRepository.findByProviderAndProviderUserId(AuthProvider.KAKAO, "sub-1")).isPresent();
+        assertThat(userRepository.findByProviderAndProviderUserId(AuthProvider.GOOGLE, "sub-1")).isPresent();
+    }
+
+    @Test
+    @DisplayName("소셜 회원은 제공자 식별자 없이 저장할 수 없다")
+    void rejectsSocialUserWithoutProviderUserId() {
+        // when & then
+        assertThatThrownBy(() -> insertUserWithoutPasswordHash("social@example.com", "KAKAO", null))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .rootCause()
+                .hasMessageContaining("ck_users_social_identifier");
+    }
+
+    @Test
+    @DisplayName("LOCAL 회원은 제공자 식별자를 가질 수 없다")
+    void rejectsLocalUserWithProviderUserId() {
+        // when & then
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+                INSERT INTO users (email, password_hash, nickname, provider, provider_user_id)
+                VALUES ('local@example.com', ?, '홍길동', 'LOCAL', 'sub-1')
+                """, PASSWORD_HASH))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .rootCause()
+                .hasMessageContaining("ck_users_social_identifier");
+    }
+
+    private void insertUserWithoutPasswordHash(String email, String provider, String providerUserId) {
         jdbcTemplate.update("""
-                INSERT INTO users (email, password_hash, nickname, provider)
-                VALUES (?, NULL, '홍길동', ?)
-                """, email, provider);
+                INSERT INTO users (email, password_hash, nickname, provider, provider_user_id)
+                VALUES (?, NULL, '홍길동', ?, ?)
+                """, email, provider, providerUserId);
     }
 }

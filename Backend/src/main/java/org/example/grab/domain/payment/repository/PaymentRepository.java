@@ -69,4 +69,25 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             @Param("staleBefore") OffsetDateTime staleBefore,
             @Param("now") OffsetDateTime now,
             @Param("limit") int limit);
+
+    /*
+        보정 환불 기록 생성의 대상 결제를 잠근다(GR-88, ERD.md 3.3, idx_payments_reconciliation).
+        주문을 확정하지 못한 승인(SUCCEEDED, 보정 REQUIRED) 중 보정 환불 기록이 아직 없는 결제만 고른다.
+        다른 인스턴스가 잠근 행은 건너뛴다. 잠금은 호출하는 쪽의 트랜잭션이 끝날 때까지 유지되므로 그 안에서 기록을 만든다.
+     */
+    @Query(value = """
+            SELECT p.id FROM payments p
+            WHERE p.reconciliation_status = 'REQUIRED'
+              AND p.status = 'SUCCEEDED'
+              -- 거절·주문번호 불일치로 끝난 기록이 있는 결제도 다시 고르지 않는다(운영자 확인).
+              AND NOT EXISTS (
+                  SELECT 1 FROM payment_cancellations c
+                  WHERE c.payment_id = p.id
+                    AND c.purpose = 'LATE_APPROVAL_COMPENSATION'
+              )
+            ORDER BY p.updated_at, p.id
+            LIMIT :limit
+            FOR UPDATE OF p SKIP LOCKED
+            """, nativeQuery = true)
+    List<Long> lockCompensationTargets(@Param("limit") int limit);
 }

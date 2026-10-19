@@ -111,7 +111,7 @@ Docker로 백엔드를 띄워 이메일 인증부터 회원가입(MEMBER_AUTH 1.
 
 ### 6.1 실행
 
-`.env`에 `JWT_SECRET`과 `EMAIL_VERIFICATION_SECRET`이 있어야 백엔드가 기동한다. 메일 키는 비워 두면 Mailpit으로 발송된다([MAIL.md](MAIL.md) 3.3).
+`.env`에 `JWT_SECRET`과 `EMAIL_VERIFICATION_SECRET`, 소셜 로그인 키 4개(`KAKAO_CLIENT_ID`·`KAKAO_CLIENT_SECRET`·`GOOGLE_CLIENT_ID`·`GOOGLE_CLIENT_SECRET`)가 있어야 백엔드가 기동한다. 소셜 로그인 키는 기본값이 없으며 발급 방법은 8.1절과 `.env.example`에 있다. 메일 키는 비워 두면 Mailpit으로 발송된다([MAIL.md](MAIL.md) 3.3).
 
 ```powershell
 docker compose up -d --build backend   # postgres·redis·mailpit도 함께 시작된다
@@ -369,7 +369,106 @@ docker compose exec -T postgres psql -U grab -d grab -c "DELETE FROM users WHERE
 Remove-Item signup-cookie.txt, other-cookie.txt
 ```
 
-## 8. 종료 및 초기화
+## 8. 소셜 로그인 확인
+
+KAKAO·GOOGLE 소셜 로그인(MEMBER_AUTH 1.4~1.6)을 실제 제공자로 확인한다. 제공자 인증 화면을 거치므로 시작·콜백은 브라우저로, 가입 완료와 DB·Redis 확인은 6절과 같은 PowerShell로 한다. 자동 테스트(`SocialLoginApiIntegrationTest`)는 제공자 응답(토큰 교환·KAKAO userinfo)을 대역하므로, 콘솔 설정과 실제 제공자 응답은 이 절차로만 확인된다.
+
+### 8.1 제공자 앱과 환경 변수
+
+| 제공자 | 콘솔 설정 |
+| --- | --- |
+| KAKAO | Kakao Developers > 내 애플리케이션. 앱 키의 REST API 키가 `KAKAO_CLIENT_ID`, 보안 > Client Secret이 `KAKAO_CLIENT_SECRET`(사용 설정). 카카오 로그인 활성화, OpenID Connect 활성화, 동의항목 > 카카오계정(이메일), Redirect URI `http://localhost:8080/api/v1/auth/oauth2/kakao/callback` |
+| GOOGLE | Google Cloud Console > API 및 서비스 > 사용자 인증 정보 > OAuth 클라이언트 ID(웹 애플리케이션). 승인된 리디렉션 URI `http://localhost:8080/api/v1/auth/oauth2/google/callback`, 동의 화면 범위 `openid`·`email`. 테스트 모드면 테스트 사용자에 확인할 계정을 추가한다 |
+
+- 네 값을 `.env`에 넣고 `docker compose up -d --build backend`로 다시 띄운다. 값은 `.env`에만 두고 커밋·공유 채널에 붙여 넣지 않는다.
+- Redirect URI는 요청한 주소 기준으로 만들어진다. 브라우저에서 `127.0.0.1`이 아니라 콘솔에 등록한 `http://localhost:8080`으로 접속해야 제공자가 받아들인다.
+- 결과는 `OAUTH2_FRONTEND_CALLBACK_URL`(기본 `http://localhost:5173/#/auth/callback`)로 리다이렉트된다. 프론트엔드 콜백 화면(GR-47)이 없거나 프론트엔드를 띄우지 않았어도 주소창의 `result`·`error` 쿼리로 결과를 읽는다.
+
+### 8.2 시작 요청
+
+```powershell
+# 302: Location이 제공자 인증 화면이고 state·nonce·code_challenge(code_challenge_method=S256)·redirect_uri가 붙는다.
+# 인가 요청은 서버 세션에 저장되므로 JSESSIONID 쿠키가 생긴다. 인증 쿠키는 없다
+curl.exe -s -i http://localhost:8080/api/v1/auth/oauth2/kakao
+curl.exe -s -i http://localhost:8080/api/v1/auth/oauth2/google
+
+# 400 UNSUPPORTED_OAUTH2_PROVIDER: 지원하지 않는 제공자
+curl.exe -s -w "`n%{http_code}`n" http://localhost:8080/api/v1/auth/oauth2/naver
+```
+
+### 8.3 최초 인증(브라우저)
+
+1. 브라우저 개발자 도구를 열고 `http://localhost:8080/api/v1/auth/oauth2/kakao`로 이동해 제공자 화면에서 로그인·동의한다.
+2. 주소창이 `.../#/auth/callback?result=signup_required`이면 성공이다. 개발자 도구 > Application > Cookies > `http://localhost:8080`에서 `oauth2_signup_token`(`Path=/api/v1/auth/oauth2/signup`, 15분, `HttpOnly`·`Secure`)을 확인하고 값을 복사한다. 시작 때 받은 `JSESSIONID` 쿠키는 브라우저에 남지만, 서버 세션(인가 요청)은 콜백 처리 후 무효화돼 더는 쓰이지 않는다. 로그인 상태는 인증 쿠키로만 판단한다.
+3. 회원이 아직 없고 가입 컨텍스트만 있는지 확인한다.
+
+```powershell
+docker compose exec -T postgres psql -U grab -d grab -c "SELECT count(*) FROM users WHERE provider <> 'LOCAL';"
+docker compose exec -T redis redis-cli --scan --pattern 'auth:oauth2-signup-context:*'
+```
+
+`error=...`로 끝나면 백엔드 로그에서 사유 종류를 본다(`docker compose logs backend | Select-String "소셜"`). KAKAO는 ID 토큰에 `email_verified`가 없어 OIDC userinfo에서 이메일을 받고, 두 제공자 모두 PKCE와 함께 토큰 교환이 된다(GR-46 M03-04, 2026-10-17 실제 키 확인).
+
+| 증상 | 원인 후보 | 조치 |
+| --- | --- | --- |
+| 제공자 화면에서 `redirect_uri_mismatch` 등 Redirect URI 오류 | 콘솔에 등록한 주소와 접속 주소가 다르다(`127.0.0.1`과 `localhost`, 포트, 끝의 `/`) | 8.1의 Redirect URI를 그대로 등록하고 `http://localhost:8080`으로 접속한다 |
+| `error=OAUTH2_EMAIL_REQUIRED` | KAKAO: 동의항목 카카오계정(이메일)이 꺼져 있거나 사용자가 동의하지 않았다. 이메일이 인증되지 않은 계정이다 | 동의항목을 켜고, 8.6처럼 앱 연결을 끊은 뒤 다시 동의한다 |
+| KAKAO만 `error=OAUTH2_AUTHENTICATION_FAILED`, 로그 `reason=invalid_user_info_response` | userinfo 조회가 실패했거나 응답의 `sub`가 ID 토큰과 다르다. OpenID Connect가 꺼져 있으면 ID 토큰부터 발급되지 않는다 | 카카오 로그인 > OpenID Connect 활성화를 확인한다 |
+| `error=OAUTH2_AUTHENTICATION_FAILED`, 로그 `reason=invalid_client`·`invalid_grant` 등 토큰 교환 오류 | Client ID·Secret 오타, `.env` 변경 후 컨테이너를 다시 만들지 않았다, KAKAO Client Secret이 사용 안 함이다 | 값을 확인하고 `docker compose up -d backend`로 컨테이너를 다시 만든다(`restart`는 `.env`를 다시 읽지 않는다) |
+| GOOGLE 화면에서 `403 access_denied`·앱 테스트 중 안내 | 동의 화면이 테스트 상태이고 계정이 테스트 사용자에 없다 | Google Auth Platform > 대상 > 테스트 사용자에 계정을 추가한다 |
+
+GOOGLE도 `http://localhost:8080/api/v1/auth/oauth2/google`로 같은 순서를 확인한다.
+
+### 8.4 가입 완료
+
+6.1의 CSRF 쿠키 발급을 먼저 실행해 `$csrfToken`을 받는다. 가입 토큰은 8.3에서 복사한 값이다. 닉네임은 영문으로 시험한다(6.1).
+
+```powershell
+$signupToken = '<8.3에서 복사한 oauth2_signup_token 값>'
+$oauth2Signup = 'http://localhost:8080/api/v1/auth/oauth2/signup'
+$cookies = "XSRF-TOKEN=$csrfToken; oauth2_signup_token=$signupToken"
+
+# 400 INVALID_NICKNAME: 닉네임 오류는 가입 컨텍스트를 소비하지 않는다
+'{"nickname":"!"}' | curl.exe -s -w "`n%{http_code}`n" $oauth2Signup `
+  -H "Cookie: $cookies" -H "X-XSRF-TOKEN: $csrfToken" -H "Content-Type: application/json" --data-binary '@-'
+
+# 201: data.user에 userId·email·nickname·roles. Set-Cookie로 가입 토큰 만료(Max-Age=0)와 access_token·refresh_token
+'{"nickname":"socialtest"}' | curl.exe -s -i -c social-cookie.txt $oauth2Signup `
+  -H "Cookie: $cookies" -H "X-XSRF-TOKEN: $csrfToken" -H "Content-Type: application/json" --data-binary '@-'
+
+# 401 OAUTH2_SIGNUP_CONTEXT_INVALID: 같은 가입 토큰 재사용
+'{"nickname":"socialtest2"}' | curl.exe -s -w "`n%{http_code}`n" $oauth2Signup `
+  -H "Cookie: $cookies" -H "X-XSRF-TOKEN: $csrfToken" -H "Content-Type: application/json" --data-binary '@-'
+
+# 200: 발급된 access_token으로 내 정보 조회. provider가 KAKAO 또는 GOOGLE이다
+curl.exe -s -w "`n%{http_code}`n" -b social-cookie.txt http://localhost:8080/api/v1/users/me
+
+# USER·ACTIVE, password_hash 없음, provider_user_id(제공자 sub) 저장. 가입 컨텍스트 키는 지워졌다
+docker compose exec -T postgres psql -U grab -d grab -c "SELECT email, nickname, role, status, provider, provider_user_id IS NOT NULL AS has_sub, password_hash IS NULL AS no_password FROM users WHERE provider <> 'LOCAL';"
+docker compose exec -T redis redis-cli --scan --pattern 'auth:oauth2-signup-context:*'
+```
+
+### 8.5 재로그인과 충돌
+
+1. 같은 제공자로 브라우저에서 다시 시작하면 `result=success`이고, 개발자 도구에 `access_token`·`refresh_token` 쿠키가 생긴다. 8.4의 회원 수 조회 결과가 늘지 않아야 한다.
+2. 같은 이메일을 쓰는 다른 제공자 계정(또는 6절에서 같은 이메일로 가입한 LOCAL 회원)이 있으면 그 제공자로 시작했을 때 `error=ACCOUNT_LINK_REQUIRED`이고 기존 회원 행은 바뀌지 않는다.
+3. 제공자 화면에서 취소하면 `error=OAUTH2_AUTHENTICATION_FAILED`이고 쿠키가 생기지 않는다.
+
+백엔드 로그(`docker compose logs backend | Select-String "소셜"`)에는 제공자 이름·결과 코드·내부 회원 ID만 있어야 한다. 이메일·제공자 식별자·인가 코드·토큰·Client Secret이 보이면 안 된다(NFR-010).
+
+### 8.6 정리
+
+```powershell
+docker compose exec -T postgres psql -U grab -d grab -c "DELETE FROM users WHERE provider <> 'LOCAL';"
+'auth:oauth2-signup-context:*', 'auth:refresh-token:*', 'auth:refresh-session:*', 'auth:refresh-token-used:*' | ForEach-Object {
+  docker compose exec -T redis redis-cli --scan --pattern $_ | ForEach-Object { docker compose exec -T redis redis-cli DEL $_ }
+}
+Remove-Item social-cookie.txt
+```
+
+같은 계정으로 최초 가입부터 다시 확인하려면 제공자 쪽 연결도 끊는다. 카카오는 카카오계정 > 연결된 서비스 관리, 구글은 Google 계정 > 보안 > 타사 앱 및 서비스에서 GRAB 앱 연결을 해제한다.
+
+## 9. 종료 및 초기화
 
 컨테이너 종료:
 

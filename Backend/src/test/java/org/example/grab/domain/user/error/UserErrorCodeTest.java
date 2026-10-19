@@ -71,6 +71,30 @@ class UserErrorCodeTest {
         assertThat(UserErrorCode.DUPLICATE_NICKNAME.getMessage()).isNotBlank();
     }
 
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "UNSUPPORTED_OAUTH2_PROVIDER   | BAD_REQUEST",
+            "OAUTH2_SIGNUP_CONTEXT_INVALID | UNAUTHORIZED"
+    })
+    @DisplayName("JSON으로 응답하는 소셜 로그인 오류 코드는 상수 이름을 코드로, COMMON.md 3절의 HTTP 상태를 가진다")
+    // 소셜 로그인 시작(MEMBER_AUTH 1.4)과 소셜 가입 완료(1.6)의 오류 응답이다(GR-46)
+    void definesSocialLoginJsonErrorCodes(UserErrorCode errorCode, HttpStatus status) {
+        // then
+        assertThat(errorCode.getCode()).isEqualTo(errorCode.name());
+        assertThat(errorCode.getStatus()).isEqualTo(status);
+        assertThat(errorCode.getMessage()).isNotBlank();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"OAUTH2_AUTHENTICATION_FAILED", "OAUTH2_EMAIL_REQUIRED", "ACCOUNT_LINK_REQUIRED"})
+    @DisplayName("소셜 로그인 콜백 오류 코드는 상수 이름을 error 쿼리 값으로 쓴다")
+    // 콜백(MEMBER_AUTH 1.5)은 JSON 대신 프론트엔드 주소로 리다이렉트해 코드만 전달하므로 HTTP 상태는 명세에 없다(COMMON.md 3절, GR-46)
+    void definesSocialLoginCallbackErrorCodes(UserErrorCode errorCode) {
+        // then: 쿼리에 그대로 붙으므로 인코딩이 필요 없는 형식이어야 한다
+        assertThat(errorCode.getCode()).isEqualTo(errorCode.name()).matches("[A-Z0-9_]+");
+        assertThat(errorCode.getMessage()).isNotBlank();
+    }
+
     @Test
     @DisplayName("공통 오류 코드와 같은 코드 이름을 다시 정의하지 않는다")
     // UserErrorCode의 코드 이름이 CommonErrorCode의 코드 이름과 하나도 겹치지 않는지 검증하는 테스트

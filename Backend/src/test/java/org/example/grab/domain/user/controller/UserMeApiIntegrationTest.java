@@ -239,9 +239,9 @@ class UserMeApiIntegrationTest {
     void returnsSocialProvider() throws Exception {
         // given
         Map<String, Object> user = jdbcTemplate.queryForMap("""
-                INSERT INTO users (email, nickname, status, provider) VALUES (?, ?, 'ACTIVE', 'KAKAO')
+                INSERT INTO users (email, nickname, status, provider, provider_user_id) VALUES (?, ?, 'ACTIVE', 'KAKAO', ?)
                 RETURNING public_id
-                """, email("kakao"), "me-" + run + "-kakao");
+                """, email("kakao"), "me-" + run + "-kakao", "sub-" + run);
         String token = jwtProvider.issue((UUID) user.get("public_id"), Set.of(AuthRole.USER)).value();
 
         // when & then

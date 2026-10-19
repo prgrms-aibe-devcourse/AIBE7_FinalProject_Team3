@@ -4,7 +4,7 @@ import org.example.grab.domain.user.dto.request.SignupRequest;
 import org.example.grab.domain.user.dto.response.SignupResponse;
 import org.example.grab.domain.user.error.UserErrorCode;
 import org.example.grab.domain.user.repository.EmailSignupContextRepository;
-import org.example.grab.domain.user.support.EmailSignupTokenGenerator;
+import org.example.grab.domain.user.support.SignupTokenGenerator;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.support.TestcontainersConfiguration;
 import org.junit.jupiter.api.AfterEach;
@@ -74,7 +74,7 @@ class SignupServiceIntegrationTest {
     private EmailSignupContextRepository signupContextRepository;
 
     @Autowired
-    private EmailSignupTokenGenerator tokenGenerator;
+    private SignupTokenGenerator tokenGenerator;
 
     @Autowired
     private PasswordEncoder passwordEncoder;

@@ -7,7 +7,7 @@ import org.example.grab.domain.user.repository.EmailSignupContextRepository;
 import org.example.grab.domain.user.repository.EmailVerificationCodeRepository;
 import org.example.grab.domain.user.repository.EmailVerificationSendLimitRepository;
 import org.example.grab.domain.user.repository.UserRepository;
-import org.example.grab.domain.user.support.EmailSignupTokenGenerator;
+import org.example.grab.domain.user.support.SignupTokenGenerator;
 import org.example.grab.domain.user.support.EmailVerificationCodeGenerator;
 import org.example.grab.domain.user.support.EmailVerificationHasher;
 import org.example.grab.domain.user.support.EmailVerificationMailFactory;
@@ -65,7 +65,7 @@ class EmailVerificationServiceTest {
     @Mock
     private UserRepository userRepository;
     @Mock
-    private EmailSignupTokenGenerator signupTokenGenerator;
+    private SignupTokenGenerator signupTokenGenerator;
     @Mock
     private EmailSignupContextRepository signupContextRepository;
 
