@@ -18,7 +18,11 @@ export default function DeliveryStageTimeline({ stage, delivered }: Props) {
         const done = delivered || index < currentIndex
         const current = !delivered && index === currentIndex
         return (
-          <li key={item} className={done ? 'done' : current ? 'current' : ''}>
+          <li
+            key={item}
+            className={done ? 'done' : current ? 'current' : ''}
+            aria-current={current ? 'step' : undefined}
+          >
             <span className="delivery-timeline-dot" aria-hidden="true" />
             {deliveryStageText[item]}
           </li>
