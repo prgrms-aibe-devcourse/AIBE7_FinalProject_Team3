@@ -39,6 +39,7 @@ test('목록 쿼리를 전달하고 페이지 데이터를 반환하며 잘못�
 
 test('상세 응답을 반환하고 필수 데이터가 없으면 거부한다', async () => {
   const get = vi.spyOn(api, 'get')
+  const signal = new AbortController().signal
   const detail = {
     dropId: 100,
     name: '한정판 스니커즈',
@@ -46,8 +47,8 @@ test('상세 응답을 반환하고 필수 데이터가 없으면 거부한다',
     actions: { wishable: false, wishCancelable: false, orderable: true },
   }
   get.mockResolvedValueOnce({ data: { success: true, data: detail } })
-  await expect(getDropDetail(100)).resolves.toEqual(detail)
-  expect(get).toHaveBeenCalledWith('/drops/100')
+  await expect(getDropDetail(100, signal)).resolves.toEqual(detail)
+  expect(get).toHaveBeenCalledWith('/drops/100', { signal })
 
   get.mockResolvedValueOnce({ data: { success: false, data: null } })
   await expect(getDropDetail(100)).rejects.toThrow(
@@ -57,14 +58,15 @@ test('상세 응답을 반환하고 필수 데이터가 없으면 거부한다',
 
 test('옵션별 재고를 반환하고 options가 배열이 아니면 거부한다', async () => {
   const get = vi.spyOn(api, 'get')
+  const signal = new AbortController().signal
   const stocks = {
     dropId: 100,
     options: [{ optionId: 1001 }],
     serverTime: '2026-09-20T10:01:00+09:00',
   }
   get.mockResolvedValueOnce({ data: { success: true, data: stocks } })
-  await expect(getDropStocks(100)).resolves.toEqual(stocks)
-  expect(get).toHaveBeenCalledWith('/drops/100/stocks')
+  await expect(getDropStocks(100, signal)).resolves.toEqual(stocks)
+  expect(get).toHaveBeenCalledWith('/drops/100/stocks', { signal })
 
   get.mockResolvedValueOnce({
     data: { success: true, data: { dropId: 100, options: null } },

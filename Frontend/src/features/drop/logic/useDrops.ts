@@ -15,7 +15,7 @@ export function useDropList(params: DropListParams | null) {
 export function useDropDetail(dropId: number) {
   return useQuery({
     queryKey: dropKeys.detail(dropId),
-    queryFn: () => getDropDetail(dropId),
+    queryFn: ({ signal }) => getDropDetail(dropId, signal),
     enabled: Number.isSafeInteger(dropId) && dropId > 0,
   })
 }
@@ -23,7 +23,7 @@ export function useDropDetail(dropId: number) {
 export function useDropStocks(dropId: number) {
   return useQuery({
     queryKey: dropKeys.stocks(dropId),
-    queryFn: () => getDropStocks(dropId),
+    queryFn: ({ signal }) => getDropStocks(dropId, signal),
     enabled: Number.isSafeInteger(dropId) && dropId > 0,
   })
 }
