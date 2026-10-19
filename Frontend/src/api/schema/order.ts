@@ -72,6 +72,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/mock/orders/{orderId}/delivery/complete': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Mock 배송 완료 반영
+     * @description SHIPPED 주문을 DELIVERED로 바꾼다. 이미 DELIVERED면 현재 결과를 반환한다. 로그인이 필요하다
+     */
+    post: operations['completeDelivery']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/seller/orders': {
     parameters: {
       query?: never
@@ -296,6 +316,9 @@ export interface components {
       trackingNumber?: string
       /** Format: date-time */
       deliveredAt?: string
+      /** @enum {string} */
+      deliveryStage?:
+        'COLLECTED' | 'LINE_HAUL_OUT' | 'LINE_HAUL_IN' | 'OUT_FOR_DELIVERY'
     }
     SellerOrderDetailResponse: {
       /** Format: uuid */
@@ -755,6 +778,73 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['ApiResponseOrderCreateResponse']
+        }
+      }
+    }
+  }
+  completeDelivery: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        orderId: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description 배송 완료 반영 */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOrderStatusResponse']
+        }
+      }
+      /** @description INVALID_REQUEST (UUID 형식 오류) */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOrderStatusResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOrderStatusResponse']
+        }
+      }
+      /** @description ACCESS_DENIED (CSRF 토큰 누락) */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOrderStatusResponse']
+        }
+      }
+      /** @description RESOURCE_NOT_FOUND */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOrderStatusResponse']
+        }
+      }
+      /** @description INVALID_STATE_TRANSITION */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOrderStatusResponse']
         }
       }
     }

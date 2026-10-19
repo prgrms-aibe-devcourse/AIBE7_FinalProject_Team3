@@ -18,7 +18,8 @@ export function useSellerOrders(query: SellerOrdersQuery, enabled = true) {
   })
 }
 
-// 행을 펼칠 때만 조회한다(열린 주문이 없으면 orderId가 null).
+// 행을 펼칠 때만 조회한다(열린 주문이 없으면 orderId가 null). 배송 단계가 바뀐 걸 보려면
+// 새로고침하거나 패널을 다시 연다(다른 화면과 동일하게 폴링하지 않는다).
 export function useSellerOrder(orderId: string | null) {
   return useQuery({
     queryKey: orderId ? sellerOrderKeys.detail(orderId) : sellerOrderKeys.all,

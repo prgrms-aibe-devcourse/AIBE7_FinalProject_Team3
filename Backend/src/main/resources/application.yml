@@ -56,7 +56,7 @@ grab:
   mock-delivery:
     enabled: ${GRAB_MOCK_DELIVERY_ENABLED:false}
     # SHIPPED 이후 배송 단계(집화완료→간선상차→간선하차→배송출발→배송완료) 자동 진행 간격(GR-86)
-    stage-interval-minutes: ${GRAB_MOCK_DELIVERY_STAGE_INTERVAL_MINUTES:2}
+    stage-interval: ${GRAB_MOCK_DELIVERY_STAGE_INTERVAL:30s}
     poll-interval: ${GRAB_MOCK_DELIVERY_POLL_INTERVAL:10s}
   drop-transition:
     enabled: ${GRAB_DROP_TRANSITION_ENABLED:true}

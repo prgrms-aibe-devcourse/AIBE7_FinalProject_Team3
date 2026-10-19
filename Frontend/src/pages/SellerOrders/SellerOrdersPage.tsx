@@ -170,6 +170,7 @@ export default function SellerOrdersPage({
           carrier: detailQuery.data.shipping.carrier,
           trackingNumber: detailQuery.data.shipping.trackingNumber ?? '',
           deliveredAt: detailQuery.data.shipping.deliveredAt ?? null,
+          deliveryStage: detailQuery.data.shipping.deliveryStage ?? null,
         }
       : null,
   }

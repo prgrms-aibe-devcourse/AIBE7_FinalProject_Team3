@@ -10,6 +10,7 @@ import org.example.grab.domain.payment.entity.PaymentProvider;
 import org.example.grab.domain.payment.entity.PaymentStatus;
 import org.example.grab.domain.payment.entity.ReconciliationStatus;
 import org.example.grab.domain.payment.service.PaymentHistoryService;
+import org.example.grab.domain.shipment.entity.DeliveryStage;
 import org.example.grab.global.error.GlobalExceptionHandler;
 import org.example.grab.global.error.ValidationErrorCodeResolver;
 import org.example.grab.global.security.identity.CurrentSellerIdProvider;
@@ -56,7 +57,7 @@ class SellerOrderControllerTest {
                 33000,
                 PaymentStatus.SUCCEEDED,
                 new OrderShippingResponse(OrderStatus.DELIVERED, "CJ", "1234567890",
-                        OffsetDateTime.parse("2026-09-30T09:00:00Z")),
+                        OffsetDateTime.parse("2026-09-30T09:00:00Z"), DeliveryStage.OUT_FOR_DELIVERY),
                 OffsetDateTime.parse("2026-09-29T12:00:00Z")
         );
         given(currentSellerIdProvider.currentSellerId()).willReturn(7L);
@@ -75,7 +76,8 @@ class SellerOrderControllerTest {
                 .andExpect(jsonPath("$.data.shipping.status").value("DELIVERED"))
                 .andExpect(jsonPath("$.data.shipping.carrier").value("CJ"))
                 .andExpect(jsonPath("$.data.shipping.trackingNumber").value("1234567890"))
-                .andExpect(jsonPath("$.data.shipping.deliveredAt").exists());
+                .andExpect(jsonPath("$.data.shipping.deliveredAt").exists())
+                .andExpect(jsonPath("$.data.shipping.deliveryStage").value("OUT_FOR_DELIVERY"));
     }
 
     @Test

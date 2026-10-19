@@ -11,6 +11,7 @@ import org.example.grab.domain.order.error.OrderErrorCode;
 import org.example.grab.domain.order.repository.OrderItemRepository;
 import org.example.grab.domain.order.repository.OrderRepository;
 import org.example.grab.domain.payment.entity.PaymentStatus;
+import org.example.grab.domain.shipment.entity.DeliveryStage;
 import org.example.grab.domain.shipment.entity.Shipment;
 import org.example.grab.domain.shipment.repository.ShipmentRepository;
 import org.example.grab.global.common.PageResponse;
@@ -115,7 +116,8 @@ class OrderQueryServiceTest {
         assertThat(result.paymentStatus()).isEqualTo(PaymentStatus.PENDING);
         assertThat(result.paymentExpiresAt()).isEqualTo(PAYMENT_EXPIRES_AT);
         assertThat(result.shipping()).isEqualTo(
-                new OrderShippingResponse(OrderStatus.PAYMENT_PENDING, "CJ", "1234567890", null));
+                new OrderShippingResponse(
+                        OrderStatus.PAYMENT_PENDING, "CJ", "1234567890", null, DeliveryStage.COLLECTED));
     }
 
     @Test
@@ -159,7 +161,8 @@ class OrderQueryServiceTest {
 
         // then
         assertThat(result.shipping()).isEqualTo(
-                new OrderShippingResponse(OrderStatus.DELIVERED, "CJ", "1234567890", deliveredAt));
+                new OrderShippingResponse(
+                        OrderStatus.DELIVERED, "CJ", "1234567890", deliveredAt, DeliveryStage.COLLECTED));
     }
 
     @Test

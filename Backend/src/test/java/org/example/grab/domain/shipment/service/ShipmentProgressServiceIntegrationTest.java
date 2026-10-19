@@ -41,7 +41,7 @@ class ShipmentProgressServiceIntegrationTest {
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
-        registry.add("grab.mock-delivery.stage-interval-minutes", () -> "2");
+        registry.add("grab.mock-delivery.stage-interval", () -> "2m");
     }
 
     @Autowired
