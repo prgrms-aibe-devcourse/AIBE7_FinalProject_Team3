@@ -40,8 +40,12 @@ import org.springframework.security.oauth2.client.endpoint.OAuth2AccessTokenResp
 import org.springframework.security.oauth2.client.endpoint.OAuth2AuthorizationCodeGrantRequest;
 import org.springframework.security.oauth2.client.oidc.authentication.OidcIdTokenDecoderFactory;
 import org.springframework.security.oauth2.client.oidc.authentication.OidcIdTokenValidator;
+import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
+import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
+import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2AuthorizationException;
@@ -50,7 +54,11 @@ import org.springframework.security.oauth2.core.converter.ClaimTypeConverter;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AccessTokenResponse;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.core.endpoint.PkceParameterNames;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.oauth2.jwt.JwtDecoderFactory;
 import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
@@ -100,7 +108,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     - 시작 요청은 실제 필터가 인가 요청(state·nonce·PKCE)을 만들어 세션에 저장한다. 콜백은 그 세션과 Location의 state로 호출한다
     - 토큰 교환(OAuth2AccessTokenResponseClient)만 mock으로 바꿔 테스트 키로 서명한 ID 토큰을 돌려준다
     - ID 토큰 디코더(JwtDecoderFactory)는 JWKS 대신 테스트 공개키를 쓰고, 검증기는 Spring 기본과 같은 OidcIdTokenValidator(iss·aud·exp)다.
-      nonce 검증과 OidcUserService(사용자 정보 엔드포인트 없음)는 운영과 같은 Spring 기본 구현이 그대로 돈다
+      nonce 검증은 운영과 같은 Spring 기본 구현이 그대로 돈다
+    - KAKAO의 OIDC userinfo 호출(OidcUserService 안의 OAuth2UserService)만 mock으로 바꾼다. userinfo sub와 ID 토큰 sub의 일치 검사,
+      claim 병합은 Spring 기본 OidcUserService가 한다. GOOGLE은 userinfo 주소가 없어 호출하지 않는다
     M00-10은 OidcUserService를 대역하려 했으나, Spring은 그 전에 ID 토큰을 디코딩하므로 디코더를 바꾸는 쪽이 대역 범위가 더 작다.
     쿠키는 ResponseCookie 문자열로 Set-Cookie 헤더에 쓰이므로 헤더 문자열로 속성을 단언한다. 쿠키 이름은 명세 문자열로 단언한다.
     @SpringBootTest는 롤백하지 않으므로 테스트마다 고유한 이메일·식별자로 회원을 만들고 직접 지운다.
@@ -164,10 +174,21 @@ class SocialLoginApiIntegrationTest {
                 return decoder;
             };
         }
+
+        // oauth2Login은 OAuth2UserService<OidcUserRequest, OidcUser> 빈이 있으면 그것을 쓴다. userinfo 호출만 mock으로 넘긴다
+        @Bean
+        OAuth2UserService<OidcUserRequest, OidcUser> providerOidcUserService(
+                OAuth2UserService<OAuth2UserRequest, OAuth2User> userInfoService) {
+            OidcUserService service = new OidcUserService();
+            service.setOauth2UserService(userInfoService);
+            return service;
+        }
     }
 
     @MockitoBean
     private OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest> tokenResponseClient;
+    @MockitoBean
+    private OAuth2UserService<OAuth2UserRequest, OAuth2User> userInfoService;
     @MockitoSpyBean
     private OAuth2SignupContextRepository signupContextRepository;
     @MockitoSpyBean
@@ -328,6 +349,23 @@ class SocialLoginApiIntegrationTest {
         when(tokenResponseClient.getTokenResponse(any())).thenReturn(response.build());
     }
 
+    // KAKAO OIDC userinfo 응답. null인 값은 응답에 넣지 않는다
+    private static Map<String, Object> userInfoClaims(String sub, String email, Object emailVerified) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("sub", sub);
+        if (email != null) {
+            claims.put("email", email);
+        }
+        if (emailVerified != null) {
+            claims.put("email_verified", emailVerified);
+        }
+        return claims;
+    }
+
+    private void stubUserInfo(Map<String, Object> claims) {
+        when(userInfoService.loadUser(any())).thenReturn(new DefaultOAuth2User(List.of(), claims, "sub"));
+    }
+
     private MockHttpServletResponse callback(String provider, Authorization authorization) throws Exception {
         return mockMvc.perform(get(BASE_PATH + "/" + provider + "/callback")
                         .session(authorization.session())
@@ -337,11 +375,19 @@ class SocialLoginApiIntegrationTest {
                 .andReturn().getResponse();
     }
 
-    // 시작 → 제공자 인증(claim 그대로 서명) → 콜백
+    /*
+        시작 → 제공자 인증 → 콜백. email·emailVerified는 제공자가 주는 값이다.
+        GOOGLE은 ID 토큰에 그대로 담는다. KAKAO는 실제처럼 ID 토큰에 email_verified 없이 email만 담고, userinfo가 둘 다 준다
+     */
     private MockHttpServletResponse socialLogin(String provider, String subName, String email, Object emailVerified)
             throws Exception {
         Authorization authorization = start(provider);
-        stubTokenResponse(sign(idTokenClaims(provider, authorization, subName, email, emailVerified), PROVIDER_KEY));
+        if ("kakao".equals(provider)) {
+            stubTokenResponse(sign(idTokenClaims(provider, authorization, subName, email, null), PROVIDER_KEY));
+            stubUserInfo(userInfoClaims(sub(subName), email, emailVerified));
+        } else {
+            stubTokenResponse(sign(idTokenClaims(provider, authorization, subName, email, emailVerified), PROVIDER_KEY));
+        }
         return callback(provider, authorization);
     }
 
@@ -493,6 +539,51 @@ class SocialLoginApiIntegrationTest {
             return AUTHORIZATION_CODE.equals(request.getAuthorizationExchange().getAuthorizationResponse().getCode())
                     && authorizationRequest.getAttribute(PkceParameterNames.CODE_VERIFIER) != null;
         }));
+
+        // then: GOOGLE은 userinfo 주소가 없어 ID 토큰만 쓴다
+        verifyNoInteractions(userInfoService);
+    }
+
+    @Test
+    @DisplayName("KAKAO는 ID 토큰에 email_verified가 없어도 OIDC userinfo의 email·email_verified로 가입 컨텍스트를 발급한다")
+    void readsKakaoEmailFromUserInfo() throws Exception {
+        // given: 실제 카카오처럼 ID 토큰에는 email만 있고 email_verified가 없다
+        Authorization authorization = start("kakao");
+        stubTokenResponse(sign(idTokenClaims("kakao", authorization, "userinfo", email("userinfo"), null), PROVIDER_KEY));
+        stubUserInfo(userInfoClaims(sub("userinfo"), email("userinfo"), true));
+
+        // when
+        MockHttpServletResponse response = callback("kakao", authorization);
+
+        // then
+        assertThat(response.getRedirectedUrl()).isEqualTo(FRONTEND_CALLBACK + "?result=signup_required");
+        assertThat(setCookie(response, SIGNUP_COOKIE)).isPresent();
+        assertThat(countSignupContexts()).isEqualTo(1);
+
+        // then: userinfo는 토큰 교환에서 받은 access token으로 카카오 등록에 대해 호출했다
+        verify(userInfoService).loadUser(org.mockito.ArgumentMatchers.argThat(request ->
+                "kakao".equals(request.getClientRegistration().getRegistrationId())
+                        && PROVIDER_ACCESS_TOKEN.equals(request.getAccessToken().getTokenValue())));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"subject-mismatch", "request-failed"})
+    @DisplayName("KAKAO userinfo의 sub가 ID 토큰과 다르거나 호출이 실패하면 OAUTH2_AUTHENTICATION_FAILED이고 회원·컨텍스트가 생기지 않는다")
+    void rejectsInvalidKakaoUserInfo(String defect) throws Exception {
+        // given
+        Authorization authorization = start("kakao");
+        stubTokenResponse(sign(idTokenClaims("kakao", authorization, "kuser", email("kuser"), null), PROVIDER_KEY));
+        if ("subject-mismatch".equals(defect)) {
+            stubUserInfo(userInfoClaims(sub("other"), email("kuser"), true));
+        } else {
+            when(userInfoService.loadUser(any()))
+                    .thenThrow(new OAuth2AuthenticationException(new OAuth2Error("invalid_user_info_response")));
+        }
+
+        // when & then
+        assertRejected(callback("kakao", authorization), "OAUTH2_AUTHENTICATION_FAILED");
+        assertThat(countUsersBySub("kuser")).isZero();
+        assertThat(countUsersByEmail("kuser")).isZero();
     }
 
     @Test
@@ -780,12 +871,14 @@ class SocialLoginApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("ID 토큰에 이메일이 없거나 검증되지 않았으면 OAUTH2_EMAIL_REQUIRED이고 회원·컨텍스트가 생기지 않는다")
+    @DisplayName("제공자 이메일(KAKAO는 userinfo, GOOGLE은 ID 토큰)이 없거나 검증되지 않았으면 OAUTH2_EMAIL_REQUIRED이고 회원·컨텍스트가 생기지 않는다")
     void rejectsUnverifiedEmail() throws Exception {
         assertRejected(socialLogin("kakao", "noemail", null, null), "OAUTH2_EMAIL_REQUIRED");
         assertRejected(socialLogin("kakao", "unverified", email("unverified"), false), "OAUTH2_EMAIL_REQUIRED");
+        assertRejected(socialLogin("kakao", "absent", email("absent"), null), "OAUTH2_EMAIL_REQUIRED");
         assertRejected(socialLogin("google", "unknown", email("unknown"), null), "OAUTH2_EMAIL_REQUIRED");
         assertThat(countUsersByEmail("unverified")).isZero();
+        assertThat(countUsersByEmail("absent")).isZero();
     }
 
     // 1.5 콜백: 제공자 인증 실패
