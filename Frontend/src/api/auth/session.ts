@@ -14,6 +14,7 @@ const AUTH_PATHS = [
   '/auth/logout',
   '/auth/csrf',
   '/auth/signup',
+  '/auth/oauth2/',
   '/auth/email-verification',
 ]
 

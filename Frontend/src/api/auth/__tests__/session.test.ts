@@ -155,6 +155,25 @@ test('인증 경로의 401은 재발급하지 않는다', async () => {
   expect(countCalls('/auth/refresh')).toBe(0)
 })
 
+test('소셜 가입 컨텍스트의 401은 재발급·재시도·세션 만료 처리 없이 전파한다', async () => {
+  const data = { error: { code: 'OAUTH2_SIGNUP_CONTEXT_INVALID' } }
+  useAdapter((config) => {
+    if (config.url === '/auth/csrf') return { status: 204 }
+    if (config.url === '/auth/refresh') return { status: 401 }
+    if (config.url === '/auth/oauth2/signup') return { status: 401, data }
+    throw new Error(`예상하지 못한 요청: ${config.url}`)
+  })
+
+  await expect(
+    api.post('/auth/oauth2/signup', { nickname: '그랩유저' }),
+  ).rejects.toMatchObject({
+    response: { status: 401, data },
+  })
+  expect(countCalls('/auth/refresh')).toBe(0)
+  expect(countCalls('/auth/oauth2/signup')).toBe(1)
+  expect(sessionExpired).toBe(0)
+})
+
 test('쿠키 없는 403은 CSRF를 다시 받아 한 번 재시도한다', async () => {
   let widget = 0
   useAdapter((config) => {
