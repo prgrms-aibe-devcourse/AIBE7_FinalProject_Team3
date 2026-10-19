@@ -36,12 +36,12 @@ public record StockStreamProperties(
 
     private static void requireDuration(Duration value, String name) {
         try {
-            if (value != null && !value.isNegative() && value.toMillis() > 0) {
+            if (value != null && !value.isNegative() && value.toMillis() > 0 && value.toNanos() > 0) {
                 return;
             }
         } catch (ArithmeticException ignored) {
             // 타이머가 표현할 수 없는 기간도 잘못된 설정으로 기동 시 거부한다.
         }
-        throw new IllegalArgumentException("grab.stock-stream." + name + "은 밀리초로 표현 가능한 양수여야 합니다.");
+        throw new IllegalArgumentException("grab.stock-stream." + name + "은 나노초로 표현 가능하고 1밀리초 이상이어야 합니다.");
     }
 }

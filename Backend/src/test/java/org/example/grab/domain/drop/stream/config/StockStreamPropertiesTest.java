@@ -33,6 +33,9 @@ class StockStreamPropertiesTest {
             assertThat(properties.connectRateWindow()).isEqualTo(Duration.ofSeconds(60));
             assertThat(properties.retryAfter()).isEqualTo(Duration.ofSeconds(60));
             assertThat(context).hasBean("stockStreamRegistry");
+            assertThat(context).hasSingleBean(StockStreamExecutors.class);
+            assertThat(context).doesNotHaveBean(java.util.concurrent.Executor.class);
+            assertThat(context).doesNotHaveBean(java.util.concurrent.ScheduledExecutorService.class);
         });
     }
 
@@ -40,7 +43,7 @@ class StockStreamPropertiesTest {
     @ValueSource(strings = {"max-connections=0", "max-connections-per-ip=-1", "max-drop-ids=101",
             "max-drop-ids=0", "max-pending-drops=99", "max-pending-drops=101", "max-tracked-ips=0",
             "connect-rate-max=0", "coalesce-window=0s", "heartbeat-interval=-1s", "send-timeout=0.1ms",
-            "connection-lifetime=0s", "connect-rate-window=0s", "retry-after=0s"})
+            "connection-lifetime=0s", "connect-rate-window=0s", "retry-after=0s", "coalesce-window=365000d"})
     @DisplayName("잘못된 개수·기간 설정은 기동할 때 거부한다")
     void rejectsInvalidSettings(String setting) {
         // when & then
