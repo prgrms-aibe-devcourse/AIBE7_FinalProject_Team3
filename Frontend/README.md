@@ -94,7 +94,7 @@ npx playwright show-trace test-results/<테스트>/trace.zip
 - 화면은 도메인 타입과 props를 사용해 표시합니다. 기존 컴포넌트를 재사용하고, 나중의 API 호출을 위해 쓰이지 않는 요청 계층이나 추상 인터페이스를 미리 만들지 않습니다.
 - 로딩·빈 결과·오류·권한 부족·상태별 버튼의 화면 상태를 준비합니다. Mock 버튼은 로컬 데모 동작이며 실제 주문·결제·판매자 승인·배송 처리로 안내하지 않습니다.
 - 실제 연동 이슈에서는 Mock 공급 부분을 `src/api/client.ts` 요청과 TanStack Query로 교체하고, API 응답을 화면용 데이터로 바꾸는 코드는 해당 `src/features`에 둡니다. 쓰이지 않게 된 Mock만 제거하고 화면 배치와 컴포넌트는 유지합니다.
-- LOCAL 회원가입(이메일 인증 코드 요청·확인·가입 완료)은 Mock 없이 실제 백엔드 API를 사용합니다(GR-31). 소셜 가입 화면(`/signup?type=social`)은 GR-47 전까지 Mock입니다.
+- LOCAL 회원가입(이메일 인증 코드 요청·확인·가입 완료)은 Mock 없이 실제 백엔드 API를 사용합니다(GR-31). KAKAO·GOOGLE 소셜 로그인(시작·콜백 `/auth/callback`·소셜 가입 `/signup?type=social`)도 실제 백엔드를 사용합니다(GR-47).
 - 인증 쿠키·CSRF·401 재시도는 `src/api/client.ts`의 공통 클라이언트와 `src/api/auth/`가 처리합니다(GR-45). 저장 결과·도메인 서버 오류·중복 요청 검증은 각 화면의 실제 API 연동 단계에서 확인합니다. 화면 초안의 Mock 성공 상태를 서버 처리 성공의 증거로 취급하지 않습니다.
 
 화면별 PR 범위와 검증 항목은 해당 Linear 이슈에, 로컬 작업 순서는 `todo/page-renewal.md`에 적습니다. `todo/`는 git에서 제외되는 개인 작업 메모입니다.
@@ -103,7 +103,7 @@ npx playwright show-trace test-results/<테스트>/trace.zip
 
 백엔드를 먼저 실행한 뒤 `npm run dev`로 프론트엔드를 띄웁니다. 프론트엔드는 `/api/v1` 상대 경로로 요청하고 Vite가 백엔드에 프록시합니다. 기본 주소는 `http://localhost:8080`입니다. 다른 백엔드를 사용하려면 `.env.example`을 `.env.local`로 복사하고 `VITE_API_PROXY_TARGET`에 백엔드 원점 주소(예: `https://api.example.com`, `/api/v1` 제외)를 설정합니다. 값이 없거나 공백이면 기본 주소를 사용합니다. `.env`·`.env.local`·`.env.[mode]` 설정은 [Vite의 `loadEnv`](https://vite.dev/config/#using-environment-variables-in-config)로 읽으며 변경 후 개발 서버를 재시작해야 합니다. 실제 환경 파일은 git에서 제외하고 `.env.example`만 공유합니다. 이 설정은 개발 서버 프록시용이며, 배포 서버에서는 `/api`를 백엔드로 전달하도록 별도로 설정합니다.
 
-LOCAL 로그인·회원가입과 `users/me`는 실제 백엔드가 필요합니다. 백엔드 없이 `npm run dev`만 띄우면 인증 요청이 401이 되어 비로그인 상태로 동작합니다. 소셜 로그인은 준비 중(GR-47)이며 로그인 화면의 결과 예시는 화면 안내용입니다.
+LOCAL 로그인·회원가입과 `users/me`는 실제 백엔드가 필요합니다. 백엔드 없이 `npm run dev`만 띄우면 인증 요청이 401이 되어 비로그인 상태로 동작합니다. 소셜 로그인은 실제 KAKAO·GOOGLE 키가 설정된 백엔드가 필요하며, 제공자 콘솔 설정과 확인 절차는 `Backend/docs/migration.md` 8절을 따릅니다. 개발 서버의 프록시를 거쳐 시작해도 제공자 콜백 주소(`redirect_uri`)는 백엔드 주소(8080)로 만들어집니다. Vite 프록시 설정을 바꾸면서 `changeOrigin`을 빼면 5173으로 바뀌니 주의합니다. E2E는 실제 제공자로 이동하지 않고 `e2e/mock/auth.ts`가 콜백 결과 주소로 바로 보냅니다.
 
 LOCAL 회원가입은 인증 코드를 메일로 받습니다. 백엔드 Docker Compose로 띄우면 메일 설정이 없을 때 Mailpit으로 발송되므로, `http://localhost:8025`에서 받는 주소의 메일을 열어 6자리 코드를 확인합니다. 같은 이메일의 코드 재요청은 60초 뒤에 가능합니다. 백엔드 실행과 시험 데이터 정리는 `Backend/docs/migration.md` 6절을 따릅니다.
 
