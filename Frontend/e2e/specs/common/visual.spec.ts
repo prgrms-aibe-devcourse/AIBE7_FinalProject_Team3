@@ -43,6 +43,16 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
   }
 
   test('my', async ({ page }) => {
+    await page.route('**/api/v1/seller-applications/me', (route) =>
+      route.fulfill({
+        status: 404,
+        json: {
+          success: false,
+          data: null,
+          error: { code: 'SELLER_APPLICATION_NOT_FOUND', message: '없음' },
+        },
+      }),
+    )
     await page.goto('/#/login')
     await page.getByLabel('이메일').fill('grab@example.com')
     await page.getByLabel('비밀번호').fill('password1234')
