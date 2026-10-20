@@ -41,7 +41,8 @@ async function handleRoute(
   if (await handleSellerDashboardRoute(route, url)) return
   if (await handleSellerDropStatsRoute(route, url)) return
   if (await handleSellerOrdersRoute(route, url, state.sellerOrders)) return
-  if (await handleBuyerOrdersRoute(route, url, state.buyerOrders)) return
+  if (await handleBuyerOrdersRoute(route, url, state.buyerOrders, state.drops))
+    return
   await route.fallback()
 }
 

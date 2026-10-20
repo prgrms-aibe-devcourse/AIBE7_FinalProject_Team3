@@ -145,15 +145,16 @@ test('MY: 가로 넘침 없이 핵심 버튼에 닿는다', async ({ page }) => 
 })
 
 test('결제: 가로 넘침 없이 배송지와 결제 버튼에 닿는다', async ({ page }) => {
-  await page.goto('/#/checkout/demo-pending')
+  await page.goto('/#/checkout?dropId=201&optionId=2012&quantity=2')
   await page.getByLabel('이메일').fill('grab@example.com')
   await page.getByLabel('비밀번호').fill('password1234')
   await page.getByRole('button', { name: '로그인', exact: true }).click()
   await expectReachable(page, page.getByLabel('받는 분'))
-  await expectReachable(
-    page,
-    page.getByRole('button', { name: 'Mock 결제 결과 보기' }),
-  )
+  await expectReachable(page, page.getByRole('button', { name: '주문하기' }))
+  await expectNoHorizontalOverflow(page)
+
+  await page.goto(`/#/checkout/${BUYER_ORDER_IDS.pending}`)
+  await expectReachable(page, page.getByRole('button', { name: '결제하기' }))
   await expectNoHorizontalOverflow(page)
 })
 
@@ -234,7 +235,7 @@ test('키보드 포커스가 입력란에 보인다', async ({ page }) => {
   await page.goto('/#/signup')
   await expectFocusRing(page.getByLabel('이메일 주소'))
 
-  await page.goto('/#/checkout/demo-pending')
+  await page.goto('/#/checkout?dropId=201&optionId=2012&quantity=2')
   await page.getByLabel('이메일').fill('grab@example.com')
   await page.getByLabel('비밀번호').fill('password1234')
   await page.getByRole('button', { name: '로그인', exact: true }).click()

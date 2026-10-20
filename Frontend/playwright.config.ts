@@ -37,5 +37,7 @@ export default defineConfig({
     command: `npm run dev -- --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,
     reuseExistingServer: true,
+    // 결제창은 가짜 스크립트로 대체하므로 실제 키 없이 형식만 맞춘 값을 쓴다(e2e/mock/toss.ts).
+    env: { VITE_TOSS_CLIENT_KEY: 'test_ck_e2e' },
   },
 })
