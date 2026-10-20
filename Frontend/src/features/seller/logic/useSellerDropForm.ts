@@ -46,6 +46,12 @@ export function useSaveSellerDrop(dropId: number | null) {
       // 공개 실패 뒤 재시도해도 이미 생성한 DRAFT를 다시 만들지 않는다.
       savedId.current = saved.dropId
       invalidate()
+      const queryKey = sellerDropKeys.detail(saved.dropId)
+      await queryClient.cancelQueries({ queryKey, exact: true })
+      await queryClient.fetchQuery({
+        queryKey,
+        queryFn: ({ signal }) => getSellerDropDetail(saved.dropId, signal),
+      })
       if (publish) {
         await publishSellerDrop(saved.dropId)
         invalidate()

@@ -14,6 +14,44 @@ const png = Buffer.from(
   'base64',
 )
 
+test('기존 DRAFT 수정 후 재진입해도 최신 값과 이미지를 유지한다', async ({
+  page,
+}) => {
+  await page.goto('/#/seller/drops/401/edit')
+  await expect(page.getByLabel('상품명')).toHaveValue('오버핏 니트 가디건')
+  await page.getByLabel('상품명').fill('수정한 DROP')
+  await page.getByLabel('가격', { exact: true }).fill('42000')
+  await page.getByLabel('재고', { exact: true }).fill('7')
+  const gallery = page.locator('.drop-image-card').first()
+  await gallery.getByLabel('대체 설명').fill('수정한 대표 이미지')
+  await page.getByRole('button', { name: '임시 저장' }).click()
+  await expect(page.locator('.toast')).toHaveText('DROP 초안을 저장했어요.')
+  await page.getByRole('link', { name: '← DROP STUDIO' }).click()
+  await page
+    .locator('.seller-drops-row')
+    .filter({ hasText: '수정한 DROP' })
+    .getByRole('link', { name: '수정', exact: true })
+    .click()
+  await expect(page.getByLabel('상품명')).toHaveValue('수정한 DROP')
+  await expect(page.getByLabel('가격', { exact: true })).toHaveValue('42000')
+  await expect(page.getByLabel('재고', { exact: true })).toHaveValue('7')
+  await expect(gallery.getByLabel('대체 설명')).toHaveValue(
+    '수정한 대표 이미지',
+  )
+  const request = page.waitForRequest(
+    (request) =>
+      request.method() === 'PATCH' &&
+      /\/seller\/drops\/401$/.test(request.url()),
+  )
+  await page.getByRole('button', { name: '임시 저장' }).click()
+  expect((await request).postDataJSON()).toMatchObject({
+    name: '수정한 DROP',
+    images: [{ altText: '수정한 대표 이미지' }],
+    options: [{ unitPrice: 42000, totalQuantity: 7 }],
+  })
+  await expect(page.locator('.toast')).toHaveText('DROP 초안을 저장했어요.')
+})
+
 test('GALLERY·DETAIL 이미지를 편집하고 저장 후 재진입 시 순서와 설명을 유지한다', async ({
   page,
 }) => {
