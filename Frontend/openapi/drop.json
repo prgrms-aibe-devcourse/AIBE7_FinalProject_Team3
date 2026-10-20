@@ -933,6 +933,118 @@
           }
         }
       }
+    },
+    "/api/v1/drops/stock-stream": {
+      "get": {
+        "tags": ["공개 DROP"],
+        "summary": "공개 DROP 변경 구독",
+        "description": "최대 100개 입력 ID의 재고·판매량·상태 변경 신호를 구독한다. ready 후 기존 API 재조회가 필요하며 replay는 지원하지 않는다. 상세는 REALTIME_STOCK.md 6~9절 참고",
+        "operationId": "subscribe",
+        "parameters": [
+          {
+            "name": "dropIds",
+            "in": "query",
+            "description": "쉼표 구분 양의 정수. 중복 쿼리 파라미터 불가",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "100,101"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "지속 스트림: ready, drop-changed, stream-closed",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "INVALID_TOKEN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "DROP_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "STOCK_STREAM_LIMIT_EXCEEDED",
+            "headers": {
+              "Retry-After": {
+                "description": "재시도 대기 초",
+                "style": "simple",
+                "schema": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "STOCK_STREAM_UNAVAILABLE",
+            "headers": {
+              "Retry-After": {
+                "description": "재시도 대기 초",
+                "style": "simple",
+                "schema": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1911,6 +2023,46 @@
           "serverTime": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ErrorDetail": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "fieldErrors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldError"
+            }
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {},
+          "error": {
+            "$ref": "#/components/schemas/ErrorDetail"
+          }
+        }
+      },
+      "FieldError": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
           }
         }
       }

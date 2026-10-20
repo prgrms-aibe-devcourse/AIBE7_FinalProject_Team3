@@ -1,5 +1,6 @@
 import { dateLabel } from '../../../utils/date'
 import { won } from '../../../utils/price'
+import DeliveryStageTimeline from './DeliveryStageTimeline'
 import type { SellerOrderDetail as Detail } from '../mock/mockSellerOrders'
 
 type Props = {
@@ -70,6 +71,12 @@ export default function SellerOrderDetail({ detail, onEditShipment }: Props) {
           <span>등록된 송장이 없습니다.</span>
         )}
       </div>
+      {detail.shipping?.deliveryStage && (
+        <DeliveryStageTimeline
+          stage={detail.shipping.deliveryStage}
+          delivered={Boolean(detail.shipping.deliveredAt)}
+        />
+      )}
     </div>
   )
 }

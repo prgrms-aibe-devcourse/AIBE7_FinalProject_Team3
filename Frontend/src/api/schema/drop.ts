@@ -212,6 +212,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/drops/stock-stream': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * 공개 DROP 변경 구독
+     * @description 최대 100개 입력 ID의 재고·판매량·상태 변경 신호를 구독한다. ready 후 기존 API 재조회가 필요하며 replay는 지원하지 않는다. 상세는 REALTIME_STOCK.md 6~9절 참고
+     */
+    get: operations['subscribe']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
 }
 export type webhooks = Record<string, never>
 export interface components {
@@ -578,6 +598,20 @@ export interface components {
       options?: components['schemas']['PublicDropStockOption'][]
       /** Format: date-time */
       serverTime?: string
+    }
+    ErrorDetail: {
+      code?: string
+      message?: string
+      fieldErrors?: components['schemas']['FieldError'][]
+    }
+    ErrorResponse: {
+      success?: boolean
+      data?: unknown
+      error?: components['schemas']['ErrorDetail']
+    }
+    FieldError: {
+      field?: string
+      reason?: string
     }
   }
   responses: never
@@ -1273,6 +1307,87 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['ApiResponsePublicDropStockResponse']
+        }
+      }
+    }
+  }
+  subscribe: {
+    parameters: {
+      query: {
+        /** @description 쉼표 구분 양의 정수. 중복 쿼리 파라미터 불가 */
+        dropIds: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description 지속 스트림: ready, drop-changed, stream-closed */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'text/event-stream': string
+        }
+      }
+      /** @description INVALID_REQUEST */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description ACCESS_DENIED */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description DROP_NOT_FOUND */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description STOCK_STREAM_LIMIT_EXCEEDED */
+      429: {
+        headers: {
+          /** @description 재시도 대기 초 */
+          'Retry-After'?: number
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description STOCK_STREAM_UNAVAILABLE */
+      503: {
+        headers: {
+          /** @description 재시도 대기 초 */
+          'Retry-After'?: number
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
         }
       }
     }

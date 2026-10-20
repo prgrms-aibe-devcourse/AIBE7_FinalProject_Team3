@@ -12,6 +12,10 @@
   ],
   "tags": [
     {
+      "name": "Mock 배송",
+      "description": "로컬·테스트 전용. GRAB_MOCK_DELIVERY_ENABLED=true일 때만 노출된다"
+    },
+    {
       "name": "주문",
       "description": "구매자의 주문 생성과 내 주문 조회"
     },
@@ -447,6 +451,87 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseOrderCreateResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/mock/orders/{orderId}/delivery/complete": {
+      "post": {
+        "tags": ["Mock 배송"],
+        "summary": "Mock 배송 완료 반영",
+        "description": "SHIPPED 주문을 DELIVERED로 바꾼다. 이미 DELIVERED면 현재 결과를 반환한다. 로그인이 필요하다",
+        "operationId": "completeDelivery",
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "배송 완료 반영",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOrderStatusResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST (UUID 형식 오류)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOrderStatusResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED, INVALID_TOKEN",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOrderStatusResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED (CSRF 토큰 누락)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOrderStatusResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOrderStatusResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "INVALID_STATE_TRANSITION",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOrderStatusResponse"
                 }
               }
             }
@@ -1103,6 +1188,15 @@
           "deliveredAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "deliveryStage": {
+            "type": "string",
+            "enum": [
+              "COLLECTED",
+              "LINE_HAUL_OUT",
+              "LINE_HAUL_IN",
+              "OUT_FOR_DELIVERY"
+            ]
           }
         }
       },

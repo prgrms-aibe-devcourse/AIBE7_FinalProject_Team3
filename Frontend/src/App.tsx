@@ -1,15 +1,10 @@
 import { useState } from 'react'
-import { Route, Routes } from 'react-router-dom'
+import { Route, Routes, useNavigate } from 'react-router-dom'
 import Footer from './components/Footer/Footer'
 import Header from './components/Header/Header'
 import useAuth from './features/auth/logic/useAuth'
 import useOrders from './features/order/logic/useOrders'
 import useWish from './features/wish/logic/useWish'
-import type { SellerDraft } from './features/seller/mock/mockSellerDrafts'
-import {
-  demoSellerDrops,
-  dropFromDraft,
-} from './features/seller/mock/mockSellerDrops'
 import CheckoutPage from './pages/Checkout/CheckoutPage'
 import DropDetailPage from './pages/DropDetail/DropDetailPage'
 import DropListPage from './pages/DropList/DropListPage'
@@ -31,6 +26,7 @@ import AdminSellerApplicationsPage from './pages/AdminSellerApplications/AdminSe
 import type { SharedProps } from './types/store'
 
 export default function App() {
+  const navigate = useNavigate()
   const [toast, setToast] = useState('')
 
   const notify = (message: string) => {
@@ -40,22 +36,6 @@ export default function App() {
   const { user, status, authenticated, login, logout } = useAuth()
   const { wishes, wishesReady, toggleWish } = useWish(authenticated, notify)
   const { orders, buyerOrders, addOrder, updateBuyerOrder } = useOrders()
-  const [sellerDrafts, setSellerDrafts] = useState<Record<string, SellerDraft>>(
-    {},
-  )
-  const [sellerDrops, setSellerDrops] = useState(demoSellerDrops)
-
-  const saveSellerDraft = (draft: SellerDraft) => {
-    setSellerDrafts((current) => ({ ...current, [draft.id]: draft }))
-    setSellerDrops((current) => {
-      const existing = current.find((drop) => drop.id === draft.id)
-      const next = dropFromDraft(
-        draft,
-        existing?.ownerEmail ?? user?.email ?? 'grab@example.com',
-      )
-      return [next, ...current.filter((drop) => drop.id !== draft.id)]
-    })
-  }
 
   const shared: SharedProps = {
     authenticated,
@@ -163,9 +143,6 @@ export default function App() {
               <SellerDropsPage
                 user={user}
                 authStatus={status}
-                drops={sellerDrops}
-                ownerEmail={user?.email ?? 'grab@example.com'}
-                onChange={setSellerDrops}
                 notify={notify}
               />
             }
@@ -174,11 +151,9 @@ export default function App() {
             path="/seller/drops/new"
             element={
               <SellerDropFormPage
-                drafts={sellerDrafts}
-                editableIds={sellerDrops
-                  .filter((drop) => drop.status === 'DRAFT')
-                  .map((drop) => drop.id)}
-                onSave={saveSellerDraft}
+                onPublished={(id) =>
+                  navigate(`/seller/drops/${id}`, { replace: true })
+                }
                 notify={notify}
               />
             }
@@ -187,11 +162,9 @@ export default function App() {
             path="/seller/drops/:dropId/edit"
             element={
               <SellerDropFormPage
-                drafts={sellerDrafts}
-                editableIds={sellerDrops
-                  .filter((drop) => drop.status === 'DRAFT')
-                  .map((drop) => drop.id)}
-                onSave={saveSellerDraft}
+                onPublished={(id) =>
+                  navigate(`/seller/drops/${id}`, { replace: true })
+                }
                 notify={notify}
               />
             }
@@ -202,9 +175,6 @@ export default function App() {
               <SellerDropDetailPage
                 user={user}
                 authStatus={status}
-                drops={sellerDrops}
-                ownerEmail={user?.email ?? 'grab@example.com'}
-                onChange={setSellerDrops}
                 notify={notify}
               />
             }

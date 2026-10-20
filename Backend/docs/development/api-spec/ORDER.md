@@ -27,12 +27,14 @@ POST /api/v1/orders
     "phone": "01012345678",
     "postalCode": "06236",
     "address1": "서울특별시 강남구 테헤란로 1",
-    "address2": "101호"
+    "address2": "101호",
+    "deliveryMemo": "문 앞에 놓아주세요"
   }
 }
 ```
 
 > 클라이언트는 가격이나 총결제금액을 전달하지 않습니다.
+> `shippingAddress.address2`와 `shippingAddress.deliveryMemo`는 선택 값입니다.
 
 **처리 조건:**
 - 구매 가능 여부는 저장 상태가 아니라 서버 시각과 판매 기간으로 판정한다. 저장 상태가 `WISH`여도 시작 전환 배치(GR-18) 이전이면 판매 시작 시각부터 주문할 수 있다.
@@ -150,11 +152,20 @@ GET /api/v1/orders/{orderId}
     "totalAmount": 261000,
     "paymentStatus": "SUCCEEDED",
     "paymentExpiresAt": null,
+    "shippingAddress": {
+      "recipient": "홍길동",
+      "phone": "01012345678",
+      "postalCode": "06236",
+      "address1": "서울특별시 강남구 테헤란로 1",
+      "address2": "101호",
+      "deliveryMemo": "문 앞에 놓아주세요"
+    },
     "shipping": {
       "status": null,
       "carrier": null,
       "trackingNumber": null,
-      "deliveredAt": null
+      "deliveredAt": null,
+      "deliveryStage": null
     },
     "orderedAt": "2026-09-18T14:00:00+09:00"
   }
@@ -163,8 +174,10 @@ GET /api/v1/orders/{orderId}
 
 - `paymentExpiresAt`은 `PAYMENT_PENDING` 주문에서만 결제 마감 시각을 담고, 그 외 상태에서는 `null`입니다.
 - `paymentStatus`는 최근 결제 시도의 상태이며, 결제 시도가 없으면 `null`입니다.
+- `shippingAddress`는 주문 생성 시 입력한 배송지이며, 필드 이름은 주문 생성 요청과 같습니다. 저장된 값을 그대로 반환하며, 요청에서 `address2`나 `deliveryMemo`를 생략했으면 `null`입니다.
 - `shipping`은 배송 정보가 등록되기 전까지 모든 값이 `null`입니다.
 - `shipping.deliveredAt`은 Mock 배송 완료 결과가 반영된 시각(`shipments.delivered_at`)이며, 배송 완료 전에는 `null`입니다.
+- `shipping.deliveryStage`는 `SHIPPED` 이후 설정된 간격(`grab.mock-delivery.stage-interval`, 기본 30초)마다 자동 진행되는 세부 배송 단계(`COLLECTED`→`LINE_HAUL_OUT`→`LINE_HAUL_IN`→`OUT_FOR_DELIVERY`)이며, 배송 정보가 등록되기 전에는 `null`입니다. 자동 진행은 `grab.mock-delivery.enabled`가 `true`일 때만 동작하며 기본값은 `false`다. 비활성 상태에서는 `deliveryStage`가 `COLLECTED`에서 더 진행되지 않는다.
 
 **오류 코드:**
 - `ORDER_NOT_FOUND`: 주문이 없거나 다른 사용자의 주문인 경우. 주문 존재 여부를 노출하지 않도록 두 경우를 구분하지 않습니다.
@@ -278,6 +291,7 @@ GET /api/v1/seller/orders/{orderId}
 > 해당 주문에 포함된 DROP의 소유권을 검증합니다.
 
 - `items`, `shipping`은 1.3 내 주문 상세와 같은 형식이며, `shipping.deliveredAt`도 함께 반환합니다.
+- `shippingAddress`는 1.3 내 주문 상세와 같은 형식입니다. 구매자 개인정보 노출을 줄이기 위해 발송 처리에 필요한 결제 완료부터 배송 중까지(`PAID`·`PREPARING`·`SHIPPED`)만 반환하고, 그 외 상태(`PAYMENT_PENDING`·`DELIVERED`·`EXPIRED`·`CANCELED`)에서는 `null`입니다.
 
 ### 2.3 배송 준비 처리
 

@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.function.IntUnaryOperator;
 
@@ -19,22 +20,22 @@ public class ShipmentProgressService {
     private static final int BATCH_SIZE = 500;
 
     private final ShipmentProgressBatchService batchService;
-    private final int stageIntervalMinutes;
+    private final Duration stageInterval;
 
     public ShipmentProgressService(
             ShipmentProgressBatchService batchService,
-            @Value("${grab.mock-delivery.stage-interval-minutes:2}") int stageIntervalMinutes) {
-        if (stageIntervalMinutes <= 0) {
+            @Value("${grab.mock-delivery.stage-interval:30s}") Duration stageInterval) {
+        if (stageInterval.isZero() || stageInterval.isNegative()) {
             throw new IllegalArgumentException(
-                    "grab.mock-delivery.stage-interval-minutes는 양수여야 합니다: " + stageIntervalMinutes);
+                    "grab.mock-delivery.stage-interval은 양수여야 합니다: " + stageInterval);
         }
         this.batchService = batchService;
-        this.stageIntervalMinutes = stageIntervalMinutes;
+        this.stageInterval = stageInterval;
     }
 
     /** 한 번의 스케줄러 실행. 단계 전진과 배송완료 전환 건수의 합을 반환한다. */
     public long progress(OffsetDateTime now) {
-        OffsetDateTime cutoff = now.minusMinutes(stageIntervalMinutes);
+        OffsetDateTime cutoff = now.minus(stageInterval);
         long advanced = drain(batchSize -> batchService.advanceStageBatch(now, cutoff, batchSize));
         long completed = drain(batchSize -> batchService.completeDeliveryBatch(now, cutoff, batchSize));
         if (advanced + completed > 0) {

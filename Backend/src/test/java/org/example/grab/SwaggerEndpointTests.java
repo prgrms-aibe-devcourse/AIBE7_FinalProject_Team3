@@ -48,6 +48,7 @@ class SwaggerEndpointTests {
             "category,/api/v1/categories",
             "dashboard,/api/v1/seller/dashboard/summary",
             "drop,/api/v1/drops",
+            "drop,/api/v1/drops/stock-stream",
             "order,/api/v1/orders",
             "payment,/api/v1/orders/{orderId}/payments",
             "user,/api/v1/auth/email-verification",
@@ -62,6 +63,19 @@ class SwaggerEndpointTests {
         mockMvc.perform(get("/v3/api-docs/" + group))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.paths['" + path + "']").exists());
+    }
+
+    @Test
+    @DisplayName("SSE 구독은 JSON 래퍼 대신 문자열 스트림과 별도 JSON 오류로 문서화한다")
+    void exposesStockStreamContract() throws Exception {
+        mockMvc.perform(get("/v3/api-docs/drop"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/v1/drops/stock-stream'].get.responses['200'].content['text/event-stream'].schema.type").value("string"))
+                .andExpect(jsonPath("$.paths['/api/v1/drops/stock-stream'].get.responses['429'].headers['Retry-After']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/drops/stock-stream'].get.responses['404'].content['application/json']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/drops/stock-stream'].get.parameters[0].name").value("dropIds"));
+        assertThat(readApiDoc("/v3/api-docs/drop").path("tags").findValuesAsText("name"))
+                .containsOnlyOnce("공개 DROP");
     }
 
     // GR-97: 내 정보 조회의 Authentication 파라미터는 서버가 채우므로 문서 입력란에 나오지 않는다

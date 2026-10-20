@@ -1,3 +1,5 @@
+import type { DeliveryStage } from '../logic/deliveryStage'
+
 export type SellerOrderStatus = 'PAID' | 'PREPARING' | 'SHIPPED' | 'DELIVERED'
 
 // GET /api/v1/seller/orders (GR-37) 의 한 행. 송장 정보는 여기 없다 — 상세에서 받는다.
@@ -29,6 +31,7 @@ export type SellerOrderDetail = {
     carrier: string
     trackingNumber: string
     deliveredAt: string | null
+    deliveryStage: DeliveryStage | null
   } | null
 }
 
@@ -201,6 +204,7 @@ export const orderDetails: Record<string, SellerOrderDetail> = {
       carrier: 'CJ대한통운',
       trackingNumber: '482910355174',
       deliveredAt: null,
+      deliveryStage: 'OUT_FOR_DELIVERY',
     },
   },
   'b8daec07-7c9e-40b1-c2d3-5e6f70819203': {
@@ -220,6 +224,7 @@ export const orderDetails: Record<string, SellerOrderDetail> = {
       carrier: '한진택배',
       trackingNumber: '771204839055',
       deliveredAt: hoursAgo(20),
+      deliveryStage: 'OUT_FOR_DELIVERY',
     },
   },
 }

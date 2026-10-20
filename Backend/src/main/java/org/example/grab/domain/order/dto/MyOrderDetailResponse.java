@@ -20,6 +20,7 @@ public record MyOrderDetailResponse(
         long totalAmount,
         PaymentStatus paymentStatus,
         OffsetDateTime paymentExpiresAt,
+        OrderShippingAddressResponse shippingAddress,
         OrderShippingResponse shipping,
         OffsetDateTime orderedAt
 ) {
@@ -41,6 +42,7 @@ public record MyOrderDetailResponse(
                 order.getTotalAmount(),
                 paymentStatus,
                 paymentExpiresAt,
+                OrderShippingAddressResponse.from(order.getShippingAddress()),
                 OrderShippingResponse.from(order, shipment),
                 order.getCreatedAt()
         );

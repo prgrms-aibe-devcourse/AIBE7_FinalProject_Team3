@@ -1,68 +1,120 @@
-import { useState, type ChangeEvent } from 'react'
 import {
-  imageError,
-  moveImage,
-  type DraftImage,
-} from '../mock/mockSellerDrafts'
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type Dispatch,
+  type SetStateAction,
+} from 'react'
+import { uploadDropImage } from '../../../api/seller/images'
+import { imageError, moveImage, type ImageKind } from '../logic/dropImages'
+import type { DraftImage } from '../logic/sellerDropForm'
 
 type Props = {
-  kind: 'GALLERY' | 'DETAIL'
+  kind: ImageKind
   images: DraftImage[]
-  totalCount: number
-  onChange: (images: DraftImage[]) => void
-  onUploading: (uploading: boolean) => void
+  onChange: Dispatch<SetStateAction<DraftImage[]>>
 }
 
-const readImage = (file: File) =>
-  new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result))
-    reader.onerror = () => reject(new Error('이미지를 읽지 못했어요.'))
-    reader.readAsDataURL(file)
-  })
+type UploadTask = { file: File; preview: string; controller: AbortController }
 
-export default function DropImageField({
-  kind,
-  images,
-  totalCount,
-  onChange,
-  onUploading,
-}: Props) {
+export default function DropImageField({ kind, images, onChange }: Props) {
   const [error, setError] = useState('')
-  const [failExample, setFailExample] = useState(false)
+  const tasks = useRef(new Map<string, UploadTask>())
+  const uploading = images.some((image) => image.uploading)
 
-  const add = async (event: ChangeEvent<HTMLInputElement>) => {
-    const files = [...(event.target.files ?? [])]
-    let next = [...images]
-    setError('')
-    onUploading(true)
-    try {
-      for (const file of files) {
-        const message = imageError(
-          file,
-          totalCount + next.length - images.length,
-        )
-        if (message) {
-          setError(message)
-          break
-        }
-        next = [
-          ...next,
-          {
-            id: crypto.randomUUID(),
-            url: await readImage(file),
-            altText: '',
-            failed: failExample,
-          },
-        ]
+  useEffect(() => {
+    const active = tasks.current
+    return () => {
+      for (const task of active.values()) {
+        task.controller.abort()
+        URL.revokeObjectURL(task.preview)
       }
-      onChange(next)
-    } catch {
-      setError('이미지를 읽지 못했어요. 다시 선택해주세요.')
-    } finally {
-      onUploading(false)
-      event.target.value = ''
+      active.clear()
     }
+  }, [])
+
+  const upload = async (id: string, task: UploadTask) => {
+    try {
+      const result = await uploadDropImage(task.file, task.controller.signal)
+      if (tasks.current.get(id) !== task || task.controller.signal.aborted)
+        return
+      onChange((current) =>
+        current.map((image) =>
+          image.id === id
+            ? {
+                ...image,
+                id: result.imageId,
+                url: result.imageUrl,
+                uploading: false,
+                failed: false,
+              }
+            : image,
+        ),
+      )
+      tasks.current.delete(id)
+      URL.revokeObjectURL(task.preview)
+    } catch {
+      if (tasks.current.get(id) !== task || task.controller.signal.aborted)
+        return
+      onChange((current) =>
+        current.map((image) =>
+          image.id === id
+            ? { ...image, uploading: false, failed: true }
+            : image,
+        ),
+      )
+    }
+  }
+
+  const add = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = [...(event.target.files ?? [])]
+    event.target.value = ''
+    const added: DraftImage[] = []
+    setError('')
+    for (const file of files) {
+      const message = imageError(file, images.length + added.length, kind)
+      if (message) {
+        setError(message)
+        break
+      }
+      const id = crypto.randomUUID()
+      const task = {
+        file,
+        preview: URL.createObjectURL(file),
+        controller: new AbortController(),
+      }
+      tasks.current.set(id, task)
+      added.push({ id, url: task.preview, altText: '', uploading: true })
+    }
+    onChange((current) => [...current, ...added])
+    for (const image of added)
+      void upload(image.id, tasks.current.get(image.id)!)
+  }
+
+  const remove = (image: DraftImage) => {
+    const task = tasks.current.get(image.id)
+    if (task) {
+      task.controller.abort()
+      URL.revokeObjectURL(task.preview)
+      tasks.current.delete(image.id)
+    }
+    onChange((current) => current.filter((item) => item.id !== image.id))
+  }
+
+  const retry = (image: DraftImage) => {
+    const previous = tasks.current.get(image.id)
+    if (!previous || image.uploading) return
+    const task = { ...previous, controller: new AbortController() }
+    tasks.current.set(image.id, task)
+    onChange((current) =>
+      current.map((item) =>
+        item.id === image.id
+          ? { ...item, uploading: true, failed: false }
+          : item,
+      ),
+    )
+    void upload(image.id, task)
   }
 
   return (
@@ -81,16 +133,9 @@ export default function DropImageField({
             type="file"
             accept="image/jpeg,image/png,image/webp"
             multiple
+            disabled={uploading}
             onChange={add}
           />
-        </label>
-        <label className="drop-image-demo">
-          <input
-            type="checkbox"
-            checked={failExample}
-            onChange={(event) => setFailExample(event.target.checked)}
-          />
-          다음 이미지 업로드 실패 예시
         </label>
         {error && (
           <p className="form-error" role="alert">
@@ -114,26 +159,34 @@ export default function DropImageField({
                   <input
                     maxLength={300}
                     value={image.altText}
-                    onChange={(event) =>
-                      onChange(
-                        images.map((item) =>
-                          item.id === image.id
-                            ? { ...item, altText: event.target.value }
-                            : item,
+                    onChange={(event) => {
+                      const altText = event.target.value
+                      onChange((current) =>
+                        current.map((item) =>
+                          item.id === image.id ? { ...item, altText } : item,
                         ),
                       )
-                    }
+                    }}
                   />
                 </label>
+                {image.uploading && (
+                  <p className="form-image-hint" role="status">
+                    업로드 중...
+                  </p>
+                )}
                 {image.failed && (
-                  <p className="form-error">Mock 업로드에 실패했어요.</p>
+                  <p className="form-error" role="alert">
+                    이미지 업로드에 실패했어요. 다시 시도하거나 삭제해주세요.
+                  </p>
                 )}
                 <div className="drop-image-actions">
                   <button
                     type="button"
                     className="secondary-button"
                     disabled={index === 0}
-                    onClick={() => onChange(moveImage(images, index, -1))}
+                    onClick={() =>
+                      onChange((current) => moveImage(current, index, -1))
+                    }
                   >
                     위로
                   </button>
@@ -141,7 +194,9 @@ export default function DropImageField({
                     type="button"
                     className="secondary-button"
                     disabled={index === images.length - 1}
-                    onClick={() => onChange(moveImage(images, index, 1))}
+                    onClick={() =>
+                      onChange((current) => moveImage(current, index, 1))
+                    }
                   >
                     아래로
                   </button>
@@ -149,15 +204,7 @@ export default function DropImageField({
                     <button
                       type="button"
                       className="secondary-button"
-                      onClick={() =>
-                        onChange(
-                          images.map((item) =>
-                            item.id === image.id
-                              ? { ...item, failed: false }
-                              : item,
-                          ),
-                        )
-                      }
+                      onClick={() => retry(image)}
                     >
                       다시 시도
                     </button>
@@ -165,9 +212,7 @@ export default function DropImageField({
                   <button
                     type="button"
                     className="secondary-button"
-                    onClick={() =>
-                      onChange(images.filter((item) => item.id !== image.id))
-                    }
+                    onClick={() => remove(image)}
                   >
                     삭제
                   </button>

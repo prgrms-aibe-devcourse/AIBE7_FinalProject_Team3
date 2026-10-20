@@ -2,6 +2,7 @@ package org.example.grab.domain.order.dto;
 
 import org.example.grab.domain.order.entity.Order;
 import org.example.grab.domain.order.entity.OrderStatus;
+import org.example.grab.domain.shipment.entity.DeliveryStage;
 import org.example.grab.domain.shipment.entity.Shipment;
 
 import java.time.OffsetDateTime;
@@ -11,16 +12,17 @@ public record OrderShippingResponse(
         OrderStatus status,
         String carrier,
         String trackingNumber,
-        OffsetDateTime deliveredAt
+        OffsetDateTime deliveredAt,
+        DeliveryStage deliveryStage
 ) {
 
     public static OrderShippingResponse from(Order order, Shipment shipment) {
         // 배송 상태는 orders.status로 관리하므로 배송 정보가 등록된 뒤에만 주문 상태를 배송 상태로 노출한다.
         if (shipment == null) {
-            return new OrderShippingResponse(null, null, null, null);
+            return new OrderShippingResponse(null, null, null, null, null);
         }
         return new OrderShippingResponse(
                 order.getStatus(), shipment.getCarrierCode(), shipment.getTrackingNumber(),
-                shipment.getDeliveredAt());
+                shipment.getDeliveredAt(), shipment.getDeliveryStage());
     }
 }

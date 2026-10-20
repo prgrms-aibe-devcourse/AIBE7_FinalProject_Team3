@@ -1,10 +1,15 @@
 package org.example.grab.global.error;
 
+<<<<<<< HEAD
 import jakarta.servlet.http.HttpServletRequest;
+=======
+import jakarta.servlet.http.HttpServletResponse;
+>>>>>>> main
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.grab.global.common.ErrorResponse;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
@@ -35,8 +40,11 @@ public class GlobalExceptionHandler {
         if (!refreshRejection) {
             log.warn("비즈니스 예외: {} - {}", errorCode.getCode(), e.getMessage());
         }
-        return ResponseEntity.status(errorCode.getStatus())
-                .body(ErrorResponse.of(errorCode.getCode(), e.getMessage(), e.getFieldErrors()));
+        var response = ResponseEntity.status(errorCode.getStatus()).contentType(MediaType.APPLICATION_JSON);
+        if (e.getRetryAfterSeconds() != null) {
+            response.header("Retry-After", Long.toString(e.getRetryAfterSeconds()));
+        }
+        return response.body(ErrorResponse.of(errorCode.getCode(), e.getMessage(), e.getFieldErrors()));
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
@@ -94,7 +102,10 @@ public class GlobalExceptionHandler {
         원인을 찾아야 하므로 스택 트레이스는 서버 로그에 남기고, 응답에는 예외 메시지를 넣지 않는다.
      */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleUnexpectedException(Exception e) throws Exception {
+    public ResponseEntity<ErrorResponse> handleUnexpectedException(Exception e, HttpServletResponse response) throws Exception {
+        if (response.isCommitted()) {
+            throw e;
+        }
         if (e instanceof org.springframework.web.ErrorResponse
                 || e instanceof AccessDeniedException
                 || e instanceof AuthenticationException) {
@@ -103,7 +114,7 @@ public class GlobalExceptionHandler {
 
         log.error("처리하지 못한 예외", e);
         CommonErrorCode errorCode = CommonErrorCode.INTERNAL_SERVER_ERROR;
-        return ResponseEntity.status(errorCode.getStatus())
+        return ResponseEntity.status(errorCode.getStatus()).contentType(MediaType.APPLICATION_JSON)
                 .body(ErrorResponse.of(errorCode.getCode(), errorCode.getMessage(), List.of()));
     }
 }

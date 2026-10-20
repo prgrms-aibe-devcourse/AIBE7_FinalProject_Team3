@@ -1,104 +1,217 @@
-import { useState, type FormEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import {
+  Link,
+  Navigate,
+  useLocation,
+  useNavigate,
+  useParams,
+} from 'react-router-dom'
+import { getCategories } from '../../api/category/categories'
 import EmptyState from '../../components/EmptyState/EmptyState'
+import AuthLoading from '../../features/auth/components/AuthLoading'
+import {
+  apiErrorCode,
+  isAdmin,
+  isSeller,
+} from '../../features/auth/logic/authUser'
+import useAuth from '../../features/auth/logic/useAuth'
+import { categoryKeys } from '../../features/drop/logic/queryKeys'
 import DropImageField from '../../features/seller/components/DropImageField'
+import DropFieldErrors from '../../features/seller/components/DropFieldErrors'
 import OptionGroupBuilder from '../../features/seller/OptionGroupBuilder'
 import {
-  defaultGroups,
-  existingSellerDraft,
+  rebuildSkuValues,
+  toSellerDropRequest,
+  validateDropPublish,
   type SellerDraft,
-} from '../../features/seller/mock/mockSellerDrafts'
+} from '../../features/seller/logic/sellerDropForm'
+import {
+  sellerDropError,
+  type DropFormError,
+} from '../../features/seller/logic/sellerDropErrors'
+import {
+  useSaveSellerDrop,
+  useSellerDropForm,
+} from '../../features/seller/logic/useSellerDropForm'
 
 type Props = {
-  drafts: Record<string, SellerDraft>
-  editableIds: string[]
-  onSave: (draft: SellerDraft) => void
   notify: (message: string) => void
+  onPublished: (dropId: number) => void
 }
 
 export default function SellerDropFormPage(props: Props) {
   const { dropId } = useParams()
-  const draft = dropId
-    ? (props.drafts[dropId] ?? existingSellerDraft(dropId))
-    : undefined
-  if (dropId && (!draft || !props.editableIds.includes(dropId)))
+  const location = useLocation()
+  const { user, status } = useAuth()
+  const id = Number(dropId)
+  const validId =
+    /^\d+$/.test(dropId ?? '') && Number.isSafeInteger(id) && id > 0
+  const query = useSellerDropForm(
+    id,
+    !!dropId && validId && status === 'authenticated' && isSeller(user),
+  )
+  if (status === 'loading') return <AuthLoading />
+  if (!user)
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />
+  if (!isSeller(user))
     return (
       <EmptyState
-        title="편집할 DRAFT를 찾을 수 없어요."
-        link="/seller"
-        label="DROP 목록으로 돌아가기"
+        title="판매자 권한이 필요해요."
+        link={isAdmin(user) ? '/my' : '/seller/apply'}
+        label={isAdmin(user) ? '내 계정으로 돌아가기' : '판매자 신청 보기'}
         variant="page"
       />
     )
-  return <SellerDropForm key={dropId ?? 'new'} {...props} draft={draft} />
+  if (dropId) {
+    if (!validId)
+      return (
+        <EmptyState
+          title="잘못된 DROP 번호예요."
+          link="/seller/drops"
+          label="DROP 목록으로 돌아가기"
+          variant="page"
+        />
+      )
+    if (query.isPending)
+      return (
+        <div role="status">
+          <EmptyState title="DROP 정보를 불러오는 중이에요." variant="page" />
+        </div>
+      )
+    if (apiErrorCode(query.error) === 'DROP_ACCESS_DENIED')
+      return (
+        <EmptyState
+          title="이 DROP을 관리할 권한이 없어요."
+          link="/seller/drops"
+          label="DROP 목록으로 돌아가기"
+          variant="page"
+        />
+      )
+    if (apiErrorCode(query.error) === 'DROP_NOT_FOUND' || query.data === null)
+      return (
+        <EmptyState
+          title="편집할 DRAFT를 찾을 수 없어요."
+          link="/seller/drops"
+          label="DROP 목록으로 돌아가기"
+          variant="page"
+        />
+      )
+    if (query.isError && !query.data)
+      return (
+        <div className="catalog-error" role="alert">
+          <EmptyState title="DROP 정보를 불러오지 못했어요." variant="block" />
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => void query.refetch()}
+          >
+            다시 시도
+          </button>
+        </div>
+      )
+  }
+  return (
+    <SellerDropForm
+      key={dropId ?? 'new'}
+      {...props}
+      draft={query.data ?? undefined}
+    />
+  )
 }
 
 function SellerDropForm({
   draft,
-  onSave,
   notify,
-}: Omit<Props, 'drafts' | 'editableIds'> & { draft?: SellerDraft }) {
+  onPublished,
+}: Props & { draft?: SellerDraft }) {
   const navigate = useNavigate()
-  const [groups, setGroups] = useState(draft?.groups ?? defaultGroups)
+  const location = useLocation()
+  const [groups, setGroups] = useState(draft?.groups ?? [])
+  const [values, setValues] = useState(
+    draft?.values ??
+      rebuildSkuValues([], {
+        shippingFee: '3000',
+        shippingNotice: '결제 완료 후 3~5 영업일 이내 출고',
+      }),
+  )
   const [gallery, setGallery] = useState(draft?.gallery ?? [])
   const [detail, setDetail] = useState(draft?.detail ?? [])
-  const [uploading, setUploading] = useState(false)
-  const [error, setError] = useState('')
-  const values = draft?.values ?? {}
+  const [error, setError] = useState<DropFormError | null>(
+    location.state?.dropFormError ?? null,
+  )
+  const save = useSaveSellerDrop(draft ? Number(draft.id) : null)
+  const submitting = useRef(false)
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
+  const categories = useQuery({
+    queryKey: categoryKeys.all,
+    queryFn: getCategories,
+  })
+  const uploading = [...gallery, ...detail].some((image) => image.uploading)
+  const fields = error?.fields ?? []
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    const submitter = (event.nativeEvent as SubmitEvent)
-      .submitter as HTMLButtonElement | null
-    const publish = submitter?.value === 'publish'
-    if (uploading) {
-      setError('이미지를 불러오는 동안에는 저장할 수 없어요.')
-      return
-    }
-    if (
-      gallery.some((image) => image.failed) ||
-      detail.some((image) => image.failed)
-    ) {
-      setError('업로드에 실패한 이미지를 다시 시도하거나 삭제해주세요.')
-      return
-    }
-    if (publish && !gallery.length) {
-      setError('공개하려면 GALLERY 이미지를 1장 이상 추가해주세요.')
-      return
-    }
-    const form = new FormData(event.currentTarget)
-    const fields = Object.fromEntries(
-      [...form.entries()].filter(([, value]) => typeof value === 'string'),
+    if (submitting.current || uploading) return
+    const publish =
+      (event.nativeEvent as SubmitEvent).submitter?.getAttribute('value') ===
+      'publish'
+    const entries = Object.fromEntries(
+      [...new FormData(event.currentTarget).entries()].filter(
+        ([, value]) => typeof value === 'string',
+      ),
     ) as Record<string, string>
-    if (
-      publish &&
-      new Date(fields.saleStartsAt).getTime() >=
-        new Date(fields.saleEndsAt).getTime()
-    ) {
-      setError('판매 종료는 시작보다 늦어야 해요.')
-      return
+    submitting.current = true
+    setError(null)
+    try {
+      const input = toSellerDropRequest({
+        values: { ...values, ...entries },
+        groups,
+        gallery,
+        detail,
+      })
+      if (publish) {
+        const errors = validateDropPublish(input)
+        if (errors.length) {
+          setError({
+            message: '공개에 필요한 항목을 확인해주세요.',
+            fields: errors,
+          })
+          return
+        }
+      }
+      const id = await save.mutateAsync({ input, publish })
+      if (!mounted.current) return
+      notify(
+        publish ? 'DROP을 WISH 상태로 공개했어요.' : 'DROP 초안을 저장했어요.',
+      )
+      if (publish) onPublished(id)
+      else navigate(`/seller/drops/${id}/edit`, { replace: true, state: null })
+    } catch (cause) {
+      if (!mounted.current) return
+      const next = sellerDropError(cause)
+      const savedId = save.getSavedId()
+      if (!draft && savedId)
+        navigate(`/seller/drops/${savedId}/edit`, {
+          replace: true,
+          state: { dropFormError: next },
+        })
+      else setError(next)
+    } finally {
+      submitting.current = false
     }
-    const next: SellerDraft = {
-      id: draft?.id ?? crypto.randomUUID(),
-      values: fields,
-      groups,
-      gallery,
-      detail,
-    }
-    onSave(next)
-    setError('')
-    notify(
-      publish
-        ? 'Mock 공개 조건을 확인했어요. 실제 DROP은 공개되지 않았습니다.'
-        : 'Mock DROP 초안을 저장했어요.',
-    )
-    if (!publish) navigate(`/seller/drops/${next.id}/edit`)
   }
 
   return (
     <section className="page-section form-page">
       <div className="breadcrumbs">
-        <Link to="/seller">← DROP STUDIO</Link>
+        <Link to="/seller/drops">← DROP STUDIO</Link>
         <span>/</span>
         <span>{draft ? 'DRAFT 편집' : '새 DROP'}</span>
       </div>
@@ -107,156 +220,211 @@ function SellerDropForm({
       <p className="page-description">
         상품 특성에 맞게 옵션 그룹과 선택값을 자유롭게 구성하세요.
       </p>
-      <form onSubmit={submit}>
-        <section className="form-card">
-          <div className="section-number">01</div>
-          <div className="form-content">
-            <h2>기본 정보</h2>
-            <label>
-              상품명
-              <input
-                required
-                name="name"
-                defaultValue={values.name ?? ''}
-                placeholder="상품 이름"
+      <form onSubmit={(event) => void submit(event)} noValidate>
+        <fieldset className="drop-form-fields" disabled={save.isPending}>
+          <section className="form-card">
+            <div className="section-number">01</div>
+            <div className="form-content">
+              <h2>기본 정보</h2>
+              <label>
+                상품명
+                <input
+                  required
+                  name="name"
+                  maxLength={200}
+                  defaultValue={values.name ?? ''}
+                  placeholder="상품 이름"
+                />
+                <DropFieldErrors field="name" errors={fields} />
+              </label>
+              <label>
+                상품 설명
+                <textarea
+                  required
+                  name="description"
+                  defaultValue={values.description ?? ''}
+                  rows={4}
+                  placeholder="상품과 브랜드의 이야기를 적어주세요."
+                />
+                <DropFieldErrors field="description" errors={fields} />
+              </label>
+              <div className="form-row">
+                <label>
+                  카테고리
+                  <select
+                    required
+                    name="categoryId"
+                    value={values.categoryId ?? ''}
+                    onChange={(event) => {
+                      const categoryId = event.target.value
+                      setValues((current) => ({ ...current, categoryId }))
+                    }}
+                    disabled={categories.isPending || categories.isError}
+                  >
+                    <option value="">선택</option>
+                    {(categories.data ?? []).map((category) => (
+                      <option
+                        key={category.categoryId}
+                        value={category.categoryId}
+                      >
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                  <DropFieldErrors field="categoryId" errors={fields} />
+                </label>
+              </div>
+              {categories.isPending && (
+                <p role="status" className="form-image-hint">
+                  카테고리를 불러오는 중이에요.
+                </p>
+              )}
+              {categories.isError && (
+                <div>
+                  <p className="form-error" role="alert">
+                    카테고리를 불러오지 못했어요.
+                  </p>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => void categories.refetch()}
+                  >
+                    다시 시도
+                  </button>
+                </div>
+              )}
+            </div>
+          </section>
+          <div className="drop-image-layout">
+            <div>
+              <DropImageField
+                kind="GALLERY"
+                images={gallery}
+                onChange={setGallery}
               />
-            </label>
-            <label>
-              상품 설명
-              <textarea
-                required
-                name="description"
-                defaultValue={values.description ?? ''}
-                rows={4}
-                placeholder="상품과 브랜드의 이야기를 적어주세요."
+              <DropFieldErrors field="images" errors={fields} />
+            </div>
+            <div>
+              <DropImageField
+                kind="DETAIL"
+                images={detail}
+                onChange={setDetail}
               />
-            </label>
-            <div className="form-row">
-              <label>
-                카테고리
-                <select
-                  required
-                  name="category"
-                  defaultValue={values.category ?? ''}
-                >
-                  <option value="" disabled>
-                    선택
-                  </option>
-                  <option>패션</option>
-                  <option>리빙</option>
-                  <option>문구 · 굿즈</option>
-                </select>
-              </label>
+              <DropFieldErrors field="detailImages" errors={fields} />
             </div>
           </div>
-        </section>
-        <div className="drop-image-layout">
-          <DropImageField
-            kind="GALLERY"
-            images={gallery}
-            totalCount={gallery.length + detail.length}
-            onChange={setGallery}
-            onUploading={setUploading}
-          />
-          <DropImageField
-            kind="DETAIL"
-            images={detail}
-            totalCount={gallery.length + detail.length}
-            onChange={setDetail}
-            onUploading={setUploading}
-          />
-        </div>
-        <p className="form-image-hint">
-          두 용도 합계 10장 · 파일당 5MB · JPEG/PNG/WebP
-        </p>
-        <section className="form-card">
-          <div className="section-number">04</div>
-          <div className="form-content">
-            <OptionGroupBuilder
-              groups={groups}
-              setGroups={setGroups}
-              values={values}
-            />
-          </div>
-        </section>
-        <section className="form-card">
-          <div className="section-number">05</div>
-          <div className="form-content">
-            <h2>판매 및 배송</h2>
-            <div className="form-row">
-              <label>
-                판매 시작
-                <input
-                  required
-                  name="saleStartsAt"
-                  defaultValue={values.saleStartsAt ?? ''}
-                  type="datetime-local"
-                />
-              </label>
-              <label>
-                판매 종료
-                <input
-                  required
-                  name="saleEndsAt"
-                  defaultValue={values.saleEndsAt ?? ''}
-                  type="datetime-local"
-                />
-              </label>
-            </div>
-            <div className="form-row">
-              <label>
-                배송비
-                <input
-                  required
-                  name="shippingFee"
-                  type="number"
-                  min="0"
-                  step="100"
-                  defaultValue={values.shippingFee ?? '3000'}
-                />
-              </label>
-              <label>
-                배송 안내
-                <input
-                  required
-                  name="shippingNotice"
-                  defaultValue={
-                    values.shippingNotice ?? '결제 완료 후 3~5 영업일 이내 출고'
-                  }
-                />
-              </label>
-            </div>
-          </div>
-        </section>
-        {error && (
-          <p className="form-error" role="alert">
-            {error}
+          <p className="form-image-hint">
+            GALLERY 최대 5장 · DETAIL 최대 15장 · 파일당 5MB · JPEG/PNG/WebP
           </p>
-        )}
-        <div className="form-actions">
-          <Link className="secondary-button" to="/seller">
-            취소
-          </Link>
-          <button
-            type="submit"
-            name="intent"
-            value="draft"
-            formNoValidate
-            className="secondary-button"
-            disabled={uploading}
-          >
-            임시 저장
-          </button>
-          <button
-            type="submit"
-            name="intent"
-            value="publish"
-            className="primary-button"
-            disabled={uploading}
-          >
-            공개 조건 확인
-          </button>
-        </div>
+          <section className="form-card">
+            <div className="section-number">04</div>
+            <div className="form-content">
+              <OptionGroupBuilder
+                groups={groups}
+                values={values}
+                setValues={setValues}
+                errors={fields}
+                onGroupsChange={(next) => {
+                  setGroups(next)
+                  setValues((current) => rebuildSkuValues(next, current))
+                }}
+              />
+            </div>
+          </section>
+          <section className="form-card">
+            <div className="section-number">05</div>
+            <div className="form-content">
+              <h2>판매 및 배송</h2>
+              <div className="form-row">
+                <label>
+                  판매 시작
+                  <input
+                    required
+                    name="saleStartsAt"
+                    defaultValue={values.saleStartsAt ?? ''}
+                    type="datetime-local"
+                    step="any"
+                  />
+                  <DropFieldErrors field="saleStartsAt" errors={fields} />
+                </label>
+                <label>
+                  판매 종료
+                  <input
+                    required
+                    name="saleEndsAt"
+                    defaultValue={values.saleEndsAt ?? ''}
+                    type="datetime-local"
+                    step="any"
+                  />
+                  <DropFieldErrors field="saleEndsAt" errors={fields} />
+                </label>
+              </div>
+              <div className="form-row">
+                <label>
+                  배송비
+                  <input
+                    required
+                    name="shippingFee"
+                    type="number"
+                    min="0"
+                    step="1"
+                    defaultValue={values.shippingFee ?? ''}
+                  />
+                  <DropFieldErrors
+                    field="shipping.shippingFee"
+                    errors={fields}
+                  />
+                </label>
+                <label>
+                  배송 안내
+                  <input
+                    required
+                    name="shippingNotice"
+                    defaultValue={values.shippingNotice ?? ''}
+                  />
+                  <DropFieldErrors
+                    field="shipping.shippingNotice"
+                    errors={fields}
+                  />
+                </label>
+              </div>
+            </div>
+          </section>
+          {error && (
+            <p className="form-error drop-submit-error" role="alert">
+              {error.message}
+            </p>
+          )}
+          <div className="form-actions">
+            <Link className="secondary-button" to="/seller/drops">
+              취소
+            </Link>
+            <button
+              type="submit"
+              name="intent"
+              value="draft"
+              formNoValidate
+              className="secondary-button"
+              disabled={uploading || save.isPending}
+            >
+              임시 저장
+            </button>
+            <button
+              type="submit"
+              name="intent"
+              value="publish"
+              className="primary-button"
+              disabled={
+                uploading ||
+                save.isPending ||
+                categories.isPending ||
+                categories.isError
+              }
+            >
+              공개
+            </button>
+          </div>
+        </fieldset>
       </form>
     </section>
   )

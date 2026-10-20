@@ -9,7 +9,7 @@
 | --- | --- | --- | --- |
 | Language | Java | 17 | 팀의 학습 경험과 라이브러리 호환성이 안정적이며 Spring Boot 4.1의 최소 요구 버전을 충족한다. |
 | Framework | Spring Boot | 4.1.x | 웹, 보안, 데이터 접근, 모니터링 환경을 일관되게 구성한다. |
-| Web | Spring MVC | Boot 관리 | REST API 구현에 사용하며 블로킹 방식의 JPA 환경에 적합하다. SSE는 GR-109 계약 확정 후 GR-110~113에서 단계적으로 도입한다. |
+| Web | Spring MVC | Boot 관리 | REST API 구현에 사용하며 블로킹 방식의 JPA 환경에 적합하다. SSE는 GR-110에서 단일 서버·커밋 후 알림을 구현했고 프론트 연동·다중 서버는 GR-111~113에서 진행한다. |
 | ORM | Spring Data JPA / Hibernate | Boot 관리 | 주문·옵션·결제 도메인의 관계 매핑과 트랜잭션을 관리한다. 복잡한 조회는 DTO Projection 또는 별도 쿼리로 처리한다. |
 | Security | Spring Security | Boot 관리 | HttpOnly 쿠키 기반 JWT 인증, CSRF 보호, KAKAO·GOOGLE OpenID Connect 소셜 로그인(OAuth2 Client), Argon2id 비밀번호 해시, USER·SELLER·ADMIN 권한 및 리소스 소유권을 검증한다. |
 | Validation | Jakarta Bean Validation | Boot 관리 | 요청 DTO와 상태별 필수값을 검증한다. |
@@ -129,7 +129,7 @@ Actuator와 Prometheus의 로컬 메트릭 수집 연결은 완료됐다. Redis 
 | Reverse Proxy | Nginx | TLS 종료 및 트래픽 전환 | 외부 요청을 애플리케이션으로 전달하고 Blue/Green 포트 전환에 사용한다. |
 | Container Registry | GHCR | Docker 이미지 저장 | GitHub Actions와 권한 및 배포 흐름을 연계한다. |
 | Secrets | AWS Systems Manager Parameter Store | 환경변수·비밀값 관리 | DB 비밀번호, PG Secret Key, SMTP 계정 정보, Supabase Secret Key가 저장소 및 이미지에 포함되는 것을 방지한다. |
-| DNS / TLS | Route 53 + ACM | 도메인·인증서 | 운영 서비스에 HTTPS를 적용한다. |
+| DNS / TLS | sslip.io(무료 매직 DNS) + Let's Encrypt(certbot) | 도메인·인증서 | 도메인 구매 없이 EC2 EIP 기반 공개 호스트명(`<EIP>.sslip.io`)으로 Let's Encrypt 인증서를 발급해 Nginx에 HTTPS를 적용한다(ACM은 ALB/CloudFront 전용이라 단일 EC2 구성에는 적용할 수 없다). 정식 도메인 확보 시 전환한다. |
 
 RDS를 기본 운영 DB로 사용하고, DROP 이미지 저장소는 Supabase Storage로 확정한다. 비용이나 운영 일정 때문에 Neon 등 다른 관리형 PostgreSQL을 검토할 수 있지만, 같은 역할의 서비스를 동시에 사용하지 않고 배포 전 하나로 확정한다.
 
@@ -227,6 +227,8 @@ SSE의 초기 연결·조회 주기·부하 조건과 수용 기준은 [실시�
 | Mail Test | GreenMail | 이메일 인증 코드 발송을 실제 발송 없이 검증한다. |
 | Load Test | k6 | 동시 주문, 재고 선점, 결제 완료 API의 VU·RPS와 Threshold를 검증한다. |
 
+전체 테스트 JVM 힙은 `build.gradle`에서 1GiB로 설정한다. Spring 컨텍스트 캐시와 8개 동시 Argon2 해시 검증이 겹치면 기본 512MiB에서 OOM이 재현돼 테스트 실행 용량을 명시했다. 운영 애플리케이션의 힙 설정과는 별개다.
+
 핵심 테스트 시나리오는 다음과 같다.
 
 - 재고 1개에 두 사용자가 동시에 주문하면 한 요청만 성공한다.
@@ -263,7 +265,7 @@ SSE의 초기 연결·조회 주기·부하 조건과 수용 기준은 [실시�
 ### 문제를 확인한 뒤 적용
 
 - Redis 조회 캐시와 분산 환경 보조 기능
-- SSE 실시간 재고·상태 변경 알림: GR-109에서 기존 API 재조회 방식을 채택했으며, 명세에 따라 GR-110~113에서 구현·검증한다. 범위·복구 정책·초기 운영 목표는 [실시간 변경 전달 계약](REALTIME_STOCK.md)을 따른다.
+- SSE 실시간 재고·상태 변경 알림: GR-109에서 기존 API 재조회 방식을 채택했으며, GR-110에서 단일 서버 SSE·커밋 후 알림·전용 지표를 구현했다. 화면 연동은 GR-111/112, 다중 서버·운영 검증은 GR-113에서 진행한다. 범위·복구 정책·초기 운영 목표는 [실시간 변경 전달 계약](REALTIME_STOCK.md)을 따른다.
 - Grafana 대시보드와 Alloy·Loki 로그 파이프라인
 - EC2 자동 배포와 Blue/Green 전환
 - Amazon SES 발송 전환 (실사용자 오픈 또는 발송량 증가 시)

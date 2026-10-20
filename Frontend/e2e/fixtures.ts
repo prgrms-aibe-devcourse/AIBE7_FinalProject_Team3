@@ -1,6 +1,8 @@
 import { expect, test as base, type Page } from '@playwright/test'
 import { FIXED_NOW, installPublicApi } from './mock/api'
 import { getAuth, installAuthApi } from './mock/auth'
+import { installDropImageUploads } from './mock/dropImages'
+import { installSellerDropApi } from './mock/sellerDrops'
 
 export type { Page }
 export { getAuth }
@@ -23,6 +25,8 @@ export const test = base.extend({
     )
     // 공개 DROP API를 fixture로 고정한다. 시나리오 테스트는 뒤에서 다시 등록해 덮어쓴다.
     await installPublicApi(page)
+    await installDropImageUploads(page)
+    await installSellerDropApi(page)
     // 인증 API는 공개 API 뒤에 등록해 인증 경로만 처리하고 나머지는 위 핸들러로 넘긴다.
     installAuthApi(page)
     await provide(page)

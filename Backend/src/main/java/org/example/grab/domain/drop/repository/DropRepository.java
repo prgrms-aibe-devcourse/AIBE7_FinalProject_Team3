@@ -20,6 +20,9 @@ import java.util.Optional;
 
 public interface DropRepository extends JpaRepository<Drop, Long> {
 
+    @Query("SELECT COUNT(d) FROM Drop d WHERE d.id IN :dropIds AND d.status <> org.example.grab.domain.drop.entity.DropStatus.DRAFT")
+    long countPublicDropsForSubscription(@Param("dropIds") List<Long> dropIds);
+
     @EntityGraph(attributePaths = "options")
     Optional<Drop> findWithOptionsById(Long id);
 
@@ -278,16 +281,31 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
      * 판매 종료 배치(GR-18). startGrabBatch와 잠금·멱등 규칙이 같다.
      * 종료 사유는 TIME_EXPIRED로 고정한다(SOLD_OUT 조기 종료는 범위 밖).
      */
+    default int endGrabBatch(OffsetDateTime now, int batchSize) {
+        return endGrabBatchIds(now, batchSize).size();
+    }
+
+    default List<Long> endGrabBatchIds(OffsetDateTime now, int batchSize) {
+        List<Long> ids = lockEndGrabTargets(now, batchSize);
+        if (!ids.isEmpty()) {
+            markGrabEnded(ids, now);
+        }
+        return ids;
+    }
+
+    @Query(value = """
+            SELECT id FROM drops
+            WHERE status = 'GRAB' AND sale_ends_at <= :now
+            ORDER BY sale_ends_at, id
+            LIMIT :batchSize
+            FOR UPDATE SKIP LOCKED
+            """, nativeQuery = true)
+    List<Long> lockEndGrabTargets(@Param("now") OffsetDateTime now, @Param("batchSize") int batchSize);
+
     @Modifying
     @Query(value = """
             UPDATE drops SET status = 'ENDED', closed_at = :now, close_reason = 'TIME_EXPIRED', updated_at = :now
-            WHERE id IN (
-                SELECT id FROM drops
-                WHERE status = 'GRAB' AND sale_ends_at <= :now
-                ORDER BY sale_ends_at, id
-                LIMIT :batchSize
-                FOR UPDATE SKIP LOCKED
-            )
+            WHERE id IN (:ids)
             """, nativeQuery = true)
-    int endGrabBatch(@Param("now") OffsetDateTime now, @Param("batchSize") int batchSize);
+    int markGrabEnded(@Param("ids") List<Long> ids, @Param("now") OffsetDateTime now);
 }

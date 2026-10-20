@@ -1,5 +1,7 @@
 package org.example.grab.global.config;
 
+import jakarta.servlet.DispatcherType;
+import jakarta.servlet.RequestDispatcher;
 import org.example.grab.global.security.handler.RestAccessDeniedHandler;
 import org.example.grab.global.security.handler.RestAuthenticationEntryPoint;
 import org.example.grab.global.security.jwt.AccessTokenProperties;
@@ -54,6 +56,11 @@ public class SecurityConfig {
                         .sessionAuthenticationStrategy(new NullAuthenticatedSessionStrategy())
                 )
                 .authorizeHttpRequests(requests -> requests
+                        // SSE의 오류 dispatch만 허용한다. 다른 보호 API의 ERROR/ASYNC를 일괄 공개하지 않는다.
+                        .requestMatchers(request -> request.getDispatcherType() == DispatcherType.ERROR
+                                && "GET".equals(request.getMethod())
+                                && "/api/v1/drops/stock-stream".equals(request.getAttribute(RequestDispatcher.ERROR_REQUEST_URI)))
+                        .permitAll()
                         .requestMatchers("/actuator/health", "/actuator/prometheus")
                         .permitAll()
                         // ponytail: 로컬 확인용 전 환경 개방. 운영 노출 정책은 GR-59(한재훈)에서 프로필로 제한
@@ -63,7 +70,7 @@ public class SecurityConfig {
                         // /api/v1/drops/{id}/wish(WISH API)와 판매자 경로는 계속 인증이 필요하다.
                         // 재고 재조회는 /stocks만 명시해 /api/v1/drops/** 전체를 열지 않는다.
                         .requestMatchers(HttpMethod.GET, "/api/v1/categories", "/api/v1/drops", "/api/v1/drops/*",
-                                "/api/v1/drops/*/stocks")
+                                "/api/v1/drops/*/stocks", "/api/v1/drops/stock-stream")
                         .permitAll()
                         // CSRF 토큰 발급은 로그인 전에도 필요하다(MEMBER_AUTH 1.1)
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/csrf")
