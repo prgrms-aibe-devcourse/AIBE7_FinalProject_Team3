@@ -5,6 +5,7 @@ import org.example.grab.domain.order.dto.MyOrderListResponse;
 import org.example.grab.domain.order.dto.OrderCreateRequest;
 import org.example.grab.domain.order.dto.OrderCreateResponse;
 import org.example.grab.domain.order.dto.OrderItemResponse;
+import org.example.grab.domain.order.dto.OrderShippingAddressResponse;
 import org.example.grab.domain.order.dto.OrderShippingResponse;
 import org.example.grab.domain.order.entity.OrderStatus;
 import org.example.grab.domain.order.error.OrderErrorCode;
@@ -161,7 +162,7 @@ class OrderControllerTest {
                 261000,
                 PaymentStatus.PENDING,
                 OffsetDateTime.parse("2026-09-28T12:10:00Z"),
-                new MyOrderDetailResponse.ShippingAddress("홍길동", "01012345678", "06236", "서울시 강남구", null, null),
+                new OrderShippingAddressResponse("홍길동", "01012345678", "06236", "서울시 강남구", null, null),
                 new OrderShippingResponse(null, null, null, null, null),
                 OffsetDateTime.parse("2026-09-28T12:00:00Z")
         );

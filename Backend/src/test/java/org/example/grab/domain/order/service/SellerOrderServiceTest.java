@@ -1,5 +1,6 @@
 package org.example.grab.domain.order.service;
 
+import org.example.grab.domain.order.dto.OrderShippingAddressResponse;
 import org.example.grab.domain.order.dto.OrderShippingResponse;
 import org.example.grab.domain.order.dto.SellerOrderDetailResponse;
 import org.example.grab.domain.order.dto.SellerOrderListProjection;
@@ -20,6 +21,8 @@ import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -76,6 +79,39 @@ class SellerOrderServiceTest {
         assertThat(result.paymentStatus()).isEqualTo(PaymentStatus.SUCCEEDED);
         assertThat(result.shipping()).isEqualTo(new OrderShippingResponse(null, null, null, null, null));
         verify(orderRepository).ownsDrop(SELLER_ID, 42L);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = OrderStatus.class, names = {"PAID", "PREPARING", "SHIPPED"})
+    void showsShippingAddressWhileOrderNeedsShipping(OrderStatus status) {
+        // given
+        UUID orderId = UUID.randomUUID();
+        Order order = createOrder();
+        ReflectionTestUtils.setField(order, "status", status);
+        givenOwnedOrderDetail(orderId, order);
+
+        // when
+        SellerOrderDetailResponse result = sellerOrderService.findOrder(SELLER_ID, orderId);
+
+        // then
+        assertThat(result.shippingAddress()).isEqualTo(
+                new OrderShippingAddressResponse("받는 사람", "01000000000", "00000", "주소", null, null));
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = OrderStatus.class, names = {"PAID", "PREPARING", "SHIPPED"}, mode = EnumSource.Mode.EXCLUDE)
+    void hidesShippingAddressOutsideShippingStatuses(OrderStatus status) {
+        // given
+        UUID orderId = UUID.randomUUID();
+        Order order = createOrder();
+        ReflectionTestUtils.setField(order, "status", status);
+        givenOwnedOrderDetail(orderId, order);
+
+        // when
+        SellerOrderDetailResponse result = sellerOrderService.findOrder(SELLER_ID, orderId);
+
+        // then
+        assertThat(result.shippingAddress()).isNull();
     }
 
     @Test
@@ -421,6 +457,14 @@ class SellerOrderServiceTest {
         verify(orderRepository).existsDrop(42L);
         verify(orderRepository).ownsDrop(SELLER_ID, 42L);
         verify(orderRepository).findSellerOrders(SELLER_ID, 42L, "PAID", "SUCCEEDED", pageRequest);
+    }
+
+    private void givenOwnedOrderDetail(UUID orderId, Order order) {
+        when(orderRepository.findByUuid(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.ownsDrop(SELLER_ID, 42L)).thenReturn(true);
+        when(orderItemRepository.findAllByOrderIdOrderByIdAsc(null)).thenReturn(List.of());
+        when(orderRepository.findLatestPaymentStatus(null)).thenReturn(Optional.empty());
+        when(shipmentRepository.findByOrderId(null)).thenReturn(Optional.empty());
     }
 
     private Order createOrder() {

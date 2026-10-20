@@ -25,6 +25,7 @@ import java.util.UUID;
 
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -56,6 +57,7 @@ class SellerOrderControllerTest {
                 3000,
                 33000,
                 PaymentStatus.SUCCEEDED,
+                null,
                 new OrderShippingResponse(OrderStatus.DELIVERED, "CJ", "1234567890",
                         OffsetDateTime.parse("2026-09-30T09:00:00Z"), DeliveryStage.OUT_FOR_DELIVERY),
                 OffsetDateTime.parse("2026-09-29T12:00:00Z")
@@ -73,6 +75,7 @@ class SellerOrderControllerTest {
                 .andExpect(jsonPath("$.data.status").value("DELIVERED"))
                 .andExpect(jsonPath("$.data.paymentStatus").value("SUCCEEDED"))
                 .andExpect(jsonPath("$.data.items[0].subtotal").value(30000))
+                .andExpect(jsonPath("$.data.shippingAddress").value(nullValue()))
                 .andExpect(jsonPath("$.data.shipping.status").value("DELIVERED"))
                 .andExpect(jsonPath("$.data.shipping.carrier").value("CJ"))
                 .andExpect(jsonPath("$.data.shipping.trackingNumber").value("1234567890"))
