@@ -318,6 +318,37 @@ test('비회원·일반 회원은 편집 상세 API를 호출하지 않는다', 
   expect(details).toBe(0)
 })
 
+test('카테고리 조회가 늦어도 기존 선택을 복원하고 변경값을 저장한다', async ({
+  page,
+}) => {
+  let release = () => {}
+  const ready = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await page.route('**/api/v1/categories', async (route) => {
+    await ready
+    await route.fallback()
+  })
+  await page.goto('/#/seller/drops/401/edit')
+  await page.reload()
+  const category = page.getByLabel('카테고리')
+  await expect(category).toBeDisabled()
+  release()
+  await expect(category).toBeEnabled()
+  await expect(category).toHaveValue('1')
+  await category.selectOption('2')
+  const request = page.waitForRequest(
+    (request) =>
+      request.method() === 'PATCH' &&
+      /\/seller\/drops\/401$/.test(request.url()),
+  )
+  await page.getByRole('button', { name: '임시 저장' }).click()
+  expect((await request).postDataJSON().categoryId).toBe(2)
+  await expect(page.locator('.toast')).toHaveText('DROP 초안을 저장했어요.')
+  await page.reload()
+  await expect(category).toHaveValue('2')
+})
+
 test('카테고리 조회 실패를 재시도하고 서버 필드 오류가 입력 가까이 표시된다', async ({
   page,
 }) => {

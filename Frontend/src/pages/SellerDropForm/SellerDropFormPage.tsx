@@ -254,7 +254,11 @@ function SellerDropForm({
                   <select
                     required
                     name="categoryId"
-                    defaultValue={values.categoryId ?? ''}
+                    value={values.categoryId ?? ''}
+                    onChange={(event) => {
+                      const categoryId = event.target.value
+                      setValues((current) => ({ ...current, categoryId }))
+                    }}
                     disabled={categories.isPending || categories.isError}
                   >
                     <option value="">선택</option>
