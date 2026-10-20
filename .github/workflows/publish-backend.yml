@@ -2,7 +2,7 @@ name: Publish backend image
 
 on:
   push:
-    branches: [main]
+    branches: [deploy]
     paths:
       - Backend/**
       - .github/workflows/publish-backend.yml
