@@ -4,6 +4,7 @@ import EmptyState from '../../components/EmptyState/EmptyState'
 import AuthLoading from '../../features/auth/components/AuthLoading'
 import type { AuthStatus } from '../../features/auth/logic/authUser'
 import BuyerOrderAmounts from '../../features/order/components/BuyerOrderAmounts'
+import BuyerOrderItem from '../../features/order/components/BuyerOrderItem'
 import {
   buyerOrderStatusText,
   canCancel,
@@ -164,15 +165,13 @@ function OrderContent({
         <section className="panel buyer-panel buyer-order-product">
           <h2>주문 상품</h2>
           {order.items.map((item, index) => (
-            <div className="buyer-item no-image" key={index}>
-              <div>
-                <strong>{item.productName}</strong>
-                <p>
-                  {item.optionName} · {item.quantity}개
-                </p>
-              </div>
-              <strong>{won(item.subtotal)}</strong>
-            </div>
+            <BuyerOrderItem
+              key={index}
+              productName={item.productName}
+              optionLabel={item.optionName}
+              quantity={item.quantity}
+              amount={item.subtotal}
+            />
           ))}
         </section>
         <section className="panel buyer-panel buyer-order-payment">

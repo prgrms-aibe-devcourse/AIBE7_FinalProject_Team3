@@ -2,7 +2,6 @@ import type { components } from '../../../api/schema/drop'
 import type {
   DetailImage,
   DetailSku,
-  Drop,
   DropActions,
   DropDetail,
   OptionGroup,
@@ -82,30 +81,5 @@ export function toDropDetail(drop: PublicDropDetail): DropDetail {
     serverTime: drop.serverTime ?? '',
     minPrice: drop.minPrice ?? null,
     soldOut: drop.soldOut ?? false,
-  }
-}
-
-// 데모 주문(GR-93 범위 밖, 실제 주문 API는 후속 이슈)의 Order가 쓰는 기존 Drop 형태로 맞춘다.
-export function toOrderDrop(detail: DropDetail): Drop {
-  return {
-    id: detail.id,
-    name: detail.name,
-    brand: detail.brand ?? '',
-    description: detail.description,
-    image: detail.image,
-    category: detail.category,
-    status: detail.status,
-    wishCount: detail.wishCount,
-    saleStartsAt: detail.saleStartsAt,
-    saleEndsAt: detail.saleEndsAt,
-    shippingFee: detail.shippingFee,
-    shippingNotice: detail.shippingNotice,
-    optionGroups: detail.optionGroups,
-    skus: detail.skus.map((sku) => ({
-      id: sku.id,
-      selections: sku.selections,
-      price: sku.price,
-      stock: sku.stock ?? 0,
-    })),
   }
 }

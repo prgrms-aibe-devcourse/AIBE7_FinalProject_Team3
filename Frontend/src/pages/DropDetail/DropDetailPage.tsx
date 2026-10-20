@@ -4,10 +4,7 @@ import axios from 'axios'
 import EmptyState from '../../components/EmptyState/EmptyState'
 import DropDetailImages from '../../features/drop/components/DropDetailImages'
 import DropGallery from '../../features/drop/components/DropGallery'
-import {
-  toDropDetail,
-  toOrderDrop,
-} from '../../features/drop/logic/dropDetailView'
+import { toDropDetail } from '../../features/drop/logic/dropDetailView'
 import {
   findMatchingSku,
   selectionLabel,
@@ -17,14 +14,11 @@ import {
   useDropStocks,
 } from '../../features/drop/logic/useDrops'
 import { useDropStockStream } from '../../features/drop/logic/useDropStockStream'
+import { checkoutDraftPath } from '../../features/order/logic/checkoutView'
 import type { SharedProps } from '../../types/store'
 import { dateLabel, daysUntil } from '../../utils/date'
 import { won } from '../../utils/price'
 import NotFoundPage from '../NotFound/NotFoundPage'
-
-function generateOrderId() {
-  return `GR-${Date.now().toString().slice(-8)}`
-}
 
 export default function DropDetailPage({
   authenticated,
@@ -32,7 +26,6 @@ export default function DropDetailPage({
   wishes,
   wishesReady,
   toggleWish,
-  addOrder,
   notify,
 }: SharedProps) {
   const { dropId } = useParams()
@@ -127,7 +120,7 @@ export default function DropDetailPage({
         : quantity > maxQuantity
           ? '수량을 확인해주세요'
           : authenticated
-            ? '데모 GRAB 하기 ↗'
+            ? 'GRAB 하기 ↗'
             : '로그인 후 GRAB ↗'
 
   const order = (event: FormEvent) => {
@@ -139,16 +132,14 @@ export default function DropDetailPage({
       navigate('/login', { state: { from: location.pathname } })
       return
     }
-    const orderId = generateOrderId()
-    addOrder({
-      id: orderId,
-      drop: toOrderDrop(detail),
-      optionLabel,
-      quantity,
-      total: unitPrice * quantity + detail.shippingFee,
-    })
-    notify('Mock 주문을 만들었어요. 배송지와 결제 결과를 확인해주세요.')
-    navigate(`/checkout/${orderId}`)
+    // 주문은 결제 화면에서 배송지를 받은 뒤 만든다(CheckoutPage.md).
+    navigate(
+      checkoutDraftPath({
+        dropId: detail.id,
+        optionId: selectedSku.id,
+        quantity,
+      }),
+    )
   }
 
   return (
