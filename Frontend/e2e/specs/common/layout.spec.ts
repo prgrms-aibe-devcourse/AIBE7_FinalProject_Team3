@@ -1,4 +1,11 @@
-import { expect, login, loginSeller, test, type Page } from '../../fixtures'
+import {
+  expect,
+  getAuth,
+  login,
+  loginSeller,
+  test,
+  type Page,
+} from '../../fixtures'
 import type { Locator } from '@playwright/test'
 import { BUYER_ORDER_IDS } from '../../mock/api/buyerOrders'
 
@@ -159,6 +166,48 @@ test('내 주문 상세: 가로 넘침 없이 취소 입력에 닿는다', async
   await expectReachable(
     page,
     page.getByRole('button', { name: '취소 내용 확인' }),
+  )
+  await expectNoHorizontalOverflow(page)
+})
+
+test('회원가입 2·3단계: 오류를 표시해도 가로 넘침 없이 핵심 버튼에 닿는다', async ({
+  page,
+}) => {
+  const auth = getAuth(page)
+  auth.failSignup('confirm', { status: 409, code: 'DUPLICATE_EMAIL' })
+  auth.failSignup('signup', {
+    status: 400,
+    code: 'VALIDATION_FAILED',
+    fieldErrors: [
+      { field: 'password', reason: 'password' },
+      { field: 'nickname', reason: 'nickname' },
+    ],
+  })
+  await page.goto('/#/signup')
+  await page.getByLabel('이메일 주소').fill('new@example.com')
+  await page.getByRole('button', { name: '인증 코드 보내기' }).click()
+  await page.getByLabel('인증 코드 6자리').fill('123456')
+  await page.getByRole('button', { name: '코드 확인' }).click()
+  await expect(page.getByRole('alert')).toBeVisible()
+  for (const action of [
+    page.getByRole('button', { name: /재발송/ }),
+    page.getByRole('button', { name: '이메일 다시 입력' }),
+    page.getByRole('link', { name: '로그인하러 가기' }),
+    page.getByRole('button', { name: '코드 확인' }),
+  ]) {
+    await expectReachable(page, action)
+  }
+  await expectNoHorizontalOverflow(page)
+
+  await page.getByRole('button', { name: '코드 확인' }).click()
+  await page.getByLabel('닉네임', { exact: true }).fill('새회원')
+  await page.getByLabel('비밀번호').fill('Password123!')
+  await page.getByRole('button', { name: '회원가입 완료' }).click()
+  await expect(page.locator('#signup-password-error')).toBeVisible()
+  await expectReachable(page, page.locator('#signup-nickname-error'))
+  await expectReachable(
+    page,
+    page.getByRole('button', { name: '회원가입 완료' }),
   )
   await expectNoHorizontalOverflow(page)
 })

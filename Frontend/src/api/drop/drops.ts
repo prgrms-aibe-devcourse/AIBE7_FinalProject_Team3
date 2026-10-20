@@ -23,16 +23,23 @@ export async function getDrops(query: DropListQuery = {}) {
   return data.data
 }
 
-export async function getDropDetail(dropId: number) {
-  const { data } = await api.get<DropDetailResponse>(`/drops/${dropId}`)
+export async function getDropDetail(dropId: number, signal?: AbortSignal) {
+  const { data } = await api.get<DropDetailResponse>(`/drops/${dropId}`, {
+    signal,
+  })
   if (data.success !== true || !data.data) {
     throw new Error('DROP 상세 응답 형식이 올바르지 않습니다.')
   }
   return data.data
 }
 
-export async function getDropStocks(dropId: number) {
-  const { data } = await api.get<DropStocksResponse>(`/drops/${dropId}/stocks`)
+export async function getDropStocks(dropId: number, signal?: AbortSignal) {
+  const { data } = await api.get<DropStocksResponse>(
+    `/drops/${dropId}/stocks`,
+    {
+      signal,
+    },
+  )
   if (
     data.success !== true ||
     !data.data ||

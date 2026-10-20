@@ -1,5 +1,6 @@
 package org.example.grab.global.error;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,9 +28,15 @@ public class GlobalExceptionHandler {
     private final ValidationErrorCodeResolver validationErrorCodeResolver;
 
     @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException e) {
+    public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException e, HttpServletRequest request) {
         ErrorCode errorCode = e.getErrorCode();
-        log.warn("비즈니스 예외: {} - {}", errorCode.getCode(), e.getMessage());
+        // 재발급 거부는 서비스가 사유별 수준으로 기록하므로 중복 경고를 남기지 않는다
+        boolean refreshRejection = errorCode == CommonErrorCode.INVALID_TOKEN
+                && "POST".equals(request.getMethod())
+                && (request.getContextPath() + "/api/v1/auth/refresh").equals(request.getRequestURI());
+        if (!refreshRejection) {
+            log.warn("비즈니스 예외: {} - {}", errorCode.getCode(), e.getMessage());
+        }
         var response = ResponseEntity.status(errorCode.getStatus()).contentType(MediaType.APPLICATION_JSON);
         if (e.getRetryAfterSeconds() != null) {
             response.header("Retry-After", Long.toString(e.getRetryAfterSeconds()));

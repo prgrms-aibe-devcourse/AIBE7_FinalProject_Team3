@@ -15,7 +15,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
@@ -26,6 +29,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -41,6 +45,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -140,6 +145,27 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.error.code").value("ACCESS_DENIED"))
                 .andExpect(jsonPath("$.error.message").value("접근 권한이 없습니다."))
                 .andExpect(jsonPath("$.error.fieldErrors").isEmpty());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "POST, /api/v1/auth/refresh, INVALID_TOKEN, false",
+            "GET, /api/v1/auth/refresh, INVALID_TOKEN, true",
+            "POST, /test/invalid-token, INVALID_TOKEN, true",
+            "POST, /api/v1/auth/refresh, ACCESS_DENIED, true"
+    })
+    @DisplayName("POST 재발급의 INVALID_TOKEN만 중복 경고를 생략하고 오류 응답은 유지한다")
+    void skipsDuplicateRefreshWarning(String method, String path, CommonErrorCode code, boolean warns) throws Exception {
+        // when
+        mockMvc.perform(request(HttpMethod.valueOf(method), path).param("code", code.name()))
+                .andExpect(status().is(code.getStatus().value()))
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value(code.getCode()))
+                .andExpect(jsonPath("$.error.message").value(code.getMessage()))
+                .andExpect(jsonPath("$.error.fieldErrors").isEmpty());
+
+        // then
+        assertThat(logAppender.list.stream().anyMatch(event -> event.getLevel() == Level.WARN)).isEqualTo(warns);
     }
 
     @Test
@@ -326,6 +352,11 @@ class GlobalExceptionHandlerTest {
 
     @RestController
     static class TestController {
+
+        @RequestMapping({"/api/v1/auth/refresh", "/test/invalid-token"})
+        void invalidToken(@RequestParam CommonErrorCode code) {
+            throw new BusinessException(code);
+        }
 
         @GetMapping("/test/unexpected")
         void unexpected() {

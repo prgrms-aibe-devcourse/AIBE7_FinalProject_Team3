@@ -7,6 +7,27 @@ export const DEMO_PASSWORD = 'password1234'
 export type AuthProvider = 'LOCAL' | 'KAKAO' | 'GOOGLE'
 type LoginFailure = 'credentials' | 'disabled' | null
 
+// LOCAL 가입 3단계(MEMBER_AUTH 1.2.1~1.2.3). 오류는 failSignup으로 다음 응답부터 차례로 바꾼다.
+export type SignupStep = 'request' | 'confirm' | 'signup'
+export type SignupReply =
+  | {
+      status: number
+      code: string
+      fieldErrors?: { field: string; reason: string }[]
+    }
+  | 'network'
+export type SignupRequest = {
+  step: SignupStep
+  body: unknown
+  xsrf: string | undefined
+}
+
+const SIGNUP_PATHS: Record<string, SignupStep> = {
+  '/api/v1/auth/email-verification': 'request',
+  '/api/v1/auth/email-verification/confirm': 'confirm',
+  '/api/v1/auth/signup': 'signup',
+}
+
 export type AuthState = {
   loggedIn: boolean
   roles: string[]
@@ -20,6 +41,8 @@ export type AuthState = {
   loginFailure: LoginFailure
   logoutFails: boolean
   refreshCount: number
+  signupReplies: Record<SignupStep, SignupReply[]>
+  signupRequests: SignupRequest[]
 }
 
 export type AuthController = {
@@ -30,6 +53,7 @@ export type AuthController = {
   invalidateSession: () => void
   failLogin: (kind: Exclude<LoginFailure, null>) => void
   failLogout: () => void
+  failSignup: (step: SignupStep, ...replies: SignupReply[]) => void
 }
 
 const controllers = new WeakMap<Page, AuthController>()
@@ -76,6 +100,8 @@ export function installAuthApi(
     loginFailure: null,
     logoutFails: false,
     refreshCount: 0,
+    signupReplies: { request: [], confirm: [], signup: [] },
+    signupRequests: [],
     ...initial,
   }
   const controller: AuthController = {
@@ -97,6 +123,9 @@ export function installAuthApi(
     },
     failLogout: () => {
       state.logoutFails = true
+    },
+    failSignup: (step, ...replies) => {
+      state.signupReplies[step].push(...replies)
     },
   }
   controllers.set(page, controller)
@@ -147,6 +176,57 @@ export function installAuthApi(
         data: { user: userBody(state).data },
         message: null,
       })
+      return
+    }
+
+    const signupStep = SIGNUP_PATHS[path]
+    if (signupStep && method === 'POST') {
+      state.signupRequests.push({
+        step: signupStep,
+        body: route.request().postDataJSON(),
+        xsrf: route.request().headers()['x-xsrf-token'],
+      })
+      const reply = state.signupReplies[signupStep].shift()
+      if (reply === 'network') {
+        await route.abort('failed')
+        return
+      }
+      if (reply) {
+        await json(
+          route,
+          {
+            success: false,
+            data: null,
+            error: {
+              code: reply.code,
+              message: reply.code,
+              fieldErrors: reply.fieldErrors ?? [],
+            },
+          },
+          reply.status,
+        )
+        return
+      }
+      // 가입 완료(201)는 인증 쿠키를 발급하지 않으므로 로그인 상태를 바꾸지 않는다.
+      if (signupStep === 'signup') {
+        const body = route.request().postDataJSON() as { nickname?: string }
+        await json(
+          route,
+          {
+            success: true,
+            data: {
+              userId: '00000000-0000-0000-0000-000000000002',
+              email: 'new@example.com',
+              nickname: body.nickname ?? '',
+              roles: ['USER'],
+              createdAt: '2026-10-20T00:00:00Z',
+            },
+          },
+          201,
+        )
+        return
+      }
+      await route.fulfill({ status: 204 })
       return
     }
 
