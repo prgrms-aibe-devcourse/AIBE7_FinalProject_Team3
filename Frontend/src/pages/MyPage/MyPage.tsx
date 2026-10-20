@@ -12,15 +12,14 @@ import {
 import { nicknameError } from '../../features/auth/logic/signupValidation'
 import { mockSignupErrors } from '../../features/auth/mock/mockAuth'
 import { wishKeys } from '../../features/wish/logic/queryKeys'
-import {
-  buyerOrderStatusText,
-  type BuyerOrder,
-} from '../../features/order/mock/mockBuyerOrders'
+import { buyerOrderStatusText } from '../../features/order/logic/buyerOrderView'
+import { useMyOrders } from '../../features/order/logic/useBuyerOrders'
 import type { SharedProps } from '../../types/store'
 import { dateLabel } from '../../utils/date'
 import { won } from '../../utils/price'
 
 const WISH_PAGE_SIZE = 20
+const ORDER_PAGE_SIZE = 20
 
 const WISH_STATUS_TEXT: Record<string, string> = {
   WISH: 'WISH',
@@ -33,15 +32,12 @@ const WISH_STATUS_TEXT: Record<string, string> = {
 type Props = SharedProps & {
   user: AuthUser | null
   onLogout: () => Promise<void>
-  buyerOrders: BuyerOrder[]
 }
 
 export default function MyPage({
   user,
   onLogout,
   authStatus,
-  orders,
-  buyerOrders,
   toggleWish,
   notify,
 }: Props) {
@@ -49,6 +45,7 @@ export default function MyPage({
   const location = useLocation()
   const [editing, setEditing] = useState(false)
   const [page, setPage] = useState(0)
+  const [orderPage, setOrderPage] = useState(0)
   const [nickname, setNickname] = useState(user?.nickname ?? '')
   const [saveResult, setSaveResult] = useState<'success' | 'nickname' | 'save'>(
     'success',
@@ -67,6 +64,12 @@ export default function MyPage({
   )
   const totalWishes = wishesQuery.data?.totalElements ?? 0
   const totalPages = wishesQuery.data?.totalPages ?? 0
+  const ordersQuery = useMyOrders(
+    { page: orderPage, size: ORDER_PAGE_SIZE },
+    authStatus === 'authenticated',
+  )
+  const orderItems = ordersQuery.data?.content ?? []
+  const totalOrderPages = ordersQuery.data?.totalPages ?? 0
 
   if (authStatus === 'loading') return <AuthLoading />
   // 로그아웃 완료 후의 이동은 아래 처리에 맡겨 로그인 가드와 경합하지 않게 한다.
@@ -307,33 +310,69 @@ export default function MyPage({
         <section className="panel order-panel">
           <div className="panel-heading">
             <h2>주문</h2>
-            <span>{orders.length}</span>
+            <span>{ordersQuery.data?.totalElements ?? 0}</span>
           </div>
-          {orders.length ? (
-            orders.map((order) => (
-              <div className="compact-item order" key={order.id}>
-                <img src={order.drop.image} alt="" />
-                <div>
-                  <small>
-                    {order.id} ·{' '}
-                    {
-                      buyerOrderStatusText[
-                        buyerOrders.find((item) => item.id === order.id)
-                          ?.status ?? 'PAYMENT_PENDING'
-                      ]
-                    }
-                  </small>
-                  <strong>{order.drop.name}</strong>
-                  <small>
-                    {order.optionLabel} · {order.quantity}개
-                  </small>
-                  <Link className="text-link" to={`/my/orders/${order.id}`}>
-                    주문 상세 ↗
-                  </Link>
+          {ordersQuery.isPending ? (
+            <div role="status" aria-live="polite">
+              <EmptyState title="주문 목록을 불러오는 중이에요." />
+            </div>
+          ) : ordersQuery.isError ? (
+            <div className="catalog-error" role="alert">
+              <EmptyState
+                title="주문 목록을 불러오지 못했어요."
+                description="잠시 후 다시 시도해주세요."
+              />
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => void ordersQuery.refetch()}
+              >
+                다시 시도
+              </button>
+            </div>
+          ) : orderItems.length ? (
+            <>
+              {orderItems.map((order) => (
+                <div className="compact-item order" key={order.id}>
+                  <div>
+                    <small>
+                      {order.orderNumber} · {buyerOrderStatusText[order.status]}
+                    </small>
+                    <strong>{order.productName}</strong>
+                    <small>주문일 {dateLabel(order.orderedAt)}</small>
+                    <Link className="text-link" to={`/my/orders/${order.id}`}>
+                      주문 상세 ↗
+                    </Link>
+                  </div>
+                  <b>{won(order.totalAmount)}</b>
                 </div>
-                <b>{won(order.total)}</b>
-              </div>
-            ))
+              ))}
+              {totalOrderPages > 1 && (
+                <div className="catalog-pagination">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    disabled={orderPage === 0}
+                    onClick={() =>
+                      setOrderPage((current) => Math.max(0, current - 1))
+                    }
+                  >
+                    이전
+                  </button>
+                  <span aria-live="polite">
+                    {orderPage + 1} / {totalOrderPages} 페이지
+                  </span>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    disabled={!ordersQuery.data?.hasNext}
+                    onClick={() => setOrderPage((current) => current + 1)}
+                  >
+                    다음
+                  </button>
+                </div>
+              )}
+            </>
           ) : (
             <EmptyState
               title="아직 주문이 없어요."

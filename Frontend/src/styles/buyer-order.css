@@ -150,6 +150,40 @@
 .buyer-order-payment .buyer-amounts {
   margin-top: 20px;
 }
+/* 주문 상세 응답에는 상품 이미지가 없다(OrderDetailPage.md). */
+.buyer-item.no-image {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.buyer-item + .buyer-item {
+  margin-top: 14px;
+}
+.buyer-order-payment h3 {
+  margin: 26px 0 12px;
+  font-size: 14px;
+}
+.buyer-payment-history {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.buyer-payment-history li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  font-size: 12px;
+}
+.buyer-payment-history small {
+  grid-column: 1 / -1;
+  overflow-wrap: anywhere;
+}
+.buyer-payment-error {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
 .buyer-shipping-info {
   display: grid;
   gap: 10px;

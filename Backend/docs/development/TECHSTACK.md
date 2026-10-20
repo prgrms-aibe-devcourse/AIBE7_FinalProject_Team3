@@ -185,8 +185,8 @@ Mock 결제(`PAYMENT.md` 1.1절)는 토스페이먼츠 **테스트 환경**으�
 | GHCR 로그인·게시 | 완료 | `deploy` 푸시에서 이미지를 게시한다(GR-122). |
 | 빌드 캐시 | 완료 | GitHub Actions cache backend를 BuildKit 캐시로 사용한다. |
 | `main`·`deploy` CI | 완료 | 두 브랜치 대상 PR과 통합 후 푸시에서 PostgreSQL 서비스를 사용한 Gradle 테스트와 Docker 이미지 빌드를 검증한다. |
-| EC2 자동 배포 | 예정 | GHCR 이미지를 내려받아 Docker Compose로 실행한다. |
-| Health Check·Blue/Green | 예정 | Actuator Health 확인 후 Nginx upstream을 전환한다. |
+| EC2 자동 배포 | 완료 | GHCR 게시 후 CI가 SSH(forced command로 `deploy.sh`만 허용)로 EC2에 접속해 실행한다(GR-123). |
+| Health Check·Blue/Green | 완료 | `deploy.sh`가 Actuator Health 확인 후 Nginx upstream을 전환한다(GR-121). |
 
 현재 워크플로는 이미지 게시 파이프라인이며 운영 서버 자동 배포까지 수행하지 않는다. 단일 EC2 Blue/Green은 배포 중단 시간을 줄이는 전략일 뿐 EC2 자체 장애를 방지하는 고가용성 구성은 아니다.
 

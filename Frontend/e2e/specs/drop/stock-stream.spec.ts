@@ -137,11 +137,30 @@ test('상품 이동과 화면 이탈 때 이전 연결을 닫는다', async ({ p
   await expect(page).toHaveURL(/#\/grab$/)
   await expect
     .poll(() =>
-      page.evaluate(() =>
-        window.__stockStream.sources.every((source) => source.readyState === 2),
+      page.evaluate(
+        () =>
+          window.__stockStream.sources.filter(
+            (source) => source.readyState !== 2,
+          ).length,
       ),
     )
-    .toBe(true)
+    .toBe(1)
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.__stockStream.sources
+          .filter((source) => source.readyState !== 2)
+          .flatMap((source) =>
+            (
+              new URL(source.url, location.href).searchParams.get('dropIds') ??
+              ''
+            )
+              .split(',')
+              .filter(Boolean),
+          ),
+      ),
+    )
+    .not.toContain('102')
 })
 
 const DROP_NAME = '뮤직 클럽 티셔츠 · 리미티드'
@@ -376,4 +395,97 @@ test('최초 상세 조회 실패는 전체 오류 화면과 재시도를 유지
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(DROP_NAME)
   await expect(page.getByRole('alert')).toHaveCount(0)
   await expect(page.locator('.detail-layout')).toBeVisible()
+})
+
+test('목록은 현재 페이지 ID를 한 연결로 구독하고 재고 변경을 목록 재조회로 반영한다', async ({
+  page,
+}) => {
+  await page.goto('/#/grab')
+  const cards = page.locator('.product-card')
+  await expect(cards.first()).toBeVisible()
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__stockStream.sources.filter(
+            (source) => source.readyState !== 2,
+          ).length,
+      ),
+    )
+    .toBe(1)
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__stockStream.sources.filter(
+            (source) => source.readyState !== 2,
+          )[0]?.readyState,
+      ),
+    )
+    .toBe(1)
+
+  const sourceIds = await page.evaluate(() => {
+    const source = window.__stockStream.sources.find(
+      (item) => item.readyState !== 2,
+    )
+    return (
+      new URL(source!.url, location.href).searchParams.get('dropIds') ?? ''
+    )
+      .split(',')
+      .filter(Boolean)
+      .map(Number)
+      .sort((a, b) => a - b)
+  })
+  const cardIds = await cards
+    .locator('a[href*="/drops/"]')
+    .evaluateAll((links) =>
+      [
+        ...new Set(
+          links.map((link) =>
+            Number((link.getAttribute('href') ?? '').split('/').pop()),
+          ),
+        ),
+      ].sort((a, b) => a - b),
+    )
+  expect(sourceIds).toEqual(cardIds)
+
+  const state = getPublicApiState(page)
+  const drop = state.drops.find(
+    (item) =>
+      cardIds.includes(item.dropId) &&
+      item.options.some((option) => option.availableStock > 0),
+  )!
+  const card = page.locator('.product-card').filter({
+    has: page.locator(`a[href$="/drops/${drop.dropId}"]`),
+  })
+  for (const option of drop.options) option.availableStock = 0
+  const refreshed = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === '/api/v1/drops' &&
+      response.status() === 200,
+  )
+  await page.evaluate(
+    (dropId) =>
+      window.__stockStream.emit('drop-changed', {
+        dropId,
+        changes: ['STOCK'],
+      }),
+    drop.dropId,
+  )
+  await refreshed
+
+  await expect(card).toContainText('SOLD OUT')
+  await expect(
+    card.getByRole('link', { name: /품절 · 상세 보기/ }),
+  ).toBeVisible()
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__stockStream.sources.filter(
+            (source) => source.readyState !== 2,
+          ).length,
+      ),
+    )
+    .toBe(1)
 })

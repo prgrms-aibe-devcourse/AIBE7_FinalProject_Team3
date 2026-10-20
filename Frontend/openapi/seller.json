@@ -750,6 +750,9 @@
           "appliedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "rejectedReason": {
+            "type": "string"
           }
         }
       },

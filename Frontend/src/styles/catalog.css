@@ -163,6 +163,14 @@
   margin-top: 32px;
   font-size: 13px;
 }
+.catalog-refresh-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 0 0 20px;
+}
 .catalog-error {
   text-align: center;
 }

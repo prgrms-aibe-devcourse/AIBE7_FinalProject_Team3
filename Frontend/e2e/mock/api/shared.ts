@@ -1,4 +1,5 @@
 import type { Route } from '@playwright/test'
+import type { BuyerOrdersFixture } from './buyerOrders'
 import type { FixtureDrop } from './drop/fixtures'
 import type { SellerOrdersFixture } from './sellerOrders'
 
@@ -6,6 +7,7 @@ export type ApiState = {
   drops: FixtureDrop[]
   wished: Set<number>
   sellerOrders: SellerOrdersFixture
+  buyerOrders: BuyerOrdersFixture
 }
 
 export const json = (route: Route, body: unknown, status = 200) =>

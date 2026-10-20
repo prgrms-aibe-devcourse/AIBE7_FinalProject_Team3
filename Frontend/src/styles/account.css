@@ -166,6 +166,10 @@
   font-size: 11px;
   text-decoration: underline;
 }
+/* 주문 목록 응답에는 상품 이미지가 없어 이미지 열을 두지 않는다. */
+.compact-item.order {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
 .compact-item.order > b {
   font-size: 12px;
 }

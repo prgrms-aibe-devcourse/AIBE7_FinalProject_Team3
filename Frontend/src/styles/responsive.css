@@ -330,6 +330,12 @@
     grid-column: 2;
     justify-self: start;
   }
+  .compact-item.order {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .compact-item.order > b {
+    grid-column: 1;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

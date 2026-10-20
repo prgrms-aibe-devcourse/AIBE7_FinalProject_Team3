@@ -233,6 +233,7 @@ export interface components {
       status?: 'PENDING' | 'APPROVED' | 'REJECTED'
       /** Format: date-time */
       appliedAt?: string
+      rejectedReason?: string
     }
     AdminSellerApplicationResponse: {
       /** Format: uuid */

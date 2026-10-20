@@ -48,6 +48,10 @@ sudo nginx -t
 sudo systemctl reload nginx
 trap - EXIT
 
+# SSE(stock-stream)처럼 오래 붙어있는 연결이 nginx 전환 직후에도 이전 컬러에 남아있을 수 있어, 바로 끊지 않고 정리할 시간을 준다
+echo "기존 컬러(${old_color}) 연결 정리 대기(30초)..."
+sleep 30
+
 docker compose -f "$DEPLOY_DIR/compose.prod.yaml" stop "backend-${old_color}"
 docker compose -f "$DEPLOY_DIR/compose.prod.yaml" rm -f "backend-${old_color}"
 

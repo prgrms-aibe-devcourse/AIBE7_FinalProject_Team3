@@ -7,6 +7,7 @@ import {
   type Page,
 } from '../../fixtures'
 import type { Locator } from '@playwright/test'
+import { BUYER_ORDER_IDS } from '../../mock/api/buyerOrders'
 
 // 페이지 전체에 가로 스크롤이 생기지 않는다. 표처럼 의도적으로 안쪽에서 스크롤하는 영역은 해당하지 않는다.
 async function expectNoHorizontalOverflow(page: Page) {
@@ -157,7 +158,7 @@ test('결제: 가로 넘침 없이 배송지와 결제 버튼에 닿는다', asy
 })
 
 test('내 주문 상세: 가로 넘침 없이 취소 입력에 닿는다', async ({ page }) => {
-  await page.goto('/#/my/orders/demo-paid')
+  await page.goto(`/#/my/orders/${BUYER_ORDER_IDS.paid}`)
   await page.getByLabel('이메일').fill('grab@example.com')
   await page.getByLabel('비밀번호').fill('password1234')
   await page.getByRole('button', { name: '로그인', exact: true }).click()

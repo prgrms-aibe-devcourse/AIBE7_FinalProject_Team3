@@ -35,14 +35,13 @@ export default function App() {
   }
   const { user, status, authenticated, login, logout } = useAuth()
   const { wishes, wishesReady, toggleWish } = useWish(authenticated, notify)
-  const { orders, buyerOrders, addOrder, updateBuyerOrder } = useOrders()
+  const { buyerOrders, addOrder, updateBuyerOrder } = useOrders()
 
   const shared: SharedProps = {
     authenticated,
     authStatus: status,
     wishes,
     wishesReady,
-    orders,
     notify,
     toggleWish,
     addOrder,
@@ -79,25 +78,11 @@ export default function App() {
           />
           <Route
             path="/my/orders/:orderId"
-            element={
-              <OrderDetailPage
-                authStatus={status}
-                buyerOrders={buyerOrders}
-                updateBuyerOrder={updateBuyerOrder}
-                notify={notify}
-              />
-            }
+            element={<OrderDetailPage authStatus={status} notify={notify} />}
           />
           <Route
             path="/my"
-            element={
-              <MyPage
-                {...shared}
-                buyerOrders={buyerOrders}
-                user={user}
-                onLogout={logout}
-              />
-            }
+            element={<MyPage {...shared} user={user} onLogout={logout} />}
           />
           <Route
             path="/login"
