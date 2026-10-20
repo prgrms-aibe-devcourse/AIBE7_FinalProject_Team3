@@ -2,6 +2,7 @@ package org.example.grab.domain.order.service;
 
 import org.example.grab.domain.order.dto.MyOrderDetailResponse;
 import org.example.grab.domain.order.dto.MyOrderListResponse;
+import org.example.grab.domain.order.dto.OrderShippingAddressResponse;
 import org.example.grab.domain.order.dto.OrderShippingResponse;
 import org.example.grab.domain.order.entity.Order;
 import org.example.grab.domain.order.entity.OrderItem;
@@ -89,7 +90,7 @@ class OrderQueryServiceTest {
     }
 
     @Test
-    @DisplayName("내 주문 상세는 스냅샷 항목과 금액 내역, 결제·배송 정보를 반환한다")
+    @DisplayName("내 주문 상세는 스냅샷 항목과 금액 내역, 배송지, 결제·배송 정보를 반환한다")
     void findsMyOrderDetail() {
         // given
         UUID orderId = UUID.randomUUID();
@@ -115,6 +116,8 @@ class OrderQueryServiceTest {
         assertThat(result.totalAmount()).isEqualTo(33000);
         assertThat(result.paymentStatus()).isEqualTo(PaymentStatus.PENDING);
         assertThat(result.paymentExpiresAt()).isEqualTo(PAYMENT_EXPIRES_AT);
+        assertThat(result.shippingAddress()).isEqualTo(
+                new OrderShippingAddressResponse("홍길동", "01012345678", "06236", "서울시 강남구", "101호", null));
         assertThat(result.shipping()).isEqualTo(
                 new OrderShippingResponse(
                         OrderStatus.PAYMENT_PENDING, "CJ", "1234567890", null, DeliveryStage.COLLECTED));

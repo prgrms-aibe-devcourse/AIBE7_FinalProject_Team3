@@ -5,6 +5,7 @@ import org.example.grab.domain.order.dto.MyOrderListResponse;
 import org.example.grab.domain.order.dto.OrderCreateRequest;
 import org.example.grab.domain.order.dto.OrderCreateResponse;
 import org.example.grab.domain.order.dto.OrderItemResponse;
+import org.example.grab.domain.order.dto.OrderShippingAddressResponse;
 import org.example.grab.domain.order.dto.OrderShippingResponse;
 import org.example.grab.domain.order.entity.OrderStatus;
 import org.example.grab.domain.order.error.OrderErrorCode;
@@ -27,6 +28,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -160,6 +162,7 @@ class OrderControllerTest {
                 261000,
                 PaymentStatus.PENDING,
                 OffsetDateTime.parse("2026-09-28T12:10:00Z"),
+                new OrderShippingAddressResponse("홍길동", "01012345678", "06236", "서울시 강남구", null, null),
                 new OrderShippingResponse(null, null, null, null, null),
                 OffsetDateTime.parse("2026-09-28T12:00:00Z")
         );
@@ -175,6 +178,9 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$.data.totalAmount").value(261000))
                 .andExpect(jsonPath("$.data.paymentStatus").value("PENDING"))
                 .andExpect(jsonPath("$.data.paymentExpiresAt").exists())
+                .andExpect(jsonPath("$.data.shippingAddress.recipient").value("홍길동"))
+                .andExpect(jsonPath("$.data.shippingAddress.address1").value("서울시 강남구"))
+                .andExpect(jsonPath("$.data.shippingAddress.address2").value(nullValue()))
                 .andExpect(jsonPath("$.data.shipping.trackingNumber").doesNotExist());
     }
 
