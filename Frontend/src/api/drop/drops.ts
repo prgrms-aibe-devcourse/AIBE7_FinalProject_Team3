@@ -11,8 +11,14 @@ type DropDetailResponse =
 type DropStocksResponse =
   paths['/api/v1/drops/{dropId}/stocks']['get']['responses'][200]['content']['*/*']
 
-export async function getDrops(query: DropListQuery = {}) {
-  const { data } = await api.get<DropListResponse>('/drops', { params: query })
+export async function getDrops(
+  query: DropListQuery = {},
+  signal?: AbortSignal,
+) {
+  const { data } = await api.get<DropListResponse>(
+    '/drops',
+    signal ? { params: query, signal } : { params: query },
+  )
   if (
     data.success !== true ||
     !data.data ||

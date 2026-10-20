@@ -7,7 +7,7 @@ import { dropKeys } from './queryKeys'
 export function useDropList(params: DropListParams | null) {
   return useQuery({
     queryKey: params ? dropKeys.list(params) : dropKeys.all,
-    queryFn: () => getDrops(params ?? {}),
+    queryFn: ({ signal }) => getDrops(params ?? {}, signal),
     enabled: params !== null,
   })
 }
