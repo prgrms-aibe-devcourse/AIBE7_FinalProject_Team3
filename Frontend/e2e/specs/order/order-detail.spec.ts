@@ -40,6 +40,20 @@ test('직접 진입한 결제 대기 주문에서 결제 화면으로 이동한�
   )
 })
 
+test('결제 이력을 받지 못하면 상세는 보이되 결제 이동은 막는다', async ({
+  page,
+}) => {
+  await page.route('**/api/v1/orders/*/payments', (route) =>
+    route.fulfill({ status: 500 }),
+  )
+  await openOrder(page, BUYER_ORDER_IDS.pending)
+  await expect(status(page)).toHaveText('결제 대기')
+  await expect(page.getByText('결제 이력을 불러오지 못했어요.')).toBeVisible()
+  await expect(
+    page.getByRole('link', { name: '결제 화면으로 이동 ↗' }),
+  ).toHaveCount(0)
+})
+
 test('결제 결과 확인 중에는 재결제를 막고 취소는 받는다', async ({ page }) => {
   await openOrder(page, BUYER_ORDER_IDS.unknown)
   await expect(page.getByText('결제 결과를 확인 중입니다.')).toBeVisible()

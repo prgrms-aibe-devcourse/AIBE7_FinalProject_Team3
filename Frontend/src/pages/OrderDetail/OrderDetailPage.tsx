@@ -103,7 +103,9 @@ function OrderContent({
   const cancelUnknown =
     lastCancel?.refundStatus === 'UNKNOWN' && order.status !== 'CANCELED'
   const cancelable = canCancel(order)
-  const payable = canPay(order, payments)
+  // 결제 이력을 받기 전에는 보정 필요 여부를 알 수 없으므로 결제 이동을 막는다.
+  const paymentsReady = !paymentsLoading && !paymentsFailed
+  const payable = paymentsReady && canPay(order, payments)
 
   const sendCancel = (request: CancelRequest) => {
     cancelMutation.mutate(
@@ -193,6 +195,7 @@ function OrderContent({
             </Link>
           )}
           {order.status === 'PAYMENT_PENDING' &&
+            paymentsReady &&
             !payable &&
             !paymentChecking && (
               <p className="buyer-note">
