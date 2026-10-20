@@ -10,11 +10,13 @@ export default function SellerDropActions({
   status,
   saleStartsAt,
   notify,
+  detailSearch = '',
 }: {
   dropId: number
   status?: DropStatus
   saleStartsAt?: string
   notify: (message: string) => void
+  detailSearch?: string
 }) {
   const action = useSellerDropAction()
   const locked = useRef(false)
@@ -101,7 +103,10 @@ export default function SellerDropActions({
         </button>
       )}
       {status === 'WISH' && !saleStartsAt && (
-        <Link className="secondary-button" to={`/seller/drops/${dropId}`}>
+        <Link
+          className="secondary-button"
+          to={`/seller/drops/${dropId}${detailSearch}`}
+        >
           상태 관리
         </Link>
       )}

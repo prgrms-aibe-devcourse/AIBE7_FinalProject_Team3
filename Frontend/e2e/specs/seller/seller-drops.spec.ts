@@ -50,6 +50,34 @@ test('서버 페이지를 조회하고 목록 조건을 상세·뒤로 가기에
   await expect(page.getByText('2 / 2')).toBeVisible()
 })
 
+test('상태 관리로 상세에 들어가도 목록 필터와 페이지를 유지한다', async ({
+  page,
+}) => {
+  await loginSeller(page)
+  await page.route('**/api/v1/seller/drops?*', (route) =>
+    route.fulfill({
+      json: {
+        success: true,
+        data: {
+          content: [{ dropId: 101, name: 'WISH 상품', status: 'WISH' }],
+          totalElements: 21,
+          totalPages: 2,
+          hasNext: false,
+        },
+      },
+    }),
+  )
+  await page.goto('/#/seller/drops?status=WISH&page=1')
+  await page.getByRole('link', { name: '상태 관리', exact: true }).click()
+  await expect(page).toHaveURL(/\/seller\/drops\/101\?status=WISH&page=1$/)
+  await page.getByRole('link', { name: '← DROP 관리' }).click()
+  await expect(page).toHaveURL(/\/seller\/drops\?status=WISH&page=1$/)
+  await expect(
+    page.getByRole('button', { name: 'WISH', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByText('2 / 2')).toBeVisible()
+})
+
 test('조회 실패·빈 결과를 구분하고 서버에 저장한 DRAFT가 목록에 표시된다', async ({
   page,
 }) => {

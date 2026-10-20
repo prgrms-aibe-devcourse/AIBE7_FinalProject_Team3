@@ -165,6 +165,7 @@ export default function SellerDropsPage({
                   <SellerDropActions
                     dropId={drop.dropId!}
                     status={drop.status}
+                    detailSearch={`?status=${status}&page=${page}`}
                     notify={notify}
                   />
                 </article>
