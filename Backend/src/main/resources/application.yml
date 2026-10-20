@@ -26,6 +26,9 @@ spring:
       # Lettuce 기본값(연결 10초·명령 60초)이면 Redis가 멈췄을 때 로그인·재발급 요청이 스레드를 오래 붙잡는다
       connect-timeout: 2s
       timeout: 2s
+      # 운영(Aiven Valkey)은 TLS 필수. 로컬 compose Redis는 평문이라 기본값 false를 유지한다
+      ssl:
+        enabled: ${REDIS_SSL_ENABLED:false}
 
   # @Scheduled 작업(DROP 상태 전환·결제 배치·배송 단계 진행)이 서로를 기다리지 않도록 스레드를 작업 수보다 넉넉히 둔다.
   # 기본값 1이면 결제 배치의 PG 지연이 DROP 판매 시작 전환까지 늦춘다(TECHSTACK.md 1장 Scheduling).

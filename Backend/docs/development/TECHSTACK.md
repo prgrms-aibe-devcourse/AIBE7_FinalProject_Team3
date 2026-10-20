@@ -124,6 +124,7 @@ Actuator와 Prometheus의 로컬 메트릭 수집 연결은 완료됐다. Redis 
 | Compute | EC2 | 애플리케이션 서버 | Docker 기반 배포와 서버 운영 구성을 직접 학습하고 제어할 수 있다. |
 | Database | Amazon RDS for PostgreSQL | 운영 DB | 자동 백업, 복구 및 관리형 PostgreSQL 환경을 사용한다. |
 | Storage | Supabase Storage | DROP 이미지 저장 | 서명 업로드 URL을 지원하고, 공개 버킷 URL로 별도 CDN 없이 조회하며, 버킷 단위로 MIME·크기 제한을 걸 수 있다. |
+| In-memory Store | Aiven Valkey(관리형, TLS) | 운영 Redis | EC2 컨테이너 Redis 대신 외부 관리형으로 둬 인스턴스를 여러 대로 늘려도 Refresh Token·인증코드 저장소를 공유한다. |
 | Container | Docker | 애플리케이션 컨테이너화 | 개발·CI·운영 환경 차이를 줄인다. |
 | Container Management | Docker Compose | 컨테이너 실행 | Kubernetes 없이 애플리케이션과 운영 도구를 단순하게 관리한다. |
 | Reverse Proxy | Nginx | TLS 종료 및 트래픽 전환 | 외부 요청을 애플리케이션으로 전달하고 Blue/Green 포트 전환에 사용한다. |
