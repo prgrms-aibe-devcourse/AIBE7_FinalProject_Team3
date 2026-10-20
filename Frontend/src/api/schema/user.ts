@@ -44,6 +44,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/auth/oauth2/signup': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * 소셜 회원가입 완료
+     * @description oauth2_signup_token 쿠키의 제공자·이메일과 입력한 닉네임으로 가입하고 로그인시킨다. 토큰은 HttpOnly 쿠키로만 전달한다
+     */
+    post: operations['signup_1']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/auth/logout': {
     parameters: {
       query?: never
@@ -144,6 +164,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/auth/oauth2/{provider}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * 소셜 로그인 시작
+     * @description 브라우저를 이 주소로 이동시킨다. kakao·google이면 302로 제공자 인증 화면에 보내고, 인증 후 결과는 프론트엔드 콜백 주소의 result(success·signup_required) 또는 error 쿼리로 전달한다
+     */
+    get: operations['start']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/auth/csrf': {
     parameters: {
       query?: never
@@ -186,9 +226,8 @@ export interface components {
       /** Format: date-time */
       createdAt?: string
     }
-    LoginRequest: {
-      email: string
-      password: string
+    OAuth2SignupRequest: {
+      nickname: string
     }
     ApiResponseLoginResponse: {
       success?: boolean
@@ -204,6 +243,10 @@ export interface components {
       email?: string
       nickname?: string
       roles?: string[]
+    }
+    LoginRequest: {
+      email: string
+      password: string
     }
     EmailVerificationRequest: {
       email: string
@@ -327,6 +370,68 @@ export interface operations {
           [name: string]: unknown
         }
         content?: never
+      }
+    }
+  }
+  signup_1: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: {
+        oauth2_signup_token?: string
+      }
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['OAuth2SignupRequest']
+      }
+    }
+    responses: {
+      /** @description 가입 성공, Set-Cookie로 가입 토큰 만료와 access_token·refresh_token 전달 */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseLoginResponse']
+        }
+      }
+      /** @description INVALID_REQUEST, VALIDATION_FAILED, INVALID_NICKNAME */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseLoginResponse']
+        }
+      }
+      /** @description OAUTH2_SIGNUP_CONTEXT_INVALID */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseLoginResponse']
+        }
+      }
+      /** @description ACCESS_DENIED(CSRF 토큰 없음·불일치) */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseLoginResponse']
+        }
+      }
+      /** @description DUPLICATE_EMAIL, DUPLICATE_NICKNAME */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseLoginResponse']
+        }
       }
     }
   }
@@ -536,6 +641,34 @@ export interface operations {
         content: {
           '*/*': components['schemas']['ApiResponseUserMeResponse']
         }
+      }
+    }
+  }
+  start: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description kakao 또는 google */
+        provider: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description 제공자 인증 화면으로 이동 */
+      302: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description UNSUPPORTED_OAUTH2_PROVIDER */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
       }
     }
   }
