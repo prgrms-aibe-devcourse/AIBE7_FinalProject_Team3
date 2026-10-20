@@ -291,6 +291,7 @@ GET /api/v1/seller/orders/{orderId}
 > 해당 주문에 포함된 DROP의 소유권을 검증합니다.
 
 - `items`, `shipping`은 1.3 내 주문 상세와 같은 형식이며, `shipping.deliveredAt`도 함께 반환합니다.
+- `shippingAddress`는 1.3 내 주문 상세와 같은 형식입니다. 구매자 개인정보 노출을 줄이기 위해 발송 처리에 필요한 결제 완료부터 배송 중까지(`PAID`·`PREPARING`·`SHIPPED`)만 반환하고, 그 외 상태(`PAYMENT_PENDING`·`DELIVERED`·`EXPIRED`·`CANCELED`)에서는 `null`입니다.
 
 ### 2.3 배송 준비 처리
 
