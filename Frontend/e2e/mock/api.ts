@@ -1,4 +1,8 @@
 import type { Page, Route } from '@playwright/test'
+import {
+  createBuyerOrdersFixture,
+  handleBuyerOrdersRoute,
+} from './api/buyerOrders'
 import { handleDropRoute } from './api/drop'
 import { CATEGORIES, datasetFor, type Scenario } from './api/drop/fixtures'
 import { handleSellerDashboardRoute } from './api/seller'
@@ -29,6 +33,7 @@ async function handleRoute(
   if (await handleSellerDashboardRoute(route, url)) return
   if (await handleSellerDropStatsRoute(route, url)) return
   if (await handleSellerOrdersRoute(route, url, state.sellerOrders)) return
+  if (await handleBuyerOrdersRoute(route, url, state.buyerOrders)) return
   await route.fallback()
 }
 
@@ -39,6 +44,7 @@ export async function installPublicApi(page: Page) {
     drops: datasetFor('base'),
     wished: initialWishesFor('base'),
     sellerOrders: createSellerOrdersFixture(),
+    buyerOrders: createBuyerOrdersFixture(),
   }
   await page.route('**/api/v1/**', (route) =>
     handleRoute(route, state, 'base', null),
@@ -53,6 +59,7 @@ export async function installHomeScenario(
     drops: datasetFor(scenario),
     wished: initialWishesFor(scenario),
     sellerOrders: createSellerOrdersFixture(),
+    buyerOrders: createBuyerOrdersFixture(),
   }
   await page.route('**/api/v1/**', (route) =>
     handleRoute(route, state, scenario, scenario === 'failure' ? 'GRAB' : null),
@@ -64,6 +71,7 @@ export async function installCatalogScenario(page: Page, scenario: Scenario) {
     drops: datasetFor(scenario),
     wished: initialWishesFor(scenario),
     sellerOrders: createSellerOrdersFixture(),
+    buyerOrders: createBuyerOrdersFixture(),
   }
   await page.route('**/api/v1/**', (route) =>
     handleRoute(route, state, scenario, scenario === 'failure' ? 'all' : null),

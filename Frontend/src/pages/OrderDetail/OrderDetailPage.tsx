@@ -65,7 +65,7 @@ function PaymentHistory({
         <li key={payment.id}>
           <span>
             {index + 1}차 · {paymentStatusText[payment.status]}
-            {payment.reconciliationRequired && ' (확인 중)'}
+            {payment.reconciliationRequired && ' · 확인 필요'}
           </span>
           <span>{won(payment.amount)}</span>
           <small>

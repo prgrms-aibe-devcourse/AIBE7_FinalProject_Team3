@@ -5,6 +5,7 @@ import {
   test,
   type Page,
 } from '../../fixtures'
+import { BUYER_ORDER_IDS } from '../../mock/api/buyerOrders'
 import { installCatalogScenario } from '../../mock/catalog'
 import { installHomeScenario } from '../../mock/home'
 
@@ -50,6 +51,7 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
     // WISH 패널도 로딩 상태를 role=status로 두므로 토스트만 확인하고, 목록 로딩이 끝난 뒤 촬영한다.
     await settleToast(page)
     await expect(page.getByText('매일을 담는 캔버스 토트')).toBeVisible()
+    await expect(page.locator('.compact-item.order')).toHaveCount(8)
     await shot(page, 'my')
   })
 
@@ -166,11 +168,12 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
   })
 
   test('order-detail', async ({ page }) => {
-    await page.goto('/#/my/orders/demo-paid')
+    await page.goto(`/#/my/orders/${BUYER_ORDER_IDS.paid}`)
     await page.getByLabel('이메일').fill('grab@example.com')
     await page.getByLabel('비밀번호').fill('password1234')
     await page.getByRole('button', { name: '로그인', exact: true }).click()
     await settleToast(page)
+    await expect(page.getByLabel('결제 이력')).toBeVisible()
     await shot(page, 'order-detail')
   })
 
