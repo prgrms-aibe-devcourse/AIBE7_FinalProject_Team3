@@ -20,7 +20,7 @@ public record MyOrderDetailResponse(
         long totalAmount,
         PaymentStatus paymentStatus,
         OffsetDateTime paymentExpiresAt,
-        OrderShippingAddressResponse shippingAddress,
+        ShippingAddress shippingAddress,
         OrderShippingResponse shipping,
         OffsetDateTime orderedAt
 ) {
@@ -42,9 +42,32 @@ public record MyOrderDetailResponse(
                 order.getTotalAmount(),
                 paymentStatus,
                 paymentExpiresAt,
-                OrderShippingAddressResponse.from(order.getShippingAddress()),
+                ShippingAddress.from(order),
                 OrderShippingResponse.from(order, shipment),
                 order.getCreatedAt()
         );
+    }
+
+    // 주문 생성 요청과 같은 필드 이름을 써서 클라이언트가 입력·조회에 같은 타입을 쓸 수 있게 한다.
+    public record ShippingAddress(
+            String recipient,
+            String phone,
+            String postalCode,
+            String address1,
+            String address2,
+            String deliveryMemo
+    ) {
+
+        // 같은 이름의 엔티티 ShippingAddress와 겹치지 않도록 Order에서 꺼내 변환한다.
+        private static ShippingAddress from(Order order) {
+            return new ShippingAddress(
+                    order.getShippingAddress().getRecipientName(),
+                    order.getShippingAddress().getRecipientPhone(),
+                    order.getShippingAddress().getPostalCode(),
+                    order.getShippingAddress().getAddressLine1(),
+                    order.getShippingAddress().getAddressLine2(),
+                    order.getShippingAddress().getDeliveryMemo()
+            );
+        }
     }
 }
