@@ -195,8 +195,94 @@ test('ready 지연과 연결 오류에는 장애 조회와 제한된 재연결�
   expect(openDropStockStream).toHaveBeenCalledTimes(2)
   await vi.advanceTimersByTimeAsync(1)
   expect(openDropStockStream).toHaveBeenCalledTimes(3)
+  await vi.advanceTimersByTimeAsync(2501)
+  expect(fetchQuery).toHaveBeenCalledTimes(4)
+  await vi.advanceTimersByTimeAsync(9998)
+  expect(fetchQuery).toHaveBeenCalledTimes(4)
+  await vi.advanceTimersByTimeAsync(2)
+  expect(fetchQuery).toHaveBeenCalledTimes(6)
+  stop()
+})
+
+test('연결이 반복 실패해도 대체 조회가 예정된 주기로 실행된다', async () => {
+  vi.spyOn(Math, 'random').mockReturnValue(0.9)
+  vi.setSystemTime(new Date('2026-10-19T00:00:00Z'))
+  vi.mocked(openDropStockStream).mockImplementation(() => {
+    const next = new FakeSource()
+    globalThis.setTimeout(() => next.onerror?.(), 0)
+    return next as unknown as EventSource
+  })
+  const fetchQuery = vi.fn().mockResolvedValue({})
+  const client = {
+    fetchQuery,
+    cancelQueries: vi.fn().mockResolvedValue(undefined),
+    getQueryCache: () => ({ subscribe: () => () => undefined }),
+    getQueryData: () => undefined,
+  } as unknown as QueryClient
+  const startedAt = Date.now()
+  const calls: number[] = []
+  fetchQuery.mockImplementation(() => {
+    calls.push(Date.now() - startedAt)
+    return Promise.resolve({})
+  })
+  const stop = subscribeDropStockStream(100, client)
+
+  await vi.advanceTimersByTimeAsync(9999)
+  expect(calls).toHaveLength(0)
+  await vi.advanceTimersByTimeAsync(2001)
+  expect(calls.length).toBeGreaterThanOrEqual(2)
+  expect(calls[0]).toBeGreaterThanOrEqual(10000)
+  expect(calls[0]).toBeLessThanOrEqual(12500)
+
+  await vi.advanceTimersByTimeAsync(13000)
+  expect(calls.length).toBeGreaterThanOrEqual(4)
+  stop()
+})
+
+test('정상 연결이 끊기면 30초 예약을 기다리지 않고 장애 주기로 전환한다', async () => {
+  vi.spyOn(Math, 'random').mockReturnValue(0)
+  vi.setSystemTime(new Date('2026-10-19T00:00:00Z'))
+  const startedAt = Date.now()
+  const { source, fetchQuery, stop } = setup()
+  const calls: number[] = []
+  fetchQuery.mockImplementation(() => {
+    calls.push(Date.now() - startedAt)
+    return Promise.resolve({})
+  })
+  source.emit('ready', { dropIds: [100], serverTime: '2026-10-19T00:00:00Z' })
+  await vi.advanceTimersByTimeAsync(0)
+  expect(calls).toHaveLength(2)
+
   await vi.advanceTimersByTimeAsync(5000)
+  source.onerror?.()
+  await vi.advanceTimersByTimeAsync(9999)
+  expect(calls).toHaveLength(2)
+  await vi.advanceTimersByTimeAsync(2)
+  expect(calls.length).toBeGreaterThanOrEqual(4)
+  expect(calls[2]).toBeGreaterThanOrEqual(15000)
+  expect(calls[2]).toBeLessThanOrEqual(17500)
+  stop()
+})
+
+test('ready 복구 뒤 정상 주기로 돌아가고 장애 주기 타이머가 남지 않는다', async () => {
+  vi.spyOn(Math, 'random').mockReturnValue(0)
+  vi.setSystemTime(new Date('2026-10-19T00:00:00Z'))
+  const { source, fetchQuery, stop } = setup()
+  source.emit('ready', { dropIds: [100], serverTime: '2026-10-19T00:00:00Z' })
+  await vi.advanceTimersByTimeAsync(0)
   expect(fetchQuery).toHaveBeenCalledTimes(2)
+
+  await vi.advanceTimersByTimeAsync(1000)
+  source.onerror?.()
+  await vi.advanceTimersByTimeAsync(2500)
+  source.emit('ready', { dropIds: [100], serverTime: '2026-10-19T00:00:00Z' })
+  await vi.advanceTimersByTimeAsync(0)
+  expect(fetchQuery).toHaveBeenCalledTimes(4)
+
+  await vi.advanceTimersByTimeAsync(8999)
+  expect(fetchQuery).toHaveBeenCalledTimes(4)
+  await vi.advanceTimersByTimeAsync(21003)
+  expect(fetchQuery).toHaveBeenCalledTimes(6)
   stop()
 })
 
@@ -262,6 +348,40 @@ test('숨김 탭은 연결과 주기를 멈추고 복귀 후 다시 조회한다
   await vi.advanceTimersByTimeAsync(0)
   expect(fetchQuery).toHaveBeenCalledTimes(before + 2)
   expect(openDropStockStream).toHaveBeenCalledTimes(2)
+  stop()
+})
+
+test('오프라인에는 주기를 멈추고 온라인 복귀 후 다시 조회한다', async () => {
+  vi.spyOn(Math, 'random').mockReturnValue(0)
+  const page = new EventTarget()
+  Object.defineProperty(page, 'visibilityState', {
+    get: () => 'visible',
+  })
+  const win = new EventTarget()
+  let onLine = true
+  vi.stubGlobal('document', page)
+  vi.stubGlobal('window', win)
+  vi.stubGlobal('navigator', {
+    get onLine() {
+      return onLine
+    },
+  })
+  const { source, fetchQuery, stop } = setup()
+  source.emit('ready', { dropIds: [100], serverTime: '2026-10-19T00:00:00Z' })
+  await vi.advanceTimersByTimeAsync(0)
+  const before = fetchQuery.mock.calls.length
+
+  onLine = false
+  win.dispatchEvent(new Event('offline'))
+  await vi.advanceTimersByTimeAsync(60000)
+  expect(source.close).toHaveBeenCalledTimes(1)
+  expect(fetchQuery).toHaveBeenCalledTimes(before)
+  expect(openDropStockStream).toHaveBeenCalledTimes(1)
+
+  onLine = true
+  win.dispatchEvent(new Event('online'))
+  await vi.advanceTimersByTimeAsync(0)
+  expect(fetchQuery).toHaveBeenCalledTimes(before + 2)
   stop()
 })
 

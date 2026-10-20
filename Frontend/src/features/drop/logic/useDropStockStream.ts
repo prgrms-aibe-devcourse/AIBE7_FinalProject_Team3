@@ -131,8 +131,7 @@ export function subscribeDropStockStream(
   }
 
   const schedulePeriodic = () => {
-    globalThis.clearTimeout(periodicTimer)
-    if (disposed || !active()) return
+    if (disposed || !active() || periodicTimer) return
     const base = fallback ? policy.fallbackIntervalMs : policy.resyncIntervalMs
     const jitter = fallback ? policy.fallbackJitterMs : policy.resyncJitterMs
     periodicTimer = globalThis.setTimeout(
@@ -143,6 +142,15 @@ export function subscribeDropStockStream(
       },
       base + Math.random() * jitter,
     )
+  }
+
+  const setFallbackMode = (next: boolean) => {
+    if (fallback !== next) {
+      fallback = next
+      globalThis.clearTimeout(periodicTimer)
+      periodicTimer = 0
+    }
+    schedulePeriodic()
   }
 
   const queueReconnect = (delayMs: number) => {
@@ -162,8 +170,7 @@ export function subscribeDropStockStream(
 
   const fail = () => {
     closeConnection()
-    fallback = true
-    schedulePeriodic()
+    setFallbackMode(true)
     failures++
     const base = Math.min(
       policy.reconnectMaxDelayMs,
@@ -228,8 +235,7 @@ export function subscribeDropStockStream(
       globalThis.clearTimeout(readyTimer)
       readyTimer = 0
       failures = 0
-      fallback = false
-      schedulePeriodic()
+      setFallbackMode(false)
       awaitingReadySync = true
       void Promise.all(
         (['detail', 'stocks'] as const).map((key) =>
@@ -299,8 +305,7 @@ export function subscribeDropStockStream(
           return
         }
         closeConnection()
-        fallback = true
-        schedulePeriodic()
+        setFallbackMode(true)
         if (subscriptionInvalid) {
           invalidated = true
           requestBoth()
