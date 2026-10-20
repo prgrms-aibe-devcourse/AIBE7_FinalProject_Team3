@@ -67,7 +67,6 @@ export default function LoginPage({ login, notify }: Props) {
       <div className="auth-form">
         <form className="auth-stack" onSubmit={submit}>
           <div className="auth-heading">
-            <p className="eyebrow">YOUR NEXT GOOD FIND</p>
             <h2>로그인</h2>
           </div>
           <label>
