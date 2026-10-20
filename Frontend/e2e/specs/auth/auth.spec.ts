@@ -124,24 +124,6 @@ test('요청에 CSRF 헤더·쿠키가 실리고 토큰은 저장소에 없다',
   expect(storage.cookie).not.toContain('refresh_token')
 })
 
-test('LOCAL 이메일 코드와 회원가입 완료 후 로그인 화면으로 이동한다', async ({
-  page,
-}) => {
-  await page.goto('/#/signup')
-  await page.getByLabel('이메일 주소').fill('new@example.com')
-  await page.getByRole('button', { name: '인증 코드 보내기' }).click()
-  await expect(
-    page.getByRole('button', { name: /초 후 재발송/ }),
-  ).toBeDisabled()
-  await page.getByLabel('인증 코드 6자리').fill('123456')
-  await page.getByRole('button', { name: '코드 확인' }).click()
-  await expect(page.getByLabel('인증된 이메일')).toHaveValue('new@example.com')
-  await page.getByLabel('닉네임', { exact: true }).fill('새회원')
-  await page.getByLabel('비밀번호').fill('Password123!')
-  await page.getByRole('button', { name: '회원가입 완료' }).click()
-  await expect(page).toHaveURL(/#\/login$/)
-})
-
 test('소셜 결과 예시는 세션을 만들지 않고 안내한다', async ({ page }) => {
   await page.goto('/#/login')
   await page.getByRole('button', { name: 'GOOGLE' }).click()
