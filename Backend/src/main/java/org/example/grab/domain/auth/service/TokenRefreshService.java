@@ -29,7 +29,7 @@ import java.util.UUID;
     교체 스크립트가 성공한 뒤에만 결과를 돌려주므로 서버가 모르는 토큰을 쿠키로 주지 않는다.
 
     실패는 사유와 관계없이 INVALID_TOKEN 하나로 응답하고, 사유는 로그로만 구분한다(M00-07).
-    탈취 의심(reuse_detected)만 WARN, 만료·여러 탭 경쟁처럼 정상 사용 중에도 생기는 사유는 INFO다.
+    쿠키 없음은 DEBUG, 탈취 의심(reuse_detected)은 WARN, 만료·여러 탭 경쟁 등 나머지 거부 사유는 INFO다.
     읽을 수 없는 세션 값(malformed)은 저장소가 경고를 남기고 없는 토큰으로 처리한다.
     Redis 오류는 잡지 않아 500이 된다. INVALID_TOKEN으로 바꾸면 Redis 장애 때 전원이 로그아웃된다(GR-33 M03-03).
     서비스 트랜잭션을 두지 않는다. 회원 조회는 끝나면 DB 연결을 돌려주고, Redis 교체는 DB 트랜잭션과 묶이지 않는다.
@@ -49,7 +49,8 @@ public class TokenRefreshService {
     // rawToken은 refresh_token 쿠키 값이다. 쿠키가 없으면 null이다
     public TokenRefreshResult refresh(String rawToken) {
         if (rawToken == null || rawToken.isBlank()) {
-            throw rejected("missing_cookie", null);
+            log.debug("토큰 재발급 거부: reason=missing_cookie, sessionId=null");
+            throw new BusinessException(CommonErrorCode.INVALID_TOKEN);
         }
 
         // 해당 토큰 값을 못 찾을 경우 사용되었던 토큰이었는지 검증하도록 넘겨짐

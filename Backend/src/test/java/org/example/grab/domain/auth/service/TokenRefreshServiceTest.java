@@ -1,5 +1,9 @@
 package org.example.grab.domain.auth.service;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.example.grab.domain.auth.dto.internal.TokenRefreshResult;
 import org.example.grab.domain.auth.repository.RefreshTokenRepository;
 import org.example.grab.domain.auth.repository.RefreshTokenReuseCheck;
@@ -24,6 +28,7 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.data.redis.RedisConnectionFailureException;
@@ -138,13 +143,28 @@ class TokenRefreshServiceTest {
     @ParameterizedTest
     @NullAndEmptySource
     @ValueSource(strings = {" "})
-    @DisplayName("쿠키가 없거나 비었으면 Redis를 조회하지 않고 INVALID_TOKEN이다")
-    void rejectsMissingCookie(String rawToken, CapturedOutput output) {
-        // when & then
-        assertInvalidToken(() -> service.refresh(rawToken));
-        verifyNoInteractions(refreshTokenRepository, activeUserLookupService, jwtProvider);
-        assertThat(rejectionLines(output)).singleElement()
-                .satisfies(line -> assertThat(line).contains(" INFO ", "reason=missing_cookie"));
+    @DisplayName("쿠키가 없거나 비었으면 DEBUG로만 기록하고 Redis 조회 없이 INVALID_TOKEN이다")
+    void rejectsMissingCookie(String rawToken) {
+        // given
+        Logger logger = (Logger) LoggerFactory.getLogger(TokenRefreshService.class);
+        Level originalLevel = logger.getLevel();
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        logger.setLevel(Level.DEBUG);
+        try {
+            // when & then
+            assertInvalidToken(() -> service.refresh(rawToken));
+            verifyNoInteractions(refreshTokenRepository, activeUserLookupService, jwtProvider);
+            assertThat(appender.list).singleElement().satisfies(event -> {
+                assertThat(event.getLevel()).isEqualTo(Level.DEBUG);
+                assertThat(event.getFormattedMessage()).contains("reason=missing_cookie");
+            });
+        } finally {
+            logger.setLevel(originalLevel);
+            logger.detachAppender(appender);
+            appender.stop();
+        }
     }
 
     @Test
