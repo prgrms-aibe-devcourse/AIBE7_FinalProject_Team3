@@ -182,7 +182,7 @@ Mock 결제(`PAYMENT.md` 1.1절)는 토스페이먼츠 **테스트 환경**으�
 | 단계 | 상태 | 내용 |
 | --- | --- | --- |
 | Docker 이미지 빌드 | 완료 | `Backend/Dockerfile`에서 `bootJar`를 실행하고 non-root 런타임 이미지를 생성한다. |
-| GHCR 로그인·게시 | 변경 필요 | 현재 `main` 푸시에서 이미지를 게시한다. 운영 기준에 맞게 `deploy` 푸시로 전환해야 한다. |
+| GHCR 로그인·게시 | 완료 | `deploy` 푸시에서 이미지를 게시한다(GR-122). |
 | 빌드 캐시 | 완료 | GitHub Actions cache backend를 BuildKit 캐시로 사용한다. |
 | `main`·`deploy` CI | 완료 | 두 브랜치 대상 PR과 통합 후 푸시에서 PostgreSQL 서비스를 사용한 Gradle 테스트와 Docker 이미지 빌드를 검증한다. |
 | EC2 자동 배포 | 예정 | GHCR 이미지를 내려받아 Docker Compose로 실행한다. |
