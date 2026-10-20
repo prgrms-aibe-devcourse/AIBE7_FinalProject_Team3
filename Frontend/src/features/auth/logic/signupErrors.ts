@@ -149,6 +149,9 @@ export const SOCIAL_SIGNUP_CONTEXT_MESSAGE =
   '가입 시간이 지났어요. 소셜 로그인을 다시 시작해주세요.'
 export const SOCIAL_DUPLICATE_EMAIL_MESSAGE =
   '이미 가입된 이메일이에요. 가입한 방법으로 로그인해주세요.'
+// 가입 201 뒤 users/me로 로그인 상태를 확인하지 못한 경우. 가입 실패로 오해하지 않게 가입 완료를 함께 알린다.
+export const SOCIAL_SIGNUP_LOGIN_REQUIRED_MESSAGE =
+  '회원가입은 완료됐어요. 소셜 로그인으로 다시 로그인해주세요.'
 
 export function socialSignupFailure(error: unknown): SocialSignupFailure {
   switch (apiErrorCode(error)) {

@@ -3,7 +3,10 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { socialSignup } from '../../../api/auth/oauth2'
 import type { AuthUser } from '../logic/authUser'
 import { safeReturnPath } from '../logic/returnPath'
-import { socialSignupFailure } from '../logic/signupErrors'
+import {
+  SOCIAL_SIGNUP_LOGIN_REQUIRED_MESSAGE,
+  socialSignupFailure,
+} from '../logic/signupErrors'
 import { nicknameError } from '../logic/signupValidation'
 
 type Props = {
@@ -46,7 +49,19 @@ export default function SocialSignupForm({ refreshAuth, notify }: Props) {
     try {
       await socialSignup(nickname)
       // 201이면 인증 쿠키가 설정됐다. users/me로 로그인 상태를 복구하고 이 화면을 다시 제출할 수 없게 replace로 떠난다(GR-47 M00-04).
-      await refreshAuth()
+      const user = await refreshAuth()
+      if (!user) {
+        // 계정은 만들어졌지만 로그인 상태를 확인하지 못했다. 소셜 로그인을 다시 하면 기존 회원으로 로그인된다.
+        // 로그인 화면이 다음 소셜 시작에 같은 복귀 경로를 저장하도록 from으로 넘긴다.
+        navigate('/login', {
+          replace: true,
+          state: {
+            socialError: SOCIAL_SIGNUP_LOGIN_REQUIRED_MESSAGE,
+            from: returnTo,
+          },
+        })
+        return
+      }
       notify('회원가입이 완료됐어요.')
       navigate(returnTo, { replace: true })
     } catch (signupError) {

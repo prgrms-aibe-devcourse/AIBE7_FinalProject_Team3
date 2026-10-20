@@ -251,6 +251,45 @@ for (const [code, status, message] of [
   })
 }
 
+test('가입 뒤 로그인 상태를 확인하지 못하면 가입 완료를 알리고 다시 로그인하면 원래 화면으로 간다', async ({
+  page,
+}) => {
+  const auth = getAuth(page)
+  auth.setSocialCallback('result=signup_required')
+  await startFromProtectedPage(page, 'GOOGLE')
+  await expect(page).toHaveURL(/#\/signup\?type=social$/)
+
+  // 가입 201 직후 users/me 재조회만 한 번 실패한다
+  await page.route(
+    '**/api/v1/users/me',
+    (route) =>
+      route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: false,
+          data: null,
+          error: { code: 'INTERNAL_SERVER_ERROR', message: 'error' },
+        }),
+      }),
+    { times: 1 },
+  )
+  await nicknameInput(page).fill('새닉네임')
+  await submitSignup(page)
+
+  await expect(page).toHaveURL(/#\/login$/)
+  await expect(page.getByRole('alert')).toHaveText(
+    '회원가입은 완료됐어요. 소셜 로그인으로 다시 로그인해주세요.',
+  )
+  await expect(toast(page)).not.toContainText('회원가입이 완료됐어요.')
+  expect(auth.state.signupRequests).toHaveLength(1)
+
+  auth.setSocialCallback('result=success')
+  await socialButton(page, 'GOOGLE').click()
+  await expect(page).toHaveURL(/#\/my$/)
+  await expect(toast(page)).toContainText('로그인했어요.')
+})
+
 test('소셜 가입은 처리 중 버튼을 막고 CSRF·네트워크 실패 후 다시 제출할 수 있다', async ({
   page,
 }) => {
