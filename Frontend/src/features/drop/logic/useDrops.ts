@@ -9,6 +9,9 @@ export function useDropList(params: DropListParams | null) {
     queryKey: params ? dropKeys.list(params) : dropKeys.all,
     queryFn: ({ signal }) => getDrops(params ?? {}, signal),
     enabled: params !== null,
+    // 화면·온라인 복귀 조회는 SSE 제어기의 2초 제한으로 병합한다.
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   })
 }
 

@@ -1,8 +1,21 @@
-import { QueryClient } from '@tanstack/react-query'
+import {
+  QueryClient,
+  QueryObserver,
+  focusManager,
+  onlineManager,
+  useQuery,
+} from '@tanstack/react-query'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { getDrops } from '../../../api/drop/drops'
 import { openDropStockStream } from '../../../api/drop/stockStream'
 import { dropKeys, type DropListParams } from '../logic/queryKeys'
 import { subscribeDropListStockStream } from '../logic/useDropListStockStream'
+import { useDropList } from '../logic/useDrops'
+
+vi.mock('@tanstack/react-query', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@tanstack/react-query')>()),
+  useQuery: vi.fn(),
+}))
 
 vi.mock('../../../api/drop/drops', () => ({
   getDrops: vi.fn(),
@@ -100,10 +113,80 @@ beforeEach(() => {
   vi.spyOn(Math, 'random').mockReturnValue(0)
 })
 afterEach(() => {
+  vi.unstubAllGlobals()
   vi.useRealTimers()
   vi.restoreAllMocks()
   vi.resetAllMocks()
 })
+
+test.each(['focus', 'online'] as const)(
+  '%s 복귀 조회는 실제 QueryClient에서도 2초 간격으로 병합된다',
+  async (trigger) => {
+    const doc = new EventTarget()
+    let visibilityState = 'visible'
+    Object.defineProperty(doc, 'visibilityState', {
+      get: () => visibilityState,
+    })
+    const win = new EventTarget()
+    vi.stubGlobal('document', doc)
+    vi.stubGlobal('window', win)
+    vi.stubGlobal('navigator', { onLine: true })
+    const source = new FakeSource()
+    vi.mocked(openDropStockStream).mockReturnValue(
+      source as unknown as EventSource,
+    )
+    const starts: number[] = []
+    vi.mocked(getDrops).mockImplementation(async () => {
+      starts.push(Date.now())
+      return page([101])
+    })
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+    })
+    client.mount()
+    client.setQueryData(key, page([101]))
+    useDropList(params)
+    const options = vi.mocked(useQuery).mock.calls.at(-1)![0]
+    const observer = new QueryObserver(client, {
+      ...options,
+      refetchOnMount: false,
+    })
+    const unsubscribe = observer.subscribe(() => {})
+    const subscription = subscribeDropListStockStream(params, client)
+    try {
+      subscription.refresh()
+      await vi.advanceTimersByTimeAsync(1)
+      expect(starts).toHaveLength(1)
+      await vi.advanceTimersByTimeAsync(99)
+
+      if (trigger === 'focus') {
+        visibilityState = 'hidden'
+        focusManager.setFocused(false)
+        doc.dispatchEvent(new Event('visibilitychange'))
+        visibilityState = 'visible'
+        focusManager.setFocused(true)
+        doc.dispatchEvent(new Event('visibilitychange'))
+      } else {
+        onlineManager.setOnline(false)
+        win.dispatchEvent(new Event('offline'))
+        onlineManager.setOnline(true)
+        win.dispatchEvent(new Event('online'))
+      }
+      await vi.advanceTimersByTimeAsync(1)
+      expect(starts).toHaveLength(1)
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(starts).toHaveLength(2)
+      expect(starts[1] - starts[0]).toBeGreaterThanOrEqual(2000)
+    } finally {
+      subscription.dispose()
+      unsubscribe()
+      client.unmount()
+      client.clear()
+      focusManager.setFocused(undefined)
+      onlineManager.setOnline(true)
+    }
+  },
+)
 
 test('최초 목록 ID를 정규화해 한 연결로 구독하고 ready 뒤 같은 조건을 재조회한다', async () => {
   const { source, fetchQuery, cancelQueries, subscription } = setup([
