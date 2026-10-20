@@ -103,6 +103,8 @@ npx playwright show-trace test-results/<테스트>/trace.zip
 
 백엔드를 먼저 실행한 뒤 `npm run dev`로 프론트엔드를 띄웁니다. 프론트엔드는 `/api/v1` 상대 경로로 요청하고 Vite가 백엔드에 프록시합니다. 기본 주소는 `http://localhost:8080`입니다. 다른 백엔드를 사용하려면 `.env.example`을 `.env.local`로 복사하고 `VITE_API_PROXY_TARGET`에 백엔드 원점 주소(예: `https://api.example.com`, `/api/v1` 제외)를 설정합니다. 값이 없거나 공백이면 기본 주소를 사용합니다. `.env`·`.env.local`·`.env.[mode]` 설정은 [Vite의 `loadEnv`](https://vite.dev/config/#using-environment-variables-in-config)로 읽으며 변경 후 개발 서버를 재시작해야 합니다. 실제 환경 파일은 git에서 제외하고 `.env.example`만 공유합니다. 이 설정은 개발 서버 프록시용이며, 배포 서버에서는 `/api`를 백엔드로 전달하도록 별도로 설정합니다.
 
+결제 화면은 토스페이먼츠 테스트 결제창을 엽니다. `.env.local`의 `VITE_TOSS_CLIENT_KEY`에 백엔드 `TOSS_SECRET_KEY`와 짝이 되는 테스트 클라이언트 키(`test_ck_`로 시작, API 개별 연동 키)를 넣습니다. 클라이언트 키는 빌드 시 번들에 포함되는 공개 값이지만, 키 값은 `.env.example`에 적지 않고 이름만 둡니다. 값이 없으면 결제창을 열지 않고 결제 설정이 없다고 안내합니다. 배포 빌드에서도 같은 이름의 환경 변수를 설정해야 합니다.
+
 LOCAL 로그인·회원가입과 `users/me`는 실제 백엔드가 필요합니다. 백엔드 없이 `npm run dev`만 띄우면 인증 요청이 401이 되어 비로그인 상태로 동작합니다. 소셜 로그인은 준비 중(GR-47)이며 로그인 화면의 결과 예시는 화면 안내용입니다.
 
 LOCAL 회원가입은 인증 코드를 메일로 받습니다. 백엔드 Docker Compose로 띄우면 메일 설정이 없을 때 Mailpit으로 발송되므로, `http://localhost:8025`에서 받는 주소의 메일을 열어 6자리 코드를 확인합니다. 같은 이메일의 코드 재요청은 60초 뒤에 가능합니다. 백엔드 실행과 시험 데이터 정리는 `Backend/docs/migration.md` 6절을 따릅니다.
