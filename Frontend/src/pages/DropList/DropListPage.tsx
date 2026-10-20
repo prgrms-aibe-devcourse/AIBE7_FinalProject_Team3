@@ -13,6 +13,7 @@ import {
 import { toCardDrops } from '../../features/drop/logic/dropView'
 import { categoryKeys } from '../../features/drop/logic/queryKeys'
 import { useDropList } from '../../features/drop/logic/useDrops'
+import { useDropListStockStream } from '../../features/drop/logic/useDropListStockStream'
 import type { CatalogQuery } from '../../features/drop/logic/catalog'
 import type { SharedProps } from '../../types/store'
 
@@ -52,6 +53,7 @@ export default function DropListPage({
     CATALOG_PAGE_SIZE,
   )
   const listQuery = useDropList(listParams ?? null)
+  const retryList = useDropListStockStream(listParams ?? null)
 
   const category = params.get('category') || '전체'
   const keyword = params.get('keyword') ?? ''
@@ -73,7 +75,7 @@ export default function DropListPage({
 
   const retry = () => {
     if (categoriesQuery.isError) void categoriesQuery.refetch()
-    void listQuery.refetch()
+    retryList()
   }
 
   return (
@@ -189,6 +191,20 @@ export default function DropListPage({
         </div>
       </section>
 
+      {listQuery.isError && listQuery.data && !categoriesQuery.isError && (
+        <p className="form-error catalog-refresh-error" role="alert">
+          최신 상품 목록을 불러오지 못했어요. 잠시 후 다시 시도해주세요.{' '}
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={retry}
+            disabled={listQuery.isFetching}
+          >
+            다시 시도
+          </button>
+        </p>
+      )}
+
       <div className="section-head catalog-heading">
         <h2>
           {status} 상품
@@ -205,7 +221,7 @@ export default function DropListPage({
           label="조회 조건 초기화"
           variant="block"
         />
-      ) : categoriesQuery.isError || listQuery.isError ? (
+      ) : categoriesQuery.isError || (listQuery.isError && !listQuery.data) ? (
         <div className="catalog-error" role="alert">
           <EmptyState
             title="상품 목록을 표시하지 못했어요."
