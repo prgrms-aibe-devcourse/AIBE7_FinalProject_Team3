@@ -123,10 +123,18 @@ test('목록 갱신 실패는 카드와 정렬 입력을 유지하고 재시도�
     'publishedAt,asc',
   )
   await expect(page.getByText('상품 목록을 표시하지 못했어요.')).toHaveCount(0)
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true)
+  const retry = page.getByRole('button', { name: '다시 시도' })
+  await retry.focus()
+  await expect(retry).toBeFocused()
 
   failing = false
   const recovered = waitForListResponse(page, 200)
-  await page.getByRole('button', { name: '다시 시도' }).click()
+  await retry.click()
   await recovered
   await expect(alert).toHaveCount(0)
   await expect(page.locator('.product-card')).toHaveCount(3)
