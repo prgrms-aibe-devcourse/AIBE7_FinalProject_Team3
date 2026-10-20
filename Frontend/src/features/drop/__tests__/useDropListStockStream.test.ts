@@ -231,3 +231,166 @@ test('미구독 ID가 포함된 변경 알림은 연결을 닫고 복구한다',
 
   subscription.dispose()
 })
+
+test('같은 ID 집합의 순서만 바뀌면 연결을 교체하지 않는다', async () => {
+  const { source, openedAt, emitCache, subscription } = setup([101, 102])
+  await vi.advanceTimersByTimeAsync(1)
+  source.emit('ready', {
+    dropIds: [101, 102],
+    serverTime: '2026-10-19T00:00:00Z',
+  })
+  await vi.advanceTimersByTimeAsync(1)
+
+  emitCache([102, 101])
+  await vi.advanceTimersByTimeAsync(6000)
+  expect(openedAt).toHaveLength(1)
+  expect(source.close).not.toHaveBeenCalled()
+
+  subscription.dispose()
+})
+
+test('ready가 오지 않으면 장애 조회로 전환하고 제한된 재연결을 수행한다', async () => {
+  const { source, openedAt, fetchQuery, subscription } = setup([101])
+  await vi.advanceTimersByTimeAsync(1)
+  expect(openedAt).toHaveLength(1)
+
+  await vi.advanceTimersByTimeAsync(10000)
+  expect(source.close).toHaveBeenCalledTimes(1)
+  expect(fetchQuery).toHaveBeenCalledTimes(1)
+
+  await vi.advanceTimersByTimeAsync(2498)
+  expect(openedAt).toHaveLength(1)
+  await vi.advanceTimersByTimeAsync(1)
+  expect(openedAt).toHaveLength(2)
+
+  subscription.dispose()
+})
+
+test('재연결 안내는 이전 연결 시작 뒤 최소 5초를 기다린다', async () => {
+  const { source, openedAt, subscription } = setup([101])
+  await vi.advanceTimersByTimeAsync(1)
+  source.emit('ready', { dropIds: [101], serverTime: '2026-10-19T00:00:00Z' })
+  await vi.advanceTimersByTimeAsync(1)
+
+  source.emit('stream-closed', {
+    reason: 'RECONNECT_REQUIRED',
+    reconnect: true,
+  })
+  expect(source.close).toHaveBeenCalledTimes(1)
+  await vi.advanceTimersByTimeAsync(4997)
+  expect(openedAt).toHaveLength(1)
+  await vi.advanceTimersByTimeAsync(1)
+  expect(openedAt).toHaveLength(2)
+
+  subscription.dispose()
+})
+
+test('숨김·오프라인에는 연결과 주기를 멈추고 복귀 후 다시 조회한다', async () => {
+  const page = new EventTarget()
+  let visibilityState = 'visible'
+  Object.defineProperty(page, 'visibilityState', {
+    get: () => visibilityState,
+  })
+  const win = new EventTarget()
+  let onLine = true
+  vi.stubGlobal('document', page)
+  vi.stubGlobal('window', win)
+  vi.stubGlobal('navigator', {
+    get onLine() {
+      return onLine
+    },
+  })
+  const { source, openedAt, fetchQuery, subscription } = setup([101])
+  await vi.advanceTimersByTimeAsync(1)
+  source.emit('ready', { dropIds: [101], serverTime: '2026-10-19T00:00:00Z' })
+  await vi.advanceTimersByTimeAsync(1)
+  expect(fetchQuery).toHaveBeenCalledTimes(1)
+
+  visibilityState = 'hidden'
+  page.dispatchEvent(new Event('visibilitychange'))
+  await vi.advanceTimersByTimeAsync(60000)
+  expect(source.close).toHaveBeenCalledTimes(1)
+  expect(fetchQuery).toHaveBeenCalledTimes(1)
+  expect(openedAt).toHaveLength(1)
+
+  visibilityState = 'visible'
+  page.dispatchEvent(new Event('visibilitychange'))
+  await vi.advanceTimersByTimeAsync(1)
+  expect(fetchQuery).toHaveBeenCalledTimes(2)
+  expect(openedAt).toHaveLength(2)
+
+  onLine = false
+  win.dispatchEvent(new Event('offline'))
+  await vi.advanceTimersByTimeAsync(60000)
+  expect(fetchQuery).toHaveBeenCalledTimes(2)
+  expect(openedAt).toHaveLength(2)
+
+  onLine = true
+  win.dispatchEvent(new Event('online'))
+  await vi.advanceTimersByTimeAsync(1)
+  expect(fetchQuery).toHaveBeenCalledTimes(3)
+  expect(openedAt).toHaveLength(3)
+
+  subscription.dispose()
+})
+
+test('ready의 ID 집합이 구독 대상과 다르면 연결을 닫고 복구한다', async () => {
+  const { source, subscription } = setup([101])
+  await vi.advanceTimersByTimeAsync(1)
+  source.emit('ready', {
+    dropIds: [999],
+    serverTime: '2026-10-19T00:00:00Z',
+  })
+  expect(source.close).toHaveBeenCalledTimes(1)
+
+  subscription.dispose()
+})
+
+test('연속 변경은 첫 dirty 기준 2초 창을 연장하지 않는다', async () => {
+  const { source, fetchQuery, subscription } = setup([101])
+  const times: number[] = []
+  fetchQuery.mockImplementation(() => {
+    times.push(Date.now())
+    return Promise.resolve({})
+  })
+  await vi.advanceTimersByTimeAsync(1)
+  source.emit('ready', { dropIds: [101], serverTime: '2026-10-19T00:00:00Z' })
+  await vi.advanceTimersByTimeAsync(1)
+  expect(times).toHaveLength(1)
+
+  source.emit('drop-changed', { dropId: 101, changes: ['STOCK'] })
+  await vi.advanceTimersByTimeAsync(500)
+  source.emit('drop-changed', { dropId: 101, changes: ['SALES'] })
+  await vi.advanceTimersByTimeAsync(500)
+  source.emit('drop-changed', { dropId: 101, changes: ['STATUS'] })
+  await vi.advanceTimersByTimeAsync(1000)
+  expect(times).toHaveLength(2)
+  expect(times[1] - times[0]).toBeGreaterThanOrEqual(2000)
+
+  subscription.dispose()
+})
+
+test('조회 중 변경은 같은 키를 병렬로 쌓지 않고 완료 뒤 후속 조회한다', async () => {
+  const { source, fetchQuery, subscription } = setup([101])
+  let finish: (() => void) | undefined
+  fetchQuery.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve
+      }),
+  )
+  await vi.advanceTimersByTimeAsync(1)
+  source.emit('ready', { dropIds: [101], serverTime: '2026-10-19T00:00:00Z' })
+  await vi.advanceTimersByTimeAsync(1)
+  expect(fetchQuery).toHaveBeenCalledTimes(1)
+
+  source.emit('drop-changed', { dropId: 101, changes: ['STOCK'] })
+  await vi.advanceTimersByTimeAsync(2000)
+  expect(fetchQuery).toHaveBeenCalledTimes(1)
+
+  finish?.()
+  await vi.advanceTimersByTimeAsync(1)
+  expect(fetchQuery).toHaveBeenCalledTimes(2)
+
+  subscription.dispose()
+})
