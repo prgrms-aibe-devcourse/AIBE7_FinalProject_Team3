@@ -188,6 +188,13 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
     await shot(page, 'home')
   })
 
+  test('home-slides', async ({ page }) => {
+    await installHomeScenario(page, 'many')
+    await page.goto('/')
+    await expect(page.locator('.popular-arrow')).toHaveCount(4)
+    await shot(page, 'home-slides')
+  })
+
   test('home-states', async ({ page }) => {
     await installHomeScenario(page, 'failure')
     await page.goto('/')
