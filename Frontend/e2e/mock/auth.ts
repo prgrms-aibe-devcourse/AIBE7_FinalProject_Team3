@@ -150,6 +150,12 @@ export function installAuthApi(
       return
     }
 
+    // LOCAL 가입 1단계(1.2.1). 가입 여부와 관계없이 204다. 오류 시나리오는 GR-31 M02-02에서 추가한다.
+    if (path === '/api/v1/auth/email-verification' && method === 'POST') {
+      await route.fulfill({ status: 204 })
+      return
+    }
+
     if (path === '/api/v1/auth/refresh' && method === 'POST') {
       state.refreshCount += 1
       if (state.invalidSession || !state.loggedIn) {
