@@ -24,6 +24,10 @@
       "description": "LOCAL 이메일·비밀번호 로그인"
     },
     {
+      "name": "소셜 로그인",
+      "description": "KAKAO·GOOGLE 소셜 로그인과 최초 소셜 회원가입"
+    },
+    {
       "name": "내 정보",
       "description": "로그인한 사용자의 회원 정보 조회"
     },
@@ -129,6 +133,86 @@
           },
           "500": {
             "description": "INTERNAL_SERVER_ERROR(Redis 장애 등. 로그아웃하지 않고 다시 시도한다)"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/oauth2/signup": {
+      "post": {
+        "tags": ["소셜 로그인"],
+        "summary": "소셜 회원가입 완료",
+        "description": "oauth2_signup_token 쿠키의 제공자·이메일과 입력한 닉네임으로 가입하고 로그인시킨다. 토큰은 HttpOnly 쿠키로만 전달한다",
+        "operationId": "signup_1",
+        "parameters": [
+          {
+            "name": "oauth2_signup_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OAuth2SignupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "가입 성공, Set-Cookie로 가입 토큰 만료와 access_token·refresh_token 전달",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseLoginResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST, VALIDATION_FAILED, INVALID_NICKNAME",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseLoginResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "OAUTH2_SIGNUP_CONTEXT_INVALID",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseLoginResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED(CSRF 토큰 없음·불일치)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseLoginResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "DUPLICATE_EMAIL, DUPLICATE_NICKNAME",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseLoginResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -323,6 +407,33 @@
         }
       }
     },
+    "/api/v1/auth/oauth2/{provider}": {
+      "get": {
+        "tags": ["소셜 로그인"],
+        "summary": "소셜 로그인 시작",
+        "description": "브라우저를 이 주소로 이동시킨다. kakao·google이면 302로 제공자 인증 화면에 보내고, 인증 후 결과는 프론트엔드 콜백 주소의 result(success·signup_required) 또는 error 쿼리로 전달한다",
+        "operationId": "start",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "description": "kakao 또는 google",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "제공자 인증 화면으로 이동"
+          },
+          "400": {
+            "description": "UNSUPPORTED_OAUTH2_PROVIDER"
+          }
+        }
+      }
+    },
     "/api/v1/auth/csrf": {
       "get": {
         "tags": ["CSRF"],
@@ -392,19 +503,15 @@
           }
         }
       },
-      "LoginRequest": {
+      "OAuth2SignupRequest": {
         "type": "object",
         "properties": {
-          "email": {
-            "type": "string",
-            "minLength": 1
-          },
-          "password": {
+          "nickname": {
             "type": "string",
             "minLength": 1
           }
         },
-        "required": ["email", "password"]
+        "required": ["nickname"]
       },
       "ApiResponseLoginResponse": {
         "type": "object",
@@ -448,6 +555,20 @@
             }
           }
         }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "minLength": 1
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["email", "password"]
       },
       "EmailVerificationRequest": {
         "type": "object",
