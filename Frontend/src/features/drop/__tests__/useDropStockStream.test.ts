@@ -40,8 +40,14 @@ function setup() {
     getQueryCache: () => ({ subscribe: () => () => undefined }),
     getQueryData: () => undefined,
   } as unknown as QueryClient
-  const stop = subscribeDropStockStream(100, client)
-  return { source, fetchQuery, cancelQueries, stop }
+  const subscription = subscribeDropStockStream(100, client)
+  return {
+    source,
+    fetchQuery,
+    cancelQueries,
+    stop: subscription.dispose,
+    refresh: subscription.refresh,
+  }
 }
 
 beforeEach(() => vi.useFakeTimers())
@@ -50,6 +56,82 @@ afterEach(() => {
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
   vi.resetAllMocks()
+})
+
+test('수동 refresh는 상세와 재고 키를 정확히 조회한다', async () => {
+  const { fetchQuery, refresh, stop } = setup()
+  refresh()
+  await vi.advanceTimersByTimeAsync(1)
+  expect(fetchQuery).toHaveBeenCalledTimes(2)
+  expect(fetchQuery.mock.calls.map(([arg]) => arg.queryKey)).toEqual([
+    ['drops', 'detail', 100],
+    ['drops', 'detail', 100, 'stocks'],
+  ])
+  stop()
+})
+
+test('연속 refresh는 요청을 하나로 묶는다', async () => {
+  const { fetchQuery, refresh, stop } = setup()
+  refresh()
+  refresh()
+  refresh()
+  await vi.advanceTimersByTimeAsync(1)
+  expect(fetchQuery).toHaveBeenCalledTimes(2)
+  stop()
+})
+
+test('refresh는 조회 중이면 후속 조회로 병합한다', async () => {
+  const { fetchQuery, refresh, stop } = setup()
+  let finishStocks: (() => void) | undefined
+  fetchQuery.mockImplementation(({ queryKey }) =>
+    queryKey.length === 4 && !finishStocks
+      ? new Promise<void>((resolve) => {
+          finishStocks = resolve
+        })
+      : Promise.resolve({}),
+  )
+  refresh()
+  await vi.advanceTimersByTimeAsync(1)
+  expect(fetchQuery).toHaveBeenCalledTimes(2)
+
+  refresh()
+  await vi.advanceTimersByTimeAsync(2000)
+  expect(fetchQuery).toHaveBeenCalledTimes(3)
+
+  finishStocks?.()
+  await vi.advanceTimersByTimeAsync(1)
+  expect(fetchQuery).toHaveBeenCalledTimes(4)
+  stop()
+})
+
+test('refresh는 이전 조회 시작 뒤 2초가 지나기 전에 다시 요청하지 않는다', async () => {
+  vi.setSystemTime(new Date('2026-10-19T00:00:00Z'))
+  const { fetchQuery, refresh, stop } = setup()
+  const times: number[] = []
+  fetchQuery.mockImplementation(() => {
+    times.push(Date.now())
+    return Promise.resolve({})
+  })
+  refresh()
+  await vi.advanceTimersByTimeAsync(1)
+  expect(times).toHaveLength(2)
+
+  refresh()
+  await vi.advanceTimersByTimeAsync(1998)
+  expect(times).toHaveLength(2)
+  await vi.advanceTimersByTimeAsync(2)
+  expect(times).toHaveLength(4)
+  expect(times[2] - times[0]).toBeGreaterThanOrEqual(2000)
+  stop()
+})
+
+test('dispose 뒤 refresh와 늦은 변경은 요청을 만들지 않는다', async () => {
+  const { source, fetchQuery, refresh, stop } = setup()
+  stop()
+  refresh()
+  source.emit('drop-changed', { dropId: 100, changes: ['STOCK'] })
+  await vi.advanceTimersByTimeAsync(3000)
+  expect(fetchQuery).not.toHaveBeenCalled()
 })
 
 test('ready 뒤 상세와 재고를 조회하고 변경 종류에 맞는 정확한 키만 갱신한다', async () => {
@@ -156,7 +238,7 @@ test('ready 이전의 늦은 상세 응답은 새 조회 결과를 덮지 못한
     })
     .catch(() => undefined)
 
-  const stop = subscribeDropStockStream(100, client)
+  const { dispose: stop } = subscribeDropStockStream(100, client)
   source.emit('ready', { dropIds: [100], serverTime: '2026-10-19T00:00:00Z' })
   await vi.advanceTimersByTimeAsync(0)
   expect(client.getQueryData(dropKeys.detail(100))).toEqual({
@@ -225,7 +307,7 @@ test('연결이 반복 실패해도 대체 조회가 예정된 주기로 실행�
     calls.push(Date.now() - startedAt)
     return Promise.resolve({})
   })
-  const stop = subscribeDropStockStream(100, client)
+  const { dispose: stop } = subscribeDropStockStream(100, client)
 
   await vi.advanceTimersByTimeAsync(9999)
   expect(calls).toHaveLength(0)
@@ -405,7 +487,7 @@ test('서버 시각으로 계산한 판매 시작 시각에 상세를 다시 조
     saleStartsAt: '2026-10-19T00:00:05Z',
   })
   vi.mocked(getDropStocks).mockResolvedValue({ dropId: 100, options: [] })
-  const stop = subscribeDropStockStream(100, client)
+  const { dispose: stop } = subscribeDropStockStream(100, client)
 
   await vi.advanceTimersByTimeAsync(4999)
   expect(getDropDetail).not.toHaveBeenCalled()
@@ -430,7 +512,7 @@ test('상세 조회의 404가 확인되면 연결과 복구 타이머를 멈춘�
     response: { status: 404 },
   })
   vi.mocked(getDropStocks).mockResolvedValue({ dropId: 100, options: [] })
-  const stop = subscribeDropStockStream(100, client)
+  const { dispose: stop } = subscribeDropStockStream(100, client)
   source.emit('ready', { dropIds: [100], serverTime: '2026-10-19T00:00:00Z' })
   await vi.advanceTimersByTimeAsync(1)
   expect(source.close).toHaveBeenCalledTimes(1)

@@ -46,7 +46,7 @@ export default function DropDetailPage({
 
   const detailQuery = useDropDetail(id)
   const stocksQuery = useDropStocks(id)
-  useDropStockStream(id)
+  const retry = useDropStockStream(id)
   const [selected, setSelected] = useState<Record<string, string>>({})
   const [quantity, setQuantity] = useState(1)
 
@@ -71,17 +71,15 @@ export default function DropDetailPage({
           description="잠시 후 다시 시도해주세요."
           variant="block"
         />
-        <button
-          type="button"
-          className="secondary-button"
-          onClick={() => void detailQuery.refetch()}
-        >
+        <button type="button" className="secondary-button" onClick={retry}>
           다시 시도
         </button>
       </div>
     )
   }
 
+  const refreshFailed = detailQuery.isError || stocksQuery.isError
+  const refreshing = detailQuery.isFetching || stocksQuery.isFetching
   const detail = toDropDetail(detailQuery.data)
   const stockByOption = new Map<number, number>()
   for (const option of stocksQuery.data?.options ?? []) {
@@ -162,6 +160,19 @@ export default function DropDetailPage({
         <span>/</span>
         <span>{detail.category}</span>
       </div>
+      {refreshFailed && (
+        <p className="form-error detail-refresh-error" role="alert">
+          최신 상품 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.{' '}
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={retry}
+            disabled={refreshing}
+          >
+            다시 시도
+          </button>
+        </p>
+      )}
       <section className="detail-layout">
         <DropGallery
           key={detail.id}

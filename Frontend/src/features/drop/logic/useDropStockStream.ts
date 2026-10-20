@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import axios from 'axios'
 import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { getDropDetail, getDropStocks } from '../../../api/drop/drops'
@@ -376,7 +376,7 @@ export function subscribeDropStockStream(
   schedulePeriodic()
   connect()
 
-  return () => {
+  const dispose = () => {
     disposed = true
     pause()
     unsubscribe()
@@ -387,12 +387,25 @@ export function subscribeDropStockStream(
       window.removeEventListener('online', onOnline)
     }
   }
+
+  return { dispose, refresh: requestBoth }
 }
 
 export function useDropStockStream(dropId: number) {
   const queryClient = useQueryClient()
+  const refreshRef = useRef<(() => void) | null>(null)
+
   useEffect(() => {
     if (!Number.isSafeInteger(dropId) || dropId <= 0) return
-    return subscribeDropStockStream(dropId, queryClient)
+    const subscription = subscribeDropStockStream(dropId, queryClient)
+    refreshRef.current = subscription.refresh
+    return () => {
+      refreshRef.current = null
+      subscription.dispose()
+    }
   }, [dropId, queryClient])
+
+  return useCallback(() => {
+    refreshRef.current?.()
+  }, [])
 }

@@ -1,3 +1,11 @@
+.detail-refresh-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 0 0 20px;
+}
 .detail-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.8fr);
