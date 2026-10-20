@@ -9,10 +9,8 @@ import {
   isSeller,
   type AuthUser,
 } from '../../features/auth/logic/authUser'
-import {
-  nicknameError,
-  mockSignupErrors,
-} from '../../features/auth/mock/mockAuth'
+import { nicknameError } from '../../features/auth/logic/signupValidation'
+import { mockSignupErrors } from '../../features/auth/mock/mockAuth'
 import { wishKeys } from '../../features/wish/logic/queryKeys'
 import {
   buyerOrderStatusText,

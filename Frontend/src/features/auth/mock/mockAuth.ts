@@ -15,26 +15,3 @@ export const mockSignupErrors = {
   save: '저장에 실패했어요. 다시 시도해주세요.',
   context: '가입 시간이 만료됐어요. 소셜 로그인을 다시 시작해주세요.',
 } as const
-
-export function nicknameError(nickname: string) {
-  const value = nickname.trim()
-  const length = [...value].length
-  if (length < 2 || length > 10 || !/^[가-힣A-Za-z0-9_]+$/.test(value)) {
-    return '닉네임은 한글·영문·숫자·_를 사용해 2~10자로 입력해주세요.'
-  }
-  return ''
-}
-
-export function passwordError(password: string) {
-  if (
-    password.length < 8 ||
-    password.length > 64 ||
-    !/^[\x21-\x7e]+$/.test(password) ||
-    !/[A-Za-z]/.test(password) ||
-    !/[0-9]/.test(password) ||
-    !/[^A-Za-z0-9]/.test(password)
-  ) {
-    return '비밀번호는 공백 없이 영문·숫자·특수문자를 포함해 8~64자로 입력해주세요.'
-  }
-  return ''
-}

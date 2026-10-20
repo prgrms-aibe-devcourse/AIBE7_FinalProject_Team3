@@ -1,10 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  mockSignupErrors,
-  nicknameError,
-  passwordError,
-} from '../mock/mockAuth'
+import { nicknameError, passwordError } from '../logic/signupValidation'
+import { mockSignupErrors } from '../mock/mockAuth'
 
 type Props = {
   notify: (message: string) => void

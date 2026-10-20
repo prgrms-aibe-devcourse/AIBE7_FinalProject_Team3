@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { nicknameError, passwordError } from '../mock/mockAuth'
+import { nicknameError, passwordError } from '../logic/signupValidation'
 
-describe('Mock 가입 입력 규칙', () => {
+describe('가입 입력 사전 검증', () => {
   it('닉네임 길이와 허용 문자를 확인한다', () => {
     expect(nicknameError(' 드롭헌터_1 ')).toBe('')
     expect(nicknameError('a')).toBeTruthy()
