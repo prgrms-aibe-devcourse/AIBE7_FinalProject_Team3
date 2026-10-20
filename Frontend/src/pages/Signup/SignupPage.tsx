@@ -37,10 +37,6 @@ export default function SignupPage({ notify }: Props) {
               로그인
             </Link>
           </p>
-          <small>
-            현재 화면은 Mock 데모입니다. 코드나 계정 정보는 저장하거나 전송하지
-            않습니다.
-          </small>
         </div>
       </div>
     </section>

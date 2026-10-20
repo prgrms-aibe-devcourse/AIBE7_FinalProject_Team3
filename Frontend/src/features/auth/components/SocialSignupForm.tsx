@@ -69,6 +69,10 @@ export default function SocialSignupForm({ notify }: Props) {
         회원가입 완료
       </button>
       <small>소셜 가입 정보는 이 화면에 표시하거나 URL에 담지 않습니다.</small>
+      <small>
+        현재 화면은 Mock 데모입니다. 코드나 계정 정보는 저장하거나 전송하지
+        않습니다.
+      </small>
     </form>
   )
 }
