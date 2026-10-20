@@ -67,7 +67,7 @@
     flex: none;
     white-space: nowrap;
   }
-  .mode-button {
+  .header-actions .secondary-button {
     min-height: 36px;
     padding: 0 10px;
     font-size: 11px;
@@ -274,9 +274,6 @@
 @media (max-width: 460px) {
   .header-actions {
     gap: 7px;
-  }
-  .mode-button span {
-    display: none;
   }
   .hero > span {
     display: none;

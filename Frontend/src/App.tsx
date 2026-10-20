@@ -3,6 +3,7 @@ import { Route, Routes, useNavigate } from 'react-router-dom'
 import Footer from './components/Footer/Footer'
 import Header from './components/Header/Header'
 import useAuth from './features/auth/logic/useAuth'
+import { isSeller } from './features/auth/logic/authUser'
 import useOrders from './features/order/logic/useOrders'
 import useWish from './features/wish/logic/useWish'
 import CheckoutPage from './pages/Checkout/CheckoutPage'
@@ -49,7 +50,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Header authenticated={authenticated} />
+      <Header authenticated={authenticated} seller={isSeller(user)} />
       <main>
         <Routes>
           <Route path="/" element={<HomePage {...shared} />} />

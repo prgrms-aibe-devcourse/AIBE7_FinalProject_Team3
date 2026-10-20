@@ -162,7 +162,6 @@ textarea:focus-visible,
   gap: 12px;
   margin-left: auto;
 }
-.mode-button,
 .secondary-button {
   display: inline-flex;
   align-items: center;
@@ -174,9 +173,6 @@ textarea:focus-visible,
   background: #fff;
   font-weight: 700;
   font-size: 13px;
-}
-.mode-button span {
-  margin-left: 14px;
 }
 .account-button {
   display: grid;
