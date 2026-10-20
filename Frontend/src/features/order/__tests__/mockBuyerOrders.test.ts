@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  canCancel,
   canPay,
   demoBuyerOrders,
-  withCancelExample,
   withPaymentExample,
 } from '../mock/mockBuyerOrders'
 
@@ -23,19 +21,6 @@ describe('구매자 주문 Mock 상태', () => {
     )
   })
 
-  it('결제 승인 대기나 배송 시작 후에는 취소를 막는다', () => {
-    expect(canCancel(scenario('demo-pending'))).toBe(true)
-    expect(canCancel(scenario('demo-paid'))).toBe(true)
-    expect(canCancel(scenario('demo-preparing'))).toBe(true)
-    expect(canCancel(scenario('demo-processing'))).toBe(false)
-    expect(canCancel(scenario('demo-unknown'))).toBe(false)
-    expect(canCancel(scenario('demo-required'))).toBe(false)
-    expect(canCancel(scenario('demo-shipped'))).toBe(false)
-    expect(canCancel(scenario('demo-delivered'))).toBe(false)
-    expect(canCancel(scenario('demo-canceled'))).toBe(false)
-    expect(canCancel(scenario('demo-expired'))).toBe(false)
-  })
-
   it('데모 결제 성공만 주문을 PAID로 표시하고 결과 불명은 재결제를 막는다', () => {
     const pending = scenario('demo-pending')
     const paid = withPaymentExample(
@@ -53,21 +38,5 @@ describe('구매자 주문 Mock 상태', () => {
     expect(unknown.status).toBe('PAYMENT_PENDING')
     expect(unknown.reconciliationStatus).toBe('REQUIRED')
     expect(canPay(unknown)).toBe(false)
-  })
-
-  it('취소 실패·결과 불명은 주문을 취소 완료로 바꾸지 않는다', () => {
-    const paid = scenario('demo-paid')
-    expect(withCancelExample(paid, 'FAILED', '단순 변심').status).toBe('PAID')
-    const unknown = withCancelExample(paid, 'UNKNOWN', '단순 변심')
-    expect(unknown.status).toBe('PAID')
-    expect(unknown.refundStatus).toBe('UNKNOWN')
-    expect(canCancel(unknown)).toBe(false)
-    const canceled = withCancelExample(paid, 'SUCCEEDED', '단순 변심')
-    expect(canceled.status).toBe('CANCELED')
-    expect(canceled.refundStatus).toBe('SUCCEEDED')
-    expect(
-      withCancelExample(scenario('demo-shipped'), 'SUCCEEDED', '단순 변심')
-        .status,
-    ).toBe('SHIPPED')
   })
 })

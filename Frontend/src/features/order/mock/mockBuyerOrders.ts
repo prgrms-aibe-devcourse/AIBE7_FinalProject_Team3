@@ -9,16 +9,6 @@ export type BuyerOrderStatus =
   | 'CANCELED'
   | 'EXPIRED'
 
-export const buyerOrderStatusText: Record<BuyerOrderStatus, string> = {
-  PAYMENT_PENDING: '결제 대기',
-  PAID: '결제 완료',
-  PREPARING: '배송 준비',
-  SHIPPED: '배송 중',
-  DELIVERED: '배송 완료',
-  CANCELED: '취소 완료',
-  EXPIRED: '주문 만료',
-}
-
 export type BuyerOrder = {
   id: string
   orderNumber: string
@@ -48,8 +38,6 @@ export type BuyerOrder = {
     trackingNumber: string | null
     deliveredAt: string | null
   }
-  refundStatus: 'NONE' | 'SUCCEEDED' | 'UNKNOWN' | null
-  cancelReason: string | null
 }
 
 const now = Date.now()
@@ -86,8 +74,6 @@ const base: BuyerOrder = {
     address2: '101호',
   },
   shipping: blankShipping,
-  refundStatus: null,
-  cancelReason: null,
 }
 
 export const demoBuyerOrders: BuyerOrder[] = [
@@ -169,8 +155,6 @@ export const demoBuyerOrders: BuyerOrder[] = [
     status: 'CANCELED',
     paymentStatus: 'SUCCEEDED',
     paymentExpiresAt: null,
-    refundStatus: 'SUCCEEDED',
-    cancelReason: '단순 변심',
   },
   {
     ...base,
@@ -216,18 +200,6 @@ export function canPay(order: BuyerOrder, currentTime = Date.now()) {
   )
 }
 
-export function canCancel(order: BuyerOrder) {
-  return (
-    (order.status === 'PAYMENT_PENDING' ||
-      order.status === 'PAID' ||
-      order.status === 'PREPARING') &&
-    order.paymentStatus !== 'PENDING' &&
-    order.paymentStatus !== 'UNKNOWN' &&
-    order.reconciliationStatus === 'NONE' &&
-    order.refundStatus !== 'UNKNOWN'
-  )
-}
-
 export type PaymentDemoResult =
   'SUCCEEDED' | 'FAILED' | 'PENDING' | 'UNKNOWN' | 'REQUIRED'
 
@@ -244,30 +216,6 @@ export function withPaymentExample(
     paymentStatus: result === 'REQUIRED' ? 'SUCCEEDED' : result,
     reconciliationStatus:
       result === 'UNKNOWN' || result === 'REQUIRED' ? 'REQUIRED' : 'NONE',
-    paymentExpiresAt: result === 'SUCCEEDED' ? null : order.paymentExpiresAt,
-  }
-}
-
-export type CancelDemoResult = 'SUCCEEDED' | 'FAILED' | 'UNKNOWN' | 'CONFLICT'
-
-export function withCancelExample(
-  order: BuyerOrder,
-  result: CancelDemoResult,
-  reason: string,
-): BuyerOrder {
-  if (!canCancel(order) || !reason.trim() || reason.trim().length > 500)
-    return order
-  if (result === 'FAILED' || result === 'CONFLICT') return order
-  return {
-    ...order,
-    status: result === 'SUCCEEDED' ? 'CANCELED' : order.status,
-    refundStatus:
-      result === 'UNKNOWN'
-        ? 'UNKNOWN'
-        : order.status === 'PAYMENT_PENDING'
-          ? 'NONE'
-          : 'SUCCEEDED',
-    cancelReason: reason.trim(),
     paymentExpiresAt: result === 'SUCCEEDED' ? null : order.paymentExpiresAt,
   }
 }

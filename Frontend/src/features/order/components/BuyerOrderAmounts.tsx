@@ -1,7 +1,13 @@
-import type { BuyerOrder } from '../mock/mockBuyerOrders'
 import { won } from '../../../utils/price'
 
-export default function BuyerOrderAmounts({ order }: { order: BuyerOrder }) {
+// 결제 화면(Mock 주문)과 주문 상세(API 주문)가 함께 쓰므로 금액 필드만 받는다.
+type OrderAmounts = {
+  itemsAmount: number
+  shippingAmount: number
+  totalAmount: number
+}
+
+export default function BuyerOrderAmounts({ order }: { order: OrderAmounts }) {
   return (
     <dl className="buyer-amounts">
       <div>
