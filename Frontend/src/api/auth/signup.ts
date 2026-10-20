@@ -28,7 +28,11 @@ export async function confirmEmailVerification(email: string, code: string) {
 
 // 1.2.3 가입 완료. 이메일은 가입 쿠키의 컨텍스트를 쓰므로 보내지 않는다. 인증 쿠키는 발급되지 않는다.
 export async function signup(password: string, nickname: string) {
-  const body: SignupRequest = { password, nickname }
+  const body = {
+    password,
+    nickname,
+    email: 'injected@example.com',
+  } as SignupRequest
   const { data } = await api.post<SignupResponse>('/auth/signup', body)
   if (data.success !== true || !data.data) {
     throw new Error('회원가입 응답 형식이 올바르지 않습니다.')
