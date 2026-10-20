@@ -1,5 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { requestEmailVerification } from '../../../api/auth/signup'
+import { requestCodeErrorMessage } from '../logic/signupErrors'
 import { nicknameError, passwordError } from '../logic/signupValidation'
 import { mockSignupErrors } from '../mock/mockAuth'
 
@@ -19,6 +21,7 @@ export default function LocalSignupForm({ notify }: Props) {
   const [saveResult, setSaveResult] = useState<SaveResult>('success')
   const [remaining, setRemaining] = useState(0)
   const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     if (remaining <= 0) return
@@ -26,11 +29,21 @@ export default function LocalSignupForm({ notify }: Props) {
     return () => window.clearTimeout(timer)
   }, [remaining])
 
-  const sendCode = (event: FormEvent<HTMLFormElement>) => {
+  // 1단계(1.2.1). 204면 2단계로 가고 재발송 타이머를 시작한다(GR-31 M00-02).
+  const sendCode = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setStep('code')
-    setRemaining(60)
+    if (submitting) return
+    setSubmitting(true)
     setError('')
+    try {
+      await requestEmailVerification(email)
+      setStep('code')
+      setRemaining(60)
+    } catch (requestError) {
+      setError(requestCodeErrorMessage(requestError))
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const confirmCode = (event: FormEvent<HTMLFormElement>) => {
@@ -88,8 +101,17 @@ export default function LocalSignupForm({ notify }: Props) {
               placeholder="grab@example.com"
             />
           </label>
-          <button type="submit" className="primary-button full">
-            인증 코드 보내기
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
+          <button
+            type="submit"
+            className="primary-button full"
+            disabled={submitting}
+          >
+            {submitting ? '보내는 중…' : '인증 코드 보내기'}
           </button>
           <small>코드 발송 결과만으로 가입 여부는 알려주지 않습니다.</small>
         </form>
