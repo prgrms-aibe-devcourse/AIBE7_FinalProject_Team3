@@ -541,6 +541,52 @@ test('한 용도 삭제 후 수정·재조회해도 다른 용도 이미지가 �
   await expect(detail.getByLabel('대체 설명')).toHaveValue('남겨둘 상세 설명')
 })
 
+test('빈 SKU 행을 제외한 요청 순서로 서버 오류를 표시한다', async ({
+  page,
+}) => {
+  await page.goto('/#/seller/drops/new')
+  await page.getByRole('button', { name: '＋ 그룹 추가' }).click()
+  await page.getByLabel('그룹명').fill('색상')
+  await page.getByLabel('선택값', { exact: true }).fill('빨강, 파랑, 초록')
+  await page.getByLabel('가격', { exact: true }).nth(1).fill('0')
+  await page.getByLabel('재고', { exact: true }).nth(1).fill('5')
+  let submitted = 0
+  await page.route('**/api/v1/seller/drops', (route) => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    const options = route.request().postDataJSON().options
+    submitted = options.length
+    return route.fulfill({
+      status: 400,
+      json: {
+        success: false,
+        error: {
+          code: 'VALIDATION_FAILED',
+          fieldErrors: [
+            {
+              field: `options[${options.length - 1}].unitPrice`,
+              reason: '파랑 가격을 확인해주세요.',
+            },
+          ],
+        },
+      },
+    })
+  })
+  for (const count of [1, 2]) {
+    if (count === 2) {
+      await page.getByLabel('가격', { exact: true }).nth(0).fill('1000')
+      await page.getByLabel('재고', { exact: true }).nth(0).fill('3')
+    }
+    await page.getByRole('button', { name: '임시 저장' }).click()
+    const rows = page.locator('.sku-row').locator('..')
+    await expect(rows.nth(1).getByRole('alert')).toHaveText(
+      '파랑 가격을 확인해주세요.',
+    )
+    await expect(rows.nth(0).getByRole('alert')).toHaveCount(0)
+    await expect(rows.nth(2).getByRole('alert')).toHaveCount(0)
+    expect(submitted).toBe(count)
+  }
+})
+
 test('12개를 넘는 옵션 조합도 잘라내지 않고 저장한다', async ({ page }) => {
   await page.goto('/#/seller/drops/new')
   await page.getByRole('button', { name: '＋ 그룹 추가' }).click()

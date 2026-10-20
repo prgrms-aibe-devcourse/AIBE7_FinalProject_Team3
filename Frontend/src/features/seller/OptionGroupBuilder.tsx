@@ -17,12 +17,18 @@ export default function OptionGroupBuilder({
   setValues: Dispatch<SetStateAction<Record<string, string>>>
   errors: DropFieldError[]
 }) {
+  let requestIndex = 0
   const rows = Object.keys(values)
     .filter((key) => key.startsWith('sku:') && key.endsWith(':price'))
-    .map((key) => ({
-      key: key.slice(0, -6),
-      selections: JSON.parse(key.slice(4, -6)) as Record<string, string>,
-    }))
+    .map((key) => {
+      const rowKey = key.slice(0, -6)
+      const empty = !values[key]?.trim() && !values[`${rowKey}:stock`]?.trim()
+      return {
+        key: rowKey,
+        selections: JSON.parse(key.slice(4, -6)) as Record<string, string>,
+        requestIndex: empty ? null : requestIndex++,
+      }
+    })
   const updateGroup = (
     index: number,
     field: 'name' | 'rawValues',
@@ -120,7 +126,7 @@ export default function OptionGroupBuilder({
           <strong>판매 조합(SKU)</strong>
           <span>{rows.length}개 조합</span>
         </div>
-        {rows.map(({ key, selections }, index) => (
+        {rows.map(({ key, selections, requestIndex }) => (
           <div key={key}>
             <div className="sku-row">
               <span>{selectionLabel(groups, selections) || '기본 옵션'}</span>
@@ -163,7 +169,12 @@ export default function OptionGroupBuilder({
                 판매 활성
               </label>
             </div>
-            <DropFieldErrors field={`options[${index}]`} errors={errors} />
+            {requestIndex !== null && (
+              <DropFieldErrors
+                field={`options[${requestIndex}]`}
+                errors={errors}
+              />
+            )}
             <DropFieldErrors field={`${key}:price`} errors={errors} />
             <DropFieldErrors field={`${key}:stock`} errors={errors} />
           </div>
