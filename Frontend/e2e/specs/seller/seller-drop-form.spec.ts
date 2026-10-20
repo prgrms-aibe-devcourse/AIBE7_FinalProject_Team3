@@ -52,6 +52,50 @@ test('기존 DRAFT 수정 후 재진입해도 최신 값과 이미지를 유지�
   await expect(page.locator('.toast')).toHaveText('DROP 초안을 저장했어요.')
 })
 
+for (const publish of [false, true]) {
+  test(`저장 후 상세 재조회가 실패해도 ${publish ? '공개를 진행한다' : '저장 성공과 최신 입력을 유지한다'}`, async ({
+    page,
+  }) => {
+    await page.goto('/#/seller/drops/401/edit')
+    await expect(page.getByLabel('상품명')).toHaveValue('오버핏 니트 가디건')
+    let saved = false
+    let failed = false
+    await page.route('**/api/v1/seller/drops/401', (route) => {
+      if (route.request().method() === 'PATCH') saved = true
+      if (route.request().method() === 'GET' && saved && !failed) {
+        failed = true
+        return route.fulfill({ status: 500, json: { success: false } })
+      }
+      return route.fallback()
+    })
+    await page.getByLabel('상품명').fill('재조회 실패 후 저장한 DROP')
+    await page
+      .getByRole('button', {
+        name: publish ? '공개' : '임시 저장',
+        exact: true,
+      })
+      .click()
+    await expect(page.locator('.toast')).toHaveText(
+      publish ? 'DROP을 WISH 상태로 공개했어요.' : 'DROP 초안을 저장했어요.',
+    )
+    expect(failed).toBe(true)
+    if (publish) {
+      await expect(page).toHaveURL(/\/seller\/drops\/401$/)
+      await expect(page.locator('.status-pill')).toHaveText('WISH')
+    } else {
+      await page.getByRole('link', { name: '← DROP STUDIO' }).click()
+      await page
+        .locator('.seller-drops-row')
+        .filter({ hasText: '재조회 실패 후 저장한 DROP' })
+        .getByRole('link', { name: '수정', exact: true })
+        .click()
+      await expect(page.getByLabel('상품명')).toHaveValue(
+        '재조회 실패 후 저장한 DROP',
+      )
+    }
+  })
+}
+
 test('GALLERY·DETAIL 이미지를 편집하고 저장 후 재진입 시 순서와 설명을 유지한다', async ({
   page,
 }) => {
