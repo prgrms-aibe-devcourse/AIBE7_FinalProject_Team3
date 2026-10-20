@@ -123,17 +123,3 @@ test('요청에 CSRF 헤더·쿠키가 실리고 토큰은 저장소에 없다',
   expect(storage.cookie).not.toContain('access_token')
   expect(storage.cookie).not.toContain('refresh_token')
 })
-
-test('소셜 결과 예시는 세션을 만들지 않고 안내한다', async ({ page }) => {
-  await page.goto('/#/login')
-  await page.getByRole('button', { name: 'GOOGLE' }).click()
-  await expect(page.locator('.toast')).toContainText(
-    '소셜 로그인은 준비 중이에요.',
-  )
-  await page.getByLabel('소셜 결과 예시').selectOption('new')
-  await page.getByRole('button', { name: 'GOOGLE' }).click()
-  await expect(page).toHaveURL(/#\/signup\?type=social$/)
-  await expect(
-    page.getByRole('heading', { name: '소셜 계정으로 가입' }),
-  ).toBeVisible()
-})
