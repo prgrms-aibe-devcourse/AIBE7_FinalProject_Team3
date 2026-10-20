@@ -54,8 +54,12 @@ export function requestCodeErrorMessage(error: unknown) {
   return fallbackMessage(error)
 }
 
-// 2단계(1.2.2) 코드 확인
-export function confirmCodeErrorMessage(error: unknown) {
+// 2단계 코드 확인 실패: 로그인 안내(duplicateEmail), 같은 단계에서 다시 입력·재발송(retry)
+export type ConfirmCodeFailure =
+  | { kind: 'duplicateEmail'; message: string }
+  | { kind: 'retry'; message: string }
+
+function confirmCodeRetryMessage(error: unknown) {
   switch (apiErrorCode(error)) {
     case 'EMAIL_VERIFICATION_CODE_MISMATCH':
       return '인증 코드가 일치하지 않아요.'
@@ -63,8 +67,6 @@ export function confirmCodeErrorMessage(error: unknown) {
       return '인증 코드가 만료됐어요. 다시 발송해주세요.'
     case 'EMAIL_VERIFICATION_ATTEMPTS_EXCEEDED':
       return '확인 횟수를 초과했어요. 새 코드를 요청해주세요.'
-    case 'DUPLICATE_EMAIL':
-      return DUPLICATE_EMAIL_MESSAGE
     case 'VALIDATION_FAILED':
       return '인증 코드 6자리를 입력해주세요.'
     case 'INVALID_EMAIL':
@@ -72,6 +74,14 @@ export function confirmCodeErrorMessage(error: unknown) {
     default:
       return fallbackMessage(error)
   }
+}
+
+// 2단계(1.2.2) 코드 확인
+export function confirmCodeFailure(error: unknown): ConfirmCodeFailure {
+  if (apiErrorCode(error) === 'DUPLICATE_EMAIL') {
+    return { kind: 'duplicateEmail', message: DUPLICATE_EMAIL_MESSAGE }
+  }
+  return { kind: 'retry', message: confirmCodeRetryMessage(error) }
 }
 
 function isSignupField(field: unknown): field is SignupField {

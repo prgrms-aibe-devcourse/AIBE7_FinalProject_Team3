@@ -134,12 +134,6 @@ test('LOCAL 이메일 코드와 회원가입 완료 후 로그인 화면으로 �
     page.getByRole('button', { name: /초 후 재발송/ }),
   ).toBeDisabled()
   await page.getByLabel('인증 코드 6자리').fill('123456')
-  await page.getByLabel('코드 확인 결과 예시').selectOption('mismatch')
-  await page.getByRole('button', { name: '코드 확인' }).click()
-  await expect(page.getByRole('alert')).toHaveText(
-    '인증 코드가 일치하지 않아요.',
-  )
-  await page.getByLabel('코드 확인 결과 예시').selectOption('success')
   await page.getByRole('button', { name: '코드 확인' }).click()
   await expect(page.getByLabel('인증된 이메일')).toHaveValue('new@example.com')
   await page.getByLabel('닉네임', { exact: true }).fill('새회원')

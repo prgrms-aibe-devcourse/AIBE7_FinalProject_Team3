@@ -1,7 +1,13 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { requestEmailVerification } from '../../../api/auth/signup'
-import { requestCodeErrorMessage } from '../logic/signupErrors'
+import { Link, useNavigate } from 'react-router-dom'
+import {
+  confirmEmailVerification,
+  requestEmailVerification,
+} from '../../../api/auth/signup'
+import {
+  confirmCodeFailure,
+  requestCodeErrorMessage,
+} from '../logic/signupErrors'
 import { nicknameError, passwordError } from '../logic/signupValidation'
 import { mockSignupErrors } from '../mock/mockAuth'
 
@@ -9,7 +15,6 @@ type Props = {
   notify: (message: string) => void
 }
 
-type CodeResult = 'success' | 'mismatch' | 'expired' | 'attempts'
 type SaveResult = 'success' | 'existing' | 'nickname' | 'save'
 
 // LOCAL 회원가입 3단계(이메일 → 코드 확인 → 계정 만들기). 실제 API 연동은 GR-31에서 진행한다.
@@ -17,10 +22,11 @@ export default function LocalSignupForm({ notify }: Props) {
   const navigate = useNavigate()
   const [step, setStep] = useState<'email' | 'code' | 'details'>('email')
   const [email, setEmail] = useState('')
-  const [codeResult, setCodeResult] = useState<CodeResult>('success')
   const [saveResult, setSaveResult] = useState<SaveResult>('success')
   const [remaining, setRemaining] = useState(0)
   const [error, setError] = useState('')
+  // 이미 가입된 이메일이면 오류 아래에 로그인 링크를 보여준다(GR-31 M00-03)
+  const [showLoginLink, setShowLoginLink] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
@@ -46,14 +52,48 @@ export default function LocalSignupForm({ notify }: Props) {
     }
   }
 
-  const confirmCode = (event: FormEvent<HTMLFormElement>) => {
+  // 2단계(1.2.2). 204면 서버가 가입 쿠키를 설정하고 3단계로 간다.
+  const confirmCode = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (codeResult !== 'success') {
-      setError(mockSignupErrors[codeResult])
-      return
-    }
-    setStep('details')
+    if (submitting) return
+    const code = String(new FormData(event.currentTarget).get('code') ?? '')
+    setSubmitting(true)
     setError('')
+    setShowLoginLink(false)
+    try {
+      await confirmEmailVerification(email, code)
+      setStep('details')
+    } catch (confirmError) {
+      const failure = confirmCodeFailure(confirmError)
+      setError(failure.message)
+      setShowLoginLink(failure.kind === 'duplicateEmail')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // 2단계 재발송. 204일 때만 타이머를 다시 시작한다(GR-31 M00-02).
+  const resendCode = async () => {
+    if (submitting) return
+    setSubmitting(true)
+    setError('')
+    setShowLoginLink(false)
+    try {
+      await requestEmailVerification(email)
+      setRemaining(60)
+    } catch (requestError) {
+      setError(requestCodeErrorMessage(requestError))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // 이메일 오타 수정용. 입력한 이메일은 남기고 오류·타이머는 초기화한다(GR-31 M00-02).
+  const editEmail = () => {
+    setStep('email')
+    setRemaining(0)
+    setError('')
+    setShowLoginLink(false)
   }
 
   const complete = (event: FormEvent<HTMLFormElement>) => {
@@ -137,35 +177,34 @@ export default function LocalSignupForm({ notify }: Props) {
           <button
             type="button"
             className="secondary-button"
-            disabled={remaining > 0}
-            onClick={() => {
-              setRemaining(60)
-              setError('')
-            }}
+            disabled={remaining > 0 || submitting}
+            onClick={resendCode}
           >
             {remaining > 0 ? `${remaining}초 후 재발송` : '인증 코드 재발송'}
           </button>
-          <label className="demo-select">
-            코드 확인 결과 예시
-            <select
-              value={codeResult}
-              onChange={(event) => {
-                setCodeResult(event.target.value as CodeResult)
-                setError('')
-              }}
-            >
-              <option value="success">확인 성공</option>
-              <option value="mismatch">코드 불일치</option>
-              <option value="expired">코드 만료</option>
-              <option value="attempts">시도 초과</option>
-            </select>
-          </label>
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={submitting}
+            onClick={editEmail}
+          >
+            이메일 다시 입력
+          </button>
           {error && (
             <p className="form-error" role="alert">
               {error}
             </p>
           )}
-          <button type="submit" className="primary-button full">
+          {showLoginLink && (
+            <Link className="text-link" to="/login">
+              로그인하러 가기
+            </Link>
+          )}
+          <button
+            type="submit"
+            className="primary-button full"
+            disabled={submitting}
+          >
             코드 확인
           </button>
         </form>

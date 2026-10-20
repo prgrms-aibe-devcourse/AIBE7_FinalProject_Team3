@@ -150,8 +150,12 @@ export function installAuthApi(
       return
     }
 
-    // LOCAL 가입 1단계(1.2.1). 가입 여부와 관계없이 204다. 오류 시나리오는 GR-31 M02-02에서 추가한다.
-    if (path === '/api/v1/auth/email-verification' && method === 'POST') {
+    // LOCAL 가입 1·2단계(1.2.1·1.2.2). 성공 응답만 둔다. 오류 시나리오는 GR-31 M02-02에서 추가한다.
+    if (
+      (path === '/api/v1/auth/email-verification' ||
+        path === '/api/v1/auth/email-verification/confirm') &&
+      method === 'POST'
+    ) {
       await route.fulfill({ status: 204 })
       return
     }
