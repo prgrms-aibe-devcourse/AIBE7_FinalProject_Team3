@@ -137,6 +137,14 @@ textarea:focus-visible,
   gap: 34px;
   height: 100%;
 }
+.site-header .seller-nav {
+  min-width: 0;
+  overflow-x: auto;
+}
+.site-header .seller-nav a {
+  flex: none;
+  white-space: nowrap;
+}
 .site-header nav a {
   position: relative;
   display: flex;
@@ -158,6 +166,7 @@ textarea:focus-visible,
 }
 .header-actions {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 12px;
   margin-left: auto;

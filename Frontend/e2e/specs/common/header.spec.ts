@@ -1,5 +1,18 @@
 import { expect, getAuth, login, loginSeller, test } from '../../fixtures'
 
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/v1/seller-applications/me', (route) =>
+    route.fulfill({
+      status: 404,
+      json: {
+        success: false,
+        data: null,
+        error: { code: 'SELLER_APPLICATION_NOT_FOUND', message: '없음' },
+      },
+    }),
+  )
+})
+
 test('일반 회원은 MY에서 신청하고 신청 상태로 판매자 메뉴를 얻지 않는다', async ({
   page,
 }) => {
@@ -108,4 +121,25 @@ test('인증 조회가 진행 중이면 SELLER 링크를 먼저 보여주지 않
       .locator('.site-header')
       .getByRole('link', { name: 'SELLER', exact: true }),
   ).toBeVisible()
+})
+
+test('태블릿 판매자 헤더도 가로 넘침 없이 마지막 메뉴에 도달한다', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 800, height: 900 })
+  await loginSeller(page)
+  await page
+    .locator('.site-header')
+    .getByRole('link', { name: 'SELLER', exact: true })
+    .click()
+  const sales = page
+    .locator('.site-header')
+    .getByRole('link', { name: 'SALES', exact: true })
+  await sales.focus()
+  await expect(sales).toBeInViewport()
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true)
 })

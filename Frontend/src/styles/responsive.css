@@ -61,11 +61,6 @@
   }
   .site-header .seller-nav {
     gap: 20px;
-    overflow-x: auto;
-  }
-  .site-header .seller-nav a {
-    flex: none;
-    white-space: nowrap;
   }
   .header-actions .secondary-button {
     min-height: 36px;
