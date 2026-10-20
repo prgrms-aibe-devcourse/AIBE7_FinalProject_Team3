@@ -15,6 +15,15 @@ export const inputDate = (value: Date) =>
     value.getDate(),
   ).padStart(2, '0')}`
 
+export function inputDateTime(value: string) {
+  const date = new Date(value)
+  if (!Number.isFinite(date.getTime()))
+    throw new Error('올바르지 않은 날짜입니다.')
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+    .toISOString()
+    .slice(0, -1)
+}
+
 // 선택한 날짜의 시작·끝 순간. 서버가 양끝을 포함해 세므로 끝날은 23:59:59.999로 맞춘다(SELLER.md 2.1).
 export const dayStart = (value: string) => new Date(`${value}T00:00:00`)
 export const dayEnd = (value: string) => new Date(`${value}T23:59:59.999`)

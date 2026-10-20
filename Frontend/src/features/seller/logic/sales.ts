@@ -1,4 +1,4 @@
-import { sellerDropStatuses } from '../mock/mockSellerDrops'
+import { sellerDropStatuses } from './sellerDropQuery'
 
 export const salesPageSize = 4
 

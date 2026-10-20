@@ -110,7 +110,9 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
   })
 
   test('seller-drop-form', async ({ page }) => {
+    await loginSeller(page)
     await page.goto('/#/seller/drops/new')
+    await settleToast(page)
     await shot(page, 'seller-drop-form')
   })
 

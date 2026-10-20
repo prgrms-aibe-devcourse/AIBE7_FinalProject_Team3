@@ -12,7 +12,7 @@ import {
   inventoryPageSize,
   readInventoryQuery,
 } from '../../features/seller/logic/inventory'
-import { sellerDropStatuses } from '../../features/seller/mock/mockSellerDrops'
+import { sellerDropStatuses } from '../../features/seller/logic/sellerDropQuery'
 import { useDropStats } from '../../features/seller/logic/useDashboard'
 import { useSellerDropStocks } from '../../features/seller/logic/useSellerDropStocks'
 import { applicationErrorMessage } from '../../features/seller/logic/sellerApplicationState'
