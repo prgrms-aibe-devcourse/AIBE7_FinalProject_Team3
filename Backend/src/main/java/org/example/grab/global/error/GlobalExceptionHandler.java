@@ -1,10 +1,7 @@
 package org.example.grab.global.error;
 
-<<<<<<< HEAD
 import jakarta.servlet.http.HttpServletRequest;
-=======
 import jakarta.servlet.http.HttpServletResponse;
->>>>>>> main
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.grab.global.common.ErrorResponse;
