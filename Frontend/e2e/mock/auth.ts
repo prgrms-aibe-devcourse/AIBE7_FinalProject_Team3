@@ -150,13 +150,33 @@ export function installAuthApi(
       return
     }
 
-    // LOCAL 가입 1·2단계(1.2.1·1.2.2). 성공 응답만 둔다. 오류 시나리오는 GR-31 M02-02에서 추가한다.
+    // LOCAL 가입 1·2단계(1.2.1·1.2.2). 성공 응답만 둔다(3단계도 같다). 오류 시나리오는 GR-31 M02-02에서 추가한다.
     if (
       (path === '/api/v1/auth/email-verification' ||
         path === '/api/v1/auth/email-verification/confirm') &&
       method === 'POST'
     ) {
       await route.fulfill({ status: 204 })
+      return
+    }
+
+    // LOCAL 가입 3단계(1.2.3). 인증 쿠키를 발급하지 않으므로 로그인 상태를 바꾸지 않는다.
+    if (path === '/api/v1/auth/signup' && method === 'POST') {
+      const body = route.request().postDataJSON() as { nickname?: string }
+      await json(
+        route,
+        {
+          success: true,
+          data: {
+            userId: '00000000-0000-0000-0000-000000000002',
+            email: 'new@example.com',
+            nickname: body.nickname ?? '',
+            roles: ['USER'],
+            createdAt: '2026-10-20T00:00:00Z',
+          },
+        },
+        201,
+      )
       return
     }
 

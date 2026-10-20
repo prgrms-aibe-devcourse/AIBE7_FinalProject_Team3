@@ -138,12 +138,6 @@ test('LOCAL 이메일 코드와 회원가입 완료 후 로그인 화면으로 �
   await expect(page.getByLabel('인증된 이메일')).toHaveValue('new@example.com')
   await page.getByLabel('닉네임', { exact: true }).fill('새회원')
   await page.getByLabel('비밀번호').fill('Password123!')
-  await page.getByLabel('가입 결과 예시').selectOption('nickname')
-  await page.getByRole('button', { name: '회원가입 완료' }).click()
-  await expect(page.getByRole('alert')).toHaveText(
-    '이미 사용 중인 닉네임이에요.',
-  )
-  await page.getByLabel('가입 결과 예시').selectOption('success')
   await page.getByRole('button', { name: '회원가입 완료' }).click()
   await expect(page).toHaveURL(/#\/login$/)
 })
