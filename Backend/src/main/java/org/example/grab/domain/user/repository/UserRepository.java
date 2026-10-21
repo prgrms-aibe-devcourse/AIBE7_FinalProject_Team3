@@ -27,6 +27,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("select count(u) > 0 from User u where lower(u.nickname) = lower(:nickname)")
     boolean existsByNicknameIgnoreCase(@Param("nickname") String nickname);
 
+    /*
+        내 닉네임 수정의 중복 검사(MEMBER_AUTH.md 1.10, GR-129 M00-05). 비교 식은 existsByNicknameIgnoreCase와 같고 본인 행만 뺀다.
+        본인 현재 닉네임과 대소문자만 다른 값으로 바꾸는 것은 중복이 아니다. 유니크 인덱스도 본인 행 갱신이라 걸리지 않는다.
+     */
+    @Query("select count(u) > 0 from User u where lower(u.nickname) = lower(:nickname) and u.id <> :userId")
+    boolean existsByNicknameIgnoreCaseExcludingUser(@Param("nickname") String nickname, @Param("userId") Long userId);
+
     @Query("select u.id from User u where u.uuid = :publicId")
     Optional<Long> findIdByPublicId(@Param("publicId") UUID publicId);
 }
