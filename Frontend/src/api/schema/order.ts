@@ -302,6 +302,14 @@ export interface components {
       /** Format: int64 */
       subtotal?: number
     }
+    OrderShippingAddressResponse: {
+      recipient?: string
+      phone?: string
+      postalCode?: string
+      address1?: string
+      address2?: string
+      deliveryMemo?: string
+    }
     OrderShippingResponse: {
       /** @enum {string} */
       status?:
@@ -343,6 +351,7 @@ export interface components {
       /** @enum {string} */
       paymentStatus?:
         'PENDING' | 'SUCCEEDED' | 'FAILED' | 'UNKNOWN' | 'CANCELED'
+      shippingAddress?: components['schemas']['OrderShippingAddressResponse']
       shipping?: components['schemas']['OrderShippingResponse']
       /** Format: date-time */
       orderedAt?: string
@@ -438,6 +447,7 @@ export interface components {
         'PENDING' | 'SUCCEEDED' | 'FAILED' | 'UNKNOWN' | 'CANCELED'
       /** Format: date-time */
       paymentExpiresAt?: string
+      shippingAddress?: components['schemas']['OrderShippingAddressResponse']
       shipping?: components['schemas']['OrderShippingResponse']
       /** Format: date-time */
       orderedAt?: string

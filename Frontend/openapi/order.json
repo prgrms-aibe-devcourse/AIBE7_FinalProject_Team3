@@ -1164,6 +1164,29 @@
           }
         }
       },
+      "OrderShippingAddressResponse": {
+        "type": "object",
+        "properties": {
+          "recipient": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "postalCode": {
+            "type": "string"
+          },
+          "address1": {
+            "type": "string"
+          },
+          "address2": {
+            "type": "string"
+          },
+          "deliveryMemo": {
+            "type": "string"
+          }
+        }
+      },
       "OrderShippingResponse": {
         "type": "object",
         "properties": {
@@ -1243,6 +1266,9 @@
           "paymentStatus": {
             "type": "string",
             "enum": ["PENDING", "SUCCEEDED", "FAILED", "UNKNOWN", "CANCELED"]
+          },
+          "shippingAddress": {
+            "$ref": "#/components/schemas/OrderShippingAddressResponse"
           },
           "shipping": {
             "$ref": "#/components/schemas/OrderShippingResponse"
@@ -1451,6 +1477,9 @@
           "paymentExpiresAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "shippingAddress": {
+            "$ref": "#/components/schemas/OrderShippingAddressResponse"
           },
           "shipping": {
             "$ref": "#/components/schemas/OrderShippingResponse"
