@@ -109,12 +109,10 @@ export default function MyPage({
 
   return (
     <section className="page-section">
-      <p className="eyebrow">MY GRAB</p>
       <h1>나의 취향과 주문</h1>
       <section className="panel account-panel">
         <div className="account-heading">
           <div>
-            <p className="eyebrow">MY ACCOUNT</p>
             <h2>내 계정</h2>
             <strong>{user.nickname}</strong>
             <p>{user.email}</p>

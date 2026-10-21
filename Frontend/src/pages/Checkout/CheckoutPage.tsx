@@ -198,7 +198,6 @@ function DraftCheckout({
 
   return (
     <section className="page-section buyer-page">
-      <p className="eyebrow">GRAB CHECKOUT</p>
       <h1>주문을 확인해 주세요</h1>
       <p className="buyer-intro">
         배송지를 입력하면 주문을 만들고 서버가 금액과 결제 마감을 확정합니다.
@@ -424,7 +423,6 @@ function OrderCheckout({
 
   return (
     <section className="page-section buyer-page">
-      <p className="eyebrow">GRAB CHECKOUT</p>
       <h1>주문을 확인해 주세요</h1>
       <p className="buyer-intro">
         주문번호 {loadedOrder.orderNumber} ·{' '}

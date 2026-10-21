@@ -202,7 +202,7 @@
   font-size: clamp(28px, 4vw, 46px);
   letter-spacing: -2px;
 }
-.story-section > p:not(.eyebrow) {
+.story-section > p {
   max-width: 650px;
   margin: 0 auto;
   color: var(--muted);

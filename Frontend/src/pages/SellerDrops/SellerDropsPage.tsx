@@ -58,7 +58,6 @@ export default function SellerDropsPage({
     <section className="page-section seller-page seller-drops-page">
       <div className="seller-drops-heading">
         <div>
-          <p className="eyebrow">DROP STUDIO</p>
           <h1>DROP 관리</h1>
           <p>상태별로 상품을 살펴보고 공개를 관리합니다.</p>
         </div>

@@ -215,7 +215,6 @@ function SellerDropForm({
         <span>/</span>
         <span>{draft ? 'DRAFT 편집' : '새 DROP'}</span>
       </div>
-      <p className="eyebrow">ONE DROP, ONE PRODUCT</p>
       <h1>{draft ? 'DRAFT 편집' : '새 DROP 만들기'}</h1>
       <p className="page-description">
         상품 특성에 맞게 옵션 그룹과 선택값을 자유롭게 구성하세요.

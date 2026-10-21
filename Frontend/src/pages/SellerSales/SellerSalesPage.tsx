@@ -71,7 +71,6 @@ export default function SellerSalesPage({
     <section className="page-section seller-page seller-sales-page">
       <div className="seller-title">
         <div>
-          <p className="eyebrow">SALES VIEW</p>
           <h1>판매 실적</h1>
           <p>상품별 누적 주문과 판매 결과를 확인합니다.</p>
         </div>

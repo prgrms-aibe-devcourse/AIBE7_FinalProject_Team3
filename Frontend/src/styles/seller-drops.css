@@ -100,7 +100,12 @@
 .seller-drops-result {
   display: grid;
   justify-items: center;
+  gap: 16px;
   padding-bottom: 24px;
+}
+/* 안내는 목록 폭을 채우고, 아래 버튼만 가운데 둔다. */
+.seller-drops-result > .empty-state {
+  justify-self: stretch;
 }
 .seller-drops-note {
   display: block;

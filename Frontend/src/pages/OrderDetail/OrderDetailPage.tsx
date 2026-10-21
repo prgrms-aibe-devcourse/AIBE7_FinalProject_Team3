@@ -153,7 +153,6 @@ function OrderContent({
 
   return (
     <section className="page-section buyer-page">
-      <p className="eyebrow">MY ORDER</p>
       <h1>주문 {order.orderNumber}</h1>
       <p className="buyer-intro">
         <span className="buyer-status">

@@ -179,7 +179,6 @@ export default function SellerOrdersPage({
     <section className="page-section seller-page seller-orders-page">
       <div className="seller-title">
         <div>
-          <p className="eyebrow">ORDER DESK</p>
           <h1>주문·배송</h1>
           <p>본인 DROP의 주문과 발송 작업을 확인합니다.</p>
           {dropId && (

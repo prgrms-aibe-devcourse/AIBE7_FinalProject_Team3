@@ -161,7 +161,6 @@ export default function SellerDropDetailPage({
       </Link>
       <div className="seller-drops-heading">
         <div>
-          <p className="eyebrow">DROP DETAIL</p>
           <h1>{drop.name || '이름 없는 DROP'}</h1>
           <p>
             {category} ·{' '}
