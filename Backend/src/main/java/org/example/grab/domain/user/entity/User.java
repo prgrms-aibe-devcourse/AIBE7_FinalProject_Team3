@@ -122,4 +122,11 @@ public class User extends UUIDEntity {
                 providerUserId
         );
     }
+
+    /*
+        본인 닉네임 수정(MEMBER_AUTH.md 1.10, GR-129). 규칙 검증·앞뒤 공백 제거는 요청 DTO가, 현재 값과 같은지·다른 회원과 중복인지는 서비스가 판단한 값을 받는다(M00-05). 중복 판단에 DB 조회가 필요해 엔티티는 null만 막는다(생성자와 같음).
+     */
+    public void changeNickname(String nickname) {
+        this.nickname = Objects.requireNonNull(nickname);
+    }
 }
