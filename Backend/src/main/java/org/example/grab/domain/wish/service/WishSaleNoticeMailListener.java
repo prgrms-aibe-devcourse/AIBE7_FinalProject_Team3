@@ -28,9 +28,10 @@ import java.util.List;
 @Component
 public class WishSaleNoticeMailListener {
 
-    private static final String DETAIL_PATH_FORMAT = "/drops/%d";
+    // 프론트가 HashRouter를 쓰므로(라우트는 # 뒤에서만 읽힘) 링크에도 #을 붙인다
+    private static final String DETAIL_PATH_FORMAT = "/#/drops/%d";
     // 취소된 DROP은 상세로 보낼 수 없으므로(GR-70), 취소 알림은 목록으로 안내한다
-    private static final String LIST_PATH = "/drops";
+    private static final String LIST_PATH = "/#/drops";
 
     // 메시지당 BCC 수신자 상한. Gmail SMTP 기준 100명이고 Brevo 상한은 공개되지 않아 보수적으로 맞춘다
     private static final int MAX_BCC_PER_MAIL = 100;
