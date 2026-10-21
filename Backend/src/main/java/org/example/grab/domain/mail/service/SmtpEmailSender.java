@@ -6,6 +6,7 @@ import org.example.grab.domain.mail.dto.EmailMessage;
 import org.example.grab.domain.mail.error.EmailSendException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -104,5 +105,9 @@ public class SmtpEmailSender implements EmailSender {
         }
         helper.setSubject(message.subject());
         helper.setText(message.textBody(), message.htmlBody()); // 수신 메일 프로그램이 HTML을 지원하면 HTML을, 지원하지 않으면 텍스트
+        // 본문을 먼저 설정해야 메일 클라이언트가 CID 참조를 올바르게 연결한다
+        for (var image : message.inlineImages().entrySet()) {
+            helper.addInline(image.getKey(), new ClassPathResource(image.getValue()));
+        }
     }
 }

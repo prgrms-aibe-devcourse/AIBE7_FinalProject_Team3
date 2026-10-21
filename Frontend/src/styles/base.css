@@ -137,6 +137,14 @@ textarea:focus-visible,
   gap: 34px;
   height: 100%;
 }
+.site-header .seller-nav {
+  min-width: 0;
+  overflow-x: auto;
+}
+.site-header .seller-nav a {
+  flex: none;
+  white-space: nowrap;
+}
 .site-header nav a {
   position: relative;
   display: flex;
@@ -158,11 +166,11 @@ textarea:focus-visible,
 }
 .header-actions {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 12px;
   margin-left: auto;
 }
-.mode-button,
 .secondary-button {
   display: inline-flex;
   align-items: center;
@@ -174,9 +182,6 @@ textarea:focus-visible,
   background: #fff;
   font-weight: 700;
   font-size: 13px;
-}
-.mode-button span {
-  margin-left: 14px;
 }
 .account-button {
   display: grid;

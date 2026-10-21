@@ -253,9 +253,15 @@ p {
 .scroll-row .card {
   flex: 0 0 calc((100% - 48px) / 4);
 }
-.rail-info {
-  font-size: 13px;
-  color: var(--muted);
+.home-rail {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 8px;
+}
+.home-rail > button {
+  padding: 0;
+  min-height: 44px;
 }
 @media (max-width: 850px) {
   .cols-4 {

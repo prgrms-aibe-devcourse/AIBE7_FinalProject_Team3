@@ -15,6 +15,10 @@
   --rail-gap: 22px;
   --rail-visible: 4;
   outline-offset: 4px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
 }
 .popular-viewport {
   overflow: hidden;
@@ -40,28 +44,16 @@
     );
   min-width: 0;
 }
-.popular-info {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px 16px;
-  margin-top: 20px;
-  font-size: 13px;
+.popular-rail-navigable {
+  grid-template-columns: 32px minmax(0, 1fr) 32px;
 }
-.popular-info .secondary-button:disabled {
+.popular-arrow {
+  width: 32px;
+  padding: 0;
+}
+.popular-arrow:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-.popular-position {
-  min-width: 52px;
-  color: var(--muted);
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-.popular-hint {
-  color: var(--muted);
-  font-size: 12px;
 }
 
 .catalog-controls {

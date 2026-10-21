@@ -7,8 +7,8 @@ export const DEMO_PASSWORD = 'password1234'
 export type AuthProvider = 'LOCAL' | 'KAKAO' | 'GOOGLE'
 type LoginFailure = 'credentials' | 'disabled' | null
 
-// LOCAL 가입 3단계(MEMBER_AUTH 1.2.1~1.2.3). 오류는 failSignup으로 다음 응답부터 차례로 바꾼다.
-export type SignupStep = 'request' | 'confirm' | 'signup'
+// LOCAL 가입 3단계(MEMBER_AUTH 1.2.1~1.2.3)와 소셜 가입 완료(1.6, social). 오류는 failSignup으로 다음 응답부터 차례로 바꾼다.
+export type SignupStep = 'request' | 'confirm' | 'signup' | 'social'
 export type SignupReply =
   | {
       status: number
@@ -26,6 +26,13 @@ const SIGNUP_PATHS: Record<string, SignupStep> = {
   '/api/v1/auth/email-verification': 'request',
   '/api/v1/auth/email-verification/confirm': 'confirm',
   '/api/v1/auth/signup': 'signup',
+  '/api/v1/auth/oauth2/signup': 'social',
+}
+
+// 소셜 로그인 시작(1.4)은 실제 제공자로 가지 않고 콜백 결과 주소로 바로 302한다(GR-47 M00-05).
+const SOCIAL_START_PROVIDERS: Record<string, AuthProvider> = {
+  '/api/v1/auth/oauth2/kakao': 'KAKAO',
+  '/api/v1/auth/oauth2/google': 'GOOGLE',
 }
 
 export type AuthState = {
@@ -43,6 +50,9 @@ export type AuthState = {
   refreshCount: number
   signupReplies: Record<SignupStep, SignupReply[]>
   signupRequests: SignupRequest[]
+  // 다음 소셜 시작이 콜백에 붙일 쿼리(result=… 또는 error=…). result=success면 그 제공자 회원으로 로그인된다.
+  socialCallbackQuery: string
+  socialStarts: string[]
 }
 
 export type AuthController = {
@@ -54,6 +64,7 @@ export type AuthController = {
   failLogin: (kind: Exclude<LoginFailure, null>) => void
   failLogout: () => void
   failSignup: (step: SignupStep, ...replies: SignupReply[]) => void
+  setSocialCallback: (query: string) => void
 }
 
 const controllers = new WeakMap<Page, AuthController>()
@@ -100,8 +111,10 @@ export function installAuthApi(
     loginFailure: null,
     logoutFails: false,
     refreshCount: 0,
-    signupReplies: { request: [], confirm: [], signup: [] },
+    signupReplies: { request: [], confirm: [], signup: [], social: [] },
     signupRequests: [],
+    socialCallbackQuery: 'result=success',
+    socialStarts: [],
     ...initial,
   }
   const controller: AuthController = {
@@ -126,6 +139,9 @@ export function installAuthApi(
     },
     failSignup: (step, ...replies) => {
       state.signupReplies[step].push(...replies)
+    },
+    setSocialCallback: (query) => {
+      state.socialCallbackQuery = query
     },
   }
   controllers.set(page, controller)
@@ -207,6 +223,28 @@ export function installAuthApi(
         )
         return
       }
+      // 소셜 가입 완료(201)는 인증 쿠키를 발급하므로 로그인 상태가 된다.
+      if (signupStep === 'social') {
+        const body = route.request().postDataJSON() as { nickname?: string }
+        state.loggedIn = true
+        state.nickname = body.nickname ?? state.nickname
+        await json(
+          route,
+          {
+            success: true,
+            data: {
+              user: {
+                userId: userBody(state).data.userId,
+                email: state.email,
+                nickname: state.nickname,
+                roles: state.roles,
+              },
+            },
+          },
+          201,
+        )
+        return
+      }
       // 가입 완료(201)는 인증 쿠키를 발급하지 않으므로 로그인 상태를 바꾸지 않는다.
       if (signupStep === 'signup') {
         const body = route.request().postDataJSON() as { nickname?: string }
@@ -227,6 +265,23 @@ export function installAuthApi(
         return
       }
       await route.fulfill({ status: 204 })
+      return
+    }
+
+    const socialProvider = SOCIAL_START_PROVIDERS[path]
+    if (socialProvider && method === 'GET') {
+      state.socialStarts.push(path)
+      if (state.socialCallbackQuery === 'result=success') {
+        state.loggedIn = true
+        state.provider = socialProvider
+      }
+      if (state.socialCallbackQuery === 'result=signup_required') {
+        state.provider = socialProvider
+      }
+      await route.fulfill({
+        status: 302,
+        headers: { location: `/#/auth/callback?${state.socialCallbackQuery}` },
+      })
       return
     }
 

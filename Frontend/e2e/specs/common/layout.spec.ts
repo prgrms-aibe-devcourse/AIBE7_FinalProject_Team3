@@ -73,12 +73,21 @@ const pages: {
   {
     name: '로그인',
     path: '/#/login',
-    actions: (page) => [page.getByRole('button', { name: '로그인' })],
+    actions: (page) => [
+      page.getByRole('button', { name: '로그인' }),
+      page.getByRole('button', { name: 'KAKAO' }),
+      page.getByRole('button', { name: 'GOOGLE' }),
+    ],
   },
   {
     name: '회원가입',
     path: '/#/signup',
     actions: (page) => [page.getByRole('button', { name: '인증 코드 보내기' })],
+  },
+  {
+    name: '소셜 회원가입',
+    path: '/#/signup?type=social',
+    actions: (page) => [page.getByRole('button', { name: '회원가입 완료' })],
   },
   {
     name: '판매자 주문',
@@ -206,6 +215,40 @@ test('회원가입 2·3단계: 오류를 표시해도 가로 넘침 없이 핵�
   await page.getByRole('button', { name: '회원가입 완료' }).click()
   await expect(page.locator('#signup-password-error')).toBeVisible()
   await expectReachable(page, page.locator('#signup-nickname-error'))
+  await expectReachable(
+    page,
+    page.getByRole('button', { name: '회원가입 완료' }),
+  )
+  await expectNoHorizontalOverflow(page)
+})
+
+test('소셜 로그인·가입: 오류를 표시해도 가로 넘침 없이 핵심 버튼에 닿는다', async ({
+  page,
+}) => {
+  // 콜백 오류 중 가장 긴 안내 문구
+  await page.goto('/#/auth/callback?error=ACCOUNT_LINK_REQUIRED')
+  await expect(page.getByRole('alert')).toBeVisible()
+  for (const action of [
+    page.getByRole('alert'),
+    page.getByRole('button', { name: 'KAKAO' }),
+    page.getByRole('button', { name: 'GOOGLE' }),
+  ]) {
+    await expectReachable(page, action)
+  }
+  await expectNoHorizontalOverflow(page)
+
+  getAuth(page).failSignup('social', {
+    status: 500,
+    code: 'INTERNAL_SERVER_ERROR',
+  })
+  await page.goto('/#/signup?type=social')
+  await page.getByRole('button', { name: '회원가입 완료' }).click()
+  await page.getByLabel('닉네임').fill('드롭헌터2')
+  await page.getByRole('button', { name: '회원가입 완료' }).click()
+  await expect(page.getByRole('alert')).toBeVisible()
+  await page.getByLabel('닉네임').fill('a')
+  await page.getByRole('button', { name: '회원가입 완료' }).click()
+  await expectReachable(page, page.locator('#social-signup-nickname-error'))
   await expectReachable(
     page,
     page.getByRole('button', { name: '회원가입 완료' }),

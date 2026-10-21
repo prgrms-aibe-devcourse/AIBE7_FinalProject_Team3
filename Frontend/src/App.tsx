@@ -3,7 +3,9 @@ import { Route, Routes, useNavigate } from 'react-router-dom'
 import Footer from './components/Footer/Footer'
 import Header from './components/Header/Header'
 import useAuth from './features/auth/logic/useAuth'
+import { isSeller } from './features/auth/logic/authUser'
 import useWish from './features/wish/logic/useWish'
+import AuthCallbackPage from './pages/AuthCallback/AuthCallbackPage'
 import CheckoutPage from './pages/Checkout/CheckoutPage'
 import DropDetailPage from './pages/DropDetail/DropDetailPage'
 import DropListPage from './pages/DropList/DropListPage'
@@ -32,7 +34,7 @@ export default function App() {
     setToast(message)
     window.setTimeout(() => setToast(''), 2600)
   }
-  const { user, status, authenticated, login, logout } = useAuth()
+  const { user, status, authenticated, login, refresh, logout } = useAuth()
   const { wishes, wishesReady, toggleWish } = useWish(authenticated, notify)
 
   const shared: SharedProps = {
@@ -46,7 +48,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Header authenticated={authenticated} />
+      <Header authenticated={authenticated} seller={isSeller(user)} />
       <main>
         <Routes>
           <Route path="/" element={<HomePage {...shared} />} />
@@ -82,7 +84,14 @@ export default function App() {
             path="/login"
             element={<LoginPage login={login} notify={notify} />}
           />
-          <Route path="/signup" element={<SignupPage notify={notify} />} />
+          <Route
+            path="/auth/callback"
+            element={<AuthCallbackPage refreshAuth={refresh} notify={notify} />}
+          />
+          <Route
+            path="/signup"
+            element={<SignupPage refreshAuth={refresh} notify={notify} />}
+          />
           <Route path="/seller" element={<SellerDashboardPage />} />
           <Route
             path="/seller/apply"

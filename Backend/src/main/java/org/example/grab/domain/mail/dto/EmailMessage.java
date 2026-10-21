@@ -1,6 +1,7 @@
 package org.example.grab.domain.mail.dto;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -11,14 +12,20 @@ import java.util.Objects;
  * @param subject  메일 제목
  * @param htmlBody HTML 본문
  * @param textBody HTML을 표시하지 못하는 메일 클라이언트를 위한 텍스트 본문
+ * @param inlineImages HTML의 CID와 메일에 첨부할 클래스패스 이미지 경로
  */
 public record EmailMessage(
         String to,
         List<String> bcc,
         String subject,
         String htmlBody,
-        String textBody
+        String textBody,
+        Map<String, String> inlineImages
 ) {
+
+    public EmailMessage(String to, List<String> bcc, String subject, String htmlBody, String textBody) {
+        this(to, bcc, subject, htmlBody, textBody, Map.of());
+    }
 
     /** 받는 사람이 한 명인 메일(인증 코드 등). */
     public EmailMessage(String to, String subject, String htmlBody, String textBody) {
@@ -38,6 +45,7 @@ public record EmailMessage(
 
     public EmailMessage {
         bcc = bcc == null ? List.of() : List.copyOf(bcc);
+        inlineImages = Map.copyOf(inlineImages);
         // 받는 사람이 아무도 없는 메일은 만들 수 없다. 보내 봐야 SMTP가 거부한다
         if (to == null && bcc.isEmpty()) {
             throw new IllegalArgumentException("받는 사람이 없는 메일은 만들 수 없다");

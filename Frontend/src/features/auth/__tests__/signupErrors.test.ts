@@ -7,6 +7,9 @@ import {
   SIGNUP_CONTEXT_MESSAGE,
   signupFailure,
   signupFieldErrors,
+  SOCIAL_DUPLICATE_EMAIL_MESSAGE,
+  SOCIAL_SIGNUP_CONTEXT_MESSAGE,
+  socialSignupFailure,
 } from '../logic/signupErrors'
 import {
   NICKNAME_RULE_MESSAGE,
@@ -211,6 +214,53 @@ describe('signupFailure', () => {
     expect(signupFailure(networkError())).toEqual({
       kind: 'general',
       message: NETWORK,
+    })
+  })
+})
+
+describe('socialSignupFailure', () => {
+  it('가입 컨텍스트 무효와 이미 가입된 이메일은 소셜 로그인부터 다시 시작한다', () => {
+    expect(
+      socialSignupFailure(apiError(401, 'OAUTH2_SIGNUP_CONTEXT_INVALID')),
+    ).toEqual({ kind: 'restart', message: SOCIAL_SIGNUP_CONTEXT_MESSAGE })
+    expect(socialSignupFailure(apiError(409, 'DUPLICATE_EMAIL'))).toEqual({
+      kind: 'restart',
+      message: SOCIAL_DUPLICATE_EMAIL_MESSAGE,
+    })
+  })
+
+  it('닉네임 중복·형식 오류는 닉네임 필드에 표시한다', () => {
+    expect(socialSignupFailure(apiError(409, 'DUPLICATE_NICKNAME'))).toEqual({
+      kind: 'fields',
+      fieldErrors: { nickname: '이미 사용 중인 닉네임이에요.' },
+    })
+    for (const code of ['INVALID_NICKNAME', 'VALIDATION_FAILED']) {
+      expect(socialSignupFailure(apiError(400, code))).toEqual({
+        kind: 'fields',
+        fieldErrors: { nickname: NICKNAME_RULE_MESSAGE },
+      })
+    }
+  })
+
+  it('그 밖의 오류는 같은 화면 폼 하단 문구다', () => {
+    expect(socialSignupFailure(apiError(400, 'INVALID_REQUEST'))).toEqual({
+      kind: 'general',
+      message: GENERAL,
+    })
+    expect(socialSignupFailure(apiError(403, 'ACCESS_DENIED'))).toEqual({
+      kind: 'general',
+      message: GENERAL,
+    })
+    expect(socialSignupFailure(apiError(500, 'INTERNAL_SERVER_ERROR'))).toEqual(
+      { kind: 'general', message: NETWORK },
+    )
+    expect(socialSignupFailure(networkError())).toEqual({
+      kind: 'general',
+      message: NETWORK,
+    })
+    expect(socialSignupFailure(new Error('x'))).toEqual({
+      kind: 'general',
+      message: GENERAL,
     })
   })
 })

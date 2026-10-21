@@ -219,6 +219,7 @@ asyncEmailDispatcher.dispatchAll(List.of(EmailMessage.toBcc(recipients, subject,
 
 - 제목에 인증 코드를 넣지 않는다. `EmailMessage.toString()`과 실패 로그에 제목이 남는다.
 - HTML 본문과 텍스트 본문을 모두 채운다. HTML을 표시하지 못하는 메일 프로그램은 텍스트 본문을 보여 준다.
+- 본문 이미지는 `EmailMessage.inlineImages`에 CID와 클래스패스 경로를 넣고 HTML에서 `src="cid:CID"`로 참조한다. SMTP 발송기가 이미지를 인라인 첨부한다. 인증 메일 로고는 웹 헤더의 원본을 `src/main/resources/mail/grab-wordmark.png`에 함께 보관해 외부 이미지 서버 없이 표시한다.
 - 본문 작성(템플릿)은 호출하는 쪽에서 한다. 발송 구현체는 완성된 메일 한 통을 보내기만 한다.
 - 받는 주소는 정규화한 이메일(앞뒤 공백 제거, 소문자)을 쓴다.
 - 본문에 넣는 사용자 입력값(DROP 이름 등)은 `HtmlUtils.htmlEscape`로 이스케이프한다. 텍스트 본문은 마크업으로 해석되지 않으므로 원문을 쓴다.
