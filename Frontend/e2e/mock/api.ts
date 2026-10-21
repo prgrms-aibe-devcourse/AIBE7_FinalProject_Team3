@@ -41,7 +41,8 @@ async function handleRoute(
   if (await handleSellerDashboardRoute(route, url)) return
   if (await handleSellerDropStatsRoute(route, url)) return
   if (await handleSellerOrdersRoute(route, url, state.sellerOrders)) return
-  if (await handleBuyerOrdersRoute(route, url, state.buyerOrders)) return
+  if (await handleBuyerOrdersRoute(route, url, state.buyerOrders, state.drops))
+    return
   await route.fallback()
 }
 
@@ -69,6 +70,16 @@ export async function installHomeScenario(
     wished: initialWishesFor(scenario),
     sellerOrders: createSellerOrdersFixture(),
     buyerOrders: createBuyerOrdersFixture(),
+  }
+  if (scenario === 'many') {
+    const sample = state.drops.find((drop) => drop.dropId === 201)!
+    state.drops.push(
+      ...Array.from({ length: 8 }, (_, index) => ({
+        ...sample,
+        dropId: 3000 + index,
+        name: `인기 GRAB 상품 ${index + 1}`,
+      })),
+    )
   }
   await page.route('**/api/v1/**', (route) =>
     handleRoute(route, state, scenario, scenario === 'failure' ? 'GRAB' : null),

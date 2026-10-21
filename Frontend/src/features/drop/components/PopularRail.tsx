@@ -82,13 +82,24 @@ export default function PopularRail({
 
   return (
     <div
-      className="popular-rail"
+      className={`popular-rail${maxIndex > 0 ? ' popular-rail-navigable' : ''}`}
       role="group"
       aria-roledescription="carousel"
       aria-label={label}
       tabIndex={0}
       onKeyDown={onKeyDown}
     >
+      {maxIndex > 0 && (
+        <button
+          type="button"
+          className="secondary-button popular-arrow"
+          aria-label="이전"
+          onClick={() => move(-1)}
+          disabled={safeIndex === 0}
+        >
+          <span aria-hidden="true">〈</span>
+        </button>
+      )}
       <div
         className="popular-viewport"
         onTouchStart={onTouchStart}
@@ -113,28 +124,15 @@ export default function PopularRail({
         </div>
       </div>
       {maxIndex > 0 && (
-        <div className="popular-info">
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() => move(-1)}
-            disabled={safeIndex === 0}
-          >
-            〈 이전
-          </button>
-          <span className="popular-position" aria-live="polite">
-            {safeIndex + 1} / {drops.length}
-          </span>
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() => move(1)}
-            disabled={safeIndex >= maxIndex}
-          >
-            다음 〉
-          </button>
-          <span className="popular-hint">터치·키보드로 이동</span>
-        </div>
+        <button
+          type="button"
+          className="secondary-button popular-arrow"
+          aria-label="다음"
+          onClick={() => move(1)}
+          disabled={safeIndex >= maxIndex}
+        >
+          <span aria-hidden="true">〉</span>
+        </button>
       )}
     </div>
   )

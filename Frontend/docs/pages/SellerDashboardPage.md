@@ -34,3 +34,7 @@ DROP 상태 카드는 `/seller/drops?status=...`, 주문 상태 카드는 `/sell
 보정 필요 결제 카드는 다른 요약 카드와 같은 테두리를 사용하고 상단 선만 위험 색으로 표시한다. 시작·종료 임박 패널은 같은 높이에서 나란히 시작한다.
 
 [공통 디자인 기준](../DESIGN.md)을 함께 따른다.
+
+## 헤더·판매자 진입 (GR-128)
+
+일반 화면과 `/seller/apply`는 WISH·GRAB 기본 헤더를 사용한다. `users/me.roles`에 SELLER가 있을 때만 그 옆에 SELLER 링크(`/seller`)를 표시한다. 일반 회원은 MY → 판매자 신청 → 운영자 승인 순서로 권한을 취득하며 제출 성공·신청 상태만으로 권한을 추정하지 않는다. 판매자 작업 공간 헤더는 DASHBOARD·DROPS·ORDERS·INVENTORY·SALES와 SHOP(`/wish`) 복귀 링크를 사용한다. 인증 로딩·로그아웃·계정 변경 시에도 실제 역할을 따른다.

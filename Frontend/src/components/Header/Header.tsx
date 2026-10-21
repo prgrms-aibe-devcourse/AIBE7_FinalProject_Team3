@@ -1,9 +1,17 @@
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import wordmark from '../../assets/images/grab-wordmark.png'
 
-export default function Header({ authenticated }: { authenticated: boolean }) {
+export default function Header({
+  authenticated,
+  seller,
+}: {
+  authenticated: boolean
+  seller: boolean
+}) {
   const location = useLocation()
-  const sellerMode = location.pathname.startsWith('/seller')
+  const sellerMode =
+    /^\/seller(?:\/|$)/.test(location.pathname) &&
+    !/^\/seller\/apply\/?$/.test(location.pathname)
 
   return (
     <header className="site-header">
@@ -17,25 +25,27 @@ export default function Header({ authenticated }: { authenticated: boolean }) {
         {sellerMode ? (
           <>
             <NavLink end to="/seller">
-              종합
+              DASHBOARD
             </NavLink>
-            <NavLink to="/seller/drops">DROP 관리</NavLink>
-            <NavLink to="/seller/orders">주문·배송</NavLink>
-            <NavLink to="/seller/inventory">재고</NavLink>
-            <NavLink to="/seller/sales">실적</NavLink>
+            <NavLink to="/seller/drops">DROPS</NavLink>
+            <NavLink to="/seller/orders">ORDERS</NavLink>
+            <NavLink to="/seller/inventory">INVENTORY</NavLink>
+            <NavLink to="/seller/sales">SALES</NavLink>
           </>
         ) : (
           <>
             <NavLink to="/wish">WISH</NavLink>
             <NavLink to="/grab">GRAB</NavLink>
+            {seller && <NavLink to="/seller">SELLER</NavLink>}
           </>
         )}
       </nav>
       <div className="header-actions">
-        <Link className="mode-button" to={sellerMode ? '/wish' : '/seller'}>
-          {sellerMode ? '쇼퍼 전환' : '셀러 전환'}{' '}
-          <span aria-hidden="true">↗</span>
-        </Link>
+        {sellerMode && (
+          <Link className="secondary-button" to="/wish">
+            SHOP ↗
+          </Link>
+        )}
         {!sellerMode && (
           <Link
             className="account-button"

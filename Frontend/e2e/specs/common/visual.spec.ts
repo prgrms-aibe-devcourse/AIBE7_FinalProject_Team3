@@ -43,6 +43,16 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
   }
 
   test('my', async ({ page }) => {
+    await page.route('**/api/v1/seller-applications/me', (route) =>
+      route.fulfill({
+        status: 404,
+        json: {
+          success: false,
+          data: null,
+          error: { code: 'SELLER_APPLICATION_NOT_FOUND', message: '없음' },
+        },
+      }),
+    )
     await page.goto('/#/login')
     await page.getByLabel('이메일').fill('grab@example.com')
     await page.getByLabel('비밀번호').fill('password1234')
@@ -158,13 +168,26 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
     await shot(page, 'seller-sales')
   })
 
+  // 주문 생성 전(배송지 입력) 화면
   test('checkout', async ({ page }) => {
-    await page.goto('/#/checkout/demo-pending')
+    await page.goto('/#/checkout?dropId=201&optionId=2012&quantity=2')
     await page.getByLabel('이메일').fill('grab@example.com')
     await page.getByLabel('비밀번호').fill('password1234')
     await page.getByRole('button', { name: '로그인', exact: true }).click()
     await settleToast(page)
+    await expect(page.getByLabel('받는 분')).toBeVisible()
     await shot(page, 'checkout')
+  })
+
+  // 주문 생성 후 결제 대기 화면
+  test('checkout-payment', async ({ page }) => {
+    await page.goto(`/#/checkout/${BUYER_ORDER_IDS.pending}`)
+    await page.getByLabel('이메일').fill('grab@example.com')
+    await page.getByLabel('비밀번호').fill('password1234')
+    await page.getByRole('button', { name: '로그인', exact: true }).click()
+    await settleToast(page)
+    await expect(page.getByRole('button', { name: '결제하기' })).toBeEnabled()
+    await shot(page, 'checkout-payment')
   })
 
   test('order-detail', async ({ page }) => {
@@ -186,6 +209,13 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
       page.getByRole('group', { name: '곧 만날 인기 WISH' }),
     ).toBeVisible()
     await shot(page, 'home')
+  })
+
+  test('home-slides', async ({ page }) => {
+    await installHomeScenario(page, 'many')
+    await page.goto('/')
+    await expect(page.locator('.popular-arrow')).toHaveCount(4)
+    await shot(page, 'home-slides')
   })
 
   test('home-states', async ({ page }) => {

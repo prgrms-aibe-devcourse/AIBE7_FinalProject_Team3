@@ -1,8 +1,39 @@
 import { afterEach, expect, test, vi } from 'vitest'
 import { api } from '../../client'
-import { getMyOrder, getMyOrders } from '../orders'
+import { createOrder, getMyOrder, getMyOrders } from '../orders'
 
 afterEach(() => vi.restoreAllMocks())
+
+test('주문 생성은 멱등 키 헤더와 본문을 보내고 잘못된 응답은 거부한다', async () => {
+  const post = vi.spyOn(api, 'post')
+  const body = {
+    dropId: 100,
+    items: [{ optionId: 1001, quantity: 2 }],
+    shippingAddress: {
+      recipient: '홍길동',
+      phone: '01012345678',
+      postalCode: '06236',
+      address1: '서울특별시 강남구 테헤란로 1',
+    },
+  }
+  const created = {
+    orderId: 'b2d4f6a8-1c3e-4a5b-8c7d-9e0f1a2b3c4d',
+    orderNumber: 'ORD-20260918-000500',
+    status: 'PAYMENT_PENDING',
+    totalAmount: 261000,
+    paymentExpiresAt: '2026-09-18T14:10:00+09:00',
+  }
+  post.mockResolvedValueOnce({ data: { success: true, data: created } })
+  await expect(createOrder('key-1', body)).resolves.toEqual(created)
+  expect(post).toHaveBeenCalledWith('/orders', body, {
+    headers: { 'Idempotency-Key': 'key-1' },
+  })
+
+  post.mockResolvedValueOnce({ data: { success: true, data: {} } })
+  await expect(createOrder('key-1', body)).rejects.toThrow(
+    '주문 생성 응답 형식이 올바르지 않습니다.',
+  )
+})
 
 test('내 주문 목록을 조회하고 잘못된 응답은 거부한다', async () => {
   const get = vi.spyOn(api, 'get')

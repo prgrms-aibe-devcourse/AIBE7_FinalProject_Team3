@@ -4,6 +4,7 @@ import { getAuth, installAuthApi } from './mock/auth'
 import { installStockStream } from './mock/stockStream'
 import { installDropImageUploads } from './mock/dropImages'
 import { installSellerDropApi } from './mock/sellerDrops'
+import { installFakeToss } from './mock/toss'
 
 export type { Page }
 export { getAuth }
@@ -25,6 +26,8 @@ export const test = base.extend({
           ? route.fulfill({ path: PLACEHOLDER_IMAGE })
           : route.abort(),
     )
+    // 토스 결제창 스크립트만 가짜로 돌린다(위 차단보다 나중에 등록해 우선한다).
+    await installFakeToss(page)
     // 공개 DROP API를 fixture로 고정한다. 시나리오 테스트는 뒤에서 다시 등록해 덮어쓴다.
     await installPublicApi(page)
     await installDropImageUploads(page)

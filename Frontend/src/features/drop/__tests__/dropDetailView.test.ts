@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { components } from '../../../api/schema/drop'
-import { toDropDetail, toOrderDrop } from '../logic/dropDetailView'
+import { toDropDetail } from '../logic/dropDetailView'
 
 type PublicDropDetail = components['schemas']['PublicDropDetailResponse']
 
@@ -88,14 +88,5 @@ describe('공개 상세 응답 → 상세 모델', () => {
       orderable: false,
     })
     expect(view.status).toBe('ENDED')
-  })
-})
-
-describe('상세 모델 → 데모 주문 Drop', () => {
-  it('브랜드는 비워 두고 SKU 재고는 0으로 채운다', () => {
-    const orderDrop = toOrderDrop(toDropDetail(detail()))
-    expect(orderDrop.brand).toBe('')
-    expect(orderDrop.skus[0].stock).toBe(8)
-    expect(orderDrop.image).toBe('https://example.com/1.jpg')
   })
 })

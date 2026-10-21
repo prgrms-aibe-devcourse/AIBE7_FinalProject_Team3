@@ -3,7 +3,9 @@ package org.example.grab.domain.mail.dto;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
@@ -25,6 +27,21 @@ class EmailMessageTest {
         // then
         assertThat(text).contains("[GRAB] 이메일 인증 코드");
         assertThat(text).doesNotContain("user@example.com", "482913");
+    }
+
+    @Test
+    @DisplayName("인라인 이미지 정보는 원본 맵을 바꿔도 변하지 않는다")
+    void copiesInlineImages() {
+        // given
+        Map<String, String> images = new HashMap<>();
+        images.put("logo", "mail/grab-wordmark.png");
+        EmailMessage message = new EmailMessage("user@example.com", List.of(), "제목", "<p>본문</p>", "본문", images);
+
+        // when
+        images.clear();
+
+        // then
+        assertThat(message.inlineImages()).containsExactlyEntriesOf(Map.of("logo", "mail/grab-wordmark.png"));
     }
 
     @Test
