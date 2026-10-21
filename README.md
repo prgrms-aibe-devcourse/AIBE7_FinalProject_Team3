@@ -142,5 +142,3 @@ cd Frontend
 npm install
 npm run dev
 ```
-
-> Frontend는 현재 Mock 데이터를 사용하는 화면 초안이며 백엔드 API 연동을 진행할 예정입니다.
