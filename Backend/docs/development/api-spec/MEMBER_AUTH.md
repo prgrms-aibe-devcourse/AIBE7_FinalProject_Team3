@@ -542,6 +542,7 @@ PATCH /api/v1/users/me
 ```
 
 - **인증**: 필요 (`USER`)
+- **CSRF**: `X-XSRF-TOKEN` 헤더 필요
 
 **요청:**
 
@@ -551,7 +552,7 @@ PATCH /api/v1/users/me
 }
 ```
 
-**응답:**
+**응답:** `200 OK`
 
 ```json
 {
@@ -560,17 +561,41 @@ PATCH /api/v1/users/me
     "userId": "6f1a2b3c-4d5e-4f70-8192-a3b4c5d6e7f8",
     "email": "user@example.com",
     "nickname": "한정판수집가",
+    "provider": "LOCAL",
     "roles": ["USER", "SELLER"],
+    "profileImageUrl": "https://cdn.example.com/images/profile.jpg",
     "createdAt": "2026-09-18T14:00:00+09:00"
   }
 }
 ```
 
-`nickname`은 1.2.3절의 닉네임 규칙으로 검증한다. 본인의 현재 닉네임과 대소문자만 다른 값으로 바꾸는 것은 중복으로 보지 않는다.
+- 닉네임만 수정할 수 있다. 사용자 ID는 요청으로 받지 않고 `access_token`의 본인 정보를 수정한다. 이메일은 변경하지 않는다.
+- 응답은 1.9 내 정보 조회와 같은 `UserMeResponse` 7개 필드다. `roles`는 요청 Access Token의 권한이며, `profileImageUrl`은 없으면 `null`이고 키를 생략하지 않는다. 클라이언트는 응답으로 내 정보 캐시를 교체할 수 있다.
+- `nickname`은 앞뒤 공백을 제거(`strip`)한 뒤 1.2.3절의 닉네임 규칙으로 검증하고 저장한다.
+- 공백을 제거한 값이 현재 닉네임과 대소문자까지 같으면 `NICKNAME_UNCHANGED`(400)로 거부한다. 예를 들어 현재 닉네임이 `Grab`이면 `Grab`과 `" Grab "`은 거부하지만 `grab`은 변경으로 본다.
+- 중복 검사는 본인을 제외하고 대소문자를 무시한다. 다른 회원과 중복되면 `DUPLICATE_NICKNAME`(409)이며, 동시 변경으로 DB 유니크 제약을 위반한 경우도 같은 코드로 응답한다.
+
+**판정 순서:**
+
+인증·권한·CSRF 검사를 통과한 요청에 다음 순서를 적용한다.
+
+1. 요청 형식·닉네임 규칙 검증 (`INVALID_REQUEST`·`VALIDATION_FAILED`·`INVALID_NICKNAME`, 400)
+2. 회원 존재·ACTIVE 상태 확인 (`AUTHENTICATION_REQUIRED`, 401)
+3. 현재 닉네임과 같은지 확인 (`NICKNAME_UNCHANGED`, 400)
+4. 다른 회원의 닉네임과 중복인지 확인 (`DUPLICATE_NICKNAME`, 409)
+5. 저장 후 변경된 내 정보 응답
 
 **오류 코드:**
-- `INVALID_NICKNAME`
-- `DUPLICATE_NICKNAME`
+
+- `INVALID_REQUEST`(400): 요청 본문 형식 오류
+- `VALIDATION_FAILED`(400): 닉네임 누락·`null` 또는 앞뒤 공백 제거 후 빈 값
+- `INVALID_NICKNAME`(400): 닉네임 규칙 위반
+- `NICKNAME_UNCHANGED`(400): 현재 닉네임과 같은 값
+- `DUPLICATE_NICKNAME`(409): 다른 회원이 사용하는 닉네임 (대소문자 무시)
+- `AUTHENTICATION_REQUIRED`(401): `access_token` 쿠키 없음, 회원 없음·정지·탈퇴
+- `INVALID_TOKEN`(401): 만료·변조된 Access Token
+- `ACCESS_DENIED`(403): `USER` 권한 없음 또는 CSRF 토큰 누락·불일치
+- `INTERNAL_SERVER_ERROR`(500): DB 장애 등 서버 오류
 
 ### 1.11 비밀번호 변경
 
@@ -579,6 +604,7 @@ PATCH /api/v1/users/me/password
 ```
 
 - **인증**: 필요 (`USER`, `LOCAL` 회원)
+- **CSRF**: `X-XSRF-TOKEN` 헤더 필요
 
 **요청:**
 
@@ -589,16 +615,41 @@ PATCH /api/v1/users/me/password
 }
 ```
 
-`newPassword`는 1.2.3절의 비밀번호 검증 규칙을 따른다.
+- 두 필드는 필수이며 누락·`null`·빈 문자열이면 `VALIDATION_FAILED`(400)로 거부한다. 두 값 모두 앞뒤 공백을 제거하거나 가공하지 않는다.
+- `currentPassword`는 필수값만 검사하고 1.2.3절의 비밀번호 규칙을 적용하지 않는다. 비밀번호 규칙이 바뀌어도 기존 비밀번호로 변경할 수 있어야 하기 때문이다.
+- `newPassword`는 1.2.3절의 비밀번호 검증 규칙을 따른다. 공백만 있는 값도 규칙 위반으로 `INVALID_PASSWORD`(400)다.
+- `KAKAO`·`GOOGLE` 회원은 로컬 비밀번호가 없으므로 이 API를 사용할 수 없으며 `PASSWORD_NOT_AVAILABLE`(400)로 거부한다.
+- 현재 비밀번호가 맞는지 먼저 확인한 뒤 새 비밀번호와 현재 비밀번호의 원문을 대소문자 구분하여 비교한다. 같으면 `PASSWORD_UNCHANGED`(400)로 거부한다. 현재 비밀번호가 틀리면 두 입력이 같아도 `PASSWORD_MISMATCH`(400)가 우선한다.
 
 **응답:** `204 No Content`
 
-**오류 코드:**
-- `INVALID_PASSWORD`
-- `PASSWORD_MISMATCH`
-- `PASSWORD_NOT_AVAILABLE`
+비밀번호 변경은 기존 로그인 세션을 종료하지 않는다. 이 요청의 세션과 다른 기기의 세션을 모두 유지하며 기존 Refresh Token으로 재발급할 수 있다. 이미 로그인한 타인의 세션도 비밀번호 변경만으로 폐기되지 않는다.
 
-`KAKAO`·`GOOGLE` 회원은 로컬 비밀번호가 없으므로 이 API를 사용할 수 없다.
+**판정 순서:**
+
+인증·권한·CSRF 검사를 통과한 요청에 다음 순서를 적용한다.
+
+1. 요청 형식·필수값·새 비밀번호 규칙 검증 (`INVALID_REQUEST`·`VALIDATION_FAILED`·`INVALID_PASSWORD`, 400)
+2. 회원 존재·ACTIVE 상태 확인 (`AUTHENTICATION_REQUIRED`, 401)
+3. 비밀번호를 사용하는 LOCAL 회원인지 확인 (`PASSWORD_NOT_AVAILABLE`, 400)
+4. 현재 비밀번호 검증 (`PASSWORD_MISMATCH`, 400)
+5. 새 비밀번호가 현재 비밀번호와 같은지 확인 (`PASSWORD_UNCHANGED`, 400)
+6. 새 비밀번호 저장 후 본문 없이 204 응답
+
+현재 비밀번호 검증 후 저장 전에 다른 요청이 먼저 비밀번호를 바꿨다면 변경하지 않고 `PASSWORD_MISMATCH`(400)로 응답한다. 이 API에는 현재 비밀번호 확인 실패에 대한 별도의 횟수 제한을 두지 않는다.
+
+**오류 코드:**
+
+- `INVALID_REQUEST`(400): 요청 본문 형식 오류
+- `VALIDATION_FAILED`(400): 필수값 누락·`null`·빈 문자열
+- `INVALID_PASSWORD`(400): 새 비밀번호 규칙 위반
+- `PASSWORD_NOT_AVAILABLE`(400): 비밀번호를 사용하지 않는 계정
+- `PASSWORD_MISMATCH`(400): 현재 비밀번호 불일치 또는 검증 후 저장 전 다른 요청이 비밀번호를 변경함
+- `PASSWORD_UNCHANGED`(400): 새 비밀번호가 현재 비밀번호와 같음 (현재 비밀번호 검증 성공 후 판단)
+- `AUTHENTICATION_REQUIRED`(401): `access_token` 쿠키 없음, 회원 없음·정지·탈퇴
+- `INVALID_TOKEN`(401): 만료·변조된 Access Token
+- `ACCESS_DENIED`(403): `USER` 권한 없음 또는 CSRF 토큰 누락·불일치
+- `INTERNAL_SERVER_ERROR`(500): DB 장애·비밀번호 해시 생성 실패 등 서버 오류
 
 ### 1.12 내 프로필 이미지 등록/수정
 
