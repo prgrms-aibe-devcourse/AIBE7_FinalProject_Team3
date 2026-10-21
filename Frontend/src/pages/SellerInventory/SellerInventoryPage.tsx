@@ -105,7 +105,6 @@ export default function SellerInventoryPage({
     <section className="page-section seller-page seller-inventory-page">
       <div className="seller-title">
         <div>
-          <p className="eyebrow">STOCK VIEW</p>
           <h1>재고 현황</h1>
           <p>상품과 옵션별 가용 · 확보 · 판매 수량을 확인합니다.</p>
         </div>

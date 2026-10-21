@@ -196,7 +196,6 @@ export default function AdminSellerApplicationsPage({
 
   return (
     <section className="page-section seller-review-page">
-      <p className="eyebrow">ADMIN</p>
       <h1>판매자 신청 심사</h1>
       <section className="panel seller-review-controls">
         <div className="chips" aria-label="신청 상태 필터">

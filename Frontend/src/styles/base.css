@@ -325,12 +325,9 @@ main {
   font-size: clamp(32px, 5vw, 60px);
   letter-spacing: -3px;
 }
-.grab-hero p:not(.eyebrow) {
+.grab-hero p {
   margin: 0;
   color: #c9cdc2;
-}
-.grab-hero .eyebrow {
-  color: var(--lime);
 }
 .grab-hero img {
   width: 170px;

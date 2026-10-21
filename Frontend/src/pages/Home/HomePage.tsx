@@ -26,9 +26,6 @@ function HomeSection({
     <section className="home-section">
       <div className="catalog-heading">
         <div>
-          <p className="eyebrow">
-            {section.status === 'GRAB' ? 'AVAILABLE NOW' : 'WORTH THE WAIT'}
-          </p>
           <h2>{section.title}</h2>
         </div>
         <div className="home-section-actions">
