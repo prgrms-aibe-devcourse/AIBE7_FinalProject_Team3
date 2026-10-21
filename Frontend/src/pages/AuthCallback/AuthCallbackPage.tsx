@@ -26,8 +26,12 @@ export default function AuthCallbackPage({ refreshAuth, notify }: Props) {
 
     const result = searchParams.get('result')
     const returnTo = takeSocialReturnPath()
+    // 복귀 경로는 위에서 이미 지웠으므로, 로그인 화면이 다시 시도할 때 저장하도록 from으로 넘긴다
     const fail = (message: string) =>
-      navigate('/login', { replace: true, state: { socialError: message } })
+      navigate('/login', {
+        replace: true,
+        state: { socialError: message, from: returnTo },
+      })
 
     if (result === 'signup_required') {
       navigate('/signup?type=social', { replace: true, state: { returnTo } })

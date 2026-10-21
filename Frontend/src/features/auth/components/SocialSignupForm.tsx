@@ -73,7 +73,7 @@ export default function SocialSignupForm({ refreshAuth, notify }: Props) {
         // 컨텍스트가 무효이거나 소비돼 같은 화면에서 다시 보낼 수 없다. 로그인 화면에서 소셜 로그인부터 다시 시작한다(GR-47 M00-03).
         navigate('/login', {
           replace: true,
-          state: { socialError: failure.message },
+          state: { socialError: failure.message, from: returnTo },
         })
       } else {
         setError(failure.message)

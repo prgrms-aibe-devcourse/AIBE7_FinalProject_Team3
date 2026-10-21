@@ -194,17 +194,50 @@ test('쿼리 없는 콜백·로그인을 확인하지 못한 success는 미완�
   await expect(page.getByRole('alert')).toHaveText(message)
 })
 
-test('소셜 실패 후 다시 시도하면 로그인할 수 있다', async ({ page }) => {
+test('소셜 실패 후 다시 시도하면 로그인해 원래 화면으로 돌아간다', async ({
+  page,
+}) => {
   const auth = getAuth(page)
   auth.setSocialCallback('error=OAUTH2_AUTHENTICATION_FAILED')
-  await page.goto('/#/login')
-  await socialButton(page, 'KAKAO').click()
+  await startFromProtectedPage(page, 'KAKAO')
+  await expect(page).toHaveURL(/#\/login$/)
   await expect(page.getByRole('alert')).toContainText('취소되었거나 실패했어요')
 
   auth.setSocialCallback('result=success')
   await socialButton(page, 'KAKAO').click()
-  await expect(page).toHaveURL(/#\/wish$/)
+  await expect(page).toHaveURL(/#\/my$/)
   await expect(toast(page)).toContainText('로그인했어요.')
+  expect(auth.state.socialStarts).toHaveLength(2)
+})
+
+test('로그인을 확인하지 못한 success 뒤 다시 시도하면 원래 화면으로 돌아간다', async ({
+  page,
+}) => {
+  const auth = getAuth(page)
+  await page.goto('/#/my')
+  await expect(page).toHaveURL(/#\/login$/)
+  // 쿠키가 실리지 않은 경우처럼 콜백 처리 동안 users/me가 비로그인을 돌려준다
+  const meUrl = '**/api/v1/users/me'
+  await page.route(meUrl, (route) =>
+    route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: false,
+        data: null,
+        error: { code: 'UNAUTHORIZED', message: 'error' },
+      }),
+    }),
+  )
+  await socialButton(page, 'KAKAO').click()
+  await expect(page).toHaveURL(/#\/login$/)
+  await expect(page.getByRole('alert')).toHaveText(
+    '소셜 로그인을 완료하지 못했어요. 다시 시도해주세요.',
+  )
+
+  await page.unroute(meUrl)
+  await socialButton(page, 'KAKAO').click()
+  await expect(page).toHaveURL(/#\/my$/)
   expect(auth.state.socialStarts).toHaveLength(2)
 })
 
@@ -250,6 +283,30 @@ for (const [code, status, message] of [
     expect(auth.state.loggedIn).toBe(false)
   })
 }
+
+test('소셜 가입을 다시 시작해 로그인하면 원래 화면으로 돌아간다', async ({
+  page,
+}) => {
+  const auth = getAuth(page)
+  auth.setSocialCallback('result=signup_required')
+  auth.failSignup('social', {
+    status: 401,
+    code: 'OAUTH2_SIGNUP_CONTEXT_INVALID',
+  })
+  await startFromProtectedPage(page, 'GOOGLE')
+  await expect(page).toHaveURL(/#\/signup\?type=social$/)
+  await nicknameInput(page).fill('드롭헌터2')
+  await submitSignup(page)
+  await expect(page).toHaveURL(/#\/login$/)
+  await expect(page.getByRole('alert')).toHaveText(
+    '가입 시간이 지났어요. 소셜 로그인을 다시 시작해주세요.',
+  )
+
+  auth.setSocialCallback('result=success')
+  await socialButton(page, 'GOOGLE').click()
+  await expect(page).toHaveURL(/#\/my$/)
+  await expect(toast(page)).toContainText('로그인했어요.')
+})
 
 test('가입 뒤 로그인 상태를 확인하지 못하면 가입 완료를 알리고 다시 로그인하면 원래 화면으로 간다', async ({
   page,
