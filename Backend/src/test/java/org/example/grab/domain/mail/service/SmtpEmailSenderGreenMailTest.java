@@ -10,12 +10,14 @@ import jakarta.mail.Part;
 import jakarta.mail.internet.MimeMessage;
 import org.example.grab.domain.mail.dto.EmailMessage;
 import org.example.grab.domain.mail.error.EmailSendException;
+import org.example.grab.domain.user.support.EmailVerificationMailFactory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.mail.autoconfigure.MailSenderAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.mail.MailSendException;
 
 import java.net.ConnectException;
@@ -81,6 +83,34 @@ class SmtpEmailSenderGreenMailTest {
         assertThat(contentOf(textParts, "text/html")).isEqualTo(HTML_BODY);
         for (Part part : textParts) {
             assertThat(part.getContentType()).containsIgnoringCase("charset=UTF-8");
+        }
+    }
+
+    @Test
+    @DisplayName("인증 메일 로고는 HTML의 CID와 연결된 PNG 인라인 이미지로 SMTP 전달된다")
+    void deliversVerificationLogoInline() throws Exception {
+        // given
+        EmailMessage verification = new EmailVerificationMailFactory().create(TO, "048213");
+
+        // when
+        contextRunner().run(context -> context.getBean(EmailSender.class).send(verification));
+        MimeMessage received = onlyReceived();
+        Multipart mixed = (Multipart) received.getContent();
+        Multipart related = (Multipart) mixed.getBodyPart(0).getContent();
+
+        // then
+        assertThat((String) contentOf(textParts(received), "text/html"))
+                .isEqualToNormalizingNewlines(verification.htmlBody());
+        assertThat((String) contentOf(textParts(received), "text/plain"))
+                .isEqualToNormalizingNewlines(verification.textBody());
+        assertThat(related.getCount()).isEqualTo(2);
+        BodyPart image = related.getBodyPart(1);
+        assertThat(image.getHeader("Content-ID")).containsExactly("<grab-logo>");
+        assertThat(image.getDisposition()).isEqualTo(Part.INLINE);
+        assertThat(image.isMimeType("image/png")).isTrue();
+        try (var actual = image.getInputStream();
+             var expected = new ClassPathResource("mail/grab-wordmark.png").getInputStream()) {
+            assertThat(actual.readAllBytes()).isEqualTo(expected.readAllBytes());
         }
     }
 

@@ -1,5 +1,5 @@
 import type { Route } from '@playwright/test'
-import { FIXED_NOW } from './drop/fixtures'
+import { FIXED_NOW, type FixtureDrop } from './drop/fixtures'
 import { json } from './shared'
 
 type OrderStatus =
@@ -26,6 +26,9 @@ type BuyerOrder = {
   orderNumber: string
   productName: string
   optionName: string
+  unitPrice: number
+  quantity: number
+  shippingAmount: number
   status: OrderStatus
   paymentStatus: Payment['status'] | null
   paymentExpiresAt: string | null
@@ -37,6 +40,9 @@ type BuyerOrder = {
   payments: Payment[]
   cancelBehavior: CancelBehavior
   cancelKey: string | null
+  createKey: string | null
+  // 결과 불명(UNKNOWN) 승인을 같은 키로 다시 확인할 때 쓴다.
+  approveKey: string | null
 }
 
 export type BuyerOrdersFixture = BuyerOrder[]
@@ -82,6 +88,9 @@ function order(
     orderNumber: `ORD-20261001-00000${index}`,
     productName: '뮤직 클럽 티셔츠 · 리미티드',
     optionName: '릴랙스 / 롱',
+    unitPrice: 43_000,
+    quantity: 2,
+    shippingAmount: 3_000,
     status: 'PAID',
     paymentStatus: 'SUCCEEDED',
     paymentExpiresAt: null,
@@ -89,6 +98,8 @@ function order(
     payments: [succeeded],
     cancelBehavior: 'SUCCEEDED',
     cancelKey: null,
+    createKey: null,
+    approveKey: null,
     ...overrides,
   }
 }
@@ -149,16 +160,15 @@ export function createBuyerOrdersFixture(): BuyerOrdersFixture {
   ]
 }
 
-const UNIT_PRICE = 43_000
-const QUANTITY = 2
-const SHIPPING_AMOUNT = 3_000
-const ITEMS_AMOUNT = UNIT_PRICE * QUANTITY
-
 const errorBody = (code: string) => ({
   success: false,
   data: null,
   error: { code, message: code, fieldErrors: [] },
 })
+
+const itemsAmount = (item: BuyerOrder) => item.unitPrice * item.quantity
+const totalAmount = (item: BuyerOrder) =>
+  itemsAmount(item) + item.shippingAmount
 
 function detailBody(item: BuyerOrder, index: number) {
   return {
@@ -169,14 +179,14 @@ function detailBody(item: BuyerOrder, index: number) {
       {
         productName: item.productName,
         optionName: item.optionName,
-        unitPrice: UNIT_PRICE,
-        quantity: QUANTITY,
-        subtotal: ITEMS_AMOUNT,
+        unitPrice: item.unitPrice,
+        quantity: item.quantity,
+        subtotal: itemsAmount(item),
       },
     ],
-    itemsAmount: ITEMS_AMOUNT,
-    shippingAmount: SHIPPING_AMOUNT,
-    totalAmount: ITEMS_AMOUNT + SHIPPING_AMOUNT,
+    itemsAmount: itemsAmount(item),
+    shippingAmount: item.shippingAmount,
+    totalAmount: totalAmount(item),
     paymentStatus: item.paymentStatus,
     paymentExpiresAt:
       item.status === 'PAYMENT_PENDING' ? item.paymentExpiresAt : null,
@@ -207,10 +217,10 @@ function detailBody(item: BuyerOrder, index: number) {
 
 function paymentsBody(item: BuyerOrder) {
   return item.payments.map((payment, index) => ({
-    paymentId: `${payment.paymentId}-${item.orderId}`,
+    paymentId: `${payment.paymentId}-${index}-${item.orderId}`,
     orderId: item.orderId,
     provider: 'TOSS',
-    amount: ITEMS_AMOUNT + SHIPPING_AMOUNT,
+    amount: totalAmount(item),
     status: payment.status,
     reconciliationStatus: payment.reconciliationStatus,
     requestedAt: minutesFrom(-30 + index),
@@ -221,6 +231,149 @@ function paymentsBody(item: BuyerOrder) {
     canceledAt: payment.status === 'CANCELED' ? minutesFrom(-5) : null,
     failure: payment.failure,
   }))
+}
+
+// ORDER.md 1.1 주문 생성 중 화면이 구분해야 하는 응답만 재현한다.
+async function create(
+  route: Route,
+  orders: BuyerOrder[],
+  drops: FixtureDrop[],
+) {
+  const key = route.request().headers()['idempotency-key'] ?? ''
+  const replay = orders.find((item) => item.createKey === key)
+  const body = route.request().postDataJSON() as {
+    dropId: number
+    items: { optionId: number; quantity: number }[]
+  }
+  const drop = drops.find((item) => item.dropId === body.dropId)
+  const [requested] = body.items
+  const option = drop?.options.find(
+    (item) => item.optionId === requested?.optionId,
+  )
+  if (!replay) {
+    if (!drop || drop.status !== 'GRAB') {
+      await json(route, errorBody('DROP_NOT_ON_SALE'), 409)
+      return
+    }
+    if (!option) {
+      await json(route, errorBody('OPTION_NOT_FOUND'), 404)
+      return
+    }
+    if (requested.quantity > (option.availableStock ?? 0)) {
+      await json(route, errorBody('INSUFFICIENT_STOCK'), 409)
+      return
+    }
+  }
+  const created =
+    replay ??
+    order('pending', 1, {
+      orderId: `c1a00000-0000-4000-8000-${String(100 + orders.length).padStart(12, '0')}`,
+      orderNumber: `ORD-20261001-000${100 + orders.length}`,
+      productName: drop!.name,
+      optionName: option!.selections
+        .map(
+          (selection) =>
+            drop!.groups
+              .find((group) => group.groupId === selection.groupId)
+              ?.values.find((value) => value.valueId === selection.valueId)
+              ?.value,
+        )
+        .join(' / '),
+      unitPrice: option!.unitPrice,
+      quantity: requested.quantity,
+      shippingAmount: drop!.shippingFee,
+      status: 'PAYMENT_PENDING',
+      paymentStatus: null,
+      paymentExpiresAt: minutesFrom(10),
+      payments: [],
+      createKey: key,
+    })
+  if (!replay) orders.unshift(created)
+  const detail = detailBody(created, 0)
+  await json(
+    route,
+    {
+      success: true,
+      data: {
+        orderId: created.orderId,
+        orderNumber: created.orderNumber,
+        status: created.status,
+        items: detail.items,
+        itemsAmount: detail.itemsAmount,
+        shippingAmount: detail.shippingAmount,
+        totalAmount: detail.totalAmount,
+        paymentExpiresAt: created.paymentExpiresAt,
+      },
+    },
+    201,
+  )
+}
+
+// PAYMENT.md 1.1 승인 중 화면이 구분해야 하는 결과만 재현한다. 결과는 가짜 결제창이 만든 paymentKey로 정한다.
+async function approve(route: Route, item: BuyerOrder) {
+  const key = route.request().headers()['idempotency-key'] ?? ''
+  const { paymentKey, amount } = route.request().postDataJSON() as {
+    paymentKey: string
+    amount: number
+  }
+  const respond = (payment: Payment) =>
+    json(route, {
+      success: true,
+      data: {
+        paymentId: `${payment.paymentId}-${item.orderId}`,
+        orderId: item.orderId,
+        orderNumber: item.orderNumber,
+        amount,
+        status: payment.status,
+        reconciliationStatus: payment.reconciliationStatus,
+        paidAt: payment.status === 'SUCCEEDED' ? minutesFrom(0) : null,
+        failure: payment.failure,
+      },
+    })
+  const pending = item.payments.find((payment) => payment.status === 'UNKNOWN')
+  if (pending && item.approveKey === key) {
+    Object.assign(pending, {
+      status: 'SUCCEEDED',
+      reconciliationStatus: 'NONE',
+    })
+    Object.assign(item, { status: 'PAID', paymentStatus: 'SUCCEEDED' })
+    await respond(pending)
+    return
+  }
+  if (item.status !== 'PAYMENT_PENDING') {
+    await json(route, errorBody('INVALID_STATE_TRANSITION'), 409)
+    return
+  }
+  if (
+    !item.paymentExpiresAt ||
+    new Date(item.paymentExpiresAt).getTime() <= FIXED_NOW.getTime()
+  ) {
+    await json(route, errorBody('PAYMENT_EXPIRED'), 422)
+    return
+  }
+  if (amount !== totalAmount(item)) {
+    await json(route, errorBody('PAYMENT_AMOUNT_MISMATCH'), 422)
+    return
+  }
+  if (pending) {
+    await json(route, errorBody('PAYMENT_ALREADY_PROCESSED'), 409)
+    return
+  }
+  const payment: Payment = paymentKey.includes('reject')
+    ? { ...failed, paymentId: 'p-rejected' }
+    : paymentKey.includes('unknown')
+      ? {
+          paymentId: 'p-unknown',
+          status: 'UNKNOWN',
+          reconciliationStatus: 'REQUIRED',
+          failure: null,
+        }
+      : { ...succeeded, paymentId: 'p-approved' }
+  item.payments.push(payment)
+  item.paymentStatus = payment.status
+  item.approveKey = key
+  if (payment.status === 'SUCCEEDED') item.status = 'PAID'
+  await respond(payment)
 }
 
 // ORDER.md 1.4 취소 규칙 중 화면이 구분해야 하는 응답만 재현한다.
@@ -280,8 +433,14 @@ export async function handleBuyerOrdersRoute(
   route: Route,
   url: URL,
   orders: BuyerOrdersFixture,
+  drops: FixtureDrop[],
 ) {
-  if (url.pathname === '/api/v1/orders' && route.request().method() === 'GET') {
+  const method = route.request().method()
+  if (url.pathname === '/api/v1/orders' && method === 'POST') {
+    await create(route, orders, drops)
+    return true
+  }
+  if (url.pathname === '/api/v1/orders' && method === 'GET') {
     const page = Number(url.searchParams.get('page') ?? '0')
     const size = Number(url.searchParams.get('size') ?? '20')
     const status = url.searchParams.get('status')
@@ -299,7 +458,7 @@ export async function handleBuyerOrdersRoute(
             orderNumber: item.orderNumber,
             productName: item.productName,
             status: item.status,
-            totalAmount: ITEMS_AMOUNT + SHIPPING_AMOUNT,
+            totalAmount: totalAmount(item),
             orderedAt: detailBody(item, index).orderedAt,
           })),
         page,
@@ -327,8 +486,10 @@ export async function handleBuyerOrdersRoute(
     return true
   }
   const item = orders[index]
-  if (action === '/cancel' && route.request().method() === 'POST') {
+  if (action === '/cancel' && method === 'POST') {
     await cancel(route, item)
+  } else if (action === '/payments' && method === 'POST') {
+    await approve(route, item)
   } else if (action === '/payments') {
     await json(route, { success: true, data: paymentsBody(item) })
   } else {

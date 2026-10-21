@@ -2,13 +2,15 @@ import { Link, useSearchParams } from 'react-router-dom'
 import logo from '../../assets/images/grab-symbol.png'
 import LocalSignupForm from '../../features/auth/components/LocalSignupForm'
 import SocialSignupForm from '../../features/auth/components/SocialSignupForm'
+import type { AuthUser } from '../../features/auth/logic/authUser'
 
 type Props = {
+  refreshAuth: () => Promise<AuthUser | null>
   notify: (message: string) => void
 }
 
 // 공통 배치만 맡고 폼은 type 쿼리로 고른다. location.state는 새로고침하면 사라지므로 쓰지 않는다(GR-31 M00-01).
-export default function SignupPage({ notify }: Props) {
+export default function SignupPage({ refreshAuth, notify }: Props) {
   const [searchParams] = useSearchParams()
   const social = searchParams.get('type') === 'social'
 
@@ -27,7 +29,7 @@ export default function SignupPage({ notify }: Props) {
             <h2>{social ? '소셜 계정으로 가입' : 'LOCAL 회원가입'}</h2>
           </div>
           {social ? (
-            <SocialSignupForm notify={notify} />
+            <SocialSignupForm refreshAuth={refreshAuth} notify={notify} />
           ) : (
             <LocalSignupForm notify={notify} />
           )}

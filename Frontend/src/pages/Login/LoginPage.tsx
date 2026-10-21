@@ -1,30 +1,46 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { socialLoginUrl, type SocialProvider } from '../../api/auth/oauth2'
 import logo from '../../assets/images/grab-symbol.png'
 import { loginErrorMessage } from '../../features/auth/logic/authUser'
-import { mockLoginErrors } from '../../features/auth/mock/mockAuth'
+import {
+  safeReturnPath,
+  saveSocialReturnPath,
+} from '../../features/auth/logic/returnPath'
 
 type Props = {
   login: (email: string, password: string) => Promise<void>
   notify: (message: string) => void
 }
 
-type SocialResult = 'existing' | 'new' | 'linked' | 'social'
-
 export default function LoginPage({ login, notify }: Props) {
   const navigate = useNavigate()
   const location = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [socialResult, setSocialResult] = useState<SocialResult>('existing')
-  const [error, setError] = useState('')
+  // 소셜 콜백·소셜 가입이 실패해 이 화면으로 보낸 안내(GR-47 M00-01·03)
+  const [error, setError] = useState(() =>
+    typeof location.state?.socialError === 'string'
+      ? location.state.socialError
+      : '',
+  )
   const [submitting, setSubmitting] = useState(false)
-  const returnTo =
-    typeof location.state?.from === 'string' &&
-    location.state.from.startsWith('/') &&
-    !location.state.from.startsWith('//')
-      ? location.state.from
-      : '/wish'
+  // 제공자 화면으로 떠나는 동안 소셜 버튼을 다시 누르지 못하게 한다
+  const [redirecting, setRedirecting] = useState(false)
+  // 상태는 다음 렌더에 반영되므로, 같은 작업 안에서 연달아 들어온 클릭은 ref로 막는다
+  const redirectingRef = useRef(false)
+
+  // 제공자 화면에서 뒤로 가기로 돌아오면 페이지가 bfcache에서 그대로 복원되므로 버튼을 다시 연다
+  useEffect(() => {
+    const reopen = (event: PageTransitionEvent) => {
+      if (!event.persisted) return
+      redirectingRef.current = false
+      setRedirecting(false)
+    }
+    window.addEventListener('pageshow', reopen)
+    return () => window.removeEventListener('pageshow', reopen)
+  }, [])
+  const returnTo = safeReturnPath(location.state?.from)
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -42,18 +58,15 @@ export default function LoginPage({ login, notify }: Props) {
     }
   }
 
-  // 소셜 로그인은 GR-47에서 실제 리다이렉트로 연동한다. 지금은 결과 안내만 한다.
-  // 가입 화면은 type 쿼리로 소셜 폼을 고르고 제공자 이름은 표시하지 않는다(GR-31 M00-01).
-  const socialLogin = () => {
-    if (socialResult === 'new') {
-      navigate('/signup?type=social')
-      return
-    }
-    if (socialResult === 'existing') {
-      notify('소셜 로그인은 준비 중이에요. 곧 제공될 예정입니다.')
-      return
-    }
-    setError(mockLoginErrors[socialResult])
+  // 소셜 로그인은 API 호출이 아니라 페이지 이동이다(MEMBER_AUTH 1.4). 돌아오면 앱이 다시 로드돼
+  // location.state가 사라지므로 복귀 경로를 sessionStorage에 남긴다(GR-47 M00-02).
+  const socialLogin = (provider: SocialProvider) => {
+    if (redirectingRef.current) return
+    redirectingRef.current = true
+    setRedirecting(true)
+    setError('')
+    saveSocialReturnPath(returnTo)
+    window.location.assign(socialLoginUrl(provider))
   }
 
   return (
@@ -106,33 +119,20 @@ export default function LoginPage({ login, notify }: Props) {
         </form>
         <div className="auth-stack auth-social">
           <p>또는 소셜 계정으로 계속</p>
-          <label className="demo-select">
-            소셜 결과 예시
-            <select
-              value={socialResult}
-              onChange={(event) => {
-                setSocialResult(event.target.value as SocialResult)
-                setError('')
-              }}
-            >
-              <option value="existing">기존 회원</option>
-              <option value="new">첫 가입 · 닉네임 입력</option>
-              <option value="linked">계정 연결 필요</option>
-              <option value="social">취소 또는 인증 실패</option>
-            </select>
-          </label>
           <div className="auth-actions">
             <button
               type="button"
               className="secondary-button"
-              onClick={socialLogin}
+              disabled={redirecting}
+              onClick={() => socialLogin('kakao')}
             >
               KAKAO
             </button>
             <button
               type="button"
               className="secondary-button"
-              onClick={socialLogin}
+              disabled={redirecting}
+              onClick={() => socialLogin('google')}
             >
               GOOGLE
             </button>
@@ -143,10 +143,6 @@ export default function LoginPage({ login, notify }: Props) {
               회원가입
             </Link>
           </p>
-          <small>
-            LOCAL 로그인은 실제 인증 API를 사용합니다. 소셜 로그인은 준비 중이며
-            소셜 결과 예시는 화면 안내용입니다.
-          </small>
         </div>
       </div>
     </section>

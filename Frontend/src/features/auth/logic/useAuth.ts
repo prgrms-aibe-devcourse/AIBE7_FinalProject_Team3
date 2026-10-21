@@ -25,6 +25,23 @@ export default function useAuth() {
     await queryClient.invalidateQueries({ queryKey: authKeys.me() })
   }
 
+  // 소셜 콜백 success·소셜 가입 201 뒤 인증 쿠키로 users/me를 다시 조회한다(GR-47 M00-04).
+  // invalidateQueries는 구독 중인 쿼리만 다시 조회하는데, 콜백 화면의 effect는 새로 로드된 앱에서
+  // App의 useQuery 구독보다 먼저 실행되므로 fetchQuery로 직접 조회한다. 같은 키라 캐시도 함께 갱신된다.
+  // 조회에 실패했거나 비로그인이면 null이다.
+  const refresh = async (): Promise<AuthUser | null> => {
+    try {
+      const me = await queryClient.fetchQuery({
+        queryKey: authKeys.me(),
+        queryFn: fetchMe,
+        staleTime: 0,
+      })
+      return me ? toAuthUser(me) : null
+    } catch {
+      return null
+    }
+  }
+
   const logout = async () => {
     await logoutRequest()
     await clearSessionCache(queryClient)
@@ -35,6 +52,7 @@ export default function useAuth() {
     status,
     authenticated: status === 'authenticated',
     login,
+    refresh,
     logout,
   }
 }

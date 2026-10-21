@@ -48,7 +48,7 @@ test('판매자 메뉴와 모바일 요약에 가로 넘침이 없고 키보드�
   await expect(
     page
       .getByRole('navigation', { name: '주요 메뉴' })
-      .getByRole('link', { name: '재고' }),
+      .getByRole('link', { name: 'INVENTORY' }),
   ).toHaveAttribute('href', '#/seller/inventory')
   await page.keyboard.press('Tab')
   await expect(page.locator(':focus-visible')).toHaveCount(1)

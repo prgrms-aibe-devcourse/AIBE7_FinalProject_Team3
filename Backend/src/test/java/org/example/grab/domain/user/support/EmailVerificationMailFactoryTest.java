@@ -36,6 +36,18 @@ class EmailVerificationMailFactoryTest {
     }
 
     @Test
+    @DisplayName("HTML 로고의 CID와 첨부 이미지가 연결되고 텍스트 본문에는 이미지 참조가 없다")
+    void includesInlineLogo() {
+        // when
+        EmailMessage message = factory.create(EMAIL, CODE);
+
+        // then
+        assertThat(message.htmlBody()).contains("src=\"cid:grab-logo\"", "alt=\"GRAB\"");
+        assertThat(message.inlineImages()).containsEntry("grab-logo", "mail/grab-wordmark.png");
+        assertThat(message.textBody()).doesNotContain("cid:");
+    }
+
+    @Test
     @DisplayName("메시지의 toString(로그에 남는 값)에 코드·받는 주소가 없다")
     void toStringHasNoCodeOrAddress() {
         // when

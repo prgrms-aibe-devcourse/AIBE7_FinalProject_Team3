@@ -73,12 +73,21 @@ const pages: {
   {
     name: '로그인',
     path: '/#/login',
-    actions: (page) => [page.getByRole('button', { name: '로그인' })],
+    actions: (page) => [
+      page.getByRole('button', { name: '로그인' }),
+      page.getByRole('button', { name: 'KAKAO' }),
+      page.getByRole('button', { name: 'GOOGLE' }),
+    ],
   },
   {
     name: '회원가입',
     path: '/#/signup',
     actions: (page) => [page.getByRole('button', { name: '인증 코드 보내기' })],
+  },
+  {
+    name: '소셜 회원가입',
+    path: '/#/signup?type=social',
+    actions: (page) => [page.getByRole('button', { name: '회원가입 완료' })],
   },
   {
     name: '판매자 주문',
@@ -145,15 +154,16 @@ test('MY: 가로 넘침 없이 핵심 버튼에 닿는다', async ({ page }) => 
 })
 
 test('결제: 가로 넘침 없이 배송지와 결제 버튼에 닿는다', async ({ page }) => {
-  await page.goto('/#/checkout/demo-pending')
+  await page.goto('/#/checkout?dropId=201&optionId=2012&quantity=2')
   await page.getByLabel('이메일').fill('grab@example.com')
   await page.getByLabel('비밀번호').fill('password1234')
   await page.getByRole('button', { name: '로그인', exact: true }).click()
   await expectReachable(page, page.getByLabel('받는 분'))
-  await expectReachable(
-    page,
-    page.getByRole('button', { name: 'Mock 결제 결과 보기' }),
-  )
+  await expectReachable(page, page.getByRole('button', { name: '주문하기' }))
+  await expectNoHorizontalOverflow(page)
+
+  await page.goto(`/#/checkout/${BUYER_ORDER_IDS.pending}`)
+  await expectReachable(page, page.getByRole('button', { name: '결제하기' }))
   await expectNoHorizontalOverflow(page)
 })
 
@@ -212,6 +222,40 @@ test('회원가입 2·3단계: 오류를 표시해도 가로 넘침 없이 핵�
   await expectNoHorizontalOverflow(page)
 })
 
+test('소셜 로그인·가입: 오류를 표시해도 가로 넘침 없이 핵심 버튼에 닿는다', async ({
+  page,
+}) => {
+  // 콜백 오류 중 가장 긴 안내 문구
+  await page.goto('/#/auth/callback?error=ACCOUNT_LINK_REQUIRED')
+  await expect(page.getByRole('alert')).toBeVisible()
+  for (const action of [
+    page.getByRole('alert'),
+    page.getByRole('button', { name: 'KAKAO' }),
+    page.getByRole('button', { name: 'GOOGLE' }),
+  ]) {
+    await expectReachable(page, action)
+  }
+  await expectNoHorizontalOverflow(page)
+
+  getAuth(page).failSignup('social', {
+    status: 500,
+    code: 'INTERNAL_SERVER_ERROR',
+  })
+  await page.goto('/#/signup?type=social')
+  await page.getByRole('button', { name: '회원가입 완료' }).click()
+  await page.getByLabel('닉네임').fill('드롭헌터2')
+  await page.getByRole('button', { name: '회원가입 완료' }).click()
+  await expect(page.getByRole('alert')).toBeVisible()
+  await page.getByLabel('닉네임').fill('a')
+  await page.getByRole('button', { name: '회원가입 완료' }).click()
+  await expectReachable(page, page.locator('#social-signup-nickname-error'))
+  await expectReachable(
+    page,
+    page.getByRole('button', { name: '회원가입 완료' }),
+  )
+  await expectNoHorizontalOverflow(page)
+})
+
 // 입력란별 outline 재정의가 전역 :focus-visible 표시를 가리지 않는다
 test('키보드 포커스가 입력란에 보인다', async ({ page }) => {
   const expectFocusRing = async (focus: Locator, ring: Locator = focus) => {
@@ -234,7 +278,7 @@ test('키보드 포커스가 입력란에 보인다', async ({ page }) => {
   await page.goto('/#/signup')
   await expectFocusRing(page.getByLabel('이메일 주소'))
 
-  await page.goto('/#/checkout/demo-pending')
+  await page.goto('/#/checkout?dropId=201&optionId=2012&quantity=2')
   await page.getByLabel('이메일').fill('grab@example.com')
   await page.getByLabel('비밀번호').fill('password1234')
   await page.getByRole('button', { name: '로그인', exact: true }).click()
