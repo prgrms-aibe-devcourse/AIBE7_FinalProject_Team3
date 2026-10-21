@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { socialLoginUrl, type SocialProvider } from '../../api/auth/oauth2'
 import logo from '../../assets/images/grab-symbol.png'
@@ -27,11 +27,15 @@ export default function LoginPage({ login, notify }: Props) {
   const [submitting, setSubmitting] = useState(false)
   // 제공자 화면으로 떠나는 동안 소셜 버튼을 다시 누르지 못하게 한다
   const [redirecting, setRedirecting] = useState(false)
+  // 상태는 다음 렌더에 반영되므로, 같은 작업 안에서 연달아 들어온 클릭은 ref로 막는다
+  const redirectingRef = useRef(false)
 
   // 제공자 화면에서 뒤로 가기로 돌아오면 페이지가 bfcache에서 그대로 복원되므로 버튼을 다시 연다
   useEffect(() => {
     const reopen = (event: PageTransitionEvent) => {
-      if (event.persisted) setRedirecting(false)
+      if (!event.persisted) return
+      redirectingRef.current = false
+      setRedirecting(false)
     }
     window.addEventListener('pageshow', reopen)
     return () => window.removeEventListener('pageshow', reopen)
@@ -57,7 +61,8 @@ export default function LoginPage({ login, notify }: Props) {
   // 소셜 로그인은 API 호출이 아니라 페이지 이동이다(MEMBER_AUTH 1.4). 돌아오면 앱이 다시 로드돼
   // location.state가 사라지므로 복귀 경로를 sessionStorage에 남긴다(GR-47 M00-02).
   const socialLogin = (provider: SocialProvider) => {
-    if (redirecting) return
+    if (redirectingRef.current) return
+    redirectingRef.current = true
     setRedirecting(true)
     setError('')
     saveSocialReturnPath(returnTo)
