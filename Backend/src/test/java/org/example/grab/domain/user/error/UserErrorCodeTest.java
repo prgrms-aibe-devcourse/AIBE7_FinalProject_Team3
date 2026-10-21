@@ -72,6 +72,17 @@ class UserErrorCodeTest {
     }
 
     @ParameterizedTest
+    @CsvSource({"NICKNAME_UNCHANGED", "PASSWORD_MISMATCH", "PASSWORD_NOT_AVAILABLE", "PASSWORD_UNCHANGED"})
+    @DisplayName("내 정보 수정·비밀번호 변경 오류 코드는 상수 이름을 코드로, HTTP 400을 가진다")
+    // 401로 두면 프론트엔드가 재발급·로그아웃 흐름을 타므로 모두 400이다(GR-129 M00-01·04·05)
+    void definesUserMeUpdateErrorCodes(UserErrorCode errorCode) {
+        // then
+        assertThat(errorCode.getCode()).isEqualTo(errorCode.name());
+        assertThat(errorCode.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(errorCode.getMessage()).isNotBlank();
+    }
+
+    @ParameterizedTest
     @CsvSource(delimiter = '|', value = {
             "UNSUPPORTED_OAUTH2_PROVIDER   | BAD_REQUEST",
             "OAUTH2_SIGNUP_CONTEXT_INVALID | UNAUTHORIZED"
