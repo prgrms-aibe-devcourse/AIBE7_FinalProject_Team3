@@ -43,6 +43,16 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
   }
 
   test('my', async ({ page }) => {
+    await page.route('**/api/v1/seller-applications/me', (route) =>
+      route.fulfill({
+        status: 404,
+        json: {
+          success: false,
+          data: null,
+          error: { code: 'SELLER_APPLICATION_NOT_FOUND', message: '없음' },
+        },
+      }),
+    )
     await page.goto('/#/login')
     await page.getByLabel('이메일').fill('grab@example.com')
     await page.getByLabel('비밀번호').fill('password1234')
@@ -186,6 +196,13 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
       page.getByRole('group', { name: '곧 만날 인기 WISH' }),
     ).toBeVisible()
     await shot(page, 'home')
+  })
+
+  test('home-slides', async ({ page }) => {
+    await installHomeScenario(page, 'many')
+    await page.goto('/')
+    await expect(page.locator('.popular-arrow')).toHaveCount(4)
+    await shot(page, 'home-slides')
   })
 
   test('home-states', async ({ page }) => {
