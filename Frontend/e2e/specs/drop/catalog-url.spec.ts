@@ -22,6 +22,42 @@ test('목록 조건을 직접 진입·새로고침·상세에서 뒤로 가기�
   await expect(list.getByRole('article')).toHaveCount(1)
 })
 
+test('검색창에서 한글 조합 입력이 끊기지 않는다', async ({ page }) => {
+  await page.goto('/#/wish')
+  const input = page.getByPlaceholder('상품명 검색')
+  await input.focus()
+  // Chromium IME 조합을 재현한다: ㅁ → 머 → 먹 → 머(확정) → 그(확정)
+  const cdp = await page.context().newCDPSession(page)
+  const compose = (text: string) =>
+    cdp.send('Input.imeSetComposition', {
+      text,
+      selectionStart: text.length,
+      selectionEnd: text.length,
+    })
+  await compose('ㅁ')
+  await compose('머')
+  await compose('먹')
+  await cdp.send('Input.insertText', { text: '머' })
+  await compose('그')
+  await cdp.send('Input.insertText', { text: '그' })
+  await expect(input).toHaveValue('머그')
+  await expect
+    .poll(() =>
+      new URLSearchParams(new URL(page.url()).hash.split('?')[1]).get(
+        'keyword',
+      ),
+    )
+    .toBe('머그')
+  await expect(
+    page.getByRole('region', { name: 'WISH 상품 목록' }).getByRole('article'),
+  ).toHaveCount(1)
+  // 같은 화면에서 URL 검색어가 바뀌면 입력창도 따라간다
+  await page.evaluate(() => {
+    location.hash = '#/wish?keyword=토트'
+  })
+  await expect(input).toHaveValue('토트')
+})
+
 test('카테고리 변경·뒤로 가기로 조건을 복원하고 검색 시 페이지를 초기화한다', async ({
   page,
 }) => {
@@ -37,8 +73,15 @@ test('카테고리 변경·뒤로 가기로 조건을 복원하고 검색 시 �
     page.getByRole('button', { name: '리빙', exact: true }),
   ).toHaveClass('active')
   await page.getByPlaceholder('상품명 검색').fill('머그')
+  // 검색어는 입력이 멈춘 뒤 URL에 반영된다
+  await expect
+    .poll(() =>
+      new URLSearchParams(new URL(page.url()).hash.split('?')[1]).get(
+        'keyword',
+      ),
+    )
+    .toBe('머그')
   query = new URLSearchParams(new URL(page.url()).hash.split('?')[1])
-  expect(query.get('keyword')).toBe('머그')
   expect(query.has('page')).toBe(false)
   await expect(
     page.getByRole('region', { name: 'WISH 상품 목록' }).getByRole('article'),
