@@ -349,7 +349,7 @@ export default function OrderDetailPage({ authStatus, notify }: Props) {
   if (orderQuery.isPending)
     return (
       <div role="status" aria-live="polite">
-        <EmptyState title="주문을 불러오는 중이에요." variant="page" />
+        <EmptyState loading title="주문을 불러오는 중이에요." variant="page" />
       </div>
     )
   if (orderQuery.isError) {

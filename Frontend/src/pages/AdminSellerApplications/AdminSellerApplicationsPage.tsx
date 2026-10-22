@@ -221,7 +221,7 @@ export default function AdminSellerApplicationsPage({
         <section className="panel seller-review-list">
           <h2>신청 목록</h2>
           {query.isLoading ? (
-            <EmptyState title="신청 목록을 불러오는 중이에요." />
+            <EmptyState loading title="신청 목록을 불러오는 중이에요." />
           ) : query.isError ? (
             <div>
               <EmptyState title="신청 목록을 불러오지 못했어요." />

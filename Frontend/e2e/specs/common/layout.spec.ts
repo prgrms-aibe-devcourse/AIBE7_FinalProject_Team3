@@ -59,7 +59,7 @@ const pages: {
   {
     name: 'WISH 상세',
     path: '/#/drops/102',
-    actions: (page) => [page.getByRole('button', { name: '♡ WISH 등록하기' })],
+    actions: (page) => [page.getByRole('button', { name: 'WISH 등록하기' })],
   },
   {
     name: 'GRAB 상세',
@@ -289,4 +289,46 @@ test('키보드 포커스가 입력란에 보인다', async ({ page }) => {
   await expectFocusRing(page.getByLabel('상품명'))
   await expectFocusRing(page.getByLabel('상품 설명'))
   await expectFocusRing(page.getByLabel('카테고리'))
+})
+
+// 첫 조회 중 짧은 본문 때문에 푸터가 화면 안으로 올라왔다가 내려가지 않는다
+test('화면 이동 후 첫 조회 중에는 푸터를 보이지 않는다', async ({ page }) => {
+  let release = () => {}
+  const held = new Promise<void>((resolve) => (release = resolve))
+  await page.route(/\/api\/v1\/drops\/\d+(\?.*)?$/, async (route) => {
+    await held
+    await route.fallback()
+  })
+  await page.goto('/#/wish')
+  const list = page.getByRole('region', { name: 'WISH 상품 목록' })
+  await expect(list.getByRole('article').first()).toBeVisible()
+  // 매 프레임 로딩 표시와 푸터가 함께 화면에 보였는지 기록한다(첫 프레임 깜빡임 포함)
+  await page.evaluate(() => {
+    const w = window as unknown as { footerFlashes: number }
+    w.footerFlashes = 0
+    const tick = () => {
+      const footer = document.querySelector('footer')
+      const visible =
+        !!footer &&
+        footer.getClientRects().length > 0 &&
+        footer.getBoundingClientRect().top < innerHeight
+      const loading = document
+        .querySelector('main')
+        ?.textContent?.includes('불러오는 중이에요')
+      if (visible && loading) w.footerFlashes++
+      requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  })
+  await list.getByRole('heading').first().getByRole('link').click()
+  await expect(page.getByText('상품 정보를 불러오는 중이에요.')).toBeVisible()
+  await expect(page.getByRole('contentinfo')).toHaveCount(0)
+  release()
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+  await expect(page.getByRole('contentinfo')).toHaveCount(1)
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { footerFlashes: number }).footerFlashes,
+    ),
+  ).toBe(0)
 })

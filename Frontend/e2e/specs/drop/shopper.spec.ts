@@ -21,8 +21,8 @@ test.describe('상품 탐색', () => {
     await expect(page.locator('.buy-form')).toHaveCount(0)
 
     await page.goto('/#/drops/201')
-    await page.getByLabel('착용감').selectOption({ label: '릴랙스' })
-    await page.getByLabel('소매').selectOption({ label: '롱' })
+    await page.getByLabel('착용감').selectOption('1')
+    await page.getByLabel('소매').selectOption('2')
     await page.getByLabel('수량').fill('6')
     await expect(
       page.getByRole('button', { name: '수량을 확인해주세요' }),
@@ -80,6 +80,8 @@ test.describe('상품 탐색', () => {
       route.abort(),
     )
     await page.goto('/#/drops/102')
+    await expect(page.locator('.detail-gallery')).toBeVisible()
+    await expect(page.locator('.detail-gallery .badge')).toHaveCount(0)
     await expect(
       page.getByRole('group', {
         name: '나의 작은 휴식, 데일리 머그 상품 갤러리',
@@ -97,6 +99,8 @@ test.describe('상품 탐색', () => {
     ).toBeVisible()
 
     await page.goto('/#/drops/101')
+    await expect(page.locator('.detail-gallery')).toBeVisible()
+    await expect(page.locator('.detail-gallery .badge')).toHaveCount(0)
     await expect(page.locator('.detail-thumbnails')).toHaveCount(0)
     await expect(page.locator('.detail-media img')).toHaveAttribute(
       'alt',
@@ -116,7 +120,7 @@ test.describe('상품 탐색', () => {
       '나의 작은 휴식, 데일리 머그',
     )
     await expect(
-      page.getByRole('button', { name: '♡ WISH 등록하기' }),
+      page.getByRole('button', { name: 'WISH 등록하기' }),
     ).toBeVisible()
   })
 
@@ -128,6 +132,7 @@ test.describe('상품 탐색', () => {
       .first()
     await expect(grabCard.locator('.creator')).not.toBeEmpty()
     await expect(grabCard).toContainText('남은 수량')
+    await expect(grabCard.locator('.badge')).toHaveCount(0)
 
     await page.goto('/#/wish')
     const wishCard = page
@@ -148,6 +153,8 @@ test.describe('상품 탐색', () => {
       .click()
 
     await expect(page).toHaveURL(/#\/drops\/201$/)
+    await expect(page.locator('.detail-gallery')).toBeVisible()
+    await expect(page.locator('.detail-gallery .badge')).toHaveCount(0)
     await expect(
       page.getByRole('button', { name: '옵션을 선택해주세요' }),
     ).toBeDisabled()

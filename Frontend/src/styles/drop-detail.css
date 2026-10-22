@@ -62,17 +62,10 @@
 .detail-summary {
   padding-top: 5px;
 }
-.detail-status {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--line);
-  font-size: 11px;
-  letter-spacing: 0.5px;
-}
-.detail-status b {
-  color: #5b731d;
+.detail-summary > .creator {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 0;
 }
 .detail-summary h1 {
   margin: 0 0 16px;
@@ -81,11 +74,6 @@
   letter-spacing: -2px;
   word-break: keep-all;
   overflow-wrap: anywhere;
-}
-.detail-description {
-  margin: 0 0 28px;
-  color: var(--muted);
-  line-height: 1.75;
 }
 .detail-price {
   display: flex;
@@ -101,7 +89,7 @@
   font-weight: 500;
 }
 .meta-list {
-  margin: 0 0 26px;
+  margin: 0;
   border-top: 1px solid var(--line);
 }
 .meta-list div {
@@ -119,10 +107,7 @@
   font-weight: 600;
 }
 .wish-panel {
-  padding: 26px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--soft);
+  padding: 0;
 }
 .wish-panel p {
   margin: 8px 0 20px;
@@ -237,4 +222,150 @@
 .detail-shipping p {
   margin: 8px 0 0;
   color: var(--muted);
+}
+
+.detail-state {
+  padding: 24px 0;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.detail-state-label {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.detail-stock-value {
+  display: block;
+  margin-top: 6px;
+  font-size: clamp(40px, 4vw, 56px);
+  font-weight: 700;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.detail-stock-value small {
+  margin-left: 6px;
+  font-size: 16px;
+  font-weight: 500;
+}
+.detail-stock[data-low='true'] .detail-stock-value {
+  color: var(--danger);
+}
+.detail-open-time {
+  display: block;
+  margin-top: 10px;
+  font-size: clamp(20px, 2vw, 26px);
+  line-height: 1.5;
+  word-break: keep-all;
+}
+.detail-wish-count {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.detail-closed {
+  margin: 0;
+  padding: 24px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 16px;
+  line-height: 1.6;
+}
+.detail-mobile-stock {
+  display: none;
+}
+.detail-summary {
+  min-width: 0;
+}
+@media (max-width: 720px) {
+  .detail-purchase {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 20;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    align-items: center;
+    gap: 16px;
+    padding: 14px 20px calc(14px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--line);
+    background: #fafaf7;
+  }
+  .detail-mobile-stock {
+    display: block;
+  }
+  .detail-mobile-stock .detail-stock-value {
+    margin-top: 4px;
+    font-size: 24px;
+  }
+  .detail-mobile-stock .detail-stock-value small {
+    font-size: 12px;
+  }
+  body:has(.detail-purchase) {
+    padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px));
+  }
+  html:has(.detail-purchase) {
+    scroll-padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+.detail-countdown {
+  display: block;
+  margin-top: 6px;
+  font-size: clamp(40px, 4vw, 56px);
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+.detail-open-time-secondary {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.detail-stock-digits {
+  display: inline-grid;
+  position: relative;
+  overflow: hidden;
+  vertical-align: bottom;
+}
+.detail-stock-current,
+.detail-stock-previous {
+  grid-area: 1 / 1;
+}
+.detail-stock-previous {
+  visibility: hidden;
+}
+.detail-stock-digits[data-changing='true'] .detail-stock-current {
+  animation: detail-stock-in 240ms ease-out both;
+}
+.detail-stock-digits[data-changing='true'] .detail-stock-previous {
+  visibility: visible;
+  animation: detail-stock-out 240ms ease-out both;
+}
+@keyframes detail-stock-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes detail-stock-out {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-100%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .detail-stock-digits[data-changing='true'] .detail-stock-current {
+    animation: none;
+  }
+  .detail-stock-digits[data-changing='true'] .detail-stock-previous {
+    display: none;
+    animation: none;
+  }
 }
