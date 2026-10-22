@@ -18,6 +18,7 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /*
@@ -43,6 +44,8 @@ public class ProfileImageUploadService {
             "image/jpeg", "jpg",
             "image/png", "png",
             "image/webp", "webp");
+    // 등록(PUT)·이전 객체 삭제 대상 검증(ProfileImageUrlVerifier)이 발급과 같은 확장자만 받도록 함께 쓴다.
+    static final Set<String> ALLOWED_EXTENSIONS = Set.copyOf(EXTENSIONS.values());
 
     private final UserRepository userRepository;
     private final ProfileImageStorage profileImageStorage;
