@@ -39,6 +39,7 @@ function setup() {
     cancelQueries,
     getQueryCache: () => ({ subscribe: () => () => undefined }),
     getQueryData: () => undefined,
+    getQueryState: () => undefined,
   } as unknown as QueryClient
   const subscription = subscribeDropStockStream(100, client)
   return {
@@ -300,6 +301,7 @@ test('연결이 반복 실패해도 대체 조회가 예정된 주기로 실행�
     cancelQueries: vi.fn().mockResolvedValue(undefined),
     getQueryCache: () => ({ subscribe: () => () => undefined }),
     getQueryData: () => undefined,
+    getQueryState: () => undefined,
   } as unknown as QueryClient
   const startedAt = Date.now()
   const calls: number[] = []
@@ -523,3 +525,36 @@ test('상세 조회의 404가 확인되면 연결과 복구 타이머를 멈춘�
   stop()
   client.clear()
 })
+
+test.each([3000, 6000])(
+  '캐시 수신 뒤 %ims가 지나도 판매 경계를 뒤로 미루지 않는다',
+  async (elapsed) => {
+    vi.setSystemTime(new Date('2026-10-19T00:05:00Z'))
+    const source = new FakeSource()
+    vi.mocked(openDropStockStream).mockReturnValue(
+      source as unknown as EventSource,
+    )
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+    })
+    client.setQueryData(dropKeys.detail(100), {
+      dropId: 100,
+      serverTime: '2026-10-19T00:00:00Z',
+      saleStartsAt: '2026-10-19T00:00:05Z',
+    })
+    await vi.advanceTimersByTimeAsync(elapsed)
+    vi.mocked(getDropDetail).mockResolvedValue({
+      dropId: 100,
+      serverTime: '2026-10-19T00:00:06Z',
+      saleStartsAt: '2026-10-19T00:00:05Z',
+    })
+    vi.mocked(getDropStocks).mockResolvedValue({ dropId: 100, options: [] })
+    const { dispose } = subscribeDropStockStream(100, client)
+    await vi.advanceTimersByTimeAsync(Math.max(0, 5000 - elapsed) + 1)
+    expect(getDropDetail).toHaveBeenCalledTimes(1)
+    dispose()
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(getDropDetail).toHaveBeenCalledTimes(1)
+    client.clear()
+  },
+)

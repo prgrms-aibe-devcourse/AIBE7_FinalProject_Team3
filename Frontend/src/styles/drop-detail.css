@@ -310,3 +310,16 @@
     scroll-padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px));
   }
 }
+
+.detail-countdown {
+  display: block;
+  margin-top: 6px;
+  font-size: clamp(40px, 4vw, 56px);
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+.detail-open-time-secondary {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}

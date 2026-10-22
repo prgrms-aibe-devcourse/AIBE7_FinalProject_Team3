@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import axios from 'axios'
 import EmptyState from '../../components/EmptyState/EmptyState'
 import DropDetailImages from '../../features/drop/components/DropDetailImages'
+import DropOpenCountdown from '../../features/drop/components/DropOpenCountdown'
 import DropStockQuantity from '../../features/drop/components/DropStockQuantity'
 import DropGallery from '../../features/drop/components/DropGallery'
 import { toDropDetail } from '../../features/drop/logic/dropDetailView'
@@ -205,18 +206,15 @@ export default function DropDetailPage({
           {mode !== 'closed' && (
             <div className="detail-state">
               {mode === 'buy' ? (
-                <DropStockQuantity stock={totalStock} />
+                <DropStockQuantity key={detail.id} stock={totalStock} />
               ) : (
-                <>
-                  <span className="detail-state-label">오픈 예정</span>
-                  <strong className="detail-open-time">
-                    <time dateTime={detail.saleStartsAt}>
-                      {dateLabel(detail.saleStartsAt)}
-                    </time>{' '}
-                    오픈
-                  </strong>
-                  <p className="detail-wish-count">{detail.wishCount} WISH</p>
-                </>
+                <DropOpenCountdown
+                  key={`${detail.id}:${detailQuery.dataUpdatedAt}`}
+                  saleStartsAt={detail.saleStartsAt}
+                  serverTime={detail.serverTime}
+                  receivedAt={detailQuery.dataUpdatedAt}
+                  wishCount={detail.wishCount}
+                />
               )}
             </div>
           )}
@@ -306,7 +304,7 @@ export default function DropDetailPage({
               </div>
               <div className="detail-purchase">
                 <div className="detail-mobile-stock">
-                  <DropStockQuantity stock={totalStock} />
+                  <DropStockQuantity key={detail.id} stock={totalStock} />
                 </div>
                 <button
                   type="submit"
