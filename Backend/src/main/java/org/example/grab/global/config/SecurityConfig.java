@@ -113,7 +113,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/users/me", "/api/v1/users/me/password").hasRole("USER")
                         // 내 WISH 목록은 정확한 경로의 GET에 USER 권한을 요구한다. 비로그인 401, USER 없는 계정 403.
                         .requestMatchers(HttpMethod.GET, "/api/v1/users/me/wishes").hasRole("USER")
-                        // 지금은 판매자 이미지 업로드만 있다. 회원 프로필 업로드가 생기면 이 규칙을 /api/v1/uploads/images/**로 좁히거나 경로를 나눈다.
+                        // 내 프로필 이미지 업로드 URL 발급·등록·삭제도 정확한 경로·메서드에만 USER 권한을 요구한다. CSRF 예외는 두지 않는다.
+                        // 정지·탈퇴 회원은 GET과 같이 서비스가 401로 거부한다(MEMBER_AUTH 1.12·1.13, GR-130 M00-07)
+                        .requestMatchers(HttpMethod.POST, "/api/v1/users/me/profile-image/upload-url").hasRole("USER")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/users/me/profile-image").hasRole("USER")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/users/me/profile-image").hasRole("USER")
+                        // 판매자 DROP 이미지 업로드 전용이다. 회원 프로필 업로드는 위 /users/me/profile-image 경로로 나눠 이 규칙에 걸리지 않는다(GR-130 M00-01).
                         .requestMatchers("/api/v1/uploads/**").hasRole("SELLER")
                         .anyRequest().authenticated()
                 )
