@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { openingSeconds } from '../logic/serverTime'
+import { openingSeconds, serverTimeAt } from '../logic/serverTime'
 import { dateLabel } from '../../../utils/date'
 
 export default function DropOpenCountdown({
@@ -22,14 +22,22 @@ export default function DropOpenCountdown({
     const tick = () => {
       window.clearTimeout(timer)
       if (document.visibilityState === 'hidden') return
-      const remaining = openingSeconds(saleStartsAt, serverTime, receivedAt)
+      const now = Date.now()
+      const remaining = openingSeconds(
+        saleStartsAt,
+        serverTime,
+        receivedAt,
+        now,
+      )
+      const remainingMs =
+        Date.parse(saleStartsAt) - serverTimeAt(serverTime, receivedAt, now)
       setSeconds(remaining)
       if (remaining === null || remaining === 0) return
       timer = window.setTimeout(
         tick,
         remaining > 600
-          ? Math.min((remaining - 600) * 1000, 2_147_483_647)
-          : 1000,
+          ? Math.min(remainingMs - 600_000, 2_147_483_647)
+          : remainingMs % 1000 || 1000,
       )
     }
     timer = window.setTimeout(tick, 0)

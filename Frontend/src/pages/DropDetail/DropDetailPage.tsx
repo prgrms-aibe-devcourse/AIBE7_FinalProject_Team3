@@ -83,12 +83,16 @@ export default function DropDetailPage({
     if (option.availableStock !== undefined)
       stockByOption.set(option.optionId, option.availableStock)
   }
-  const totalStock = stocksQuery.data?.options?.length
-    ? stocksQuery.data.options.reduce(
-        (sum, option) => sum + (option.availableStock ?? 0),
-        0,
-      )
-    : undefined
+  const totalStock =
+    stocksQuery.data?.options?.length &&
+    stocksQuery.data.options.every(
+      (option) => option.availableStock !== undefined,
+    )
+      ? stocksQuery.data.options.reduce(
+          (sum, option) => sum + (option.availableStock ?? 0),
+          0,
+        )
+      : undefined
 
   const selectedSku = findMatchingSku(detail.skus, selected)
   const wished = wishes.has(detail.id)
@@ -154,19 +158,6 @@ export default function DropDetailPage({
         <span>/</span>
         <span>{detail.category}</span>
       </div>
-      {refreshFailed && (
-        <p className="form-error detail-refresh-error" role="alert">
-          최신 상품 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.{' '}
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={retry}
-            disabled={refreshing}
-          >
-            다시 시도
-          </button>
-        </p>
-      )}
       <section className="detail-layout">
         <DropGallery
           key={detail.id}
@@ -204,6 +195,19 @@ export default function DropDetailPage({
             </div>
           </dl>
 
+          {refreshFailed && (
+            <p className="form-error detail-refresh-error" role="alert">
+              최신 상품 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.{' '}
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={retry}
+                disabled={refreshing}
+              >
+                다시 시도
+              </button>
+            </p>
+          )}
           {mode !== 'closed' && (
             <div className="detail-state">
               {mode === 'buy' ? (
@@ -311,7 +315,7 @@ export default function DropDetailPage({
                 <strong>{won(unitPrice * quantity)}</strong>
               </div>
               <div className="detail-purchase">
-                <div className="detail-mobile-stock">
+                <div className="detail-mobile-stock" aria-hidden="true">
                   <DropStockQuantity key={detail.id} stock={totalStock} />
                 </div>
                 <button
