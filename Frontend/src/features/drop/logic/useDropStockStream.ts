@@ -195,12 +195,16 @@ export function subscribeDropStockStream(
       .filter((date) => Number.isFinite(date) && date > responseTime)
       .sort((a, b) => a - b)[0]
     if (next === undefined) return
+    if (next <= serverNow) {
+      requestBoth()
+      return
+    }
     saleTimer = globalThis.setTimeout(
       () => {
         saleTimer = 0
         requestBoth()
       },
-      Math.max(0, Math.min(next - serverNow, 2_147_483_647)),
+      Math.min(next - serverNow, 2_147_483_647),
     )
   }
 

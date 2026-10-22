@@ -558,3 +558,49 @@ test.each([3000, 6000])(
     client.clear()
   },
 )
+
+test('판매 경계가 지난 뒤 복귀해도 같은 갱신을 후속 요청으로 중복하지 않는다', async () => {
+  vi.setSystemTime(new Date('2026-10-19T00:00:00Z'))
+  const win = new EventTarget()
+  let online = true
+  vi.stubGlobal('window', win)
+  vi.stubGlobal('navigator', {
+    get onLine() {
+      return online
+    },
+  })
+  const source = new FakeSource()
+  vi.mocked(openDropStockStream).mockReturnValue(
+    source as unknown as EventSource,
+  )
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+  })
+  const detail = {
+    dropId: 100,
+    serverTime: '2026-10-19T00:00:00Z',
+    saleStartsAt: '2026-10-19T00:00:05Z',
+  }
+  client.setQueryData(dropKeys.detail(100), detail)
+  vi.mocked(getDropDetail).mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        setTimeout(
+          () => resolve({ ...detail, serverTime: '2026-10-19T00:00:06Z' }),
+          10,
+        )
+      }),
+  )
+  vi.mocked(getDropStocks).mockResolvedValue({ dropId: 100, options: [] })
+  const { dispose } = subscribeDropStockStream(100, client)
+  online = false
+  win.dispatchEvent(new Event('offline'))
+  await vi.advanceTimersByTimeAsync(6000)
+  online = true
+  win.dispatchEvent(new Event('online'))
+  await vi.advanceTimersByTimeAsync(2100)
+  expect(getDropDetail).toHaveBeenCalledTimes(1)
+  expect(getDropStocks).toHaveBeenCalledTimes(1)
+  dispose()
+  client.clear()
+})
