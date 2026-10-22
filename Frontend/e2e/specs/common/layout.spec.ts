@@ -290,3 +290,21 @@ test('키보드 포커스가 입력란에 보인다', async ({ page }) => {
   await expectFocusRing(page.getByLabel('상품 설명'))
   await expectFocusRing(page.getByLabel('카테고리'))
 })
+
+// 첫 조회 중 짧은 본문 때문에 푸터가 화면 안으로 올라왔다가 내려가지 않는다
+test('화면 이동 후 첫 조회 중에는 푸터를 보이지 않는다', async ({ page }) => {
+  let release = () => {}
+  const held = new Promise<void>((resolve) => (release = resolve))
+  await page.route(/\/api\/v1\/drops\/\d+(\?.*)?$/, async (route) => {
+    await held
+    await route.fallback()
+  })
+  await page.goto('/#/wish')
+  const list = page.getByRole('region', { name: 'WISH 상품 목록' })
+  await list.getByRole('heading').first().getByRole('link').click()
+  await expect(page.getByText('상품 정보를 불러오는 중이에요.')).toBeVisible()
+  await expect(page.getByRole('contentinfo')).toHaveCount(0)
+  release()
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+  await expect(page.getByRole('contentinfo')).toHaveCount(1)
+})
