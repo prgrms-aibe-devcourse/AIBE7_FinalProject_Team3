@@ -92,6 +92,8 @@
   border-width: 1px 0;
   border-radius: 0;
   background: transparent;
+  /* .panel의 overflow: hidden이 좌우 여백 없는 입력창의 포커스 표시(바깥 6px)를 자른다 */
+  overflow: visible;
 }
 .catalog-query-controls {
   display: flex;
