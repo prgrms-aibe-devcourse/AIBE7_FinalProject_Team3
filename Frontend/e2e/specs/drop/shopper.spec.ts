@@ -128,6 +128,7 @@ test.describe('상품 탐색', () => {
       .first()
     await expect(grabCard.locator('.creator')).not.toBeEmpty()
     await expect(grabCard).toContainText('남은 수량')
+    await expect(grabCard.locator('.badge')).toHaveCount(0)
 
     await page.goto('/#/wish')
     const wishCard = page
