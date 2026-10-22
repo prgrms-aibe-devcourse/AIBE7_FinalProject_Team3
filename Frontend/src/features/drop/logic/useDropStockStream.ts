@@ -3,6 +3,7 @@ import axios from 'axios'
 import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { getDropDetail, getDropStocks } from '../../../api/drop/drops'
 import { openDropStockStream } from '../../../api/drop/stockStream'
+import { serverTimeAt } from './serverTime'
 import { dropKeys } from './queryKeys'
 import { realtimeStockPolicy as policy } from './realtimeStockPolicy'
 
@@ -179,17 +180,25 @@ export function subscribeDropStockStream(
     queueReconnect(base * (0.5 + Math.random() * 0.5))
   }
 
-  const scheduleSale = (detail: Detail | undefined) => {
+  const scheduleSale = (
+    detail: Detail | undefined,
+    receivedAt: number | undefined,
+  ) => {
     globalThis.clearTimeout(saleTimer)
     saleTimer = 0
     if (!detail || disposed || !active()) return
-    const serverNow = Date.parse(detail.serverTime ?? '')
+    const responseTime = Date.parse(detail.serverTime ?? '')
+    const serverNow = serverTimeAt(detail.serverTime, receivedAt)
     if (!Number.isFinite(serverNow)) return
     const next = [detail.saleStartsAt, detail.saleEndsAt]
       .map((date) => Date.parse(date ?? ''))
-      .filter((date) => Number.isFinite(date) && date > serverNow)
+      .filter((date) => Number.isFinite(date) && date > responseTime)
       .sort((a, b) => a - b)[0]
     if (next === undefined) return
+    if (next <= serverNow) {
+      requestBoth()
+      return
+    }
     saleTimer = globalThis.setTimeout(
       () => {
         saleTimer = 0
@@ -331,7 +340,10 @@ export function subscribeDropStockStream(
     requestBoth()
     schedulePeriodic()
     queueReconnect(normalReconnectDelay())
-    scheduleSale(queryClient.getQueryData<Detail>(keys.detail))
+    scheduleSale(
+      queryClient.getQueryData<Detail>(keys.detail),
+      queryClient.getQueryState(keys.detail)?.dataUpdatedAt,
+    )
   }
   const onVisibility = () => {
     if (document.visibilityState === 'hidden') pause()
@@ -359,7 +371,10 @@ export function subscribeDropStockStream(
       return
     }
     if (event.action.type !== 'success') return
-    scheduleSale(event.query.state.data as Detail)
+    scheduleSale(
+      event.query.state.data as Detail,
+      event.query.state.dataUpdatedAt,
+    )
     if (invalidated && active()) {
       invalidated = false
       queueReconnect(normalReconnectDelay())
@@ -372,7 +387,10 @@ export function subscribeDropStockStream(
     window.addEventListener('offline', onOffline)
     window.addEventListener('online', onOnline)
   }
-  scheduleSale(queryClient.getQueryData<Detail>(keys.detail))
+  scheduleSale(
+    queryClient.getQueryData<Detail>(keys.detail),
+    queryClient.getQueryState(keys.detail)?.dataUpdatedAt,
+  )
   schedulePeriodic()
   connect()
 

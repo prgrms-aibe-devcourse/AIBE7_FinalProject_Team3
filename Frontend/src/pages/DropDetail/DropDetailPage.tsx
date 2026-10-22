@@ -3,10 +3,13 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import axios from 'axios'
 import EmptyState from '../../components/EmptyState/EmptyState'
 import DropDetailImages from '../../features/drop/components/DropDetailImages'
+import DropOpenCountdown from '../../features/drop/components/DropOpenCountdown'
+import DropStockQuantity from '../../features/drop/components/DropStockQuantity'
 import DropGallery from '../../features/drop/components/DropGallery'
 import { toDropDetail } from '../../features/drop/logic/dropDetailView'
 import {
   findMatchingSku,
+  optionStockLabel,
   selectionLabel,
 } from '../../features/drop/logic/option'
 import {
@@ -16,7 +19,7 @@ import {
 import { useDropStockStream } from '../../features/drop/logic/useDropStockStream'
 import { checkoutDraftPath } from '../../features/order/logic/checkoutView'
 import type { SharedProps } from '../../types/store'
-import { dateLabel, daysUntil } from '../../utils/date'
+import { dateLabel } from '../../utils/date'
 import { won } from '../../utils/price'
 import NotFoundPage from '../NotFound/NotFoundPage'
 
@@ -47,7 +50,11 @@ export default function DropDetailPage({
   if (detailQuery.isPending)
     return (
       <div role="status" aria-live="polite">
-        <EmptyState title="상품 정보를 불러오는 중이에요." variant="block" />
+        <EmptyState
+          loading
+          title="상품 정보를 불러오는 중이에요."
+          variant="block"
+        />
       </div>
     )
   if (
@@ -80,12 +87,16 @@ export default function DropDetailPage({
     if (option.availableStock !== undefined)
       stockByOption.set(option.optionId, option.availableStock)
   }
-  const totalStock = stocksQuery.data?.options?.length
-    ? stocksQuery.data.options.reduce(
-        (sum, option) => sum + (option.availableStock ?? 0),
-        0,
-      )
-    : undefined
+  const totalStock =
+    stocksQuery.data?.options?.length &&
+    stocksQuery.data.options.every(
+      (option) => option.availableStock !== undefined,
+    )
+      ? stocksQuery.data.options.reduce(
+          (sum, option) => sum + (option.availableStock ?? 0),
+          0,
+        )
+      : undefined
 
   const selectedSku = findMatchingSku(detail.skus, selected)
   const wished = wishes.has(detail.id)
@@ -151,48 +162,15 @@ export default function DropDetailPage({
         <span>/</span>
         <span>{detail.category}</span>
       </div>
-      {refreshFailed && (
-        <p className="form-error detail-refresh-error" role="alert">
-          최신 상품 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.{' '}
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={retry}
-            disabled={refreshing}
-          >
-            다시 시도
-          </button>
-        </p>
-      )}
       <section className="detail-layout">
         <DropGallery
           key={detail.id}
           name={detail.name}
-          status={detail.status}
           images={detail.galleryImages}
         />
         <div className="detail-summary">
-          <div className="detail-status">
-            <b>
-              {detail.status === 'WISH'
-                ? `오픈 D−${daysUntil(detail.saleStartsAt)}`
-                : detail.status === 'GRAB'
-                  ? 'LIMITED DROP'
-                  : detail.status === 'ENDED'
-                    ? '판매 종료'
-                    : '판매 취소'}
-            </b>
-            <span>
-              {detail.status === 'WISH'
-                ? `${detail.wishCount} WISH`
-                : detail.status === 'GRAB' && totalStock !== undefined
-                  ? `재고 ${totalStock}개`
-                  : ''}
-            </span>
-          </div>
           {detail.brand && <p className="creator">{detail.brand}</p>}
           <h1>{detail.name}</h1>
-          <p className="detail-description">{detail.description}</p>
           <p className="detail-price">
             {selectedSku
               ? won(selectedSku.price)
@@ -220,6 +198,35 @@ export default function DropDetailPage({
             </div>
           </dl>
 
+          {refreshFailed && (
+            <p className="form-error detail-refresh-error" role="alert">
+              최신 상품 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.{' '}
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={retry}
+                disabled={refreshing}
+              >
+                다시 시도
+              </button>
+            </p>
+          )}
+          {mode !== 'closed' && (
+            <div className="detail-state">
+              {mode === 'buy' ? (
+                <DropStockQuantity key={detail.id} stock={totalStock} />
+              ) : (
+                <DropOpenCountdown
+                  key={`${detail.id}:${detailQuery.dataUpdatedAt}`}
+                  saleStartsAt={detail.saleStartsAt}
+                  serverTime={detail.serverTime}
+                  receivedAt={detailQuery.dataUpdatedAt}
+                  wishCount={detail.wishCount}
+                />
+              )}
+            </div>
+          )}
+
           {mode === 'wish' ? (
             <div className="wish-panel">
               <strong>
@@ -236,7 +243,7 @@ export default function DropDetailPage({
                   void toggleWish(detail.id)
                 }}
               >
-                {wished ? '✓ WISH 취소하기' : '♡ WISH 등록하기'}
+                {wished ? 'WISH 취소하기' : 'WISH 등록하기'}
               </button>
             </div>
           ) : mode === 'buy' ? (
@@ -258,7 +265,14 @@ export default function DropDetailPage({
                     <option value="">선택해주세요</option>
                     {group.values.map((value) => (
                       <option key={value.id} value={value.id}>
-                        {value.label}
+                        {value.label} ·{' '}
+                        {optionStockLabel(
+                          detail.skus,
+                          selected,
+                          group.id,
+                          value.id,
+                          stockByOption,
+                        )}
                       </option>
                     ))}
                   </select>
@@ -303,25 +317,27 @@ export default function DropDetailPage({
                 <span>상품 합계</span>
                 <strong>{won(unitPrice * quantity)}</strong>
               </div>
-              <button
-                type="submit"
-                className="primary-button full"
-                disabled={!orderable}
-              >
-                {grabLabel}
-              </button>
+              <div className="detail-purchase">
+                <div className="detail-mobile-stock" aria-hidden="true">
+                  <DropStockQuantity key={detail.id} stock={totalStock} />
+                </div>
+                <button
+                  type="submit"
+                  className="primary-button full"
+                  disabled={!orderable}
+                >
+                  {grabLabel}
+                </button>
+              </div>
             </form>
           ) : (
-            <div className="wish-panel">
-              <strong>
-                {detail.status === 'CANCELED'
-                  ? '이 DROP은 판매가 취소됐어요.'
-                  : detail.soldOut
-                    ? '이 DROP은 품절됐어요.'
-                    : '이 DROP은 판매가 종료됐어요.'}
-              </strong>
-              <p>상품 정보는 계속 확인할 수 있어요.</p>
-            </div>
+            <p className="detail-closed">
+              {detail.status === 'CANCELED'
+                ? '이 DROP은 판매가 취소됐어요.'
+                : detail.soldOut
+                  ? '이 DROP은 품절됐어요.'
+                  : '이 DROP은 판매가 종료됐어요.'}
+            </p>
           )}
         </div>
       </section>

@@ -195,6 +195,33 @@
   min-height: 55vh;
   gap: 22px;
 }
+.empty-state[aria-busy='true'] {
+  align-content: center;
+  gap: 14px;
+}
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--line);
+  border-top-color: var(--ink);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 2.4s;
+  }
+}
+/* 첫 조회 중에는 본문이 짧아 푸터가 화면 안으로 올라왔다 내려가므로 숨긴다.
+   로딩 표시와 같은 렌더링에서 적용되어 푸터가 보이는 프레임이 없다 */
+.app-shell:has([aria-busy='true']) > footer {
+  display: none;
+}
 
 .my-columns .wish-panel {
   padding: 0;

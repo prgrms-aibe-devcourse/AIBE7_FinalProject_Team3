@@ -141,7 +141,7 @@ export default function SellerInventoryPage({
             </div>
           </div>
           {listQuery.isLoading ? (
-            <EmptyState title="재고 목록을 불러오는 중이에요." />
+            <EmptyState loading title="재고 목록을 불러오는 중이에요." />
           ) : listQuery.isError ? (
             <div className="inventory-result">
               <EmptyState title={applicationErrorMessage(listQuery.error)} />
@@ -240,7 +240,7 @@ export default function SellerInventoryPage({
           {!dropIdNum || selectedNotFound ? (
             <EmptyState title="상품을 선택하면 옵션별 재고가 보여요." />
           ) : stocksQuery.isLoading || selectedQuery.isLoading ? (
-            <EmptyState title="옵션 재고를 불러오는 중이에요." />
+            <EmptyState loading title="옵션 재고를 불러오는 중이에요." />
           ) : stocksQuery.isError ? (
             <div className="inventory-result">
               <EmptyState title={applicationErrorMessage(stocksQuery.error)} />

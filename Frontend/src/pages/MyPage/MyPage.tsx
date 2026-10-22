@@ -217,7 +217,7 @@ export default function MyPage({
           </div>
           {wishesQuery.isPending ? (
             <div role="status" aria-live="polite">
-              <EmptyState title="WISH 목록을 불러오는 중이에요." />
+              <EmptyState loading title="WISH 목록을 불러오는 중이에요." />
             </div>
           ) : wishesQuery.isError ? (
             <div className="catalog-error" role="alert">
@@ -312,7 +312,7 @@ export default function MyPage({
           </div>
           {ordersQuery.isPending ? (
             <div role="status" aria-live="polite">
-              <EmptyState title="주문 목록을 불러오는 중이에요." />
+              <EmptyState loading title="주문 목록을 불러오는 중이에요." />
             </div>
           ) : ordersQuery.isError ? (
             <div className="catalog-error" role="alert">

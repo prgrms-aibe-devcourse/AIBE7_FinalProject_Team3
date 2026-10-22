@@ -233,7 +233,7 @@ export default function SellerOrdersPage({
           />
         ) : listQuery.isLoading ? (
           <div role="status">
-            <EmptyState title="주문 목록을 불러오는 중이에요." />
+            <EmptyState loading title="주문 목록을 불러오는 중이에요." />
           </div>
         ) : listQuery.isError ? (
           <div role="alert" className="seller-order-error">
