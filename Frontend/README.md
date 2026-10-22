@@ -105,6 +105,8 @@ npx playwright show-trace test-results/<테스트>/trace.zip
 
 결제 화면은 토스페이먼츠 테스트 결제창을 엽니다. `.env.local`의 `VITE_TOSS_CLIENT_KEY`에 백엔드 `TOSS_SECRET_KEY`와 짝이 되는 테스트 클라이언트 키(`test_ck_`로 시작, API 개별 연동 키)를 넣습니다. 클라이언트 키는 빌드 시 번들에 포함되는 공개 값이지만, 키 값은 `.env.example`에 적지 않고 이름만 둡니다. 값이 없으면 결제창을 열지 않고 결제 설정이 없다고 안내합니다. 배포 빌드에서도 같은 이름의 환경 변수를 설정해야 합니다.
 
+링크 공유 미리보기(Open Graph)는 `index.html`의 `og:*` 태그와 `public/og-image.jpg`(1200×630, 메인 히어로 배경에서 잘라냄)를 사용합니다. 크롤러는 절대 URL만 읽으므로 배포 빌드에 `VITE_SITE_URL`(배포된 프론트엔드 원점 주소, 끝의 `/` 제외)을 설정해야 합니다. 값이 없으면 빌드가 경고(`%VITE_SITE_URL% is not defined`)를 내고 태그에 자리표시자가 그대로 남아 미리보기가 뜨지 않습니다. 해시 라우팅이라 모든 경로가 같은 미리보기를 공유합니다. 배포 후 카카오·Facebook 공유 디버거로 확인하고, 이미지를 바꾸면 디버거에서 캐시를 초기화합니다.
+
 LOCAL 로그인·회원가입과 `users/me`는 실제 백엔드가 필요합니다. 백엔드 없이 `npm run dev`만 띄우면 인증 요청이 401이 되어 비로그인 상태로 동작합니다. 소셜 로그인은 실제 KAKAO·GOOGLE 키가 설정된 백엔드가 필요하며, 제공자 콘솔 설정과 확인 절차는 `Backend/docs/migration.md` 8절을 따릅니다. 개발 서버의 프록시를 거쳐 시작해도 제공자 콜백 주소(`redirect_uri`)는 백엔드 주소(8080)로 만들어집니다. Vite 프록시 설정을 바꾸면서 `changeOrigin`을 빼면 5173으로 바뀌니 주의합니다. E2E는 실제 제공자로 이동하지 않고 `e2e/mock/auth.ts`가 콜백 결과 주소로 바로 보냅니다.
 
 LOCAL 회원가입은 인증 코드를 메일로 받습니다. 백엔드 Docker Compose로 띄우면 메일 설정이 없을 때 Mailpit으로 발송되므로, `http://localhost:8025`에서 받는 주소의 메일을 열어 6자리 코드를 확인합니다. 같은 이메일의 코드 재요청은 60초 뒤에 가능합니다. 백엔드 실행과 시험 데이터 정리는 `Backend/docs/migration.md` 6절을 따릅니다.

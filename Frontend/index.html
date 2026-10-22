@@ -13,6 +13,20 @@
       href="/src/assets/images/grab-symbol.png"
     />
     <title>GRAB — 취향이 모이면 현실이 된다</title>
+    <!-- 링크 공유 미리보기. 크롤러는 스크립트를 실행하지 않고 절대 URL만 읽으므로 빌드 시 VITE_SITE_URL로 채운다 -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="GRAB" />
+    <meta property="og:title" content="GRAB — 취향이 모이면 현실이 된다" />
+    <meta
+      property="og:description"
+      content="작은 브랜드의 특별한 상품을 발견하고 WISH한 뒤 GRAB하세요."
+    />
+    <meta property="og:url" content="%VITE_SITE_URL%/" />
+    <meta property="og:image" content="%VITE_SITE_URL%/og-image.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="GRAB — Grab what you want." />
+    <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body>
     <div id="root"></div>
