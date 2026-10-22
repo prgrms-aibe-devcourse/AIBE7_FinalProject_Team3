@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Route, Routes, useNavigate } from 'react-router-dom'
-import { useIsFetching } from '@tanstack/react-query'
 import Footer from './components/Footer/Footer'
 import Header from './components/Header/Header'
 import useAuth from './features/auth/logic/useAuth'
@@ -37,11 +36,6 @@ export default function App() {
   }
   const { user, status, authenticated, login, refresh, logout } = useAuth()
   const { wishes, wishesReady, toggleWish } = useWish(authenticated, notify)
-  // 화면 이동 직후 첫 조회 중에는 본문이 짧아 푸터가 화면 안으로 올라왔다가 내려간다.
-  // 데이터가 아직 없는 첫 조회 동안만 푸터를 숨긴다. 데이터가 있는 재조회는 제외한다.
-  const loadingFirstData =
-    useIsFetching({ predicate: (query) => query.state.status === 'pending' }) >
-    0
 
   const shared: SharedProps = {
     authenticated,
@@ -176,7 +170,7 @@ export default function App() {
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>
-      {!loadingFirstData && <Footer />}
+      <Footer />
       <div
         className={`toast ${toast ? 'is-visible' : ''}`}
         role="status"

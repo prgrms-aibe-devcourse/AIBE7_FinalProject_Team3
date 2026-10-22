@@ -237,7 +237,11 @@ export default function DropListPage({
         </div>
       ) : loading ? (
         <div role="status" aria-live="polite">
-          <EmptyState title="상품 목록을 불러오는 중이에요." variant="block" />
+          <EmptyState
+            loading
+            title="상품 목록을 불러오는 중이에요."
+            variant="block"
+          />
         </div>
       ) : cards.length ? (
         <section

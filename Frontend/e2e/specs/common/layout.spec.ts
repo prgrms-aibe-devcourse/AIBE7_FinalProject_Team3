@@ -301,10 +301,34 @@ test('화면 이동 후 첫 조회 중에는 푸터를 보이지 않는다', asy
   })
   await page.goto('/#/wish')
   const list = page.getByRole('region', { name: 'WISH 상품 목록' })
+  await expect(list.getByRole('article').first()).toBeVisible()
+  // 매 프레임 로딩 표시와 푸터가 함께 화면에 보였는지 기록한다(첫 프레임 깜빡임 포함)
+  await page.evaluate(() => {
+    const w = window as unknown as { footerFlashes: number }
+    w.footerFlashes = 0
+    const tick = () => {
+      const footer = document.querySelector('footer')
+      const visible =
+        !!footer &&
+        footer.getClientRects().length > 0 &&
+        footer.getBoundingClientRect().top < innerHeight
+      const loading = document
+        .querySelector('main')
+        ?.textContent?.includes('불러오는 중이에요')
+      if (visible && loading) w.footerFlashes++
+      requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  })
   await list.getByRole('heading').first().getByRole('link').click()
   await expect(page.getByText('상품 정보를 불러오는 중이에요.')).toBeVisible()
   await expect(page.getByRole('contentinfo')).toHaveCount(0)
   release()
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
   await expect(page.getByRole('contentinfo')).toHaveCount(1)
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { footerFlashes: number }).footerFlashes,
+    ),
+  ).toBe(0)
 })

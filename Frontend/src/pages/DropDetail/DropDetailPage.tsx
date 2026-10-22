@@ -50,7 +50,11 @@ export default function DropDetailPage({
   if (detailQuery.isPending)
     return (
       <div role="status" aria-live="polite">
-        <EmptyState title="상품 정보를 불러오는 중이에요." variant="block" />
+        <EmptyState
+          loading
+          title="상품 정보를 불러오는 중이에요."
+          variant="block"
+        />
       </div>
     )
   if (

@@ -83,7 +83,7 @@ export default function SellerDropsPage({
         </div>
         {query.isPending ? (
           <div role="status">
-            <EmptyState title="DROP 목록을 불러오는 중이에요." />
+            <EmptyState loading title="DROP 목록을 불러오는 중이에요." />
           </div>
         ) : query.isError ? (
           <div className="seller-drops-result" role="alert">

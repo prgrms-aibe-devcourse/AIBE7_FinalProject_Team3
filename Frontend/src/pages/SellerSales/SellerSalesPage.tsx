@@ -102,7 +102,7 @@ export default function SellerSalesPage({
           </div>
         </div>
         {query.isLoading ? (
-          <EmptyState title="판매 실적을 불러오는 중이에요." />
+          <EmptyState loading title="판매 실적을 불러오는 중이에요." />
         ) : query.isError ? (
           <div className="seller-sales-result">
             <EmptyState title={applicationErrorMessage(query.error)} />
