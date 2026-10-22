@@ -21,8 +21,8 @@ test.describe('상품 탐색', () => {
     await expect(page.locator('.buy-form')).toHaveCount(0)
 
     await page.goto('/#/drops/201')
-    await page.getByLabel('착용감').selectOption({ label: '릴랙스' })
-    await page.getByLabel('소매').selectOption({ label: '롱' })
+    await page.getByLabel('착용감').selectOption('1')
+    await page.getByLabel('소매').selectOption('2')
     await page.getByLabel('수량').fill('6')
     await expect(
       page.getByRole('button', { name: '수량을 확인해주세요' }),

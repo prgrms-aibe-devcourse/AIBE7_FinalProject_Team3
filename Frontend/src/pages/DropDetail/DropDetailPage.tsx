@@ -9,6 +9,7 @@ import DropGallery from '../../features/drop/components/DropGallery'
 import { toDropDetail } from '../../features/drop/logic/dropDetailView'
 import {
   findMatchingSku,
+  optionStockLabel,
   selectionLabel,
 } from '../../features/drop/logic/option'
 import {
@@ -257,7 +258,14 @@ export default function DropDetailPage({
                     <option value="">선택해주세요</option>
                     {group.values.map((value) => (
                       <option key={value.id} value={value.id}>
-                        {value.label}
+                        {value.label} ·{' '}
+                        {optionStockLabel(
+                          detail.skus,
+                          selected,
+                          group.id,
+                          value.id,
+                          stockByOption,
+                        )}
                       </option>
                     ))}
                   </select>
