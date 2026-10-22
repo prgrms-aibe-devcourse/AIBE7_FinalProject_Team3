@@ -277,6 +277,43 @@ class SwaggerEndpointTests {
         assertThat(values).containsExactly("LOCAL", "KAKAO", "GOOGLE");
     }
 
+    // GR-129 M05-05: 닉네임 수정·비밀번호 변경이 user 그룹에 노출되고, Authentication 파라미터는 문서 입력란에 나오지 않는다
+    @Test
+    @DisplayName("내 닉네임 수정·비밀번호 변경 PATCH가 user 그룹에 요청 본문과 함께 노출된다")
+    void exposesUserMeUpdateEndpoints() throws Exception {
+        JsonNode doc = readApiDoc("/v3/api-docs/user");
+        JsonNode nickname = doc.path("paths").path("/api/v1/users/me").path("patch");
+        JsonNode password = doc.path("paths").path("/api/v1/users/me/password").path("patch");
+
+        assertThat(nickname.isMissingNode()).isFalse();
+        assertThat(password.isMissingNode()).isFalse();
+        assertThat(nickname.has("parameters")).isFalse();
+        assertThat(password.has("parameters")).isFalse();
+        assertThat(propertyNames(deref(doc, responseSchema(nickname.path("requestBody"))).path("properties")))
+                .containsExactlyInAnyOrder("nickname");
+        assertThat(propertyNames(deref(doc, responseSchema(password.path("requestBody"))).path("properties")))
+                .containsExactlyInAnyOrder("currentPassword", "newPassword");
+        assertThat(password.path("responses").has("204")).isTrue();
+        assertThat(password.path("responses").path("400").path("description").asText())
+                .contains("PASSWORD_MISMATCH", "PASSWORD_NOT_AVAILABLE", "PASSWORD_UNCHANGED");
+    }
+
+    // GR-129 M00-02: 닉네임 수정 200 응답의 data는 내 정보 조회와 같은 스키마다
+    @Test
+    @DisplayName("내 닉네임 수정 200 응답의 data는 내 정보 조회와 같은 UserMeResponse 스키마다")
+    void exposesSameResponseSchemaForNicknameUpdate() throws Exception {
+        JsonNode doc = readApiDoc("/v3/api-docs/user");
+        JsonNode me = doc.path("paths").path("/api/v1/users/me");
+        JsonNode getData = deref(doc, responseSchema(me.path("get").path("responses").path("200")))
+                .path("properties").path("data");
+        JsonNode patchData = deref(doc, responseSchema(me.path("patch").path("responses").path("200")))
+                .path("properties").path("data");
+
+        assertThat(patchData.path("$ref").asText()).isNotBlank().isEqualTo(getData.path("$ref").asText());
+        assertThat(propertyNames(deref(doc, patchData).path("properties"))).containsExactlyInAnyOrder(
+                "userId", "email", "nickname", "provider", "roles", "profileImageUrl", "createdAt");
+    }
+
     private JsonNode readApiDoc(String uri) throws Exception {
         return objectMapper.readTree(mockMvc.perform(get(uri))
                 .andExpect(status().isOk())

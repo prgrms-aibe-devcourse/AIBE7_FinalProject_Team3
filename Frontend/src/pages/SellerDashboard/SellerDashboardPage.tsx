@@ -100,7 +100,6 @@ export default function SellerDashboardPage() {
     <section className="page-section seller-page seller-dashboard-page">
       <div className="seller-title">
         <div>
-          <p className="eyebrow">CREATOR WORKSPACE</p>
           <h1>판매자 종합</h1>
           <p>현재 운영 현황과 처리할 일을 확인합니다.</p>
         </div>

@@ -98,4 +98,29 @@ class UserTest {
         assertThatThrownBy(() -> User.createSocial(EMAIL, null, "sub-1", NICKNAME))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    @DisplayName("닉네임을 받은 값 그대로 바꾼다")
+    void changeNicknameReplacesNickname() {
+        // given
+        User user = User.createLocal(EMAIL, PASSWORD_HASH, NICKNAME);
+
+        // when
+        user.changeNickname("Grab_2");
+
+        // then: 대소문자는 입력 그대로 저장한다(MEMBER_AUTH.md 1.2.3)
+        assertThat(user.getNickname()).isEqualTo("Grab_2");
+    }
+
+    @Test
+    @DisplayName("닉네임을 null로 바꿀 수 없고 기존 값이 유지된다")
+    void changeNicknameRejectsNull() {
+        // given
+        User user = User.createLocal(EMAIL, PASSWORD_HASH, NICKNAME);
+
+        // when & then
+        assertThatThrownBy(() -> user.changeNickname(null))
+                .isInstanceOf(NullPointerException.class);
+        assertThat(user.getNickname()).isEqualTo(NICKNAME);
+    }
 }
