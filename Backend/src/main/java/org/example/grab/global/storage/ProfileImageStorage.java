@@ -7,4 +7,8 @@ public interface ProfileImageStorage {
     SignedUploadUrl createSignedUploadUrl(String objectKey);
 
     String publicUrl(String objectKey);
+
+    // 객체 키(버킷 안 경로)를 받는다. 공개 URL에서 키를 꺼내는 일과 삭제 대상 검증은 호출자가 한다.
+    // 없는 객체를 지워도 성공한다. 실패하면 EXTERNAL_SERVICE_ERROR BusinessException을 던진다.
+    void delete(String objectKey);
 }
