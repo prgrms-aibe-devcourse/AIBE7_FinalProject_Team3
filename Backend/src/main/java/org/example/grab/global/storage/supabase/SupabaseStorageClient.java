@@ -12,6 +12,7 @@ import org.springframework.web.client.RestClientException;
 /**
  * Supabase Storage 서명 업로드 URL 발급 클라이언트. 도메인을 모르는 순수 인프라 계층이다.
  * 객체 키는 호출자가 만든다(예: images/{imageId}.{ext}).
+ * 인스턴스마다 버킷 하나에 묶인다. DROP 이미지(dropImagesBucket)와 프로필 이미지(profileImagesBucket, GR-130)는 각각 다른 인스턴스다.
  */
 @Slf4j
 public class SupabaseStorageClient implements ImageStorage {
@@ -27,10 +28,10 @@ public class SupabaseStorageClient implements ImageStorage {
     private final boolean configured;
 
     // TossPaymentGateway와 같은 방식으로 builder를 받아, 테스트는 같은 builder에 MockRestServiceServer를 묶는다.
-    public SupabaseStorageClient(RestClient.Builder restClientBuilder, SupabaseStorageProperties properties) {
-        this.baseUrl = stripTrailingSlash(properties.url());
-        this.bucket = properties.bucket();
-        this.configured = StringUtils.hasText(baseUrl) && StringUtils.hasText(properties.secretKey());
+    public SupabaseStorageClient(RestClient.Builder restClientBuilder, SupabaseStorageProperties properties, String bucket) {
+        this.baseUrl = stripTrailingSlash(properties.url()); // 공백과 끝의 /를 제거
+        this.bucket = bucket;
+        this.configured = StringUtils.hasText(baseUrl) && StringUtils.hasText(properties.secretKey()); // 프로젝트 주소와 Secret Key가 모두 존재하면 true
 
         RestClient.Builder builder = restClientBuilder.clone();
         if (StringUtils.hasText(properties.secretKey())) {

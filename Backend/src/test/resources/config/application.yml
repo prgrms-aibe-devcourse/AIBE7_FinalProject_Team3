@@ -23,7 +23,7 @@ grab:
   storage:
     supabase:
       url: https://project.supabase.co
-      bucket: drop-images
+      drop-images-bucket: drop-images
       profile-images-bucket: profile-images
   # 테스트 전용 서류 암호화 마스터키(GR-91). 디코딩하면 "grab-test-only-doc-encrypt-key32"(32바이트)다.
   seller:

@@ -96,7 +96,7 @@ grab:
     supabase:
       url: ${SUPABASE_URL:}
       secret-key: ${SUPABASE_SECRET_KEY:}
-      bucket: ${SUPABASE_DROP_IMAGE_BUCKET:drop-images}
+      drop-images-bucket: ${SUPABASE_DROP_IMAGE_BUCKET:drop-images}
       documents-bucket: ${SUPABASE_SELLER_DOCUMENT_BUCKET:seller-documents}
       profile-images-bucket: ${SUPABASE_PROFILE_IMAGE_BUCKET:profile-images}
       connect-timeout: 3s
