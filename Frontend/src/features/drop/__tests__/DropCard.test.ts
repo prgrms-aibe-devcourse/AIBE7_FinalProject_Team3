@@ -1,7 +1,7 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import DropCard from '../components/DropCard'
 import type { CardDrop } from '../../../types/drop'
 
@@ -25,7 +25,26 @@ const render = (drop: CardDrop, mode: 'WISH' | 'GRAB') =>
     ),
   )
 
+afterEach(() => vi.restoreAllMocks())
+
 describe('상품 카드 상태', () => {
+  it.each(['WISH', 'GRAB'] as const)(
+    '저장 상태가 %s여도 판매 중 GRAB 영역에는 배지를 표시하지 않는다',
+    (status) => {
+      const html = render({ ...base, status }, 'GRAB')
+      expect(html).not.toContain('class="badge')
+      expect(html).toContain('GRAB ↗')
+    },
+  )
+
+  it('WISH 카드에는 오픈 D-day 배지를 유지한다', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(
+      Date.parse('2026-10-01T10:00:00+09:00'),
+    )
+    const html = render(base, 'WISH')
+    expect(html).toContain('OPEN D−3')
+    expect(html).toContain('class="badge lime"')
+  })
   it('비활성 옵션은 최저 가격과 가용 재고에 포함하지 않는다', () => {
     const html = render(
       {
@@ -63,6 +82,7 @@ describe('상품 카드 상태', () => {
     const wish = render(delayed, 'WISH')
     expect(wish).toContain('disabled=""')
     expect(wish).toContain('WISH 마감')
+    expect(wish).toContain('판매 시작')
     const grab = render(delayed, 'GRAB')
     expect(grab).toContain('GRAB ↗')
     expect(grab).not.toContain('♡ WISH')

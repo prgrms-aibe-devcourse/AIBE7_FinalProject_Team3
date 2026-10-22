@@ -64,15 +64,15 @@ export default function DropCard({
             상품 이미지 준비 중
           </span>
         )}
-        <span className={`badge ${wishMode ? 'lime' : ''}`}>
-          {wishMode
-            ? wishable
-              ? `OPEN D−${daysUntil(drop.saleStartsAt)}`
-              : '판매 시작'
-            : soldOut
-              ? 'SOLD OUT'
-              : 'LIMITED DROP'}
-        </span>
+        {(wishMode || soldOut) && (
+          <span className={`badge ${wishMode ? 'lime' : ''}`}>
+            {wishMode
+              ? wishable
+                ? `OPEN D−${daysUntil(drop.saleStartsAt)}`
+                : '판매 시작'
+              : 'SOLD OUT'}
+          </span>
+        )}
         <span className="round-arrow" aria-hidden="true">
           ↗
         </span>

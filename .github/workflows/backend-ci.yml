@@ -3,14 +3,8 @@ name: Backend CI
 on:
   pull_request:
     branches: [deploy, main]
-    paths:
-      - Backend/**
-      - .github/workflows/backend-ci.yml
   push:
     branches: [deploy, main]
-    paths:
-      - Backend/**
-      - .github/workflows/backend-ci.yml
   workflow_dispatch:
 
 concurrency:
@@ -50,7 +44,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      # deploy 브랜치 룰셋이 이 job 이름("Test and build image")을 필수 체크로
+      # 요구한다. 워크플로 트리거 자체를 Backend/** 경로로 거르면 Frontend 전용
+      # PR에서는 체크가 아예 생기지 않아 머지가 영구히 막힌다(GitHub Docs
+      # "Troubleshooting required status checks" 권장 패턴). 그래서 트리거는
+      # 항상 열어 job이 실행되게 하고, Backend 변경이 없을 때는 아래 스텝만
+      # 건너뛰어 빠르게 통과시킨다.
+      - name: Backend 변경 여부 확인
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'Backend/**'
+              - '.github/workflows/backend-ci.yml'
+
       - name: Set up Java
+        if: steps.filter.outputs.backend == 'true'
         uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -61,13 +71,16 @@ jobs:
             Backend/gradle/wrapper/gradle-wrapper.properties
 
       - name: Run backend tests
+        if: steps.filter.outputs.backend == 'true'
         working-directory: Backend
         run: ./gradlew test --no-daemon
 
       - name: Set up Docker Buildx
+        if: steps.filter.outputs.backend == 'true'
         uses: docker/setup-buildx-action@v4
 
       - name: Build backend image
+        if: steps.filter.outputs.backend == 'true'
         uses: docker/build-push-action@v7
         with:
           context: ./Backend

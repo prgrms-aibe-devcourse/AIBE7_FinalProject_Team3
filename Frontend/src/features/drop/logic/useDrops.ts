@@ -15,6 +15,7 @@ export function useDropList(params: DropListParams | null) {
   })
 }
 
+// dataUpdatedAt을 수신 시각으로 쓰므로 serverTime을 유지한 채 setQueryData로 상세를 갱신하지 않는다.
 export function useDropDetail(dropId: number) {
   return useQuery({
     queryKey: dropKeys.detail(dropId),

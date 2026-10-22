@@ -1,4 +1,4 @@
-import { useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getCategories } from '../../api/category/categories'
@@ -57,6 +57,41 @@ export default function DropListPage({
 
   const category = params.get('category') || '전체'
   const keyword = params.get('keyword') ?? ''
+  // 검색 입력은 로컬 상태로 둔다. URL 갱신은 전환(transition)으로 늦게 반영되므로
+  // 입력값을 URL에 직접 묶으면 한글 조합 중 값이 되돌려져 자모가 쌓인다.
+  const [draft, setDraft] = useState(keyword)
+  const [seenKeyword, setSeenKeyword] = useState(keyword)
+  const [sentKeyword, setSentKeyword] = useState<string | null>(null)
+  const [externalKeywordChanges, setExternalKeywordChanges] = useState(0)
+  if (keyword !== seenKeyword) {
+    setSeenKeyword(keyword)
+    setSentKeyword(null)
+    // 직접 보낸 값이 반영된 것이면 그사이 이어서 입력한 내용을 덮지 않는다.
+    // 뒤로 가기 등 외부에서 바뀐 검색어만 입력창에 반영한다.
+    if (keyword !== sentKeyword) {
+      setDraft(keyword)
+      setExternalKeywordChanges((count) => count + 1)
+    }
+  }
+  const keywordTimer = useRef(0)
+  useEffect(() => () => window.clearTimeout(keywordTimer.current), [])
+  // 외부에서 검색어가 바뀌면 이전 입력의 예약된 URL 반영이 그 결과를 덮지 않게 취소한다
+  useEffect(
+    () => window.clearTimeout(keywordTimer.current),
+    [externalKeywordChanges],
+  )
+  const changeKeyword = (value: string) => {
+    setDraft(value)
+    window.clearTimeout(keywordTimer.current)
+    // 입력이 멈춘 뒤에만 URL에 반영해 키 입력마다 목록을 다시 조회하지 않는다
+    keywordTimer.current = window.setTimeout(() => {
+      setSentKeyword(value)
+      updateParams(
+        (current) => changeCatalogParams(current, 'keyword', value),
+        { replace: true },
+      )
+    }, 300)
+  }
   const invalid = invalidQuery || listParams === null
   const cards = listQuery.data ? toCardDrops(listQuery.data.content ?? []) : []
   const totalElements = listQuery.data?.totalElements ?? 0
@@ -80,23 +115,10 @@ export default function DropListPage({
 
   return (
     <>
-      <section className="catalog-title">
-        <div>
-          <h1>
-            {status === 'WISH' ? '다가올 DROP을 WISH' : '지금 GRAB 할 상품'}
-          </h1>
-          <p>
-            {status === 'WISH'
-              ? '판매 시작을 기다리는 상품을 살펴보세요.'
-              : '작은 브랜드의 한정 판매를 만나보세요.'}
-          </p>
-        </div>
-        {status === 'WISH' && (
-          <Link className="text-link" to="/my">
-            나의 WISH ↗
-          </Link>
-        )}
-      </section>
+      {/* 화면 제목은 두지 않고 카테고리부터 보여준다. 페이지 제목은 스크린리더 탐색용으로 남긴다 */}
+      <h1 className="sr-only">
+        {status === 'WISH' ? '다가올 DROP을 WISH' : '지금 GRAB 할 상품'}
+      </h1>
 
       <section
         className="catalog-controls catalog-filters panel"
@@ -127,13 +149,8 @@ export default function DropListPage({
           <label className="search-box">
             <span className="sr-only">상품 검색</span>
             <input
-              value={keyword}
-              onChange={(event) =>
-                updateParams(
-                  changeCatalogParams(params, 'keyword', event.target.value),
-                  { replace: true },
-                )
-              }
+              value={draft}
+              onChange={(event) => changeKeyword(event.target.value)}
               maxLength={100}
               placeholder="상품명 검색"
             />
@@ -229,7 +246,11 @@ export default function DropListPage({
         </div>
       ) : loading ? (
         <div role="status" aria-live="polite">
-          <EmptyState title="상품 목록을 불러오는 중이에요." variant="block" />
+          <EmptyState
+            loading
+            title="상품 목록을 불러오는 중이에요."
+            variant="block"
+          />
         </div>
       ) : cards.length ? (
         <section

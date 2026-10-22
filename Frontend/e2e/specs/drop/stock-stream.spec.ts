@@ -9,8 +9,8 @@ test('최초 조회 뒤 ready가 오면 빠진 변경을 다시 조회한다', a
     window.__stockStream.autoReady = false
     location.hash = '#/drops/201'
   })
-  await page.getByLabel('착용감').selectOption({ label: '릴랙스' })
-  await page.getByLabel('소매').selectOption({ label: '롱' })
+  await page.getByLabel('착용감').selectOption('1')
+  await page.getByLabel('소매').selectOption('2')
   await expect(page.locator('.sku-result')).toContainText('재고 5개')
 
   getPublicApiState(page)
@@ -29,8 +29,8 @@ test('ready 뒤 재고 변경을 반영하고 선택과 수량을 유지한다',
   page,
 }) => {
   await page.goto('/#/drops/201')
-  await page.getByLabel('착용감').selectOption({ label: '릴랙스' })
-  await page.getByLabel('소매').selectOption({ label: '롱' })
+  await page.getByLabel('착용감').selectOption('1')
+  await page.getByLabel('소매').selectOption('2')
   await page.getByLabel('수량').fill('2')
   await expect(page.locator('.sku-result')).toContainText('재고 5개')
   await expect
@@ -97,8 +97,8 @@ test('연결 오류 뒤 재연결하여 변경을 다시 받는다', async ({ pa
     .drops.find((drop) => drop.dropId === 201)!
     .options.find((item) => item.optionId === 2012)!
   option.availableStock = 2
-  await page.getByLabel('착용감').selectOption({ label: '릴랙스' })
-  await page.getByLabel('소매').selectOption({ label: '롱' })
+  await page.getByLabel('착용감').selectOption('1')
+  await page.getByLabel('소매').selectOption('2')
   await page.evaluate(() =>
     window.__stockStream.emit('drop-changed', {
       dropId: 201,
@@ -193,8 +193,8 @@ async function installFailureRoutes(
 async function openDropDetail(page: Page) {
   await page.goto('/#/drops/201')
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(DROP_NAME)
-  await page.getByLabel('착용감').selectOption({ label: '릴랙스' })
-  await page.getByLabel('소매').selectOption({ label: '롱' })
+  await page.getByLabel('착용감').selectOption('1')
+  await page.getByLabel('소매').selectOption('2')
   await expect(page.locator('.sku-result')).toContainText('재고 5개')
   await expect
     .poll(() =>
