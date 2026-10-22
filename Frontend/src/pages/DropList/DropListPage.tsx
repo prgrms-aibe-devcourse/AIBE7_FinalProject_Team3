@@ -62,15 +62,24 @@ export default function DropListPage({
   const [draft, setDraft] = useState(keyword)
   const [seenKeyword, setSeenKeyword] = useState(keyword)
   const [sentKeyword, setSentKeyword] = useState<string | null>(null)
+  const [externalKeywordChanges, setExternalKeywordChanges] = useState(0)
   if (keyword !== seenKeyword) {
     setSeenKeyword(keyword)
     setSentKeyword(null)
     // 직접 보낸 값이 반영된 것이면 그사이 이어서 입력한 내용을 덮지 않는다.
     // 뒤로 가기 등 외부에서 바뀐 검색어만 입력창에 반영한다.
-    if (keyword !== sentKeyword) setDraft(keyword)
+    if (keyword !== sentKeyword) {
+      setDraft(keyword)
+      setExternalKeywordChanges((count) => count + 1)
+    }
   }
   const keywordTimer = useRef(0)
   useEffect(() => () => window.clearTimeout(keywordTimer.current), [])
+  // 외부에서 검색어가 바뀌면 이전 입력의 예약된 URL 반영이 그 결과를 덮지 않게 취소한다
+  useEffect(
+    () => window.clearTimeout(keywordTimer.current),
+    [externalKeywordChanges],
+  )
   const changeKeyword = (value: string) => {
     setDraft(value)
     window.clearTimeout(keywordTimer.current)

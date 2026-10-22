@@ -62,6 +62,24 @@ test('검색창에서 한글 조합 입력이 끊기지 않는다', async ({ pag
   await expect(input).toHaveValue('토트')
 })
 
+test('입력 직후 URL 검색어가 바뀌면 예약된 검색 반영이 덮어쓰지 않는다', async ({
+  page,
+}) => {
+  await page.goto('/#/wish')
+  const input = page.getByPlaceholder('상품명 검색')
+  await input.fill('머그')
+  // URL 반영(300ms) 전에 뒤로 가기·링크 이동처럼 외부에서 검색어가 바뀐다
+  await page.evaluate(() => {
+    location.hash = '#/wish?keyword=토트'
+  })
+  await expect(input).toHaveValue('토트')
+  await page.waitForTimeout(600)
+  expect(
+    new URLSearchParams(new URL(page.url()).hash.split('?')[1]).get('keyword'),
+  ).toBe('토트')
+  await expect(input).toHaveValue('토트')
+})
+
 test('카테고리 변경·뒤로 가기로 조건을 복원하고 검색 시 페이지를 초기화한다', async ({
   page,
 }) => {
