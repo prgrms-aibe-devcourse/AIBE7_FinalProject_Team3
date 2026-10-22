@@ -106,23 +106,10 @@ export default function DropListPage({
 
   return (
     <>
-      <section className="catalog-title">
-        <div>
-          <h1>
-            {status === 'WISH' ? '다가올 DROP을 WISH' : '지금 GRAB 할 상품'}
-          </h1>
-          <p>
-            {status === 'WISH'
-              ? '판매 시작을 기다리는 상품을 살펴보세요.'
-              : '작은 브랜드의 한정 판매를 만나보세요.'}
-          </p>
-        </div>
-        {status === 'WISH' && (
-          <Link className="text-link" to="/my">
-            나의 WISH ↗
-          </Link>
-        )}
-      </section>
+      {/* 화면 제목은 두지 않고 카테고리부터 보여준다. 페이지 제목은 스크린리더 탐색용으로 남긴다 */}
+      <h1 className="sr-only">
+        {status === 'WISH' ? '다가올 DROP을 WISH' : '지금 GRAB 할 상품'}
+      </h1>
 
       <section
         className="catalog-controls catalog-filters panel"

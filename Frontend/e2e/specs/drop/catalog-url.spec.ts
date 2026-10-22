@@ -9,6 +9,10 @@ test('목록 조건을 직접 진입·새로고침·상세에서 뒤로 가기�
   )
   const list = page.getByRole('region', { name: 'WISH 상품 목록' })
   await expect(page.getByPlaceholder('상품명 검색')).toHaveValue('머그')
+  // 화면 제목은 없지만 스크린리더용 페이지 제목은 남는다
+  await expect(
+    page.getByRole('heading', { level: 1, name: '다가올 DROP을 WISH' }),
+  ).toHaveClass('sr-only')
   await expect(
     page.getByRole('button', { name: '리빙', exact: true }),
   ).toHaveClass('active')
