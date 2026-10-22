@@ -101,7 +101,7 @@ class SupabaseDocumentStorageClientTest {
     void loadNotConfigured() {
         // given
         SupabaseDocumentStorageClient client = new SupabaseDocumentStorageClient(builder,
-                new SupabaseStorageProperties("", " ", "drop-images", DOCUMENTS_BUCKET,
+                new SupabaseStorageProperties("", " ", "drop-images", DOCUMENTS_BUCKET, "profile-images",
                         Duration.ofSeconds(3), Duration.ofSeconds(5)));
 
         // when & then
@@ -143,7 +143,7 @@ class SupabaseDocumentStorageClientTest {
     void notConfigured() {
         // given
         SupabaseDocumentStorageClient client = new SupabaseDocumentStorageClient(builder,
-                new SupabaseStorageProperties("", " ", "drop-images", DOCUMENTS_BUCKET,
+                new SupabaseStorageProperties("", " ", "drop-images", DOCUMENTS_BUCKET, "profile-images",
                         Duration.ofSeconds(3), Duration.ofSeconds(5)));
 
         // when & then
@@ -155,7 +155,7 @@ class SupabaseDocumentStorageClientTest {
     }
 
     private static SupabaseStorageProperties properties(String secretKey) {
-        return new SupabaseStorageProperties(BASE_URL, secretKey, "drop-images", DOCUMENTS_BUCKET,
+        return new SupabaseStorageProperties(BASE_URL, secretKey, "drop-images", DOCUMENTS_BUCKET, "profile-images",
                 Duration.ofSeconds(3), Duration.ofSeconds(5));
     }
 }

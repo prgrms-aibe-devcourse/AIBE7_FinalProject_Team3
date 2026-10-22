@@ -25,11 +25,12 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       # 소셜 로그인 결과를 받을 프론트엔드 콜백 주소. 사용자의 브라우저가 여는 주소라 외부에서 닿는 값을 넣는다
       OAUTH2_FRONTEND_CALLBACK_URL: ${OAUTH2_FRONTEND_CALLBACK_URL:-http://localhost:5173/#/auth/callback}
-      # Supabase Storage(GR-51 이미지, GR-91 서류) 연동 설정. 비워 두면 업로드·다운로드 시 EXTERNAL_SERVICE_ERROR로 거부된다
+      # Supabase Storage(GR-51 이미지, GR-91 서류, GR-130 프로필 이미지) 연동 설정. 비워 두면 업로드·다운로드 시 EXTERNAL_SERVICE_ERROR로 거부된다
       SUPABASE_URL: ${SUPABASE_URL:-}
       SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY:-}
       SUPABASE_DROP_IMAGE_BUCKET: ${SUPABASE_DROP_IMAGE_BUCKET:-drop-images}
       SUPABASE_SELLER_DOCUMENT_BUCKET: ${SUPABASE_SELLER_DOCUMENT_BUCKET:-seller-documents}
+      SUPABASE_PROFILE_IMAGE_BUCKET: ${SUPABASE_PROFILE_IMAGE_BUCKET:-profile-images}
       # 쿠키를 포함한 요청을 허용할 프론트엔드 Origin. 기본값은 로컬 Vite 개발 서버다
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
       REDIS_HOST: redis
