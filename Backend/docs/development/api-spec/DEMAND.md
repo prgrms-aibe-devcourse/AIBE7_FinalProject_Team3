@@ -1,0 +1,277 @@
+# 수요 분석 API 명세
+
+> 요구사항: [REQUIREMENTS.md](../REQUIREMENTS.md) 1.13 (DEMAND-001~009), NFR-012·013
+> 스키마: [ERD.md](../ERD.md) 1.7 (`demand_plans`, `drop_embeddings`)
+> 선정 근거: [TECHSTACK.md](../TECHSTACK.md) 1.3
+
+판매자의 WISH DROP에 대해 수요 데이터를 집계하고 판매 계획을 계산한다. 계산은 서버의 결정적 함수가 하고, LLM은 저장된 계획의 설명만 만든다. 제안은 참고용이며 재고·가격·판매 상태를 바꾸지 않는다.
+
+## 1. 계산 규칙
+
+### 1.1 수요 데이터
+
+| 값 | 정의 |
+| --- | --- |
+| `activeWishCount` | 해당 DROP의 `canceled_at IS NULL`인 WISH 수 |
+| `dailyWishes` | 최근 14일의 날짜(KST)별 활성 WISH 등록 수. 재등록 시 `activated_at`을 덮어쓰므로 근사치다(`trendApproximate: true`). |
+| `hoursUntilSaleStart` | 서버 시각부터 `sale_starts_at`까지 남은 시간(시간 단위, 내림) |
+
+### 1.2 전환율 표본 선택
+
+후보는 `status = ENDED`, `close_reason = TIME_EXPIRED`이고 활성 WISH가 1 이상인 DROP이며 분석 대상 DROP은 제외한다. 표본은 최대 20개다.
+
+| 기준 | 선택 방법 | 사용 조건 |
+| --- | --- | --- |
+| `SIMILAR` | 대상과 후보의 임베딩 코사인 유사도가 0.75 이상인 DROP을 유사도 순으로 선택 | 대상 DROP의 임베딩이 있고(GR-147), 결과 신뢰도가 `NONE`이 아닐 때 |
+| `CATEGORY` | 같은 `category_id`의 DROP을 `closed_at` 최신순으로 선택 | 그 외 모든 경우(GR-147 구현 전 기본값) |
+
+유사도 기준값은 설정(`grab.demand.similarity.min-score`)으로 바꾼다.
+
+### 1.3 다른 판매자 데이터 보호
+
+다른 판매자의 DROP별 판매 실적은 노출하지 않는다(DEMAND-008).
+
+- 선택한 표본을 본인 DROP과 다른 판매자 DROP으로 나눈다. 다른 판매자 DROP이 10개 이상이고 서로 다른 판매자가 5명 이상일 때만 다른 판매자 DROP을 표본에 포함한다(`scope: OWN_AND_OTHERS`). 미달이면 본인 DROP만 쓴다(`scope: OWN_ONLY`).
+- 응답·저장 스냅샷·LLM 입력에는 집계값만 담는다. 다른 판매자의 상품명·브랜드·DROP ID·DROP별 수치는 담지 않는다.
+- 다른 판매자 표본 수는 구간(`NONE`, `10_TO_19`, `20_PLUS`)으로만, 표본 WISH 수는 10 단위 내림으로 표시한다. 본인 표본 수는 그대로 표시한다.
+- 전환율은 소수 둘째 자리, 구매자당 평균 수량은 소수 첫째 자리로 반올림한 값을 계산과 응답에 쓴다.
+
+### 1.4 전환율
+
+- 표본 DROP마다 `wishers` = 활성 WISH 수, `converted` = 그중 해당 DROP에 결제 확정(`paid_at` 있음)·미취소(`canceled_at` 없음) 주문이 한 건 이상 있는 사용자 수, `quantity` = 그 주문들의 `order_items.quantity` 합계.
+- `conversionRate` = Σ`converted` / Σ`wishers`, `avgQuantityPerBuyer` = Σ`quantity` / Σ`converted` (Σ`converted`가 0이면 1).
+- WISH 없이 구매한 사용자는 포함하지 않는다. 예상 수량이 실제보다 낮게 나올 수 있다는 점을 응답의 `notes`에 표시한다.
+
+| 신뢰도 | 조건 | 예상 범위 폭 `u` |
+| --- | --- | --- |
+| `HIGH` | 표본 DROP 10개 이상, Σ`wishers` 100 이상 | 0.2 |
+| `LOW` | 표본 DROP 3개 이상, Σ`wishers` 20 이상 | 0.4 |
+| `NONE` | 그 외 | - |
+| `SELLER_INPUT` | 판매자가 전환율을 직접 입력 | 0.3 |
+
+### 1.5 판매 계획
+
+```text
+base        = activeWishCount × conversionRate × avgQuantityPerBuyer
+low         = floor(base × (1 - u))
+expected    = round(base)
+high        = ceil(base × (1 + u))
+recommended = ceil(base × (1 + safetyStockRate))
+```
+
+- 기본 가정: `conversionRate`는 표본 전환율(신뢰도 `NONE`이면 없음), `safetyStockRate`는 0.1.
+- 입력 범위: `0 < conversionRate ≤ 1`, `0 ≤ safetyStockRate ≤ 1`, 각각 소수 둘째 자리까지. 벗어나면 `VALIDATION_FAILED`.
+- 옵션별 배분: `recommended`를 활성 옵션(`is_active = true`)의 현재 `total_quantity` 비율로 나눈다. 정수 배분은 최대 나머지 방식이며 나머지가 같으면 `sort_order`, `id` 순이다.
+- 현재 판매 수량 합계(`currentTotalQuantity`)와 차이(`differenceFromCurrent`)를 함께 반환한다.
+- 계산 로직을 바꾸면 `calculationVersion`을 올린다(초기 `v1`, 유사 상품 기준 도입 시 `v2`).
+
+### 1.6 데이터 부족
+
+| `dataGaps` 코드 | 조건 | 결과 |
+| --- | --- | --- |
+| `NO_ACTIVE_WISH` | `activeWishCount = 0` | 범위·추천 수량 없음 |
+| `NO_CONVERSION_SAMPLE` | 신뢰도 `NONE`이고 판매자 입력 전환율 없음 | 범위·추천 수량 없음 |
+| `SMALL_CONVERSION_SAMPLE` | 신뢰도 `LOW` | 범위를 넓혀 계산, 추천 수량은 제공 |
+
+범위·추천 수량이 없으면 `plan`의 수량 필드가 `null`이다. 판매자는 전환율을 직접 입력해 다시 계산할 수 있다.
+
+### 1.7 제안 표시 조건
+
+`suggestion.ready`는 `activeWishCount ≥ 30` 또는 `hoursUntilSaleStart ≤ 48`일 때 `true`다. 기준값은 설정(`grab.demand.suggestion.*`)으로 바꾼다.
+
+## 2. 판매자 수요 분석 API
+
+모든 API는 `SELLER` 권한과 DROP 소유권을 검사한다. 분석·저장·결정 대상은 `status = WISH`이고 서버 시각이 `sale_starts_at` 이전인 DROP이며, 그 외에는 `DEMAND_ANALYSIS_UNAVAILABLE`(409)이다.
+
+### 2.1 수요 분석 조회
+
+```http
+GET /api/v1/seller/drops/{dropId}/demand-analysis
+```
+
+- **인증**: `SELLER`
+
+기본 가정으로 계산한 결과를 반환한다.
+
+**응답:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "dropId": 100,
+    "calculatedAt": "2026-10-22T14:00:00+09:00",
+    "calculationVersion": "v1",
+    "suggestion": { "ready": true },
+    "demand": {
+      "activeWishCount": 420,
+      "hoursUntilSaleStart": 40,
+      "dailyWishes": [
+        { "date": "2026-10-21", "count": 35 },
+        { "date": "2026-10-22", "count": 12 }
+      ],
+      "trendApproximate": true
+    },
+    "conversion": {
+      "rate": 0.32,
+      "avgQuantityPerBuyer": 1.0,
+      "confidence": "HIGH",
+      "selection": "CATEGORY",
+      "scope": "OWN_AND_OTHERS",
+      "ownDropCount": 2,
+      "otherDropCountBand": "10_TO_19",
+      "sampleWishCount": 1830
+    },
+    "assumptions": {
+      "conversionRate": { "value": 0.32, "source": "SAMPLE" },
+      "safetyStockRate": { "value": 0.1, "source": "DEFAULT" }
+    },
+    "plan": {
+      "low": 107,
+      "expected": 134,
+      "high": 162,
+      "recommended": 148,
+      "currentTotalQuantity": 120,
+      "differenceFromCurrent": 28,
+      "options": [
+        { "optionId": 1001, "name": "블랙 / M", "currentQuantity": 40, "recommendedQuantity": 50 },
+        { "optionId": 1002, "name": "블랙 / L", "currentQuantity": 40, "recommendedQuantity": 49 },
+        { "optionId": 1003, "name": "화이트 / M", "currentQuantity": 40, "recommendedQuantity": 49 }
+      ]
+    },
+    "dataGaps": [],
+    "notes": ["WISH 없이 구매한 사용자는 전환율에 포함하지 않았습니다."]
+  }
+}
+```
+
+- `assumptions.*.source`: `SAMPLE`(표본), `DEFAULT`(기본값), `SELLER_INPUT`(판매자 입력).
+- `conversion`은 1.3의 보호 규칙을 적용한 집계값이다. 신뢰도가 `NONE`이면 `rate`·`avgQuantityPerBuyer`가 `null`이다.
+- 옵션 `name`은 옵션 그룹 순서대로 값을 ` / `로 이은 표시명이다.
+
+### 2.2 가정 변경 재계산
+
+```http
+POST /api/v1/seller/drops/{dropId}/demand-analysis/calculate
+```
+
+- **인증**: `SELLER`
+
+**요청:**
+
+```json
+{
+  "conversionRate": 0.25,
+  "safetyStockRate": 0.05
+}
+```
+
+두 필드 모두 선택이며 생략하면 기본 가정을 쓴다. 응답은 2.1과 같고 저장하지 않는다.
+
+### 2.3 판매 계획 저장
+
+```http
+POST /api/v1/seller/drops/{dropId}/demand-plans
+```
+
+- **인증**: `SELLER`
+
+요청은 2.2와 같다. 서버가 저장 시점 데이터로 다시 계산해 `DRAFT`로 저장하고, 커밋 후 LLM 설명 생성을 비동기로 시작한다(3절).
+
+**응답:** `201 Created`, 본문은 2.5의 계획 상세(`explanationStatus: PENDING`)
+
+### 2.4 판매 계획 목록
+
+```http
+GET /api/v1/seller/drops/{dropId}/demand-plans?page=0&size=20
+```
+
+- **인증**: `SELLER`
+
+최근 저장순으로 계획 요약(`planId`, `status`, `recommended`, `createdAt`, `decidedAt`)을 페이지 응답으로 반환한다. 이 API는 DROP 상태와 관계없이 조회할 수 있다.
+
+### 2.5 판매 계획 상세
+
+```http
+GET /api/v1/seller/demand-plans/{planId}
+```
+
+- **인증**: `SELLER`
+
+**응답:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "planId": "4f0c9a52-1d6b-4f4e-9a57-8f6d2c1e0b11",
+    "dropId": 100,
+    "status": "DRAFT",
+    "createdAt": "2026-10-22T14:05:00+09:00",
+    "analysis": { "...": "2.1 data와 같은 형식의 저장 시점 스냅샷" },
+    "decision": null,
+    "explanationStatus": "GENERATED",
+    "explanation": {
+      "summary": "활성 WISH 420명과 비슷한 상품의 전환율 32%를 적용하면 예상 주문 수량은 134개입니다.",
+      "reasons": ["본인과 다른 판매자의 비슷한 종료 상품을 함께 본 표본이라 신뢰도가 높습니다."],
+      "risks": ["WISH 없이 구매한 사용자가 많으면 예상보다 빨리 품절될 수 있습니다."],
+      "dataGaps": [],
+      "notRecommended": ["예상 수량 134개만 준비하면 예상 범위 상단 162개에 미치지 못합니다."]
+    }
+  }
+}
+```
+
+- `decision`: 결정 후 `{ "status", "quantities", "reason", "decidedAt" }`.
+- `explanationStatus`가 `GENERATED`가 아니면 `explanation`은 `null`이다. `PENDING`이 생성 후 2분을 넘으면 응답에서 `FAILED`로 표시한다(저장값은 바꾸지 않음).
+
+### 2.6 판매 계획 결정 기록
+
+```http
+POST /api/v1/seller/demand-plans/{planId}/decision
+```
+
+- **인증**: `SELLER`
+
+**요청:**
+
+```json
+{
+  "status": "MODIFIED",
+  "quantities": [
+    { "optionId": 1001, "quantity": 45 },
+    { "optionId": 1002, "quantity": 40 },
+    { "optionId": 1003, "quantity": 45 }
+  ],
+  "reason": "재고 부담을 줄이기 위해 조정"
+}
+```
+
+- `status`: `ACCEPTED`, `MODIFIED`, `REJECTED`
+- `quantities`: `MODIFIED`일 때 필수, 계획의 모든 옵션을 한 번씩 포함하고 각 값은 0 이상. 다른 상태에서는 보내지 않는다.
+- `reason`: 선택, 최대 500자
+- 이미 결정된 계획은 `DEMAND_PLAN_ALREADY_DECIDED`(409), 판매 시작 이후는 `DEMAND_ANALYSIS_UNAVAILABLE`(409)
+- 결정은 DROP의 판매 수량을 바꾸지 않는다.
+
+**응답:** 2.5의 계획 상세
+
+## 3. LLM 설명 생성
+
+- 입력: 저장된 `result`·`assumptions`와 카테고리명·본인 DROP의 옵션 표시명. 회원 정보, 원본 행, 다른 판매자의 개별 데이터는 보내지 않는다(NFR-012). 옵션 표시명은 판매자 입력이므로 지시가 아닌 데이터로 구분해 전달한다.
+- 출력: `summary`(문자열), `reasons`·`risks`·`dataGaps`·`notRecommended`(문자열 배열)의 JSON.
+- 수치 검증: 출력 문자열의 모든 숫자가 입력의 수치(정수, 소수, 백분율 환산값)와 같은지 대조한다. 하나라도 다르면 `DISCARDED`로 기록하고 응답 원문은 저장하지 않는다.
+- 호출 시간 제한 10초, 재시도하지 않는다. 실패하면 `FAILED`로 기록한다. 계획 저장·조회·결정은 설명과 관계없이 동작한다.
+- 모델명·프롬프트 버전·토큰 사용량을 계획에 기록한다.
+
+## 4. 지표
+
+| 지표 | 태그 | 용도 |
+| --- | --- | --- |
+| `grab.demand.plan.saved` | `selection`, `scope` | 계획 저장 수, 표본 기준별 비율 |
+| `grab.demand.plan.decided` | `status` | 수락·수정·거절 비율 |
+| `grab.demand.explanation` | `outcome`(`generated`, `discarded`, `failed`) | 설명 생성 결과 |
+| `grab.demand.explanation.duration` | `model` | LLM 응답 시간 |
+| `grab.demand.explanation.tokens` | `model` | 토큰 사용량 |
+| `grab.demand.embedding` | `outcome`(`created`, `skipped`, `failed`) | DROP 임베딩 생성 결과(GR-147) |
+
+평가셋 실행 결과는 지표가 아니라 버전별 기록 파일로 남긴다(GR-146). 카테고리 기준과 유사 상품 기준의 예측 오차 비교도 같은 방식으로 기록한다(GR-147).
