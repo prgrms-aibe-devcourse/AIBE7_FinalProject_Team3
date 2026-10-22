@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import axios from 'axios'
 import EmptyState from '../../components/EmptyState/EmptyState'
 import DropDetailImages from '../../features/drop/components/DropDetailImages'
+import DropStockQuantity from '../../features/drop/components/DropStockQuantity'
 import DropGallery from '../../features/drop/components/DropGallery'
 import { toDropDetail } from '../../features/drop/logic/dropDetailView'
 import {
@@ -16,7 +17,7 @@ import {
 import { useDropStockStream } from '../../features/drop/logic/useDropStockStream'
 import { checkoutDraftPath } from '../../features/order/logic/checkoutView'
 import type { SharedProps } from '../../types/store'
-import { dateLabel, daysUntil } from '../../utils/date'
+import { dateLabel } from '../../utils/date'
 import { won } from '../../utils/price'
 import NotFoundPage from '../NotFound/NotFoundPage'
 
@@ -172,27 +173,8 @@ export default function DropDetailPage({
           images={detail.galleryImages}
         />
         <div className="detail-summary">
-          <div className="detail-status">
-            <b>
-              {detail.status === 'WISH'
-                ? `오픈 D−${daysUntil(detail.saleStartsAt)}`
-                : detail.status === 'GRAB'
-                  ? 'LIMITED DROP'
-                  : detail.status === 'ENDED'
-                    ? '판매 종료'
-                    : '판매 취소'}
-            </b>
-            <span>
-              {detail.status === 'WISH'
-                ? `${detail.wishCount} WISH`
-                : detail.status === 'GRAB' && totalStock !== undefined
-                  ? `재고 ${totalStock}개`
-                  : ''}
-            </span>
-          </div>
           {detail.brand && <p className="creator">{detail.brand}</p>}
           <h1>{detail.name}</h1>
-          <p className="detail-description">{detail.description}</p>
           <p className="detail-price">
             {selectedSku
               ? won(selectedSku.price)
@@ -220,6 +202,25 @@ export default function DropDetailPage({
             </div>
           </dl>
 
+          {mode !== 'closed' && (
+            <div className="detail-state">
+              {mode === 'buy' ? (
+                <DropStockQuantity stock={totalStock} />
+              ) : (
+                <>
+                  <span className="detail-state-label">오픈 예정</span>
+                  <strong className="detail-open-time">
+                    <time dateTime={detail.saleStartsAt}>
+                      {dateLabel(detail.saleStartsAt)}
+                    </time>{' '}
+                    오픈
+                  </strong>
+                  <p className="detail-wish-count">{detail.wishCount} WISH</p>
+                </>
+              )}
+            </div>
+          )}
+
           {mode === 'wish' ? (
             <div className="wish-panel">
               <strong>
@@ -236,7 +237,7 @@ export default function DropDetailPage({
                   void toggleWish(detail.id)
                 }}
               >
-                {wished ? '✓ WISH 취소하기' : '♡ WISH 등록하기'}
+                {wished ? 'WISH 취소하기' : 'WISH 등록하기'}
               </button>
             </div>
           ) : mode === 'buy' ? (
@@ -303,25 +304,27 @@ export default function DropDetailPage({
                 <span>상품 합계</span>
                 <strong>{won(unitPrice * quantity)}</strong>
               </div>
-              <button
-                type="submit"
-                className="primary-button full"
-                disabled={!orderable}
-              >
-                {grabLabel}
-              </button>
+              <div className="detail-purchase">
+                <div className="detail-mobile-stock">
+                  <DropStockQuantity stock={totalStock} />
+                </div>
+                <button
+                  type="submit"
+                  className="primary-button full"
+                  disabled={!orderable}
+                >
+                  {grabLabel}
+                </button>
+              </div>
             </form>
           ) : (
-            <div className="wish-panel">
-              <strong>
-                {detail.status === 'CANCELED'
-                  ? '이 DROP은 판매가 취소됐어요.'
-                  : detail.soldOut
-                    ? '이 DROP은 품절됐어요.'
-                    : '이 DROP은 판매가 종료됐어요.'}
-              </strong>
-              <p>상품 정보는 계속 확인할 수 있어요.</p>
-            </div>
+            <p className="detail-closed">
+              {detail.status === 'CANCELED'
+                ? '이 DROP은 판매가 취소됐어요.'
+                : detail.soldOut
+                  ? '이 DROP은 품절됐어요.'
+                  : '이 DROP은 판매가 종료됐어요.'}
+            </p>
           )}
         </div>
       </section>

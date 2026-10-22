@@ -59,7 +59,7 @@ const pages: {
   {
     name: 'WISH 상세',
     path: '/#/drops/102',
-    actions: (page) => [page.getByRole('button', { name: '♡ WISH 등록하기' })],
+    actions: (page) => [page.getByRole('button', { name: 'WISH 등록하기' })],
   },
   {
     name: 'GRAB 상세',

@@ -116,7 +116,7 @@ test.describe('상품 탐색', () => {
       '나의 작은 휴식, 데일리 머그',
     )
     await expect(
-      page.getByRole('button', { name: '♡ WISH 등록하기' }),
+      page.getByRole('button', { name: 'WISH 등록하기' }),
     ).toBeVisible()
   })
 
