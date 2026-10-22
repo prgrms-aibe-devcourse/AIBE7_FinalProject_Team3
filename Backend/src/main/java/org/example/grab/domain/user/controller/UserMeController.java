@@ -5,10 +5,13 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.example.grab.domain.drop.upload.dto.ImageUploadUrlRequest;
+import org.example.grab.domain.drop.upload.dto.ImageUploadUrlResponse;
 import org.example.grab.domain.user.dto.request.PasswordChangeRequest;
 import org.example.grab.domain.user.dto.request.UserNicknameUpdateRequest;
 import org.example.grab.domain.user.dto.response.UserMeResponse;
 import org.example.grab.domain.user.service.PasswordChangeService;
+import org.example.grab.domain.user.service.ProfileImageUploadService;
 import org.example.grab.domain.user.service.UserMeCommandService;
 import org.example.grab.domain.user.service.UserMeQueryService;
 import org.example.grab.global.common.ApiResponse;
@@ -19,6 +22,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -34,16 +38,19 @@ import java.util.stream.Collectors;
     판매자 승인·취소는 다음 재발급부터 반영된다. 즉시 반영이 필요하면 클라이언트가 재발급 후 다시 조회한다.
     닉네임 수정(1.10, GR-129)도 같은 응답을 돌려줘 클라이언트가 응답으로 내 정보를 그대로 바꿀 수 있다(M00-02).
     비밀번호 변경(1.11, GR-129)은 본문 없이 204로 응답하고 기존 로그인 세션을 종료하지 않는다(M00-03).
+    프로필 이미지 업로드 URL 발급(GR-130)은 SELLER 전용 DROP 이미지 발급과 같은 요청·응답 DTO를 쓰고(M02-01),
+    본인 public_id가 들어간 경로로만 발급한다(M00-02).
  */
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/users/me")
-@Tag(name = "내 정보", description = "로그인한 사용자의 회원 정보 조회·수정, 비밀번호 변경")
+@Tag(name = "내 정보", description = "로그인한 사용자의 회원 정보 조회·수정, 비밀번호 변경, 프로필 이미지 업로드 URL 발급")
 public class UserMeController {
 
     private final UserMeQueryService userMeQueryService;
     private final UserMeCommandService userMeCommandService;
     private final PasswordChangeService passwordChangeService;
+    private final ProfileImageUploadService profileImageUploadService;
     private final CurrentUserIdProvider currentUserIdProvider;
 
     @Operation(summary = "내 정보 조회",
@@ -94,6 +101,25 @@ public class UserMeController {
         passwordChangeService.changePassword(
                 currentUserIdProvider.currentUserId(), request.currentPassword(), request.newPassword());
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "내 프로필 이미지 업로드 URL 발급",
+            description = "받은 uploadUrl로 클라이언트가 직접 PUT 업로드하고, imageUrl을 프로필 이미지 등록 요청에 쓴다. "
+                    + "요청·응답은 DROP 이미지 업로드 URL 발급과 같다. 형식은 image/jpeg·image/png·image/webp, 크기는 5MB 이하. "
+                    + "uploadUrl은 발급 후 2시간 동안 유효하다")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "발급 성공")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+            description = "INVALID_REQUEST, VALIDATION_FAILED(fileName·contentType·fileSize)")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401",
+            description = "AUTHENTICATION_REQUIRED(쿠키 없음, 회원 없음·정지·탈퇴), INVALID_TOKEN")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "ACCESS_DENIED(USER 권한 없음, CSRF 토큰 없음·불일치)")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "INTERNAL_SERVER_ERROR")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "502", description = "EXTERNAL_SERVICE_ERROR")
+    @PostMapping("/profile-image/upload-url")
+    public ApiResponse<ImageUploadUrlResponse> issueProfileImageUploadUrl(
+            @Valid @RequestBody ImageUploadUrlRequest request) {
+        return ApiResponse.success(profileImageUploadService.issue(
+                currentUserIdProvider.currentUserId(), request.contentType(), request.fileSize()));
     }
 
     // JwtAuthenticationFilter가 AuthRole.authority()로 만든 권한만 되돌린다. 그 외 권한은 roles에 넣지 않는다

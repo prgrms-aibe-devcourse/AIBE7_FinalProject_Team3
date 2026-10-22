@@ -129,4 +129,20 @@ public class User extends UUIDEntity {
     public void changeNickname(String nickname) {
         this.nickname = Objects.requireNonNull(nickname);
     }
+
+    /*
+        본인 프로필 이미지 등록·변경(MEMBER_AUTH.md 1.12, GR-130). 본인이 발급받은 공개 URL인지는 서비스가 검증한 값을 받는다(M00-02).
+        검증에 저장소 설정(공개 URL 형식)이 필요해 엔티티는 null·빈 값만 막는다. 이미지를 지울 때는 removeProfileImage를 쓴다.
+     */
+    public void changeProfileImage(String profileImageUrl) {
+        if (profileImageUrl == null || profileImageUrl.isBlank()) {
+            throw new IllegalArgumentException("프로필 이미지 URL이 필요합니다.");
+        }
+        this.profileImageUrl = profileImageUrl;
+    }
+
+    // 본인 프로필 이미지 삭제(MEMBER_AUTH.md 1.13, GR-130). 이미지가 없어도 그대로 null이다(M00-06 멱등 삭제).
+    public void removeProfileImage() {
+        this.profileImageUrl = null;
+    }
 }
