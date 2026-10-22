@@ -24,6 +24,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import java.util.UUID;
@@ -321,6 +322,113 @@ class  UserRepositoryTest {
                 .isInstanceOf(DataIntegrityViolationException.class)
                 .rootCause()
                 .hasMessageContaining("ck_users_social_identifier");
+    }
+
+    // GR-129 M05-03: 내 닉네임 수정의 중복 사전 검사는 본인 행을 빼고 대소문자를 무시한다(M00-05)
+    @Test
+    @DisplayName("본인을 뺀 닉네임 중복 검사는 다른 회원의 닉네임만 대소문자를 무시해 찾는다")
+    void checksNicknameExcludingUser() {
+        // given
+        User me = userRepository.save(User.createLocal("me@example.com", PASSWORD_HASH, "Grab_01"));
+        userRepository.save(User.createLocal("other@example.com", PASSWORD_HASH, "드롭헌터"));
+        entityManager.flush();
+        entityManager.clear();
+
+        // when & then
+        assertThat(userRepository.existsByNicknameIgnoreCaseExcludingUser("grab_01", me.getId())).isFalse();
+        assertThat(userRepository.existsByNicknameIgnoreCaseExcludingUser("Grab_01", me.getId())).isFalse();
+        assertThat(userRepository.existsByNicknameIgnoreCaseExcludingUser("드롭헌터", me.getId())).isTrue();
+        assertThat(userRepository.existsByNicknameIgnoreCaseExcludingUser("Grab_02", me.getId())).isFalse();
+    }
+
+    @Test
+    @DisplayName("본인 닉네임의 대소문자만 바꾸면 유니크 인덱스에 걸리지 않는다")
+    void allowsCaseOnlyNicknameChange() {
+        // given
+        User me = userRepository.saveAndFlush(User.createLocal("me@example.com", PASSWORD_HASH, "Grab"));
+
+        // when
+        me.changeNickname("grab");
+        userRepository.flush();
+        entityManager.clear();
+
+        // then
+        assertThat(userRepository.findById(me.getId()).orElseThrow().getNickname()).isEqualTo("grab");
+    }
+
+    // 서비스가 이 제약 이름으로만 DUPLICATE_NICKNAME으로 바꾸므로 이름을 고정한다(UserMeCommandService)
+    @Test
+    @DisplayName("다른 회원과 대소문자만 다른 닉네임으로 바꾸면 flush에서 uq_users_nickname_lower 위반이다")
+    void rejectsNicknameChangeToOthersNickname() {
+        // given
+        userRepository.saveAndFlush(User.createLocal("other@example.com", PASSWORD_HASH, "Grab"));
+        User me = userRepository.saveAndFlush(User.createLocal("me@example.com", PASSWORD_HASH, "드롭헌터"));
+
+        // when
+        me.changeNickname("GRAB");
+
+        // then
+        assertThatThrownBy(() -> userRepository.flush())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .rootCause()
+                .hasMessageContaining("uq_users_nickname_lower");
+    }
+
+    // GR-129 M05-03: 비밀번호 변경의 조건부 갱신(M03-01·02). 네이티브 쿼리는 기동 시 검증되지 않아 이 테스트가 첫 실행 확인이다
+    @Test
+    @DisplayName("읽은 해시가 그대로면 비밀번호 해시와 updated_at을 바꾸고 1을 돌려준다")
+    void updatesPasswordHashWhenUnchanged() {
+        // given
+        User me = userRepository.saveAndFlush(User.createLocal("me@example.com", PASSWORD_HASH, "드롭헌터"));
+        setUpdatedAt(me.getId(), "2026-01-01T00:00:00Z");
+        entityManager.clear();
+
+        // when
+        int updated = userRepository.updatePasswordHashIfUnchanged(me.getId(), PASSWORD_HASH, "$argon2id$new");
+
+        // then: 엔티티를 거치지 않는 UPDATE라 영속성 컨텍스트를 비우고 DB 값을 읽는다
+        entityManager.clear();
+        User found = userRepository.findById(me.getId()).orElseThrow();
+        assertThat(updated).isEqualTo(1);
+        assertThat(found.getPasswordHash()).isEqualTo("$argon2id$new");
+        assertThat(found.getUpdatedAt()).isAfter(OffsetDateTime.parse("2026-01-01T00:00:00Z"));
+    }
+
+    @Test
+    @DisplayName("읽은 해시와 저장된 해시가 다르면 바꾸지 않고 0을 돌려준다")
+    void skipsPasswordUpdateWhenHashChanged() {
+        // given
+        User me = userRepository.saveAndFlush(User.createLocal("me@example.com", PASSWORD_HASH, "드롭헌터"));
+        entityManager.clear();
+
+        // when: 검증 뒤 다른 요청이 비밀번호를 바꾼 경우처럼 다른 해시를 읽었다고 가정한다
+        int updated = userRepository.updatePasswordHashIfUnchanged(me.getId(), "$argon2id$stale", "$argon2id$new");
+
+        // then
+        entityManager.clear();
+        assertThat(updated).isZero();
+        assertThat(userRepository.findById(me.getId()).orElseThrow().getPasswordHash()).isEqualTo(PASSWORD_HASH);
+    }
+
+    @Test
+    @DisplayName("소셜 회원은 비밀번호 해시를 바꾸지 않고 0을 돌려준다")
+    void skipsPasswordUpdateForSocialUser() {
+        // given: 해시가 없는 소셜 회원에 같은 값을 넘겨도 provider 조건으로 걸러진다
+        User social = userRepository.saveAndFlush(
+                User.createSocial("social@example.com", AuthProvider.KAKAO, "sub-1", "드롭헌터"));
+        entityManager.clear();
+
+        // when
+        int updated = userRepository.updatePasswordHashIfUnchanged(social.getId(), PASSWORD_HASH, "$argon2id$new");
+
+        // then
+        entityManager.clear();
+        assertThat(updated).isZero();
+        assertThat(userRepository.findById(social.getId()).orElseThrow().getPasswordHash()).isNull();
+    }
+
+    private void setUpdatedAt(Long userId, String updatedAt) {
+        jdbcTemplate.update("UPDATE users SET updated_at = ?::timestamptz WHERE id = ?", updatedAt, userId);
     }
 
     private void insertUserWithoutPasswordHash(String email, String provider, String providerUserId) {

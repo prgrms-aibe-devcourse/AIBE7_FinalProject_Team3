@@ -74,8 +74,8 @@ class WishSaleNoticeMailListenerTest {
         ArgumentCaptor<List<EmailMessage>> captor = ArgumentCaptor.captor();
         verify(emailDispatcher).dispatchAll(captor.capture());
         EmailMessage message = captor.getValue().get(0);
-        assertThat(message.htmlBody()).contains("href=\"https://grab.example.com/drops/7\"");
-        assertThat(message.textBody()).contains("https://grab.example.com/drops/7");
+        assertThat(message.htmlBody()).contains("href=\"https://grab.example.com/#/drops/7\"");
+        assertThat(message.textBody()).contains("https://grab.example.com/#/drops/7");
     }
 
     @Test
@@ -97,7 +97,7 @@ class WishSaleNoticeMailListenerTest {
         assertThat(message.htmlBody()).contains("판매 임박", DropSaleStartingSoonEvent.LEAD.toMinutes() + "분 뒤 시작됩니다");
         assertThat(message.textBody()).contains("판매가 곧 시작됩니다", "상품 보러 가기");
         // 판매 시작 알림과 같은 레이아웃·링크를 쓴다
-        assertThat(message.htmlBody()).contains("href=\"https://grab.example.com/drops/3\"");
+        assertThat(message.htmlBody()).contains("href=\"https://grab.example.com/#/drops/3\"");
     }
 
     @Test
@@ -117,9 +117,9 @@ class WishSaleNoticeMailListenerTest {
         assertThat(message.subject()).isEqualTo("[GRAB] 한정판 스니커즈 판매가 취소됐습니다");
         assertThat(message.htmlBody()).contains("판매 취소", "다시 열리지 않습니다");
         // 상세 페이지가 더는 유효하지 않으므로 목록 링크를 쓴다
-        assertThat(message.htmlBody()).contains("href=\"https://grab.example.com/drops\"")
-                .doesNotContain("https://grab.example.com/drops/5");
-        assertThat(message.textBody()).contains("https://grab.example.com/drops");
+        assertThat(message.htmlBody()).contains("href=\"https://grab.example.com/#/drops\"")
+                .doesNotContain("https://grab.example.com/#/drops/5");
+        assertThat(message.textBody()).contains("https://grab.example.com/#/drops");
     }
 
     @Test

@@ -155,7 +155,6 @@ export default function SellerApplyPage({ user, authStatus, notify }: Props) {
       <div className="seller-apply-layout">
         <div className="seller-apply-intro">
           <img className="seller-apply-symbol" src={symbol} alt="" />
-          <p className="eyebrow">BECOME A SELLER</p>
           <h1>나만의 DROP을 열어보세요</h1>
           <p>신청 후 운영자 승인을 받으면 판매자 기능을 사용할 수 있습니다.</p>
         </div>

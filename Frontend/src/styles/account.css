@@ -29,7 +29,7 @@
   font-size: 28px;
   letter-spacing: -1px;
 }
-.account-heading p:not(.eyebrow) {
+.account-heading p {
   margin: 6px 0;
   color: var(--muted);
 }

@@ -82,11 +82,6 @@ export default function DropListPage({
     <>
       <section className="catalog-title">
         <div>
-          <p className="eyebrow">
-            {status === 'WISH'
-              ? 'BE READY FOR THE DROP'
-              : 'LIMITED TIME. LIMITED QUANTITY.'}
-          </p>
           <h1>
             {status === 'WISH' ? '다가올 DROP을 WISH' : '지금 GRAB 할 상품'}
           </h1>

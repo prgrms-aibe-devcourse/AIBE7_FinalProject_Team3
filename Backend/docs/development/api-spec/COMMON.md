@@ -187,6 +187,10 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 | `INVALID_EMAIL` | 400 | 이메일 형식·길이 규칙 위반 |
 | `INVALID_PASSWORD` | 400 | 비밀번호 길이·공백·허용 문자·문자 조합 규칙 위반 |
 | `INVALID_NICKNAME` | 400 | 닉네임 길이·허용 문자 규칙 위반 |
+| `NICKNAME_UNCHANGED` | 400 | 앞뒤 공백을 제거한 새 닉네임이 현재 닉네임과 대소문자까지 같음 |
+| `PASSWORD_MISMATCH` | 400 | 현재 비밀번호 불일치 또는 검증 후 저장 전에 다른 요청이 비밀번호를 변경함 |
+| `PASSWORD_NOT_AVAILABLE` | 400 | 비밀번호를 사용하지 않는 계정의 비밀번호 변경 요청 (`KAKAO`·`GOOGLE` 회원 등) |
+| `PASSWORD_UNCHANGED` | 400 | 현재 비밀번호 검증 성공 후 새 비밀번호가 현재 비밀번호와 같음 |
 | `UNSUPPORTED_OAUTH2_PROVIDER` | 400 | 지원하지 않는 소셜 로그인 제공자 (`kakao`·`google` 외) |
 | `EMAIL_VERIFICATION_CODE_MISMATCH` | 400 | 이메일 인증 코드 불일치 |
 | `EMAIL_VERIFICATION_CODE_EXPIRED` | 400 | 유효한 이메일 인증 코드 없음 (만료·미요청·사용 완료) |

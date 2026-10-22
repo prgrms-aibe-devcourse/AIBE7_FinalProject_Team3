@@ -108,6 +108,9 @@ public class SecurityConfig {
                         // 내 정보 조회도 정확한 경로의 GET에만 USER 권한을 요구한다. /users/me/** 전체에는 걸지 않는다.
                         // 정지·탈퇴 회원은 토큰이 유효해도 서비스가 401로 거부한다(MEMBER_AUTH 1.9, GR-97 M00-03·04)
                         .requestMatchers(HttpMethod.GET, "/api/v1/users/me").hasRole("USER")
+                        // 내 닉네임 수정·비밀번호 변경도 정확한 경로의 PATCH에만 USER 권한을 요구한다. CSRF 예외는 두지 않는다.
+                        // 정지·탈퇴 회원은 GET과 같이 서비스가 401로 거부한다(MEMBER_AUTH 1.10·1.11, GR-129 M00-06)
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/users/me", "/api/v1/users/me/password").hasRole("USER")
                         // 내 WISH 목록은 정확한 경로의 GET에 USER 권한을 요구한다. 비로그인 401, USER 없는 계정 403.
                         .requestMatchers(HttpMethod.GET, "/api/v1/users/me/wishes").hasRole("USER")
                         // 지금은 판매자 이미지 업로드만 있다. 회원 프로필 업로드가 생기면 이 규칙을 /api/v1/uploads/images/**로 좁히거나 경로를 나눈다.

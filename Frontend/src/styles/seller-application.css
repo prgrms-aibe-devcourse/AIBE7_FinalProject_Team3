@@ -13,9 +13,6 @@
   background: var(--ink);
   color: #fff;
 }
-.seller-apply-intro .eyebrow {
-  color: var(--lime);
-}
 .seller-apply-intro h1 {
   margin: 18px 0;
   font-size: clamp(32px, 4vw, 50px);
