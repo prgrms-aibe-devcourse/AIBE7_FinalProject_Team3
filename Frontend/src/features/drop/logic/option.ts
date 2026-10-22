@@ -1,4 +1,4 @@
-import type { OptionGroup } from '../../../types/drop'
+import type { DetailSku, OptionGroup } from '../../../types/drop'
 
 export function findMatchingSku<
   T extends { selections: Record<string, string> },
@@ -37,4 +37,29 @@ export function selectionLabel(
     })
     .filter(Boolean)
     .join(' · ')
+}
+
+export function optionStockLabel(
+  skus: readonly DetailSku[],
+  selected: Record<string, string>,
+  groupId: string,
+  valueId: string,
+  stockByOption: ReadonlyMap<number, number>,
+) {
+  const matching = skus.filter(
+    (sku) =>
+      sku.selections[groupId] === valueId &&
+      Object.entries(selected).every(
+        ([id, value]) =>
+          id === groupId || !value || sku.selections[id] === value,
+      ),
+  )
+  if (matching.length === 0) return '선택 불가'
+  let total = 0
+  for (const sku of matching) {
+    const stock = stockByOption.get(sku.id) ?? sku.stock
+    if (stock === undefined) return '재고 확인 중'
+    total += stock
+  }
+  return total === 0 ? '품절' : `${total}개 남음`
 }
