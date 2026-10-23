@@ -25,26 +25,94 @@
         DROPS · ORDERS · INVENTORY · SALES, SHOP으로 복귀.
       </p>
       <p class="note">
-        디자인 기준: 계정 요약의 상단 경계선과 닉네임을 강조한다. WISH·주문
-        패널의 안쪽 여백을 통일하고 긴 이메일은 줄바꿈한다.
-        <a href="../DESIGN.md">공통 기준</a>
+        구성(GR-160): 계정 카드 → 주문·WISH(PC 2 : 1) → 계정 설정. 모바일은 계정
+        카드 → 주문 → WISH → 계정 설정 한 열. 주요 행동은 검정, 상태 강조는
+        라임. <a href="../DESIGN.md">공통 기준</a>
       </p>
       <h1>나의 취향과 주문</h1>
-      <p class="note">
-        정보 수정 패널을 연 LOCAL 계정 예시다. 닉네임과 비밀번호는 별도 폼과
-        저장 버튼을 사용하며 오류·처리 중 상태도 각각 관리한다. 소셜 계정은
-        닉네임 폼만 표시한다. 이 와이어프레임은 정적 문서이며 API를 호출하지
-        않는다.
-      </p>
-      <section class="panel section stack">
+
+      <section class="panel section stack" aria-label="계정 카드">
         <div class="row">
-          <div>
-            <h2>내 계정</h2>
-            <p>드롭헌터 · user@example.com</p>
+          <div class="row">
+            <span class="picture" style="width: 72px; border-radius: 50%"
+              >드</span
+            >
+            <div class="stack">
+              <h2>드롭헌터</h2>
+              <p class="muted">user@example.com</p>
+              <div class="controls">
+                <span class="chip">LOCAL</span
+                ><span class="chip">일반 회원</span>
+              </div>
+            </div>
           </div>
-          <span class="control">닫기</span>
+          <div class="grid cols-2">
+            <div class="metric">
+              <small>주문</small>
+              <strong>8</strong>
+            </div>
+            <div class="metric">
+              <small>WISH</small>
+              <strong>1</strong>
+            </div>
+          </div>
+          <a class="control" href="#settings">계정 설정</a>
         </div>
-        <section class="panel soft stack" aria-label="닉네임 수정 폼">
+        <small>
+          프로필 이미지가 없으면 닉네임 첫 글자를 라임 원에 표시한다. 개수는
+          주문·WISH 목록의 전체 개수(totalElements)만 쓰고, 조회 중·실패 시
+          숫자를 비워 둔다. 긴 이메일은 줄바꿈한다.
+        </small>
+      </section>
+
+      <div class="side section">
+        <section class="panel">
+          <h2>주문</h2>
+          <div class="list-row">
+            <span class="tag">결제 대기</span
+            ><strong>주문 ORD-... · 상품 A</strong
+            ><span class="secondary">총액</span
+            ><span class="control primary">결제하기</span>
+          </div>
+          <div class="list-row">
+            <span class="secondary">배송 중</span
+            ><strong>주문 ORD-... · 상품 B</strong
+            ><span class="secondary">총액</span
+            ><a class="control" href="OrderDetailPage.html">주문 상세</a>
+          </div>
+          <small
+            >결제 대기 주문만 "결제하기"(/checkout/:orderId), 그 밖은 주문
+            상세.</small
+          >
+          <p class="muted">빈 목록일 때: 아직 주문이 없어요.</p>
+        </section>
+        <section class="panel">
+          <h2>WISH</h2>
+          <div class="list-row">
+            <strong>상품 C</strong><span class="secondary">오픈 예정</span
+            ><span class="secondary">오픈 일정</span
+            ><a class="control" href="DropDetailPage.html">상품 보기</a>
+          </div>
+          <p class="muted">빈 목록일 때: 아직 담은 WISH가 없어요.</p>
+        </section>
+      </div>
+
+      <section id="settings" class="panel section stack" aria-label="계정 설정">
+        <h2>계정 설정</h2>
+        <div class="list-row">
+          <strong>프로필 이미지</strong
+          ><span class="secondary"
+            >JPG·PNG·WEBP, 5MB 이하 · GR-132 연동 전 안내만</span
+          >
+        </div>
+        <div class="list-row">
+          <strong>닉네임</strong><span class="secondary">드롭헌터</span
+          ><span class="control">닫기</span>
+        </div>
+        <section
+          class="panel soft stack"
+          aria-label="닉네임 수정 폼(펼친 상태)"
+        >
           <div class="split">
             <div>
               <small>이메일 · 읽기 전용</small>
@@ -53,71 +121,37 @@
             <div>
               <small>닉네임 변경</small>
               <span class="field">드롭헌터</span>
+              <small>필드 오류는 이 입력 바로 아래</small>
             </div>
           </div>
-          <p class="muted">
-            오류 발생 시: 입력들 다음 줄의 전체 폭 영역에 필드 오류를 표시하고
-            닉네임 입력과 연결한다. 일반 오류는 폼 하단에 표시한다.
-          </p>
           <div class="controls">
             <span class="control primary">저장</span>
           </div>
-          <small>성공: 내 정보 캐시·표시·입력값 갱신, 패널 유지</small>
+          <small>
+            성공: 내 정보 캐시·계정 카드 갱신, 폼 유지. 일반 오류는 폼 하단.
+          </small>
         </section>
-        <section class="panel soft stack" aria-label="LOCAL 비밀번호 변경 폼">
-          <small>LOCAL 계정에만 표시</small>
-          <div class="split">
-            <div>
-              <small>현재 비밀번호</small>
-              <span class="field">••••••••</span>
-            </div>
-            <div>
-              <small>새 비밀번호</small>
-              <span class="field">••••••••</span>
-            </div>
-          </div>
-          <p class="muted">
-            오류 발생 시: 두 입력 다음 줄의 전체 폭 영역에 필드 오류를 표시하고
-            해당 입력과 연결한다. 일반 오류는 폼 하단에 표시한다.
-          </p>
-          <div class="controls">
-            <span class="control primary">비밀번호 변경</span>
-          </div>
-          <small>성공: 두 입력 비움, 로그인 세션 유지</small>
-        </section>
-        <p class="muted">프로필 이미지 관리는 API 연동 시 제공됩니다.</p>
-        <small>
-          프로필 이미지 관리 UI는 GR-132에서 연동한다. 소셜 계정의 하단 안내는
-          "소셜 계정에는 비밀번호 변경이 제공되지 않습니다."다.
-        </small>
-        <div class="controls">
-          <span class="control">판매자 신청</span>
+        <div class="list-row">
+          <strong>비밀번호</strong
+          ><span class="secondary">LOCAL 계정만 표시</span
+          ><span class="control">변경</span>
         </div>
-        <small>승인된 판매자에게는 판매자 작업 공간 링크로 대체</small>
+        <div class="list-row">
+          <strong>판매자</strong
+          ><span class="secondary">신청 후 운영자 승인이 필요해요</span
+          ><a class="control" href="SellerApplyPage.html">판매자 신청</a>
+        </div>
+        <div class="list-row">
+          <strong>로그아웃</strong><span class="control">로그아웃</span>
+        </div>
+        <small>
+          한 번에 한 행만 펼친다. 다른 행을 펼치면 열린 행은 닫히고 입력·오류가
+          사라진다. 펼친 행의 버튼은 "닫기"(aria-expanded). 비밀번호 폼은
+          현재·새 비밀번호와 "비밀번호 변경", 오류는 각 입력 바로 아래. 판매자
+          행은 승인된 판매자에게 작업 공간, 운영자에게 판매자 신청 심사 링크로
+          바뀐다.
+        </small>
       </section>
-      <div class="split section">
-        <section class="panel">
-          <h2>주문</h2>
-          <div class="list-row">
-            <strong>주문 ORD-... · 상품 A</strong
-            ><span class="secondary">결제 완료</span
-            ><span class="secondary">옵션 · 수량</span
-            ><span class="secondary">총액</span
-            ><a class="control" href="OrderDetailPage.html">상세 보기</a>
-          </div>
-          <p class="muted">빈 목록일 때: 아직 주문이 없어요.</p>
-        </section>
-        <section class="panel">
-          <h2>WISH</h2>
-          <div class="list-row">
-            <strong>상품 B</strong><span class="secondary">오픈 예정</span
-            ><span class="secondary">오픈 일정</span
-            ><span class="secondary">상품 정보</span
-            ><a class="control" href="DropDetailPage.html">상품 보기</a>
-          </div>
-          <p class="muted">빈 목록일 때: 아직 담은 WISH가 없어요.</p>
-        </section>
-      </div>
     </main>
     <footer>
       화면별 동작·예외·조회 조건은 <a href="../pages/MyPage.md">MyPage.md</a>를
