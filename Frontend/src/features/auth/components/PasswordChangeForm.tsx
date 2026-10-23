@@ -94,12 +94,14 @@ export default function PasswordChangeForm({ notify }: Props) {
         autoComplete={autoComplete}
         placeholder={placeholder}
         value={values[field]}
-        onChange={(event) =>
+        onChange={(event) => {
           setValues((current) => ({
             ...current,
             [field]: event.target.value,
           }))
-        }
+          setFieldErrors((current) => ({ ...current, [field]: undefined }))
+          setError('')
+        }}
         aria-invalid={fieldErrors[field] ? true : undefined}
         aria-describedby={fieldErrors[field] ? fieldErrorId(field) : undefined}
       />
