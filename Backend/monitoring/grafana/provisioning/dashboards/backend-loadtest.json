@@ -9,42 +9,21 @@
   "panels": [
     {
       "id": 1,
-      "title": "CPU 사용률 (마우스를 올리면 그 시점 URI별 요청 처리량도 같이 보임)",
+      "title": "CPU 사용률",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "prometheus-ds" },
-      "fieldConfig": {
-        "defaults": { "unit": "percentunit" },
-        "overrides": [
-          {
-            "matcher": { "id": "byFrameRefID", "options": "uri" },
-            "properties": [
-              { "id": "unit", "value": "reqps" },
-              { "id": "custom.axisPlacement", "value": "right" },
-              { "id": "custom.fillOpacity", "value": 0 }
-            ]
-          }
-        ]
-      },
-      "options": { "tooltip": { "mode": "multi" } },
+      "fieldConfig": { "defaults": { "unit": "percentunit" }, "overrides": [] },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus-ds" },
-          "refId": "cpu-process",
           "expr": "process_cpu_usage{job=\"backend\"}",
           "legendFormat": "process cpu"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus-ds" },
-          "refId": "cpu-system",
           "expr": "system_cpu_usage{job=\"backend\"}",
           "legendFormat": "system cpu"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus-ds" },
-          "refId": "uri",
-          "expr": "sum(rate(http_server_requests_seconds_count{job=\"backend\"}[1m])) by (uri, method)",
-          "legendFormat": "{{method}} {{uri}}"
         }
       ]
     },
