@@ -15,7 +15,7 @@ export function setup() {
     const dropId = Number(__ENV.DROP_ID);
     const optionId = Number(__ENV.OPTION_ID);
     if (!dropId || !optionId) {
-        throw new Error('DROP_ID, OPTION_ID 환경변수가 필요합니다. seed.sql 실행 결과를 확인하세요.');
+        throw new Error('DROP_ID, OPTION_ID 환경변수가 필요합니다. 이 폴더의 seed.sql 실행 결과를 확인하세요.');
     }
     return { session: login('k6-buyer@loadtest.local', 'LoadTest1234!'), dropId, optionId };
 }

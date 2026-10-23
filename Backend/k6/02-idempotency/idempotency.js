@@ -4,8 +4,8 @@
 //   2) sameKeyDifferentBody — 같은 키 + 다른 본문 → 첫 요청 201, 두 번째 요청 409
 //      DUPLICATE_IDEMPOTENCY_KEY
 //
-// 실행 전: Backend/k6/common/seed.sql을 다시 실행해 재고를 초기화해둔다(stock-race.js와
-// 재고 풀을 공유하므로, 먼저 돌린 시나리오가 재고를 소진했으면 여기서도 재고부족이 날 수 있다).
+// 사전 준비: common/accounts-seed.sql, 02-idempotency/seed.sql을 실행해 이 시나리오 전용
+// DROP/옵션을 만든다(01-stock-race와 재고 풀이 분리돼 있어 서로 영향 없음).
 //   k6 run -e DROP_ID=1 -e OPTION_ID=1 Backend/k6/02-idempotency/idempotency.js
 import http from 'k6/http';
 import { check } from 'k6';
@@ -47,7 +47,7 @@ export function setup() {
     const dropId = Number(__ENV.DROP_ID);
     const optionId = Number(__ENV.OPTION_ID);
     if (!dropId || !optionId) {
-        throw new Error('DROP_ID, OPTION_ID 환경변수가 필요합니다. seed.sql 실행 결과를 확인하세요.');
+        throw new Error('DROP_ID, OPTION_ID 환경변수가 필요합니다. 이 폴더의 seed.sql 실행 결과를 확인하세요.');
     }
     const session = login('k6-buyer@loadtest.local', 'LoadTest1234!');
     return {
@@ -106,5 +106,5 @@ export function sameKeyDifferentBody(data) {
 }
 
 export function teardown() {
-    console.log('완료: Backend/k6/common/verify.sql로 idempotency_key당 주문이 1건인지 확인하세요.');
+    console.log('완료: Backend/k6/02-idempotency/verify.sql로 idempotency_key당 주문이 1건인지 확인하세요.');
 }

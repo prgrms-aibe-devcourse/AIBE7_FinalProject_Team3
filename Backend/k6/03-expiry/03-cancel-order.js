@@ -1,7 +1,7 @@
 // 결제 대기 만료 + 취소 동시 발생 시나리오 3/3.
 // 02-backdate.sql 실행 직후 바로 실행해, 백그라운드에서 10초마다 도는 만료 배치
 // (PaymentBatchScheduler)와 취소 요청이 같은 주문을 두고 경합하게 만든다.
-// 둘 중 누가 먼저 처리하든 재고는 한 번만 반환돼야 한다 — 결과는 Backend/k6/common/verify.sql로 확인.
+// 둘 중 누가 먼저 처리하든 재고는 한 번만 반환돼야 한다 — 결과는 Backend/k6/03-expiry/verify.sql로 확인.
 //
 //   k6 run -e ORDER_ID=<UUID> Backend/k6/03-expiry/03-cancel-order.js
 import http from 'k6/http';
@@ -33,5 +33,5 @@ export default function (data) {
 }
 
 export function teardown() {
-    console.log('완료: Backend/k6/common/verify.sql로 해당 주문의 재고가 정확히 한 번만 반환됐는지 확인하세요.');
+    console.log('완료: Backend/k6/03-expiry/verify.sql로 해당 주문의 재고가 정확히 한 번만 반환됐는지 확인하세요.');
 }
