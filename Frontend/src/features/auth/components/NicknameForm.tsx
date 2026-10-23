@@ -74,7 +74,11 @@ export default function NicknameForm({ user, notify }: Props) {
           name="nickname"
           autoComplete="nickname"
           value={nickname}
-          onChange={(event) => setNickname(event.target.value)}
+          onChange={(event) => {
+            setNickname(event.target.value)
+            setFieldError('')
+            setError('')
+          }}
           aria-invalid={fieldError ? true : undefined}
           aria-describedby={fieldError ? NICKNAME_ERROR_ID : undefined}
         />
