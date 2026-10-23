@@ -5,6 +5,7 @@ import { getMyWishes } from '../../api/wish/wishes'
 import EmptyState from '../../components/EmptyState/EmptyState'
 import AuthLoading from '../../features/auth/components/AuthLoading'
 import NicknameForm from '../../features/auth/components/NicknameForm'
+import PasswordChangeForm from '../../features/auth/components/PasswordChangeForm'
 import {
   isAdmin,
   isSeller,
@@ -111,7 +112,14 @@ export default function MyPage({
             {editing ? '닫기' : '정보 수정'}
           </button>
         </div>
-        {editing && <NicknameForm user={user} notify={notify} />}
+        {editing && (
+          <>
+            <NicknameForm user={user} notify={notify} />
+            {user.provider === 'LOCAL' && (
+              <PasswordChangeForm notify={notify} />
+            )}
+          </>
+        )}
         <div className="account-footer">
           <p>
             {user.provider === 'LOCAL'
