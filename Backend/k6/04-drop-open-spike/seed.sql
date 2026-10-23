@@ -17,6 +17,9 @@ DELETE FROM orders
     WHERE drop_id IN (SELECT id FROM drops WHERE name = 'k6 오픈스파이크 상품');
 DELETE FROM drop_options
     WHERE drop_id IN (SELECT id FROM drops WHERE name = 'k6 오픈스파이크 상품');
+-- 판매 시작 10분 전 메일 알림(GR-69)이 WISH->GRAB 전환 과정에서 기록을 남긴다.
+DELETE FROM drop_notifications
+    WHERE drop_id IN (SELECT id FROM drops WHERE name = 'k6 오픈스파이크 상품');
 DELETE FROM drops WHERE name = 'k6 오픈스파이크 상품';
 
 WITH drop_row AS (
