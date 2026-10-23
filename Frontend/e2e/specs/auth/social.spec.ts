@@ -64,7 +64,9 @@ test('기존 회원은 KAKAO 로그인 후 원래 화면으로 돌아가고 새�
 
   await expect(page).toHaveURL(/#\/my$/)
   await expect(toast(page)).toContainText('로그인했어요.')
-  await expect(page.getByText('KAKAO 계정')).toBeVisible()
+  await expect(
+    page.getByText('소셜 계정에는 비밀번호 변경이 제공되지 않습니다.'),
+  ).toBeVisible()
   expect(auth.state.socialStarts).toEqual(['/api/v1/auth/oauth2/kakao'])
   await expectNoSecretsInStorage(page)
 
@@ -75,7 +77,9 @@ test('기존 회원은 KAKAO 로그인 후 원래 화면으로 돌아가고 새�
   await page.goto('/#/my')
   await page.reload()
   await expect(page).toHaveURL(/#\/my$/)
-  await expect(page.getByText('KAKAO 계정')).toBeVisible()
+  await expect(
+    page.getByText('소셜 계정에는 비밀번호 변경이 제공되지 않습니다.'),
+  ).toBeVisible()
 })
 
 test('최초 GOOGLE 인증은 닉네임만 입력해 가입하고 원래 화면으로 돌아간다', async ({
@@ -128,7 +132,9 @@ test('최초 GOOGLE 인증은 닉네임만 입력해 가입하고 원래 화면�
   await submitSignup(page)
   await expect(page).toHaveURL(/#\/my$/)
   await expect(toast(page)).toContainText('회원가입이 완료됐어요.')
-  await expect(page.getByText('GOOGLE 계정')).toBeVisible()
+  await expect(
+    page.getByText('소셜 계정에는 비밀번호 변경이 제공되지 않습니다.'),
+  ).toBeVisible()
 
   const requests = auth.state.signupRequests
   expect(requests.map((request) => request.body)).toEqual([

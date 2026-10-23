@@ -308,7 +308,24 @@
   .account-panel {
     padding: 20px;
   }
-  .account-heading,
+  .account-heading {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 16px;
+  }
+  .account-heading .account-stats,
+  .account-heading > button {
+    grid-column: 1 / -1;
+  }
+  .account-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+  .account-stats div:first-child {
+    padding-left: 0;
+  }
   .account-edit {
     display: grid;
     grid-template-columns: 1fr;

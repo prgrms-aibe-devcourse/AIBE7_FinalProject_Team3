@@ -79,7 +79,7 @@ test('계정 유형에 따라 마이페이지 링크가 달라진다', async ({ 
   getAuth(page).setRoles(['USER', 'SELLER'])
   await login(page)
   await page.getByRole('link', { name: 'MY', exact: true }).click()
-  await expect(page.getByText('LOCAL 계정 · 승인된 판매자')).toBeVisible()
+  await expect(page.locator('.account-badge')).toHaveText(['승인된 판매자'])
   await expect(
     page.getByRole('link', { name: '판매자 작업 공간 ↗' }),
   ).toBeVisible()
@@ -88,7 +88,7 @@ test('계정 유형에 따라 마이페이지 링크가 달라진다', async ({ 
 test('운영자 계정은 심사 링크를 본다', async ({ page }) => {
   await loginAdmin(page)
   await page.getByRole('link', { name: 'MY', exact: true }).click()
-  await expect(page.getByText('LOCAL 계정 · 운영자')).toBeVisible()
+  await expect(page.locator('.account-badge')).toHaveText(['운영자'])
   await expect(
     page.getByRole('link', { name: '판매자 신청 심사 ↗' }),
   ).toBeVisible()

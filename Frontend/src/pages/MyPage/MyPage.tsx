@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getMyWishes } from '../../api/wish/wishes'
+import Avatar from '../../components/Avatar/Avatar'
 import EmptyState from '../../components/EmptyState/EmptyState'
 import AuthLoading from '../../features/auth/components/AuthLoading'
 import NicknameForm from '../../features/auth/components/NicknameForm'
@@ -64,6 +65,11 @@ export default function MyPage({
     authStatus === 'authenticated',
   )
   const orderItems = ordersQuery.data?.content ?? []
+  // 조회 중·실패면 개수를 비워 두고 각 영역의 상태 표시를 따른다(GR-160).
+  const orderCount = ordersQuery.isSuccess
+    ? (ordersQuery.data?.totalElements ?? 0)
+    : null
+  const wishCount = wishesQuery.isSuccess ? totalWishes : null
   const totalOrderPages = ordersQuery.data?.totalPages ?? 0
 
   if (authStatus === 'loading') return <AuthLoading />
@@ -88,21 +94,35 @@ export default function MyPage({
   return (
     <section className="page-section">
       <h1>나의 취향과 주문</h1>
-      <section className="panel account-panel">
+      <section className="panel account-panel" aria-labelledby="account-title">
         <div className="account-heading">
-          <div>
-            <h2>내 계정</h2>
+          <Avatar src={user.profileImageUrl} name={user.nickname} />
+          <div className="account-identity">
+            <h2 id="account-title" className="sr-only">
+              내 계정
+            </h2>
             <strong>{user.nickname}</strong>
             <p>{user.email}</p>
-            <small>
-              {user.provider} 계정 ·{' '}
-              {isAdmin(user)
-                ? '운영자'
-                : isSeller(user)
-                  ? '승인된 판매자'
-                  : '일반 회원'}
-            </small>
+            <div className="account-badges">
+              <span className="account-badge">
+                {isAdmin(user)
+                  ? '운영자'
+                  : isSeller(user)
+                    ? '승인된 판매자'
+                    : '일반 회원'}
+              </span>
+            </div>
           </div>
+          <dl className="account-stats">
+            <div>
+              <dt>주문</dt>
+              <dd>{orderCount}</dd>
+            </div>
+            <div>
+              <dt>WISH</dt>
+              <dd>{wishCount}</dd>
+            </div>
+          </dl>
           <button
             type="button"
             className="secondary-button"
