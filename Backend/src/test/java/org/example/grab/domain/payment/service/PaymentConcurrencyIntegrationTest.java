@@ -3,10 +3,12 @@ package org.example.grab.domain.payment.service;
 import org.example.grab.domain.order.dto.PaymentExpiryResult;
 import org.example.grab.domain.order.entity.Order;
 import org.example.grab.domain.order.entity.OrderStatus;
+import org.example.grab.domain.order.error.OrderErrorCode;
 import org.example.grab.domain.order.repository.OrderItemRepository;
 import org.example.grab.domain.order.repository.OrderRepository;
 import org.example.grab.domain.order.repository.StockReservationRepository;
 import org.example.grab.domain.order.service.OrderPaymentService;
+import org.example.grab.domain.payment.dto.OrderCancelRequest;
 import org.example.grab.domain.payment.dto.PaymentRequest;
 import org.example.grab.domain.payment.dto.PaymentResponse;
 import org.example.grab.domain.payment.entity.PaymentStatus;
@@ -60,6 +62,9 @@ class PaymentConcurrencyIntegrationTest {
 
     @Autowired
     private OrderPaymentService orderPaymentService;
+
+    @Autowired
+    private OrderCancelTransactionService orderCancelTransactionService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -303,6 +308,100 @@ class PaymentConcurrencyIntegrationTest {
         assertThat(statusWhileLocked).isEqualTo(OrderStatus.PAYMENT_PENDING);
         assertThat(nextRun).isEqualTo(PaymentExpiryResult.EXPIRED);
         assertThat(fixture.quantities()).containsEntry("reserved_quantity", 0);
+    }
+
+    /*
+        GR-150 k6 03-expiry 시나리오(SQL로 payment_expires_at을 당기고 취소 요청을 보내는 수동 스모크
+        테스트)는 만료 배치와 취소가 실제로 같은 순간 경합하길 바랄 뿐, 그 타이밍을 보장하지 않는다.
+        아래 두 테스트는 CountDownLatch로 잠금 대기 순서를 직접 통제해, 어느 쪽이 이기든 재고가
+        정확히 한 번만 반환되는지를 결정적으로(매번 같은 결과로) 검증한다.
+     */
+    @Test
+    @DisplayName("취소가 먼저 주문을 잠그면 취소가 완료되고, 기다리던 만료 배치는 아무것도 바꾸지 않는다")
+    void cancelWinsOverExpiry() throws Exception {
+        // given
+        Order order = fixture.createOrder();
+        OffsetDateTime deadline = order.getPaymentExpiresAt();
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        int baseline = waitingForLock();
+        Future<?> holder = executor.submit(() -> new TransactionTemplate(transactionManager).executeWithoutResult(
+                status -> {
+                    jdbcTemplate.queryForObject("SELECT id FROM orders WHERE id = ? FOR UPDATE", Long.class,
+                            order.getId());
+                    locked.countDown();
+                    await(release);
+                }));
+        assertThat(locked.await(10, TimeUnit.SECONDS)).isTrue();
+
+        // when: 취소가 먼저 잠금을 기다리고, 그 뒤에 만료 배치가 기다린다
+        Future<CancelPreparation> cancel = executor.submit(() -> orderCancelTransactionService.prepare(
+                fixture.buyerId(), order.getUuid(), IdempotencyKey.from(UUID.randomUUID().toString()),
+                RequestHash.from("e".repeat(64)), new OrderCancelRequest("취소-만료 경합 테스트"),
+                deadline.minusSeconds(1)));
+        awaitWaitingForLock(baseline + 1);
+        Future<Boolean> expiry = executor.submit(() -> orderPaymentService.expireIfDue(order.getId(), deadline));
+        awaitWaitingForLock(baseline + 2);
+
+        release.countDown();
+        holder.get(10, TimeUnit.SECONDS);
+        CancelPreparation cancelResult = cancel.get(10, TimeUnit.SECONDS);
+        boolean expired = expiry.get(10, TimeUnit.SECONDS);
+
+        // then
+        assertThat(cancelResult).isInstanceOf(CancelPreparation.Done.class);
+        assertThat(expired).isFalse();
+        assertThat(fixture.orderStatus(order)).isEqualTo(OrderStatus.CANCELED);
+        assertThat(fixture.reservationStatus(order)).isEqualTo("RELEASED");
+        assertThat(fixture.releaseReason(order)).isEqualTo("ORDER_CANCELED");
+        assertThat(fixture.quantities())
+                .containsEntry("reserved_quantity", 0)
+                .containsEntry("sold_quantity", 0);
+    }
+
+    @Test
+    @DisplayName("만료 배치가 먼저 주문을 잠그면 재고가 반환되고, 기다리던 취소는 ORDER_NOT_CANCELABLE로 거부된다")
+    void expiryWinsOverCancel() throws Exception {
+        // given
+        Order order = fixture.createOrder();
+        OffsetDateTime deadline = order.getPaymentExpiresAt();
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        int baseline = waitingForLock();
+        Future<?> holder = executor.submit(() -> new TransactionTemplate(transactionManager).executeWithoutResult(
+                status -> {
+                    jdbcTemplate.queryForObject("SELECT id FROM orders WHERE id = ? FOR UPDATE", Long.class,
+                            order.getId());
+                    locked.countDown();
+                    await(release);
+                }));
+        assertThat(locked.await(10, TimeUnit.SECONDS)).isTrue();
+
+        // when: 만료 배치가 먼저 잠금을 기다리고, 그 뒤에 취소가 기다린다
+        Future<Boolean> expiry = executor.submit(() -> orderPaymentService.expireIfDue(order.getId(), deadline));
+        awaitWaitingForLock(baseline + 1);
+        Future<CancelPreparation> cancel = executor.submit(() -> orderCancelTransactionService.prepare(
+                fixture.buyerId(), order.getUuid(), IdempotencyKey.from(UUID.randomUUID().toString()),
+                RequestHash.from("f".repeat(64)), new OrderCancelRequest("취소-만료 경합 테스트"), deadline));
+        awaitWaitingForLock(baseline + 2);
+
+        release.countDown();
+        holder.get(10, TimeUnit.SECONDS);
+        boolean expired = expiry.get(10, TimeUnit.SECONDS);
+
+        // then
+        assertThat(expired).isTrue();
+        assertThatThrownBy(() -> cancel.get(10, TimeUnit.SECONDS))
+                .cause()
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(OrderErrorCode.ORDER_NOT_CANCELABLE);
+        assertThat(fixture.orderStatus(order)).isEqualTo(OrderStatus.EXPIRED);
+        assertThat(fixture.reservationStatus(order)).isEqualTo("RELEASED");
+        assertThat(fixture.releaseReason(order)).isEqualTo("EXPIRED");
+        assertThat(fixture.quantities())
+                .containsEntry("reserved_quantity", 0)
+                .containsEntry("sold_quantity", 0);
     }
 
     // 결제 시도가 PENDING으로 저장되고 PG 승인이 끝난 직후, 결제 마감에 도달한 상황을 만든다.
