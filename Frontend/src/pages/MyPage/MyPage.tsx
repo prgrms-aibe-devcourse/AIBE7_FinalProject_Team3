@@ -1,12 +1,11 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getMyWishes } from '../../api/wish/wishes'
 import Avatar from '../../components/Avatar/Avatar'
 import EmptyState from '../../components/EmptyState/EmptyState'
+import AccountSettings from '../../features/auth/components/AccountSettings'
 import AuthLoading from '../../features/auth/components/AuthLoading'
-import NicknameForm from '../../features/auth/components/NicknameForm'
-import PasswordChangeForm from '../../features/auth/components/PasswordChangeForm'
 import {
   isAdmin,
   isSeller,
@@ -44,7 +43,7 @@ export default function MyPage({
 }: Props) {
   const navigate = useNavigate()
   const location = useLocation()
-  const [editing, setEditing] = useState(false)
+  const settingsTitleRef = useRef<HTMLHeadingElement>(null)
   const [page, setPage] = useState(0)
   const [orderPage, setOrderPage] = useState(0)
   const [loggingOut, setLoggingOut] = useState(false)
@@ -91,9 +90,16 @@ export default function MyPage({
     }
   }
 
+  // 같은 페이지의 계정 설정 섹션으로 이동한다. 해시 라우터라 #앵커 대신 스크롤·포커스로 옮긴다.
+  const goToSettings = () => {
+    const title = settingsTitleRef.current
+    title?.scrollIntoView({ block: 'start' })
+    title?.focus({ preventScroll: true })
+  }
+
   return (
     <section className="page-section">
-      <h1>나의 취향과 주문</h1>
+      <h1>My Page</h1>
       <section className="panel account-panel" aria-labelledby="account-title">
         <div className="account-heading">
           <Avatar src={user.profileImageUrl} name={user.nickname} />
@@ -126,51 +132,9 @@ export default function MyPage({
           <button
             type="button"
             className="secondary-button"
-            aria-expanded={editing}
-            onClick={() => setEditing(!editing)}
+            onClick={goToSettings}
           >
-            {editing ? '닫기' : '정보 수정'}
-          </button>
-        </div>
-        {editing && (
-          <>
-            <NicknameForm user={user} notify={notify} />
-            {user.provider === 'LOCAL' && (
-              <PasswordChangeForm notify={notify} />
-            )}
-          </>
-        )}
-        <div className="account-footer">
-          <p>
-            {user.provider === 'LOCAL'
-              ? '프로필 이미지 관리는 API 연동 시 제공됩니다.'
-              : '소셜 계정에는 비밀번호 변경이 제공되지 않습니다.'}
-          </p>
-          {isAdmin(user) ? (
-            <Link className="secondary-button" to="/admin/seller-applications">
-              판매자 신청 심사 ↗
-            </Link>
-          ) : isSeller(user) ? (
-            <Link className="secondary-button" to="/seller">
-              판매자 작업 공간 ↗
-            </Link>
-          ) : (
-            <Link className="secondary-button" to="/seller/apply">
-              판매자 신청 ↗
-            </Link>
-          )}
-          {logoutError && (
-            <p className="form-error" role="alert">
-              {logoutError}
-            </p>
-          )}
-          <button
-            type="button"
-            className="text-link"
-            disabled={loggingOut}
-            onClick={() => void logout()}
-          >
-            {loggingOut ? '로그아웃 중…' : '로그아웃'}
+            계정 설정
           </button>
         </div>
       </section>
@@ -370,6 +334,14 @@ export default function MyPage({
           )}
         </section>
       </div>
+      <AccountSettings
+        user={user}
+        notify={notify}
+        loggingOut={loggingOut}
+        logoutError={logoutError}
+        onLogout={() => void logout()}
+        titleRef={settingsTitleRef}
+      />
     </section>
   )
 }

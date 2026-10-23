@@ -153,7 +153,7 @@ test('MY: 가로 넘침 없이 핵심 버튼에 닿는다', async ({ page }) => 
   await expectNoHorizontalOverflow(page)
 })
 
-test('MY 정보 수정: 오류를 표시해도 가로 넘침 없이 저장 버튼에 닿는다', async ({
+test('MY 계정 설정: 오류를 표시해도 가로 넘침 없이 저장 버튼에 닿는다', async ({
   page,
 }) => {
   getAuth(page).failAccount('nickname', {
@@ -162,20 +162,33 @@ test('MY 정보 수정: 오류를 표시해도 가로 넘침 없이 저장 버�
   })
   await login(page)
   await page.getByRole('link', { name: 'MY', exact: true }).click()
-  await page.getByRole('button', { name: '정보 수정' }).click()
+  await expectReachable(page, page.getByRole('button', { name: '계정 설정' }))
+  // 한 번에 한 행만 열리므로 닉네임·비밀번호 행을 차례로 열어 확인한다
+  const nickname = page.getByRole('group', { name: '닉네임' })
+  await nickname.getByRole('button', { name: '변경' }).click()
   await page.getByLabel('닉네임 변경').fill('새닉네임')
   await page.getByRole('button', { name: '저장', exact: true }).click()
+  await expect(page.getByText('이미 사용 중인 닉네임이에요.')).toBeVisible()
+  for (const action of [
+    nickname.getByRole('button', { name: '닫기' }),
+    page.getByLabel('닉네임 변경'),
+    page.getByRole('button', { name: '저장', exact: true }),
+  ]) {
+    await expectReachable(page, action)
+  }
+  await expectNoHorizontalOverflow(page)
+
+  const password = page.getByRole('group', { name: '비밀번호' })
+  await password.getByRole('button', { name: '변경' }).click()
   await page.getByLabel('현재 비밀번호').fill('Wrong123!')
   await page.getByLabel('새 비밀번호').fill('NewPassword456!')
   await page.getByRole('button', { name: '비밀번호 변경', exact: true }).click()
   await expect(page.getByText('현재 비밀번호가 일치하지 않아요.')).toBeVisible()
-  await expect(page.getByText('이미 사용 중인 닉네임이에요.')).toBeVisible()
   for (const action of [
-    page.getByRole('button', { name: '닫기' }),
-    page.getByLabel('닉네임 변경'),
-    page.getByRole('button', { name: '저장', exact: true }),
+    password.getByRole('button', { name: '닫기' }),
     page.getByLabel('새 비밀번호'),
     page.getByRole('button', { name: '비밀번호 변경', exact: true }),
+    page.getByRole('button', { name: '로그아웃' }),
   ]) {
     await expectReachable(page, action)
   }

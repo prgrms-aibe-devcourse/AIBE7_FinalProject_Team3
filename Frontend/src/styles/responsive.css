@@ -327,6 +327,16 @@
     display: grid;
     grid-template-columns: 1fr;
   }
+  .panel.account-settings {
+    padding: 8px 20px 12px;
+  }
+  .settings-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .settings-row > p {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
   .compact-item img {
     width: 56px;
     height: 54px;

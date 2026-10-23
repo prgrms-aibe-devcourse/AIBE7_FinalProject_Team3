@@ -15,8 +15,7 @@
   padding: 32px;
   border-top: 3px solid var(--ink);
 }
-.account-heading,
-.account-footer {
+.account-heading {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -85,7 +84,6 @@
   color: var(--muted);
 }
 .account-heading small,
-.account-footer p,
 .my-demo-controls small {
   color: var(--muted);
   font-size: 12px;
@@ -122,21 +120,46 @@
 .account-edit button {
   justify-self: start;
 }
-.account-footer {
+/* 계정 설정 섹션(GR-160): 행마다 제목·설명·행동, 펼친 폼은 행 아래 전체 폭 */
+.panel.account-settings {
+  margin-top: 24px;
+  padding: 12px 32px 16px;
+}
+.account-settings h2 {
+  margin: 16px 0 8px;
+  /* "계정 설정" 버튼으로 이동했을 때 고정 헤더에 가리지 않게 한다 */
+  scroll-margin-top: 140px;
+}
+.settings-row {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr) auto;
+  gap: 8px 16px;
   align-items: center;
-  justify-content: flex-start;
-  flex-wrap: wrap;
-  margin-top: 22px;
-  padding-top: 18px;
+  padding: 16px 0;
   border-top: 1px solid var(--line);
 }
-.account-footer p {
-  flex: 1 1 260px;
+.settings-row h3 {
   margin: 0;
+  font-size: 14px;
 }
-.account-footer .text-link {
+.settings-row > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.settings-row .text-link {
   border: 0;
   background: none;
+}
+.settings-form {
+  grid-column: 1 / -1;
+}
+.settings-form:empty {
+  display: none;
+}
+.settings-form .account-edit {
+  margin-top: 4px;
 }
 .my-demo-controls {
   display: flex;
@@ -305,7 +328,6 @@
   padding: 0;
   background: #fff;
 }
-.account-heading p,
-.account-footer p {
+.account-heading p {
   overflow-wrap: anywhere;
 }

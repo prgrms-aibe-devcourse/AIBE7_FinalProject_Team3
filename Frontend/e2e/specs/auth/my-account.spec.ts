@@ -2,6 +2,7 @@ import { expect, getAuth, login, test, toast, type Page } from '../../fixtures'
 
 // 마이페이지 닉네임 수정·비밀번호 변경(GR-131). PATCH 응답은 installAuthApi가 처리하고,
 // 오류는 failAccount('nickname' | 'password', ...)로 다음 응답부터 차례로 바꾼다.
+// 폼은 계정 설정 섹션의 행 안에서 "변경"으로 펼치고 한 번에 한 행만 열린다(GR-160).
 
 const NETWORK = '연결에 실패했어요. 잠시 뒤 다시 시도해주세요.'
 const NICKNAME_RULE =
@@ -20,11 +21,17 @@ const newPassword = (page: Page) => page.getByLabel('새 비밀번호')
 const changePassword = (page: Page) =>
   page.getByRole('button', { name: '비밀번호 변경', exact: true }).click()
 
-async function openEditor(page: Page) {
+const settingsRow = (page: Page, name: string) =>
+  page.getByRole('group', { name })
+
+async function openRow(page: Page, name: '닉네임' | '비밀번호') {
   await login(page)
   await page.goto('/#/my')
-  await page.getByRole('button', { name: '정보 수정' }).click()
+  await settingsRow(page, name).getByRole('button', { name: '변경' }).click()
 }
+
+const openEditor = (page: Page) => openRow(page, '닉네임')
+const openPasswordEditor = (page: Page) => openRow(page, '비밀번호')
 
 async function expectFieldError(
   page: Page,
@@ -127,7 +134,7 @@ test('닉네임 저장 중에는 다시 제출되지 않는다', async ({ page }
 test('LOCAL 계정은 비밀번호를 바꾸면 입력을 비우고 안내한다', async ({
   page,
 }) => {
-  await openEditor(page)
+  await openPasswordEditor(page)
   // 현재 비밀번호는 규칙을 검사하지 않는다(가입 당시 규칙이 달랐어도 변경 가능)
   await currentPassword(page).fill('password1234')
   await newPassword(page).fill('NewPassword456!')
@@ -151,7 +158,7 @@ test('LOCAL 계정은 비밀번호를 바꾸면 입력을 비우고 안내한다
 })
 
 test('비밀번호 사전 검증에 걸리면 요청하지 않는다', async ({ page }) => {
-  await openEditor(page)
+  await openPasswordEditor(page)
   await currentPassword(page).fill('password1234')
   await newPassword(page).fill('short')
   await changePassword(page)
@@ -169,7 +176,7 @@ test('비밀번호 사전 검증에 걸리면 요청하지 않는다', async ({ 
 })
 
 test('비밀번호 변경 실패는 원인별로 다르게 표시한다', async ({ page }) => {
-  await openEditor(page)
+  await openPasswordEditor(page)
 
   // 현재 비밀번호 불일치: 현재 비밀번호만 비우고 포커스
   await currentPassword(page).fill('Wrong123!')
@@ -211,9 +218,7 @@ for (const provider of ['KAKAO', 'GOOGLE'] as const) {
     await openEditor(page)
     await expect(passwordForm(page)).toHaveCount(0)
     await expect(page.getByLabel('현재 비밀번호')).toHaveCount(0)
-    await expect(
-      page.getByText('소셜 계정에는 비밀번호 변경이 제공되지 않습니다.'),
-    ).toBeVisible()
+    await expect(settingsRow(page, '비밀번호')).toHaveCount(0)
 
     await nicknameInput(page).fill('소셜회원')
     await saveNickname(page)
@@ -224,13 +229,13 @@ for (const provider of ['KAKAO', 'GOOGLE'] as const) {
 test('키보드만으로 닉네임과 비밀번호를 바꿀 수 있다', async ({ page }) => {
   await login(page)
   await page.goto('/#/my')
-  const editButton = page.getByRole('button', { name: '정보 수정' })
-  await editButton.focus()
+  await settingsRow(page, '닉네임')
+    .getByRole('button', { name: '변경' })
+    .focus()
   await page.keyboard.press('Enter')
-  await expect(page.getByRole('button', { name: '닫기' })).toHaveAttribute(
-    'aria-expanded',
-    'true',
-  )
+  await expect(
+    settingsRow(page, '닉네임').getByRole('button', { name: '닫기' }),
+  ).toHaveAttribute('aria-expanded', 'true')
 
   await page.keyboard.press('Tab')
   await expect(page.getByLabel('이메일')).toBeFocused()
@@ -241,7 +246,14 @@ test('키보드만으로 닉네임과 비밀번호를 바꿀 수 있다', async 
   await page.keyboard.press('Enter')
   await expect(summaryNickname(page)).toHaveText('키보드회원')
 
+  // 저장 버튼 다음은 비밀번호 행의 "변경"이다. 열면 닉네임 행은 닫힌다.
   await page.keyboard.press('Tab')
+  await page.keyboard.press('Tab')
+  await expect(
+    settingsRow(page, '비밀번호').getByRole('button', { name: '변경' }),
+  ).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(nicknameInput(page)).toHaveCount(0)
   await page.keyboard.press('Tab')
   await expect(currentPassword(page)).toBeFocused()
   await page.keyboard.type('password1234')
