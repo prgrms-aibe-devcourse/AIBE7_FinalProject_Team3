@@ -60,12 +60,11 @@ export type DropActions = {
   orderable: boolean
 }
 
-// 공개 상세가 쓰는 화면 모델. 재고는 옵션별 재조회 값으로 덮어쓸 수 있어 optional이다.
+// 공개 상세가 쓰는 화면 모델. 재고는 옵션별 재조회 응답(GET /drops/{dropId}/stocks)만 사용한다.
 export type DetailSku = {
   id: number
   selections: Record<string, string>
   price: number
-  stock?: number
 }
 
 export type DropDetail = {

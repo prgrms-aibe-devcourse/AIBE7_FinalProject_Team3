@@ -57,7 +57,7 @@ export function optionStockLabel(
   if (matching.length === 0) return '선택 불가'
   let total = 0
   for (const sku of matching) {
-    const stock = stockByOption.get(sku.id) ?? sku.stock
+    const stock = stockByOption.get(sku.id)
     if (stock === undefined) return '재고 확인 중'
     total += stock
   }

@@ -81,27 +81,24 @@ export default function DropDetailPage({
   const refreshFailed = detailQuery.isError || stocksQuery.isError
   const refreshing = detailQuery.isFetching || stocksQuery.isFetching
   const detail = toDropDetail(detailQuery.data)
-  const stockByOption = new Map<number, number>()
-  for (const option of stocksQuery.data?.options ?? []) {
-    if (option.optionId === undefined) continue
-    if (option.availableStock !== undefined)
-      stockByOption.set(option.optionId, option.availableStock)
-  }
-  const totalStock =
-    stocksQuery.data?.options?.length &&
-    stocksQuery.data.options.every(
-      (option) => option.availableStock !== undefined,
-    )
-      ? stocksQuery.data.options.reduce(
-          (sum, option) => sum + (option.availableStock ?? 0),
-          0,
-        )
-      : undefined
+  // 재고는 재조회 응답만 근거로 삼는다. 응답 전이거나 응답에 없는 SKU는 undefined('확인 중')다.
+  const stockByOption = new Map(
+    (stocksQuery.data?.options ?? []).map((option) => [
+      option.optionId,
+      option.availableStock,
+    ]),
+  )
+  const totalStock = stocksQuery.data?.options?.length
+    ? stocksQuery.data.options.reduce(
+        (sum, option) => sum + option.availableStock,
+        0,
+      )
+    : undefined
 
   const selectedSku = findMatchingSku(detail.skus, selected)
   const wished = wishes.has(detail.id)
   const selectedStock = selectedSku
-    ? (stockByOption.get(selectedSku.id) ?? selectedSku.stock)
+    ? stockByOption.get(selectedSku.id)
     : undefined
   const maxQuantity = Math.min(
     5,
