@@ -42,8 +42,8 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus-ds" },
-          "expr": "sum(jvm_memory_max_bytes{job=\"backend\", area=\"heap\"})",
-          "legendFormat": "heap max"
+          "expr": "sum(jvm_memory_committed_bytes{job=\"backend\", area=\"heap\"})",
+          "legendFormat": "heap committed"
         }
       ]
     },
