@@ -1,5 +1,5 @@
 {
-  "title": "Backend 부하테스트 (GR-159)",
+  "title": "Backend 부하테스트 모니터링",
   "uid": "backend-loadtest",
   "schemaVersion": 39,
   "version": 1,
