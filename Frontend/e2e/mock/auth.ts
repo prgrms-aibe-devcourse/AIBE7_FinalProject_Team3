@@ -29,6 +29,19 @@ const SIGNUP_PATHS: Record<string, SignupStep> = {
   '/api/v1/auth/oauth2/signup': 'social',
 }
 
+// 내 정보 수정(1.10 닉네임, 1.11 비밀번호, GR-131). 오류는 failAccount로 다음 응답부터 차례로 바꾼다.
+export type AccountApi = 'nickname' | 'password'
+export type AccountRequest = {
+  api: AccountApi
+  body: unknown
+  xsrf: string | undefined
+}
+
+const ACCOUNT_PATHS: Record<string, AccountApi> = {
+  '/api/v1/users/me': 'nickname',
+  '/api/v1/users/me/password': 'password',
+}
+
 // 소셜 로그인 시작(1.4)은 실제 제공자로 가지 않고 콜백 결과 주소로 바로 302한다(GR-47 M00-05).
 const SOCIAL_START_PROVIDERS: Record<string, AuthProvider> = {
   '/api/v1/auth/oauth2/kakao': 'KAKAO',
@@ -41,6 +54,8 @@ export type AuthState = {
   provider: AuthProvider
   nickname: string
   email: string
+  // LOCAL 로그인·비밀번호 변경(1.11)이 비교하는 현재 비밀번호
+  password: string
   // 다음 보호 API 요청을 한 번 401로 만든다. 재발급 후 재시도 성공 시나리오에 쓴다.
   accessExpired: boolean
   // Access·Refresh 모두 무효. 재발급 실패 → 비로그인 전환 시나리오에 쓴다.
@@ -50,6 +65,8 @@ export type AuthState = {
   refreshCount: number
   signupReplies: Record<SignupStep, SignupReply[]>
   signupRequests: SignupRequest[]
+  accountReplies: Record<AccountApi, SignupReply[]>
+  accountRequests: AccountRequest[]
   // 다음 소셜 시작이 콜백에 붙일 쿼리(result=… 또는 error=…). result=success면 그 제공자 회원으로 로그인된다.
   socialCallbackQuery: string
   socialStarts: string[]
@@ -64,6 +81,7 @@ export type AuthController = {
   failLogin: (kind: Exclude<LoginFailure, null>) => void
   failLogout: () => void
   failSignup: (step: SignupStep, ...replies: SignupReply[]) => void
+  failAccount: (api: AccountApi, ...replies: SignupReply[]) => void
   setSocialCallback: (query: string) => void
 }
 
@@ -106,6 +124,7 @@ export function installAuthApi(
     provider: 'LOCAL',
     nickname: '드롭헌터',
     email: DEMO_EMAIL,
+    password: DEMO_PASSWORD,
     accessExpired: false,
     invalidSession: false,
     loginFailure: null,
@@ -113,6 +132,8 @@ export function installAuthApi(
     refreshCount: 0,
     signupReplies: { request: [], confirm: [], signup: [], social: [] },
     signupRequests: [],
+    accountReplies: { nickname: [], password: [] },
+    accountRequests: [],
     socialCallbackQuery: 'result=success',
     socialStarts: [],
     ...initial,
@@ -139,6 +160,9 @@ export function installAuthApi(
     },
     failSignup: (step, ...replies) => {
       state.signupReplies[step].push(...replies)
+    },
+    failAccount: (api, ...replies) => {
+      state.accountReplies[api].push(...replies)
     },
     setSocialCallback: (query) => {
       state.socialCallbackQuery = query
@@ -181,7 +205,7 @@ export function installAuthApi(
         email?: string
         password?: string
       }
-      if (body.password !== DEMO_PASSWORD) {
+      if (body.password !== state.password) {
         await unauthorized(route, 'INVALID_CREDENTIALS')
         return
       }
@@ -309,6 +333,60 @@ export function installAuthApi(
         return
       }
       state.loggedIn = false
+      await route.fulfill({ status: 204 })
+      return
+    }
+
+    const accountApi = ACCOUNT_PATHS[path]
+    if (accountApi && method === 'PATCH') {
+      if (!state.loggedIn || state.invalidSession) {
+        await unauthorized(route, 'AUTHENTICATION_REQUIRED')
+        return
+      }
+      const body = route.request().postDataJSON() as {
+        nickname?: string
+        currentPassword?: string
+        newPassword?: string
+      }
+      state.accountRequests.push({
+        api: accountApi,
+        body,
+        xsrf: route.request().headers()['x-xsrf-token'],
+      })
+      const reply = state.accountReplies[accountApi].shift()
+      if (reply === 'network') {
+        await route.abort('failed')
+        return
+      }
+      const fail = (
+        status: number,
+        code: string,
+        fieldErrors: { field: string; reason: string }[] = [],
+      ) =>
+        json(
+          route,
+          {
+            success: false,
+            data: null,
+            error: { code, message: code, fieldErrors },
+          },
+          status,
+        )
+      if (reply) {
+        await fail(reply.status, reply.code, reply.fieldErrors)
+        return
+      }
+      if (accountApi === 'nickname') {
+        // 서버처럼 앞뒤 공백을 제거해 저장하고 1.9와 같은 7개 필드로 응답한다
+        state.nickname = (body.nickname ?? '').trim()
+        await json(route, userBody(state))
+        return
+      }
+      if (body.currentPassword !== state.password) {
+        await fail(400, 'PASSWORD_MISMATCH')
+        return
+      }
+      state.password = body.newPassword ?? state.password
       await route.fulfill({ status: 204 })
       return
     }

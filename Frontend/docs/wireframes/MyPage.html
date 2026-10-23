@@ -30,19 +30,66 @@
         <a href="../DESIGN.md">공통 기준</a>
       </p>
       <h1>나의 취향과 주문</h1>
+      <p class="note">
+        정보 수정 패널을 연 LOCAL 계정 예시다. 닉네임과 비밀번호는 별도 폼과
+        저장 버튼을 사용하며 오류·처리 중 상태도 각각 관리한다. 소셜 계정은
+        닉네임 폼만 표시한다. 이 와이어프레임은 정적 문서이며 API를 호출하지
+        않는다.
+      </p>
       <section class="panel section stack">
         <div class="row">
           <div>
             <h2>내 계정</h2>
             <p>드롭헌터 · user@example.com</p>
           </div>
-          <span class="control">정보 수정</span>
+          <span class="control">닫기</span>
         </div>
-        <div class="split">
-          <span class="field">닉네임 변경</span
-          ><span class="control primary">저장</span>
-        </div>
-        <small>LOCAL 계정에만 비밀번호 변경 · 프로필 이미지 관리</small>
+        <section class="panel soft stack" aria-label="닉네임 수정 폼">
+          <div class="split">
+            <div>
+              <small>이메일 · 읽기 전용</small>
+              <span class="field">user@example.com</span>
+            </div>
+            <div>
+              <small>닉네임 변경</small>
+              <span class="field">드롭헌터</span>
+            </div>
+          </div>
+          <p class="muted">
+            오류 발생 시: 입력들 다음 줄의 전체 폭 영역에 필드 오류를 표시하고
+            닉네임 입력과 연결한다. 일반 오류는 폼 하단에 표시한다.
+          </p>
+          <div class="controls">
+            <span class="control primary">저장</span>
+          </div>
+          <small>성공: 내 정보 캐시·표시·입력값 갱신, 패널 유지</small>
+        </section>
+        <section class="panel soft stack" aria-label="LOCAL 비밀번호 변경 폼">
+          <small>LOCAL 계정에만 표시</small>
+          <div class="split">
+            <div>
+              <small>현재 비밀번호</small>
+              <span class="field">••••••••</span>
+            </div>
+            <div>
+              <small>새 비밀번호</small>
+              <span class="field">••••••••</span>
+            </div>
+          </div>
+          <p class="muted">
+            오류 발생 시: 두 입력 다음 줄의 전체 폭 영역에 필드 오류를 표시하고
+            해당 입력과 연결한다. 일반 오류는 폼 하단에 표시한다.
+          </p>
+          <div class="controls">
+            <span class="control primary">비밀번호 변경</span>
+          </div>
+          <small>성공: 두 입력 비움, 로그인 세션 유지</small>
+        </section>
+        <p class="muted">프로필 이미지 관리는 API 연동 시 제공됩니다.</p>
+        <small>
+          프로필 이미지 관리 UI는 GR-132에서 연동한다. 소셜 계정의 하단 안내는
+          "소셜 계정에는 비밀번호 변경이 제공되지 않습니다."다.
+        </small>
         <div class="controls">
           <span class="control">판매자 신청</span>
         </div>

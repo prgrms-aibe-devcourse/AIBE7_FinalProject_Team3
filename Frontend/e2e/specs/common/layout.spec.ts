@@ -153,6 +153,35 @@ test('MY: 가로 넘침 없이 핵심 버튼에 닿는다', async ({ page }) => 
   await expectNoHorizontalOverflow(page)
 })
 
+test('MY 정보 수정: 오류를 표시해도 가로 넘침 없이 저장 버튼에 닿는다', async ({
+  page,
+}) => {
+  getAuth(page).failAccount('nickname', {
+    status: 409,
+    code: 'DUPLICATE_NICKNAME',
+  })
+  await login(page)
+  await page.getByRole('link', { name: 'MY', exact: true }).click()
+  await page.getByRole('button', { name: '정보 수정' }).click()
+  await page.getByLabel('닉네임 변경').fill('새닉네임')
+  await page.getByRole('button', { name: '저장', exact: true }).click()
+  await page.getByLabel('현재 비밀번호').fill('Wrong123!')
+  await page.getByLabel('새 비밀번호').fill('NewPassword456!')
+  await page.getByRole('button', { name: '비밀번호 변경', exact: true }).click()
+  await expect(page.getByText('현재 비밀번호가 일치하지 않아요.')).toBeVisible()
+  await expect(page.getByText('이미 사용 중인 닉네임이에요.')).toBeVisible()
+  for (const action of [
+    page.getByRole('button', { name: '닫기' }),
+    page.getByLabel('닉네임 변경'),
+    page.getByRole('button', { name: '저장', exact: true }),
+    page.getByLabel('새 비밀번호'),
+    page.getByRole('button', { name: '비밀번호 변경', exact: true }),
+  ]) {
+    await expectReachable(page, action)
+  }
+  await expectNoHorizontalOverflow(page)
+})
+
 test('결제: 가로 넘침 없이 배송지와 결제 버튼에 닿는다', async ({ page }) => {
   await page.goto('/#/checkout?dropId=201&optionId=2012&quantity=2')
   await page.getByLabel('이메일').fill('grab@example.com')

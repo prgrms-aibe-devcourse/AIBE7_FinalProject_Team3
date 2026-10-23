@@ -1,6 +1,6 @@
 # GRAB Frontend
 
-React와 TypeScript로 만든 GRAB MVP 화면 초안입니다. 주요 화면은 Mock 데이터를 사용하며 공개 카테고리 API만 최소 연동했습니다.
+React와 TypeScript로 만든 GRAB MVP 프론트엔드입니다. 화면별 Mock과 실제 API 연동 범위는 아래 "Mock 화면과 API 연동 경계"를 따릅니다.
 
 ## 실행
 
@@ -95,6 +95,7 @@ npx playwright show-trace test-results/<테스트>/trace.zip
 - 로딩·빈 결과·오류·권한 부족·상태별 버튼의 화면 상태를 준비합니다. Mock 버튼은 로컬 데모 동작이며 실제 주문·결제·판매자 승인·배송 처리로 안내하지 않습니다.
 - 실제 연동 이슈에서는 Mock 공급 부분을 `src/api/client.ts` 요청과 TanStack Query로 교체하고, API 응답을 화면용 데이터로 바꾸는 코드는 해당 `src/features`에 둡니다. 쓰이지 않게 된 Mock만 제거하고 화면 배치와 컴포넌트는 유지합니다.
 - LOCAL 회원가입(이메일 인증 코드 요청·확인·가입 완료)은 Mock 없이 실제 백엔드 API를 사용합니다(GR-31). KAKAO·GOOGLE 소셜 로그인(시작·콜백 `/auth/callback`·소셜 가입 `/signup?type=social`)도 실제 백엔드를 사용합니다(GR-47).
+- 마이페이지 닉네임 수정(`PATCH /api/v1/users/me`)과 LOCAL 계정의 비밀번호 변경(`PATCH /api/v1/users/me/password`)은 실제 백엔드 API를 사용합니다(GR-131, `src/api/auth/me.ts`). 같은 정보 수정 패널의 별도 폼으로 처리하며 닉네임 저장 성공 시 응답으로 `['auth', 'me']` 캐시를 교체합니다. 비밀번호 변경 성공 시 입력을 비우고 기존 로그인 세션을 유지합니다. 프로필 이미지 관리 UI 연동은 GR-132에서 진행합니다.
 - 인증 쿠키·CSRF·401 재시도는 `src/api/client.ts`의 공통 클라이언트와 `src/api/auth/`가 처리합니다(GR-45). 저장 결과·도메인 서버 오류·중복 요청 검증은 각 화면의 실제 API 연동 단계에서 확인합니다. 화면 초안의 Mock 성공 상태를 서버 처리 성공의 증거로 취급하지 않습니다.
 
 화면별 PR 범위와 검증 항목은 해당 Linear 이슈에, 로컬 작업 순서는 `todo/page-renewal.md`에 적습니다. `todo/`는 git에서 제외되는 개인 작업 메모입니다.
