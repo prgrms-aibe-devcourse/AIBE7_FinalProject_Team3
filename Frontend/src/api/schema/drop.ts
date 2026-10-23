@@ -587,10 +587,10 @@ export interface components {
     }
     PublicDropStockOption: {
       /** Format: int64 */
-      optionId?: number
+      optionId: number
       /** Format: int32 */
-      availableStock?: number
-      soldOut?: boolean
+      availableStock: number
+      soldOut: boolean
     }
     PublicDropStockResponse: {
       /** Format: int64 */
