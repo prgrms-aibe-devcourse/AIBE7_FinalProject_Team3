@@ -175,6 +175,105 @@ export default function MyPage({
         </div>
       </section>
       <div className="my-columns">
+        <section className="panel order-panel">
+          <div className="panel-heading">
+            <h2>주문</h2>
+            <span>{ordersQuery.data?.totalElements ?? 0}</span>
+          </div>
+          {ordersQuery.isPending ? (
+            <div role="status" aria-live="polite">
+              <EmptyState loading title="주문 목록을 불러오는 중이에요." />
+            </div>
+          ) : ordersQuery.isError ? (
+            <div className="catalog-error" role="alert">
+              <EmptyState
+                title="주문 목록을 불러오지 못했어요."
+                description="잠시 후 다시 시도해주세요."
+              />
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => void ordersQuery.refetch()}
+              >
+                다시 시도
+              </button>
+            </div>
+          ) : orderItems.length ? (
+            <>
+              {orderItems.map((order) => {
+                const pending = order.status === 'PAYMENT_PENDING'
+                return (
+                  <div className="compact-item order" key={order.id}>
+                    <span
+                      className={
+                        pending ? 'order-status pending' : 'order-status'
+                      }
+                    >
+                      {buyerOrderStatusText[order.status]}
+                    </span>
+                    <div>
+                      <strong>{order.productName}</strong>
+                      <small>
+                        {order.orderNumber} · 주문일{' '}
+                        {dateLabel(order.orderedAt)}
+                      </small>
+                    </div>
+                    <b>{won(order.totalAmount)}</b>
+                    {/* 행마다 같은 문구라 주문번호를 붙여 링크를 구분한다(보이는 문구는 이름에 포함). */}
+                    {pending ? (
+                      <Link
+                        className="primary-button"
+                        to={`/checkout/${order.id}`}
+                        aria-label={`${order.orderNumber} 결제하기`}
+                      >
+                        결제하기
+                      </Link>
+                    ) : (
+                      <Link
+                        className="secondary-button"
+                        to={`/my/orders/${order.id}`}
+                        aria-label={`${order.orderNumber} 주문 상세`}
+                      >
+                        주문 상세
+                      </Link>
+                    )}
+                  </div>
+                )
+              })}
+              {totalOrderPages > 1 && (
+                <div className="catalog-pagination">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    disabled={orderPage === 0}
+                    onClick={() =>
+                      setOrderPage((current) => Math.max(0, current - 1))
+                    }
+                  >
+                    이전
+                  </button>
+                  <span aria-live="polite">
+                    {orderPage + 1} / {totalOrderPages} 페이지
+                  </span>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    disabled={!ordersQuery.data?.hasNext}
+                    onClick={() => setOrderPage((current) => current + 1)}
+                  >
+                    다음
+                  </button>
+                </div>
+              )}
+            </>
+          ) : (
+            <EmptyState
+              title="아직 주문이 없어요."
+              link="/grab"
+              label="GRAB 둘러보기"
+            />
+          )}
+        </section>
         <section className="panel wish-panel">
           <div className="panel-heading">
             <h2>WISH</h2>
@@ -267,80 +366,6 @@ export default function MyPage({
               title="아직 담은 WISH가 없어요."
               link="/wish"
               label="WISH 둘러보기"
-            />
-          )}
-        </section>
-        <section className="panel order-panel">
-          <div className="panel-heading">
-            <h2>주문</h2>
-            <span>{ordersQuery.data?.totalElements ?? 0}</span>
-          </div>
-          {ordersQuery.isPending ? (
-            <div role="status" aria-live="polite">
-              <EmptyState loading title="주문 목록을 불러오는 중이에요." />
-            </div>
-          ) : ordersQuery.isError ? (
-            <div className="catalog-error" role="alert">
-              <EmptyState
-                title="주문 목록을 불러오지 못했어요."
-                description="잠시 후 다시 시도해주세요."
-              />
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => void ordersQuery.refetch()}
-              >
-                다시 시도
-              </button>
-            </div>
-          ) : orderItems.length ? (
-            <>
-              {orderItems.map((order) => (
-                <div className="compact-item order" key={order.id}>
-                  <div>
-                    <small>
-                      {order.orderNumber} · {buyerOrderStatusText[order.status]}
-                    </small>
-                    <strong>{order.productName}</strong>
-                    <small>주문일 {dateLabel(order.orderedAt)}</small>
-                    <Link className="text-link" to={`/my/orders/${order.id}`}>
-                      주문 상세 ↗
-                    </Link>
-                  </div>
-                  <b>{won(order.totalAmount)}</b>
-                </div>
-              ))}
-              {totalOrderPages > 1 && (
-                <div className="catalog-pagination">
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    disabled={orderPage === 0}
-                    onClick={() =>
-                      setOrderPage((current) => Math.max(0, current - 1))
-                    }
-                  >
-                    이전
-                  </button>
-                  <span aria-live="polite">
-                    {orderPage + 1} / {totalOrderPages} 페이지
-                  </span>
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    disabled={!ordersQuery.data?.hasNext}
-                    onClick={() => setOrderPage((current) => current + 1)}
-                  >
-                    다음
-                  </button>
-                </div>
-              )}
-            </>
-          ) : (
-            <EmptyState
-              title="아직 주문이 없어요."
-              link="/grab"
-              label="GRAB 둘러보기"
             />
           )}
         </section>

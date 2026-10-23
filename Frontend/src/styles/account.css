@@ -6,7 +6,7 @@
 }
 .my-columns {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   gap: 24px;
   align-items: start;
 }
@@ -219,10 +219,37 @@
 }
 /* 주문 목록 응답에는 상품 이미지가 없어 이미지 열을 두지 않는다. */
 .compact-item.order {
-  grid-template-columns: minmax(0, 1fr) auto;
+  /* 행마다 별도 그리드라 배지·버튼 열 폭을 고정해 열을 맞춘다 */
+  grid-template-columns: 76px minmax(0, 1fr) auto 96px;
+  gap: 16px;
+}
+.compact-item.order > .order-status {
+  justify-self: start;
 }
 .compact-item.order > b {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.compact-item.order > a {
+  min-height: 40px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+/* 결제 대기만 라임으로 강조하고 나머지 상태는 회색 배지로 둔다(GR-160). */
+.order-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--soft);
   font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.order-status.pending {
+  background: var(--lime);
 }
 .empty-state {
   display: grid;
