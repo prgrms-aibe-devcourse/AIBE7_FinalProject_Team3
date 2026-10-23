@@ -1,10 +1,16 @@
-import { useState, type Ref } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import Modal from '../../../components/Modal/Modal'
 import { isAdmin, isSeller, type AuthUser } from '../logic/authUser'
 import NicknameForm from './NicknameForm'
 import PasswordChangeForm from './PasswordChangeForm'
 
 type EditableRow = 'nickname' | 'password'
+
+const MODAL_TITLES: Record<EditableRow, string> = {
+  nickname: '닉네임 변경',
+  password: '비밀번호 변경',
+}
 
 type Props = {
   user: AuthUser
@@ -12,33 +18,28 @@ type Props = {
   loggingOut: boolean
   logoutError: string
   onLogout: () => void
-  titleRef?: Ref<HTMLHeadingElement>
 }
 
-// 마이페이지 계정 설정 섹션(GR-160). 행마다 "변경"으로 그 행 안에서 폼을 펼치고 한 번에 한 행만 연다(M00-01).
-// 다른 행을 열면 이전 폼이 언마운트되어 입력·오류도 함께 사라진다.
-// 제목은 계정 카드의 "계정 설정" 버튼이 포커스를 옮기는 대상이다.
+// 마이페이지 계정 설정 섹션(GR-160). 행의 "변경"은 모달로 폼을 열어 페이지 배치를 밀지 않는다.
+// 모달을 닫으면 폼이 언마운트되어 입력·오류도 함께 사라지고, 저장에 성공하면 닫는다.
 export default function AccountSettings({
   user,
   notify,
   loggingOut,
   logoutError,
   onLogout,
-  titleRef,
 }: Props) {
   const [openRow, setOpenRow] = useState<EditableRow | null>(null)
-  const toggle = (row: EditableRow) =>
-    setOpenRow((current) => (current === row ? null : row))
+  const close = () => setOpenRow(null)
 
   const editButton = (row: EditableRow) => (
     <button
       type="button"
       className="secondary-button"
-      aria-expanded={openRow === row}
-      aria-controls={`account-settings-${row}`}
-      onClick={() => toggle(row)}
+      aria-haspopup="dialog"
+      onClick={() => setOpenRow(row)}
     >
-      {openRow === row ? '닫기' : '변경'}
+      변경
     </button>
   )
 
@@ -47,9 +48,7 @@ export default function AccountSettings({
       className="panel account-settings"
       aria-labelledby="settings-title"
     >
-      <h2 id="settings-title" ref={titleRef} tabIndex={-1}>
-        계정 설정
-      </h2>
+      <h2 id="settings-title">계정 설정</h2>
       <div
         className="settings-row"
         role="group"
@@ -66,11 +65,6 @@ export default function AccountSettings({
         <h3 id="settings-nickname">닉네임</h3>
         <p>{user.nickname}</p>
         {editButton('nickname')}
-        <div id="account-settings-nickname" className="settings-form">
-          {openRow === 'nickname' && (
-            <NicknameForm user={user} notify={notify} />
-          )}
-        </div>
       </div>
       {user.provider === 'LOCAL' && (
         <div
@@ -81,9 +75,6 @@ export default function AccountSettings({
           <h3 id="settings-password">비밀번호</h3>
           <p>현재 비밀번호를 확인한 뒤 변경해요.</p>
           {editButton('password')}
-          <div id="account-settings-password" className="settings-form">
-            {openRow === 'password' && <PasswordChangeForm notify={notify} />}
-          </div>
         </div>
       )}
       <div
@@ -138,6 +129,27 @@ export default function AccountSettings({
           </div>
         )}
       </div>
+      <Modal
+        open={openRow !== null}
+        title={openRow ? MODAL_TITLES[openRow] : ''}
+        onClose={close}
+      >
+        {openRow === 'nickname' && (
+          <NicknameForm
+            user={user}
+            notify={notify}
+            onSuccess={close}
+            onCancel={close}
+          />
+        )}
+        {openRow === 'password' && (
+          <PasswordChangeForm
+            notify={notify}
+            onSuccess={close}
+            onCancel={close}
+          />
+        )}
+      </Modal>
     </section>
   )
 }

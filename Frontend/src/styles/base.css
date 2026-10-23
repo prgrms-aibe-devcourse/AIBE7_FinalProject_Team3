@@ -86,6 +86,68 @@ textarea:focus-visible,
   object-fit: cover;
 }
 
+/* 모달(GR-160): 브라우저 <dialog>. 열릴 때만 짧게 움직인다(DESIGN.md 모달 예외). */
+.modal {
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+}
+.modal[open] {
+  animation: modal-rise 200ms ease-out;
+}
+.modal::backdrop {
+  background: rgb(25 27 23 / 45%);
+}
+.modal[open]::backdrop {
+  animation: modal-fade 200ms ease-out;
+}
+.modal-panel {
+  padding: 28px;
+}
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.modal-header h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.modal-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: -10px -10px 0 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+@keyframes modal-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+@keyframes modal-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes modal-sheet {
+  from {
+    transform: translateY(100%);
+  }
+}
+
 .sr-only {
   position: absolute;
   width: 1px;

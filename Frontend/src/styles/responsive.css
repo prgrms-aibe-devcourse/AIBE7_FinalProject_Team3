@@ -302,6 +302,22 @@
   .buyer-item strong {
     justify-self: start;
   }
+  .modal {
+    width: 100%;
+    max-width: none;
+    margin: auto 0 0;
+    border-radius: 14px 14px 0 0;
+  }
+  .modal[open] {
+    animation: modal-sheet 240ms ease-out;
+  }
+  .modal-panel {
+    padding: 20px 20px 28px;
+  }
+  .account-edit-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
   .account-panel {
     padding: 20px;
   }
@@ -310,8 +326,7 @@
     grid-template-columns: auto minmax(0, 1fr);
     gap: 16px;
   }
-  .account-heading .account-stats,
-  .account-heading > button {
+  .account-heading .account-stats {
     grid-column: 1 / -1;
   }
   .account-stats {
@@ -373,6 +388,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .modal[open],
+  .modal[open]::backdrop {
+    animation: none;
+  }
   *,
   *::before,
   *::after {

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getMyWishes } from '../../api/wish/wishes'
@@ -43,7 +43,6 @@ export default function MyPage({
 }: Props) {
   const navigate = useNavigate()
   const location = useLocation()
-  const settingsTitleRef = useRef<HTMLHeadingElement>(null)
   const [page, setPage] = useState(0)
   const [orderPage, setOrderPage] = useState(0)
   const [loggingOut, setLoggingOut] = useState(false)
@@ -90,13 +89,6 @@ export default function MyPage({
     }
   }
 
-  // 같은 페이지의 계정 설정 섹션으로 이동한다. 해시 라우터라 #앵커 대신 스크롤·포커스로 옮긴다.
-  const goToSettings = () => {
-    const title = settingsTitleRef.current
-    title?.scrollIntoView({ block: 'start' })
-    title?.focus({ preventScroll: true })
-  }
-
   return (
     <section className="page-section">
       <h1>My Page</h1>
@@ -129,13 +121,6 @@ export default function MyPage({
               <dd>{wishCount}</dd>
             </div>
           </dl>
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={goToSettings}
-          >
-            계정 설정
-          </button>
         </div>
       </section>
       <div className="my-columns">
@@ -340,7 +325,6 @@ export default function MyPage({
         loggingOut={loggingOut}
         logoutError={logoutError}
         onLogout={() => void logout()}
-        titleRef={settingsTitleRef}
       />
     </section>
   )

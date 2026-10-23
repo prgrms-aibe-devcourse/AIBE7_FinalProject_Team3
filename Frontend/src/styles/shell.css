@@ -28,9 +28,10 @@ footer .footer-wordmark {
   max-width: calc(100vw - 48px);
   padding: 14px 18px;
   border-radius: 4px;
-  background: var(--ink);
-  color: #fff;
+  background: var(--lime);
+  color: var(--ink);
   font-size: 13px;
+  font-weight: 700;
   transform: translateY(30px);
   opacity: 0;
   pointer-events: none;

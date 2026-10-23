@@ -15,10 +15,18 @@ export const PASSWORD_UNCHANGED_MESSAGE =
   '현재 비밀번호와 다른 비밀번호를 입력해주세요.'
 export const CURRENT_PASSWORD_REQUIRED_MESSAGE = '현재 비밀번호를 입력해주세요.'
 export const NEW_PASSWORD_REQUIRED_MESSAGE = '새 비밀번호를 입력해주세요.'
+// 새 비밀번호 확인은 화면에서만 비교하고 서버로 보내지 않는다(GR-160)
+export const NEW_PASSWORD_CONFIRM_REQUIRED_MESSAGE =
+  '새 비밀번호를 한 번 더 입력해주세요.'
+export const NEW_PASSWORD_CONFIRM_MISMATCH_MESSAGE =
+  '새 비밀번호가 일치하지 않아요.'
 const PASSWORD_NOT_AVAILABLE_MESSAGE = '이 계정은 비밀번호를 변경할 수 없어요.'
 
 export type PasswordField = 'currentPassword' | 'newPassword'
 export type PasswordFieldErrors = Partial<Record<PasswordField, string>>
+// 화면 폼의 입력. 확인 입력은 화면 사전 검증에만 쓴다.
+export type PasswordFormField = PasswordField | 'newPasswordConfirm'
+export type PasswordFormErrors = Partial<Record<PasswordFormField, string>>
 
 // 입력 아래에 표시(fields), 폼 하단 표시(general)
 export type NicknameUpdateFailure =

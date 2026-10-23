@@ -127,8 +127,6 @@
 }
 .account-settings h2 {
   margin: 16px 0 8px;
-  /* "계정 설정" 버튼으로 이동했을 때 고정 헤더에 가리지 않게 한다 */
-  scroll-margin-top: 140px;
 }
 .settings-row {
   display: grid;
@@ -160,6 +158,60 @@
 }
 .settings-form .account-edit {
   margin-top: 4px;
+}
+/* 모달 안의 내 정보 폼은 한 열이고 오류는 각 입력 바로 아래에 둔다 */
+.modal .account-edit {
+  grid-template-columns: 1fr;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  background: none;
+}
+.account-field {
+  display: grid;
+  gap: 6px;
+}
+.account-field .form-error {
+  margin: 0;
+}
+.account-field > label {
+  font-size: 12px;
+  font-weight: 700;
+}
+/* 비밀번호 보기 버튼은 입력 안쪽 오른쪽에 겹쳐 두고 그만큼 입력 오른쪽 여백을 둔다 */
+.password-input {
+  position: relative;
+  display: grid;
+}
+.account-edit .password-input input {
+  padding-right: 52px;
+}
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+.password-toggle[aria-pressed='true'] {
+  color: var(--ink);
+}
+.account-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+.account-edit-actions button {
+  justify-self: auto;
 }
 .my-demo-controls {
   display: flex;

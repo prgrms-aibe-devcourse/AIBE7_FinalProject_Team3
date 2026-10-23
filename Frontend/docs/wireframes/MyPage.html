@@ -55,7 +55,6 @@
               <strong>1</strong>
             </div>
           </div>
-          <a class="control" href="#settings">계정 설정</a>
         </div>
         <small>
           프로필 이미지가 없으면 닉네임 첫 글자를 라임 원에 표시한다. 개수는
@@ -106,30 +105,8 @@
         </div>
         <div class="list-row">
           <strong>닉네임</strong><span class="secondary">드롭헌터</span
-          ><span class="control">닫기</span>
+          ><span class="control">변경</span>
         </div>
-        <section
-          class="panel soft stack"
-          aria-label="닉네임 수정 폼(펼친 상태)"
-        >
-          <div class="split">
-            <div>
-              <small>이메일 · 읽기 전용</small>
-              <span class="field">user@example.com</span>
-            </div>
-            <div>
-              <small>닉네임 변경</small>
-              <span class="field">드롭헌터</span>
-              <small>필드 오류는 이 입력 바로 아래</small>
-            </div>
-          </div>
-          <div class="controls">
-            <span class="control primary">저장</span>
-          </div>
-          <small>
-            성공: 내 정보 캐시·계정 카드 갱신, 폼 유지. 일반 오류는 폼 하단.
-          </small>
-        </section>
         <div class="list-row">
           <strong>비밀번호</strong
           ><span class="secondary">LOCAL 계정만 표시</span
@@ -144,12 +121,58 @@
           <strong>로그아웃</strong><span class="control">로그아웃</span>
         </div>
         <small>
-          한 번에 한 행만 펼친다. 다른 행을 펼치면 열린 행은 닫히고 입력·오류가
-          사라진다. 펼친 행의 버튼은 "닫기"(aria-expanded). 비밀번호 폼은
-          현재·새 비밀번호와 "비밀번호 변경", 오류는 각 입력 바로 아래. 판매자
-          행은 승인된 판매자에게 작업 공간, 운영자에게 판매자 신청 심사 링크로
-          바뀐다.
+          판매자 행은 승인된 판매자에게 작업 공간, 운영자에게 판매자 신청 심사
+          링크로 바뀐다.
         </small>
+      </section>
+
+      <section class="panel section stack" aria-label="변경 모달 예시">
+        <p class="note">
+          "변경"을 누르면 모달로 연다. PC는 가운데 다이얼로그(200ms 페이드 +
+          16px 떠오름), 모바일은 하단 시트(240ms 아래에서 올라옴).
+          바깥·Esc·닫기·취소로 닫고 포커스는 "변경" 버튼으로 돌아간다. 저장 성공
+          시 닫고 토스트.
+        </p>
+        <div class="split">
+          <section class="panel soft stack" aria-label="닉네임 변경 모달">
+            <div class="row">
+              <h2>닉네임 변경</h2>
+              <span class="control">✕</span>
+            </div>
+            <div>
+              <small>새 닉네임</small>
+              <span class="field">드롭헌터2</span>
+              <small>필드 오류는 이 입력 바로 아래</small>
+            </div>
+            <div class="controls">
+              <span class="control">취소</span
+              ><span class="control primary">저장</span>
+            </div>
+          </section>
+          <section class="panel soft stack" aria-label="비밀번호 변경 모달">
+            <div class="row">
+              <h2>비밀번호 변경</h2>
+              <span class="control">✕</span>
+            </div>
+            <div>
+              <small>현재 비밀번호</small>
+              <span class="field">••••••••</span>
+            </div>
+            <div>
+              <small>새 비밀번호</small>
+              <span class="field">••••••••</span>
+            </div>
+            <div>
+              <small>새 비밀번호 확인</small>
+              <span class="field">••••••••</span>
+              <small>새 비밀번호와 다르면 이 입력 아래에 안내, 요청 없음</small>
+            </div>
+            <div class="controls">
+              <span class="control">취소</span
+              ><span class="control primary">비밀번호 변경</span>
+            </div>
+          </section>
+        </div>
       </section>
     </main>
     <footer>
