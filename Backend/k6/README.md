@@ -9,7 +9,8 @@ Backend/k6/
 │   └── lib/                 # 로그인·CSRF·UUID 헬퍼
 ├── 01-stock-race/           # 시나리오마다 자기 전용 DROP/옵션(seed.sql)과 검증(verify.sql)을 둔다
 ├── 02-idempotency/
-└── 03-expiry/
+├── 03-expiry/
+└── 04-drop-open-spike/
 ```
 
 ## 0. 사전 준비
@@ -58,3 +59,16 @@ docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/03-expiry
 ```
 취소 요청과 배치(10초 주기)가 같은 주문을 두고 경합한다. 어느 쪽이 먼저 처리하든
 재고는 한 번만 반환돼야 한다.
+
+## 4. 드롭 오픈 순간 스파이크 (04-drop-open-spike)
+
+```
+docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/04-drop-open-spike/seed.sql
+k6 run -e DROP_ID=1 -e OPTION_ID=1 Backend/k6/04-drop-open-spike/spike.js
+docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/04-drop-open-spike/verify.sql
+```
+seed.sql 실행 직후 바로 k6를 돌려야 한다(DROP 상태가 WISH, `sale_starts_at`이 30초 뒤로
+잡혀 있음). 목록/상세 조회가 램프업하다가 오픈 시각에 일부 VU가 주문을 시도한다.
+레이트리밋이 없으므로 유입 제한 없이 그대로 받았을 때 서버가 버티는지(응답 불가·
+재시작 여부는 `docker stats`/`docker compose logs backend`로 확인), 재고 정합성이
+깨지지 않는지를 본다.
