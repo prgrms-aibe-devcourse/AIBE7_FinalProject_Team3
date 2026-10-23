@@ -12,6 +12,10 @@
   ],
   "tags": [
     {
+      "name": "내 정보",
+      "description": "로그인한 사용자의 회원 정보 조회·수정, 비밀번호 변경, 프로필 이미지 업로드 URL 발급·등록·삭제"
+    },
+    {
       "name": "토큰 재발급",
       "description": "Refresh Token Rotation"
     },
@@ -28,10 +32,6 @@
       "description": "KAKAO·GOOGLE 소셜 로그인과 최초 소셜 회원가입"
     },
     {
-      "name": "내 정보",
-      "description": "로그인한 사용자의 회원 정보 조회"
-    },
-    {
       "name": "회원가입",
       "description": "이메일 인증을 마친 LOCAL 회원가입"
     },
@@ -45,6 +45,176 @@
     }
   ],
   "paths": {
+    "/api/v1/users/me/profile-image": {
+      "put": {
+        "tags": ["내 정보"],
+        "summary": "내 프로필 이미지 등록/수정",
+        "description": "프로필 이미지 업로드 URL 발급으로 받은 본인의 imageUrl을 그대로 등록한다. 다른 회원 경로·DROP 이미지·외부 URL은 거부하며, 업로드 여부는 확인하지 않는다. 현재와 같은 URL도 성공하고, 바뀐 경우 이전 이미지는 커밋 후 삭제한다. 응답은 userId(public_id)와 profileImageUrl 두 필드다",
+        "operationId": "registerProfileImage",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileImageUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "등록 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseProfileImageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST, VALIDATION_FAILED(imageUrl 누락·빈 값, 본인이 발급받은 URL 아님)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseProfileImageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED(쿠키 없음, 회원 없음·정지·탈퇴), INVALID_TOKEN",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseProfileImageResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED(USER 권한 없음, CSRF 토큰 없음·불일치)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseProfileImageResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_SERVER_ERROR",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseProfileImageResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["내 정보"],
+        "summary": "내 프로필 이미지 삭제",
+        "description": "프로필 이미지를 지워 profileImageUrl을 null로 만든다. 이미지가 없어도 성공한다. 이전 이미지는 커밋 후 삭제한다",
+        "operationId": "removeProfileImage",
+        "responses": {
+          "204": {
+            "description": "삭제 성공"
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED(쿠키 없음, 회원 없음·정지·탈퇴), INVALID_TOKEN"
+          },
+          "403": {
+            "description": "ACCESS_DENIED(USER 권한 없음, CSRF 토큰 없음·불일치)"
+          },
+          "500": {
+            "description": "INTERNAL_SERVER_ERROR"
+          }
+        }
+      }
+    },
+    "/api/v1/users/me/profile-image/upload-url": {
+      "post": {
+        "tags": ["내 정보"],
+        "summary": "내 프로필 이미지 업로드 URL 발급",
+        "description": "받은 uploadUrl로 클라이언트가 직접 PUT 업로드하고, imageUrl을 프로필 이미지 등록 요청에 쓴다. 요청·응답은 DROP 이미지 업로드 URL 발급과 같다. 형식은 image/jpeg·image/png·image/webp, 크기는 5MB 이하. uploadUrl은 발급 후 2시간 동안 유효하다",
+        "operationId": "issueProfileImageUploadUrl",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImageUploadUrlRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "발급 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseImageUploadUrlResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST, VALIDATION_FAILED(fileName·contentType·fileSize)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseImageUploadUrlResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED(쿠키 없음, 회원 없음·정지·탈퇴), INVALID_TOKEN",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseImageUploadUrlResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED(USER 권한 없음, CSRF 토큰 없음·불일치)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseImageUploadUrlResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_SERVER_ERROR",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseImageUploadUrlResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "EXTERNAL_SERVICE_ERROR",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseImageUploadUrlResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/signup": {
       "post": {
         "tags": ["회원가입"],
@@ -405,6 +575,119 @@
             }
           }
         }
+      },
+      "patch": {
+        "tags": ["내 정보"],
+        "summary": "내 닉네임 수정",
+        "description": "본인의 닉네임을 바꾸고 내 정보 조회와 같은 응답을 반환한다. 앞뒤 공백을 제거해 저장하며, 현재 닉네임과 대소문자만 다른 값은 허용하고 대소문자까지 같은 값은 거부한다",
+        "operationId": "changeNickname",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserNicknameUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "수정 성공, 내 정보 조회와 같은 7개 필드",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseUserMeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST, VALIDATION_FAILED, INVALID_NICKNAME, NICKNAME_UNCHANGED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseUserMeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED(쿠키 없음, 회원 없음·정지·탈퇴), INVALID_TOKEN",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseUserMeResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED(USER 권한 없음, CSRF 토큰 없음·불일치)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseUserMeResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "DUPLICATE_NICKNAME",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseUserMeResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_SERVER_ERROR",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseUserMeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/me/password": {
+      "patch": {
+        "tags": ["내 정보"],
+        "summary": "내 비밀번호 변경",
+        "description": "LOCAL 회원이 현재 비밀번호를 확인한 뒤 새 비밀번호로 바꾼다. 현재 비밀번호는 비밀번호 규칙을 검사하지 않는다. 기존 로그인 세션(이 요청의 세션 포함)은 종료하지 않는다",
+        "operationId": "changePassword",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordChangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "변경 성공"
+          },
+          "400": {
+            "description": "INVALID_REQUEST, VALIDATION_FAILED, INVALID_PASSWORD, PASSWORD_MISMATCH(현재 비밀번호 불일치), PASSWORD_NOT_AVAILABLE(KAKAO·GOOGLE 회원), PASSWORD_UNCHANGED(새 비밀번호가 현재와 같음)"
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED(쿠키 없음, 회원 없음·정지·탈퇴), INVALID_TOKEN"
+          },
+          "403": {
+            "description": "ACCESS_DENIED(USER 권한 없음, CSRF 토큰 없음·불일치)"
+          },
+          "500": {
+            "description": "INTERNAL_SERVER_ERROR"
+          }
+        }
       }
     },
     "/api/v1/auth/oauth2/{provider}": {
@@ -450,6 +733,95 @@
   },
   "components": {
     "schemas": {
+      "ProfileImageUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "imageUrl": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["imageUrl"]
+      },
+      "ApiResponseProfileImageResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProfileImageResponse"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ProfileImageResponse": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "profileImageUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "ImageUploadUrlRequest": {
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 0
+          },
+          "contentType": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fileSize": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "required": ["contentType", "fileName", "fileSize"]
+      },
+      "ApiResponseImageUploadUrlResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ImageUploadUrlResponse"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ImageUploadUrlResponse": {
+        "type": "object",
+        "properties": {
+          "imageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "uploadUrl": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "SignupRequest": {
         "type": "object",
         "properties": {
@@ -594,6 +966,16 @@
         },
         "required": ["code", "email"]
       },
+      "UserNicknameUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "nickname": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["nickname"]
+      },
       "ApiResponseUserMeResponse": {
         "type": "object",
         "properties": {
@@ -639,6 +1021,20 @@
             "format": "date-time"
           }
         }
+      },
+      "PasswordChangeRequest": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "minLength": 1
+          },
+          "newPassword": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["currentPassword", "newPassword"]
       }
     }
   }

@@ -4,6 +4,50 @@
  */
 
 export interface paths {
+  '/api/v1/users/me/profile-image': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    /**
+     * 내 프로필 이미지 등록/수정
+     * @description 프로필 이미지 업로드 URL 발급으로 받은 본인의 imageUrl을 그대로 등록한다. 다른 회원 경로·DROP 이미지·외부 URL은 거부하며, 업로드 여부는 확인하지 않는다. 현재와 같은 URL도 성공하고, 바뀐 경우 이전 이미지는 커밋 후 삭제한다. 응답은 userId(public_id)와 profileImageUrl 두 필드다
+     */
+    put: operations['registerProfileImage']
+    post?: never
+    /**
+     * 내 프로필 이미지 삭제
+     * @description 프로필 이미지를 지워 profileImageUrl을 null로 만든다. 이미지가 없어도 성공한다. 이전 이미지는 커밋 후 삭제한다
+     */
+    delete: operations['removeProfileImage']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/users/me/profile-image/upload-url': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * 내 프로필 이미지 업로드 URL 발급
+     * @description 받은 uploadUrl로 클라이언트가 직접 PUT 업로드하고, imageUrl을 프로필 이미지 등록 요청에 쓴다. 요청·응답은 DROP 이미지 업로드 URL 발급과 같다. 형식은 image/jpeg·image/png·image/webp, 크기는 5MB 이하. uploadUrl은 발급 후 2시간 동안 유효하다
+     */
+    post: operations['issueProfileImageUploadUrl']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/auth/signup': {
     parameters: {
       query?: never
@@ -161,7 +205,31 @@ export interface paths {
     delete?: never
     options?: never
     head?: never
-    patch?: never
+    /**
+     * 내 닉네임 수정
+     * @description 본인의 닉네임을 바꾸고 내 정보 조회와 같은 응답을 반환한다. 앞뒤 공백을 제거해 저장하며, 현재 닉네임과 대소문자만 다른 값은 허용하고 대소문자까지 같은 값은 거부한다
+     */
+    patch: operations['changeNickname']
+    trace?: never
+  }
+  '/api/v1/users/me/password': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    /**
+     * 내 비밀번호 변경
+     * @description LOCAL 회원이 현재 비밀번호를 확인한 뒤 새 비밀번호로 바꾼다. 현재 비밀번호는 비밀번호 규칙을 검사하지 않는다. 기존 로그인 세션(이 요청의 세션 포함)은 종료하지 않는다
+     */
+    patch: operations['changePassword']
     trace?: never
   }
   '/api/v1/auth/oauth2/{provider}': {
@@ -208,6 +276,38 @@ export interface paths {
 export type webhooks = Record<string, never>
 export interface components {
   schemas: {
+    ProfileImageUpdateRequest: {
+      imageUrl: string
+    }
+    ApiResponseProfileImageResponse: {
+      success?: boolean
+      data?: components['schemas']['ProfileImageResponse']
+      message?: string
+    }
+    ProfileImageResponse: {
+      /** Format: uuid */
+      userId?: string
+      profileImageUrl?: string
+    }
+    ImageUploadUrlRequest: {
+      fileName: string
+      contentType: string
+      /** Format: int64 */
+      fileSize: number
+    }
+    ApiResponseImageUploadUrlResponse: {
+      success?: boolean
+      data?: components['schemas']['ImageUploadUrlResponse']
+      message?: string
+    }
+    ImageUploadUrlResponse: {
+      /** Format: uuid */
+      imageId?: string
+      uploadUrl?: string
+      imageUrl?: string
+      /** Format: date-time */
+      expiresAt?: string
+    }
     SignupRequest: {
       password: string
       nickname: string
@@ -255,6 +355,9 @@ export interface components {
       email: string
       code: string
     }
+    UserNicknameUpdateRequest: {
+      nickname: string
+    }
     ApiResponseUserMeResponse: {
       success?: boolean
       data?: components['schemas']['UserMeResponse']
@@ -272,6 +375,10 @@ export interface components {
       /** Format: date-time */
       createdAt?: string
     }
+    PasswordChangeRequest: {
+      currentPassword: string
+      newPassword: string
+    }
   }
   responses: never
   parameters: never
@@ -281,6 +388,174 @@ export interface components {
 }
 export type $defs = Record<string, never>
 export interface operations {
+  registerProfileImage: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ProfileImageUpdateRequest']
+      }
+    }
+    responses: {
+      /** @description 등록 성공 */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseProfileImageResponse']
+        }
+      }
+      /** @description INVALID_REQUEST, VALIDATION_FAILED(imageUrl 누락·빈 값, 본인이 발급받은 URL 아님) */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseProfileImageResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED(쿠키 없음, 회원 없음·정지·탈퇴), INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseProfileImageResponse']
+        }
+      }
+      /** @description ACCESS_DENIED(USER 권한 없음, CSRF 토큰 없음·불일치) */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseProfileImageResponse']
+        }
+      }
+      /** @description INTERNAL_SERVER_ERROR */
+      500: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseProfileImageResponse']
+        }
+      }
+    }
+  }
+  removeProfileImage: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description 삭제 성공 */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description AUTHENTICATION_REQUIRED(쿠키 없음, 회원 없음·정지·탈퇴), INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description ACCESS_DENIED(USER 권한 없음, CSRF 토큰 없음·불일치) */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description INTERNAL_SERVER_ERROR */
+      500: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  issueProfileImageUploadUrl: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ImageUploadUrlRequest']
+      }
+    }
+    responses: {
+      /** @description 발급 성공 */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseImageUploadUrlResponse']
+        }
+      }
+      /** @description INVALID_REQUEST, VALIDATION_FAILED(fileName·contentType·fileSize) */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseImageUploadUrlResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED(쿠키 없음, 회원 없음·정지·탈퇴), INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseImageUploadUrlResponse']
+        }
+      }
+      /** @description ACCESS_DENIED(USER 권한 없음, CSRF 토큰 없음·불일치) */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseImageUploadUrlResponse']
+        }
+      }
+      /** @description INTERNAL_SERVER_ERROR */
+      500: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseImageUploadUrlResponse']
+        }
+      }
+      /** @description EXTERNAL_SERVICE_ERROR */
+      502: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseImageUploadUrlResponse']
+        }
+      }
+    }
+  }
   signup: {
     parameters: {
       query?: never
@@ -641,6 +916,125 @@ export interface operations {
         content: {
           '*/*': components['schemas']['ApiResponseUserMeResponse']
         }
+      }
+    }
+  }
+  changeNickname: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UserNicknameUpdateRequest']
+      }
+    }
+    responses: {
+      /** @description 수정 성공, 내 정보 조회와 같은 7개 필드 */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseUserMeResponse']
+        }
+      }
+      /** @description INVALID_REQUEST, VALIDATION_FAILED, INVALID_NICKNAME, NICKNAME_UNCHANGED */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseUserMeResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED(쿠키 없음, 회원 없음·정지·탈퇴), INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseUserMeResponse']
+        }
+      }
+      /** @description ACCESS_DENIED(USER 권한 없음, CSRF 토큰 없음·불일치) */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseUserMeResponse']
+        }
+      }
+      /** @description DUPLICATE_NICKNAME */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseUserMeResponse']
+        }
+      }
+      /** @description INTERNAL_SERVER_ERROR */
+      500: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseUserMeResponse']
+        }
+      }
+    }
+  }
+  changePassword: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PasswordChangeRequest']
+      }
+    }
+    responses: {
+      /** @description 변경 성공 */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description INVALID_REQUEST, VALIDATION_FAILED, INVALID_PASSWORD, PASSWORD_MISMATCH(현재 비밀번호 불일치), PASSWORD_NOT_AVAILABLE(KAKAO·GOOGLE 회원), PASSWORD_UNCHANGED(새 비밀번호가 현재와 같음) */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description AUTHENTICATION_REQUIRED(쿠키 없음, 회원 없음·정지·탈퇴), INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description ACCESS_DENIED(USER 권한 없음, CSRF 토큰 없음·불일치) */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description INTERNAL_SERVER_ERROR */
+      500: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
       }
     }
   }
