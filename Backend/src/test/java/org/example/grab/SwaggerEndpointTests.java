@@ -178,6 +178,10 @@ class SwaggerEndpointTests {
         assertInteger(publicStock.path("optionId"), "int64");
         assertInteger(publicStock.path("availableStock"), "int32");
         assertThat(publicStock.path("soldOut").path("type").asText()).isEqualTo("boolean");
+        // GR-148: 공개 재고 옵션의 세 필드는 항상 채워지므로 필수로 노출해 생성 타입이 선택 필드가 되지 않게 한다
+        List<String> publicStockRequired = new ArrayList<>();
+        schemas.path("PublicDropStockOption").path("required").forEach(name -> publicStockRequired.add(name.asText()));
+        assertThat(publicStockRequired).containsExactlyInAnyOrder("optionId", "availableStock", "soldOut");
 
         JsonNode sellerDetail = schemas.path("SellerDropDetailOption").path("properties");
         assertThat(propertyNames(sellerDetail)).containsExactlyInAnyOrder(
