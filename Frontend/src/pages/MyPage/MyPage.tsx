@@ -123,7 +123,7 @@ export default function MyPage({
         <div className="account-footer">
           <p>
             {user.provider === 'LOCAL'
-              ? 'LOCAL 계정의 비밀번호 변경과 프로필 이미지 관리는 API 연동 시 제공됩니다.'
+              ? '프로필 이미지 관리는 API 연동 시 제공됩니다.'
               : '소셜 계정에는 비밀번호 변경이 제공되지 않습니다.'}
           </p>
           {isAdmin(user) ? (
