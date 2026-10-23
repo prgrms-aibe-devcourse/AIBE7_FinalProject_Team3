@@ -101,7 +101,8 @@ export function sameKeyDifferentBody(data) {
     });
     check(secondRes, {
         '같은 키 다른 본문 → 409': (r) => r.status === 409,
-        'DUPLICATE_IDEMPOTENCY_KEY': (r) => JSON.parse(r.body).error.code === 'DUPLICATE_IDEMPOTENCY_KEY',
+        'DUPLICATE_IDEMPOTENCY_KEY': (r) =>
+            r.status === 409 && JSON.parse(r.body).error.code === 'DUPLICATE_IDEMPOTENCY_KEY',
     });
 }
 

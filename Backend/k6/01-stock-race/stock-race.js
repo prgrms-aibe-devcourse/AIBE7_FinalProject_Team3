@@ -8,10 +8,15 @@
 // 실행 후 검증: Backend/k6/01-stock-race/verify.sql (옵션 재고 음수 여부, 총 판매량 <= 초기재고)
 import http from 'k6/http';
 import { check } from 'k6';
+import { Counter } from 'k6/metrics';
 import { BASE_URL, login, primeCookies, authHeaders } from '../common/lib/auth.js';
 import { uuidv4 } from '../common/lib/util.js';
 
 const VUS = Number(__ENV.VUS || 20);
+// seed.sql의 total_quantity와 맞춘다. 재고보다 적게 성공하면(0건 등) 재고 로직이 아예
+// 안 먹힌 경우라서, 개별 체크만으로는 못 잡고 이 threshold로 잡는다.
+const EXPECTED_STOCK = Number(__ENV.EXPECTED_STOCK || 5);
+const successCount = new Counter('stock_race_success_total');
 
 export const options = {
     scenarios: {
@@ -21,6 +26,9 @@ export const options = {
             iterations: 1,
             maxDuration: '30s',
         },
+    },
+    thresholds: {
+        stock_race_success_total: [`count==${Math.min(VUS, EXPECTED_STOCK)}`],
     },
 };
 
@@ -59,6 +67,9 @@ export default function (data) {
             return JSON.parse(r.body).error.code === 'INSUFFICIENT_STOCK';
         },
     });
+    if (res.status === 201) {
+        successCount.add(1);
+    }
 }
 
 export function teardown() {

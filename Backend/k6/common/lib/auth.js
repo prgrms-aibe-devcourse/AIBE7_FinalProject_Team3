@@ -9,7 +9,14 @@ export const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
 export function login(email, password) {
     const csrfRes = http.get(`${BASE_URL}/api/v1/auth/csrf`);
     check(csrfRes, { 'csrf 발급 204': (r) => r.status === 204 });
-    const xsrfToken = csrfRes.cookies['XSRF-TOKEN'][0].value;
+    if (csrfRes.status !== 204) {
+        throw new Error(`CSRF 발급 실패: status=${csrfRes.status} body=${csrfRes.body}`);
+    }
+    const xsrfCookie = csrfRes.cookies['XSRF-TOKEN'];
+    if (!xsrfCookie || !xsrfCookie[0]) {
+        throw new Error('CSRF 응답에 XSRF-TOKEN 쿠키가 없습니다.');
+    }
+    const xsrfToken = xsrfCookie[0].value;
 
     // 서버는 XSRF-TOKEN 쿠키에 Secure 속성을 강제로 붙인다(SecurityConfig.csrfTokenRepository).
     // k6의 쿠키 저장소는 Secure 쿠키를 http:// 요청엔 자동으로 다시 실어 보내지 않으므로,
@@ -22,9 +29,16 @@ export function login(email, password) {
         { headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': xsrfToken } }
     );
     check(loginRes, { '로그인 200': (r) => r.status === 200 });
+    if (loginRes.status !== 200) {
+        throw new Error(`로그인 실패: status=${loginRes.status} body=${loginRes.body}`);
+    }
+    const accessTokenCookie = loginRes.cookies['access_token'];
+    if (!accessTokenCookie || !accessTokenCookie[0]) {
+        throw new Error('로그인 응답에 access_token 쿠키가 없습니다.');
+    }
 
     return {
-        accessToken: loginRes.cookies['access_token'][0].value,
+        accessToken: accessTokenCookie[0].value,
         xsrfToken,
     };
 }

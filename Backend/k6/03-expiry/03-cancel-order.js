@@ -28,8 +28,16 @@ export default function (data) {
         { headers: authHeaders(data.session, { 'Idempotency-Key': uuidv4() }) }
     );
 
-    // 취소가 이기면 200, 배치가 먼저 만료시켰으면 409(ORDER_NOT_CANCELABLE 등) — 둘 다 정상 결과다.
-    check(res, { '200(취소 성공) 또는 409(이미 배치가 처리함)': (r) => r.status === 200 || r.status === 409 });
+    // 취소가 이기면 200, 배치가 먼저 만료시켰으면 cancelable()이 false가 돼 409 ORDER_NOT_CANCELABLE이
+    // 난다(OrderCancelTransactionService.prepare). 매번 새 Idempotency-Key를 쓰므로 그 외의
+    // 409(DUPLICATE_IDEMPOTENCY_KEY, ORDER_STATUS_CONFLICT)는 이 시나리오에서 나오면 안 된다.
+    check(res, {
+        '200(취소 성공) 또는 409(이미 배치가 처리함)': (r) => {
+            if (r.status === 200) return true;
+            if (r.status !== 409) return false;
+            return JSON.parse(r.body).error.code === 'ORDER_NOT_CANCELABLE';
+        },
+    });
 }
 
 export function teardown() {
