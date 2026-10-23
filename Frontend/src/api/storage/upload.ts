@@ -18,7 +18,7 @@ export type SignedImageUpload = {
   expiresAt: string
 }
 
-// Storage 응답은 공통 오류 형식이 아니라 상태 코드만 남긴다. 화면은 네트워크 오류와 구분해 문구를 고른다.
+// Storage 응답은 공통 오류 형식이 아니라 상태 코드만 남긴다(연결 실패는 0). 화면은 API 오류와 구분해 문구를 고른다.
 export class StorageUploadError extends Error {
   readonly status: number
 
@@ -62,6 +62,10 @@ export async function putToSignedUrl(
     credentials: 'omit',
     referrerPolicy: 'no-referrer',
     signal,
+  }).catch((error: unknown) => {
+    // fetch의 연결 실패는 TypeError다. 취소(AbortError)는 그대로 던져 호출부가 무시할 수 있게 한다.
+    if (error instanceof TypeError) throw new StorageUploadError(0)
+    throw error
   })
   if (!response.ok) throw new StorageUploadError(response.status)
 }

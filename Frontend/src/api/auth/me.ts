@@ -49,7 +49,7 @@ export async function requestProfileImageUploadUrl(
   signal?: AbortSignal,
 ) {
   const { data } = await api.post<ProfileImageUploadUrlResponse>(
-    '/users/me/profile-image/`upload`-url',
+    '/users/me/profile-image/upload-url',
     input,
     { signal },
   )
