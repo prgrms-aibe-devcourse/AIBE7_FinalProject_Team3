@@ -10,7 +10,8 @@ Backend/k6/
 ├── 01-stock-race/           # 시나리오마다 자기 전용 DROP/옵션(seed.sql)과 검증(verify.sql)을 둔다
 ├── 02-idempotency/
 ├── 03-expiry/
-└── 04-drop-open-spike/
+├── 04-drop-open-spike/
+└── 05-steady-read/
 ```
 
 ## 0. 사전 준비
@@ -72,3 +73,17 @@ seed.sql 실행 직후 바로 k6를 돌려야 한다(DROP 상태가 WISH, `sale_
 레이트리밋이 없으므로 유입 제한 없이 그대로 받았을 때 서버가 버티는지(응답 불가·
 재시작 여부는 `docker stats`/`docker compose logs backend`로 확인), 재고 정합성이
 깨지지 않는지를 본다.
+
+## 5. 평상시 조회 (05-steady-read)
+
+```
+docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/05-steady-read/seed.sql
+k6 run Backend/k6/05-steady-read/steady-read.js
+docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/05-steady-read/verify.sql
+```
+DROP_ID/OPTION_ID를 넘길 필요 없다 — k6가 `keyword`로 seed.sql이 만든 더미 DROP
+풀을 직접 조회한다. 인기 드롭 1개를 반복 상세조회(`hot_read`)하는 트래픽과, 매번
+다른 드롭을 조회(`random_read`)하는 트래픽을 동시에 steady-state로 유지한다.
+조회 캐시(Redis)는 아직 없어서(TECHSTACK.md 87절) 이 결과는 캐시 없이 DB가
+평상시 조회를 얼마나 버티는지의 하한선이며, DB 커넥션(HikariCP) 사용량은
+GR-159 Grafana 대시보드로 함께 본다.
