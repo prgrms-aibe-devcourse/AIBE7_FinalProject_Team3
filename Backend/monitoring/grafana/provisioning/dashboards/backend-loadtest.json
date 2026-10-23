@@ -78,10 +78,25 @@
       ]
     },
     {
+      "id": 6,
+      "title": "URI별 요청 처리량 (CPU/메모리 스파이크 시점에 어떤 API인지 확인용)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus-ds" },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-ds" },
+          "expr": "sum(rate(http_server_requests_seconds_count{job=\"backend\"}[1m])) by (uri, method)",
+          "legendFormat": "{{method}} {{uri}}"
+        }
+      ]
+    },
+    {
       "id": 5,
       "title": "HikariCP 커넥션 풀",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
       "datasource": { "type": "prometheus", "uid": "prometheus-ds" },
       "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
       "targets": [
