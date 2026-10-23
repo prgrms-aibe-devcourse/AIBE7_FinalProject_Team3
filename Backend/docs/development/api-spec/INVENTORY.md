@@ -20,6 +20,7 @@ GET /api/v1/drops/{dropId}/stocks
 - **정책**: 공개 상세와 동일하게 `isPublic()` 기준을 적용한다. DRAFT는 `DROP_NOT_FOUND`(404)이며 WISH·GRAB·ENDED·CANCELED는 200이다. CANCELED여도 가용 재고를 0으로 바꾸지 않는다.
 - 활성 SKU만 반환하고 SKU `sortOrder` 순서로 정렬한다. 반환할 SKU가 없으면 `options: []`다.
 - `soldOut = availableStock == 0`이며, 재고 여부만 나타낸다. 판매 기간 종료나 CANCELED를 이유로 품절 처리하지 않는다.
+- `options`의 각 항목은 `optionId`·`availableStock`·`soldOut`을 항상 포함하며 null이 아니다. OpenAPI 스키마(`PublicDropStockOption`)에서도 세 필드를 필수(`required`)로 표시한다.
 - 응답 이후 주문으로 재고가 바뀔 수 있으며, 실제 주문 가능 여부는 주문 API가 서버의 최신 재고로 다시 판단한다.
 
 **응답:**
