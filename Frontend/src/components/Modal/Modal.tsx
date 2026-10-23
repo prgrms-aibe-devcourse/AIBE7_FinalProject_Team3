@@ -22,8 +22,12 @@ export default function Modal({ open, title, onClose, children }: Props) {
         ? document.activeElement
         : null
     dialog.showModal()
-    // 기본으로는 첫 버튼(닫기)에 포커스가 가므로 입력이 있으면 첫 입력으로 옮긴다
-    dialog.querySelector<HTMLElement>('input, select, textarea')?.focus()
+    // 기본으로는 첫 버튼(닫기)에 포커스가 가므로 data-autofocus 요소, 없으면 첫 입력으로 옮긴다.
+    // 숨긴 파일 입력처럼 첫 입력이 포커스를 받을 수 없을 때 data-autofocus로 대상을 정한다(GR-132).
+    const target =
+      dialog.querySelector<HTMLElement>('[data-autofocus]') ??
+      dialog.querySelector<HTMLElement>('input, select, textarea')
+    target?.focus()
     return () => {
       if (dialog.open) dialog.close()
       opener?.focus()

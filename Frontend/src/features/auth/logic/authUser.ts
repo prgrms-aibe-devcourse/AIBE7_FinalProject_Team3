@@ -6,7 +6,7 @@ export type AuthRole = 'USER' | 'SELLER' | 'ADMIN'
 export type AuthStatus = 'loading' | 'authenticated' | 'anonymous'
 
 // API는 profileImageUrl을 null로 줄 수 있는데 명세 타입은 string이라 느슨하게 받는다.
-type AuthUserSource = Omit<UserMe, 'profileImageUrl'> & {
+export type AuthUserSource = Omit<UserMe, 'profileImageUrl'> & {
   profileImageUrl?: string | null
 }
 

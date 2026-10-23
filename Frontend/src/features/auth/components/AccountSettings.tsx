@@ -4,10 +4,12 @@ import Modal from '../../../components/Modal/Modal'
 import { isAdmin, isSeller, type AuthUser } from '../logic/authUser'
 import NicknameForm from './NicknameForm'
 import PasswordChangeForm from './PasswordChangeForm'
+import ProfileImageForm from './ProfileImageForm'
 
-type EditableRow = 'nickname' | 'password'
+type EditableRow = 'profileImage' | 'nickname' | 'password'
 
 const MODAL_TITLES: Record<EditableRow, string> = {
+  profileImage: '프로필 이미지 변경',
   nickname: '닉네임 변경',
   password: '비밀번호 변경',
 }
@@ -55,7 +57,8 @@ export default function AccountSettings({
         aria-labelledby="settings-profile"
       >
         <h3 id="settings-profile">프로필 이미지</h3>
-        <p>프로필 이미지 관리는 API 연동 시 제공됩니다.</p>
+        <p>JPG, PNG, WebP · 5MB 이하</p>
+        {editButton('profileImage')}
       </div>
       <div
         className="settings-row"
@@ -134,6 +137,14 @@ export default function AccountSettings({
         title={openRow ? MODAL_TITLES[openRow] : ''}
         onClose={close}
       >
+        {openRow === 'profileImage' && (
+          <ProfileImageForm
+            user={user}
+            notify={notify}
+            onSuccess={close}
+            onCancel={close}
+          />
+        )}
         {openRow === 'nickname' && (
           <NicknameForm
             user={user}
