@@ -56,7 +56,7 @@ export default function Header({
         {!sellerMode &&
           (authenticated && account ? (
             <Link className="account-avatar" to="/my" aria-label="마이페이지">
-              <Avatar src={account.imageUrl} name={account.name} size={40} />
+              <Avatar src={account.imageUrl} name={account.name} size={36} />
             </Link>
           ) : (
             <Link className="account-button" to="/login">

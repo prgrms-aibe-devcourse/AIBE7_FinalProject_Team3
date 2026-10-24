@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Route, Routes, useNavigate } from 'react-router-dom'
 import Footer from './components/Footer/Footer'
 import Header from './components/Header/Header'
@@ -30,9 +30,14 @@ export default function App() {
   const navigate = useNavigate()
   const [toast, setToast] = useState('')
 
+  const toastTimer = useRef<number | undefined>(undefined)
+
+  // 새 안내는 이전 안내의 타이머를 지워 제 시간(2.6초)만큼 보이게 한다.
+  // 이전 타이머가 남아 있으면 로그인 직후의 안내가 곧바로 지워진다(GR-132).
   const notify = (message: string) => {
     setToast(message)
-    window.setTimeout(() => setToast(''), 2600)
+    window.clearTimeout(toastTimer.current)
+    toastTimer.current = window.setTimeout(() => setToast(''), 2600)
   }
   const { user, status, authenticated, login, refresh, logout } = useAuth()
   const { wishes, wishesReady, toggleWish } = useWish(authenticated, notify)
