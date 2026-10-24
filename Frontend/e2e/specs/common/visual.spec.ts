@@ -1,5 +1,6 @@
 import {
   expect,
+  goToMyPage,
   loginAdmin,
   loginSeller,
   test,
@@ -82,7 +83,7 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
     await page.getByLabel('이메일').fill('grab@example.com')
     await page.getByLabel('비밀번호').fill('password1234')
     await page.getByRole('button', { name: '로그인', exact: true }).click()
-    await page.getByRole('link', { name: 'MY', exact: true }).click()
+    await goToMyPage(page)
     // WISH 패널도 로딩 상태를 role=status로 두므로 토스트만 확인하고, 목록 로딩이 끝난 뒤 촬영한다.
     await settleToast(page)
     await expect(page.getByText('매일을 담는 캔버스 토트')).toBeVisible()

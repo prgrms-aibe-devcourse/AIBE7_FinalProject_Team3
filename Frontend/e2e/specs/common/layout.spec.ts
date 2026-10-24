@@ -1,6 +1,7 @@
 import {
   expect,
   getAuth,
+  goToMyPage,
   login,
   loginSeller,
   test,
@@ -8,6 +9,11 @@ import {
 } from '../../fixtures'
 import type { Locator } from '@playwright/test'
 import { BUYER_ORDER_IDS } from '../../mock/api/buyerOrders'
+
+// tsconfig에 Node 타입이 없어 필요한 Buffer 메서드만 선언한다(seller-drop-form.spec.ts와 같음)
+declare const Buffer: {
+  from(value: string, encoding: string): Uint8Array
+}
 
 // 페이지 전체에 가로 스크롤이 생기지 않는다. 표처럼 의도적으로 안쪽에서 스크롤하는 영역은 해당하지 않는다.
 async function expectNoHorizontalOverflow(page: Page) {
@@ -148,7 +154,7 @@ for (const { name, path, actions } of pages) {
 
 test('MY: 가로 넘침 없이 핵심 버튼에 닿는다', async ({ page }) => {
   await login(page)
-  await page.getByRole('link', { name: 'MY', exact: true }).click()
+  await goToMyPage(page)
   await expectReachable(page, page.getByRole('button', { name: '취소' }))
   await expectNoHorizontalOverflow(page)
 })
@@ -161,7 +167,7 @@ test('MY 계정 설정: 모달에 오류를 표시해도 가로 넘침 없이 �
     code: 'DUPLICATE_NICKNAME',
   })
   await login(page)
-  await page.getByRole('link', { name: 'MY', exact: true }).click()
+  await goToMyPage(page)
 
   await page
     .getByRole('group', { name: '닉네임' })
@@ -200,6 +206,58 @@ test('MY 계정 설정: 모달에 오류를 표시해도 가로 넘침 없이 �
     password.getByRole('button', { name: '닫기' }),
     page.getByLabel('새 비밀번호 확인', { exact: true }),
     password.getByRole('button', { name: '비밀번호 변경', exact: true }),
+  ]) {
+    await expectReachable(page, action)
+  }
+  await expectNoHorizontalOverflow(page)
+})
+
+test('MY 프로필 이미지: 미리보기·오류를 표시해도 가로 넘침 없이 모든 버튼에 닿는다', async ({
+  page,
+}) => {
+  const auth = getAuth(page)
+  auth.state.profileImageUrl = 'https://storage.grab.test/images/profile/a.png'
+  auth.failAccount('profileImageUploadUrl', {
+    status: 502,
+    code: 'EXTERNAL_SERVICE_ERROR',
+  })
+  await login(page)
+  // 헤더 계정 메뉴를 펼쳐도 가로 넘침 없이 두 항목에 닿는다
+  await page
+    .locator('.site-header')
+    .getByRole('button', { name: '계정 메뉴' })
+    .click()
+  for (const action of [
+    page.locator('.site-header').getByRole('link', { name: '마이페이지' }),
+    page.locator('.site-header').getByRole('button', { name: '로그아웃' }),
+  ]) {
+    await expectReachable(page, action)
+  }
+  await expectNoHorizontalOverflow(page)
+  await page
+    .locator('.site-header')
+    .getByRole('link', { name: '마이페이지' })
+    .click()
+
+  await page
+    .getByRole('group', { name: '프로필 이미지' })
+    .getByRole('button', { name: '변경' })
+    .click()
+  const dialog = page.getByRole('dialog', { name: '프로필 이미지 변경' })
+  await dialog.locator('input[type="file"]').setInputFiles({
+    // 파일명이 길어도 화면에 쓰지 않으므로 배치가 바뀌지 않는다
+    name: `${'긴파일명'.repeat(40)}.png`,
+    mimeType: 'image/png',
+    buffer: Buffer.from('image', 'utf8'),
+  })
+  await dialog.getByRole('button', { name: '저장', exact: true }).click()
+  await expect(dialog.getByRole('alert')).toBeVisible()
+  for (const action of [
+    dialog.getByRole('button', { name: '닫기' }),
+    dialog.getByRole('button', { name: '이미지 선택' }),
+    dialog.getByRole('button', { name: '삭제' }),
+    dialog.getByRole('button', { name: '취소' }),
+    dialog.getByRole('button', { name: '저장', exact: true }),
   ]) {
     await expectReachable(page, action)
   }

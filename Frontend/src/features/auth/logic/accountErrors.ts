@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { StorageUploadError } from '../../../api/storage/upload'
 import { apiErrorCode } from './authUser'
 import { DUPLICATE_NICKNAME_MESSAGE, fallbackMessage } from './signupErrors'
 import {
@@ -106,4 +107,59 @@ export function passwordChangeFailure(error: unknown): PasswordChangeFailure {
       return { kind: 'general', message: PASSWORD_NOT_AVAILABLE_MESSAGE }
   }
   return { kind: 'general', message: fallbackMessage(error) }
+}
+
+// 프로필 이미지 등록·삭제(IMAGE_UPLOAD 1.2, MEMBER_AUTH 1.12·1.13, GR-132 M00-05).
+// 입력이 파일 선택 하나라 필드별로 나누지 않고 모달 안 한 곳에 문구 하나를 표시한다.
+
+export const PROFILE_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+export const PROFILE_IMAGE_MAX_SIZE = 5 * 1024 * 1024
+const PROFILE_IMAGE_NAME_MAX_LENGTH = 255
+
+export const PROFILE_IMAGE_TYPE_MESSAGE =
+  'JPG, PNG, WebP 이미지만 올릴 수 있어요.'
+export const PROFILE_IMAGE_SIZE_MESSAGE = '5MB 이하의 이미지를 올려주세요.'
+export const PROFILE_IMAGE_NAME_MESSAGE = '파일명은 255자 이하로 지정해주세요.'
+export const PROFILE_IMAGE_UPLOAD_FAILED_MESSAGE =
+  '이미지를 올리지 못했어요. 잠시 뒤 다시 시도해주세요.'
+export const PROFILE_IMAGE_REGISTER_FAILED_MESSAGE =
+  '이미지를 등록하지 못했어요. 다시 시도해주세요.'
+
+// 발급 요청의 검증 필드 → 사전 검증과 같은 문구. 화면 사전 검증 순서(형식 → 크기 → 파일명)를 따른다.
+const UPLOAD_FIELD_MESSAGES: [string, string][] = [
+  ['contentType', PROFILE_IMAGE_TYPE_MESSAGE],
+  ['fileSize', PROFILE_IMAGE_SIZE_MESSAGE],
+  ['fileName', PROFILE_IMAGE_NAME_MESSAGE],
+]
+
+// 파일을 고를 때 검사한다. 위반이면 문구를 돌려주고 미리보기·요청을 하지 않는다. 통과하면 빈 문자열.
+export function profileImageError(file: File): string {
+  if (!PROFILE_IMAGE_TYPES.includes(file.type))
+    return PROFILE_IMAGE_TYPE_MESSAGE
+  if (file.size === 0 || file.size > PROFILE_IMAGE_MAX_SIZE)
+    return PROFILE_IMAGE_SIZE_MESSAGE
+  if (file.name.length > PROFILE_IMAGE_NAME_MAX_LENGTH)
+    return PROFILE_IMAGE_NAME_MESSAGE
+  return ''
+}
+
+// 발급·Storage 업로드·등록·삭제 실패 → 문구. 같은 VALIDATION_FAILED라도 field로 단계를 가른다.
+export function profileImageFailure(error: unknown): string {
+  if (error instanceof StorageUploadError)
+    return PROFILE_IMAGE_UPLOAD_FAILED_MESSAGE
+  switch (apiErrorCode(error)) {
+    case 'EXTERNAL_SERVICE_ERROR':
+      return PROFILE_IMAGE_UPLOAD_FAILED_MESSAGE
+    case 'VALIDATION_FAILED': {
+      const fields = responseFields(error)
+      if (fields.includes('imageUrl'))
+        return PROFILE_IMAGE_REGISTER_FAILED_MESSAGE
+      const matched = UPLOAD_FIELD_MESSAGES.find(([field]) =>
+        fields.includes(field),
+      )
+      if (matched) return matched[1]
+      break
+    }
+  }
+  return fallbackMessage(error)
 }

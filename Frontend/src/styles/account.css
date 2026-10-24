@@ -178,6 +178,23 @@
   font-size: 12px;
   font-weight: 700;
 }
+/* 프로필 이미지 모달(GR-132): 현재 이미지·미리보기 옆에 선택·삭제 버튼, 좁으면 버튼이 아래로 내려간다 */
+.profile-image-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px 20px;
+}
+.profile-image-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.profile-image-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
 /* 비밀번호 보기 버튼은 입력 안쪽 오른쪽에 겹쳐 두고 그만큼 입력 오른쪽 여백을 둔다 */
 .password-input {
   position: relative;

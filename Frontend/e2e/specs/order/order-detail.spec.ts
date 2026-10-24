@@ -1,4 +1,4 @@
-import { expect, login, test, type Page } from '../../fixtures'
+import { expect, goToMyPage, login, test, type Page } from '../../fixtures'
 import { BUYER_ORDER_IDS } from '../../mock/api/buyerOrders'
 
 async function openOrder(page: Page, id: string) {
@@ -14,7 +14,7 @@ const status = (page: Page) => page.locator('.buyer-status')
 
 test('내 주문 목록에서 주문 상세로 이동한다', async ({ page }) => {
   await login(page)
-  await page.getByRole('link', { name: 'MY', exact: true }).click()
+  await goToMyPage(page)
   const orders = page.locator('.compact-item.order')
   await expect(orders).toHaveCount(8)
   await expect(orders.nth(2).locator('.order-status')).toHaveText('결제 완료')

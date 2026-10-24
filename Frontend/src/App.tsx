@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Route, Routes, useNavigate } from 'react-router-dom'
 import Footer from './components/Footer/Footer'
 import Header from './components/Header/Header'
@@ -30,12 +30,28 @@ export default function App() {
   const navigate = useNavigate()
   const [toast, setToast] = useState('')
 
+  const toastTimer = useRef<number | undefined>(undefined)
+
+  // 새 안내는 이전 안내의 타이머를 지워 제 시간(2.6초)만큼 보이게 한다.
+  // 이전 타이머가 남아 있으면 로그인 직후의 안내가 곧바로 지워진다(GR-132).
   const notify = (message: string) => {
     setToast(message)
-    window.setTimeout(() => setToast(''), 2600)
+    window.clearTimeout(toastTimer.current)
+    toastTimer.current = window.setTimeout(() => setToast(''), 2600)
   }
   const { user, status, authenticated, login, refresh, logout } = useAuth()
   const { wishes, wishesReady, toggleWish } = useWish(authenticated, notify)
+
+  // 헤더 계정 메뉴의 로그아웃(GR-132). 마이페이지 로그아웃과 같이 성공하면 WISH로 이동하고,
+  // 실패하면 로그인 상태를 유지한 채 안내한다.
+  const logoutFromHeader = async () => {
+    try {
+      await logout()
+      navigate('/wish')
+    } catch {
+      notify('로그아웃하지 못했어요. 잠시 뒤 다시 시도해주세요.')
+    }
+  }
 
   const shared: SharedProps = {
     authenticated,
@@ -48,7 +64,19 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Header authenticated={authenticated} seller={isSeller(user)} />
+      <Header
+        authenticated={authenticated}
+        seller={isSeller(user)}
+        account={
+          user
+            ? {
+                imageUrl: user.profileImageUrl,
+                name: user.nickname,
+                onLogout: logoutFromHeader,
+              }
+            : null
+        }
+      />
       <main>
         <Routes>
           <Route path="/" element={<HomePage {...shared} />} />

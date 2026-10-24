@@ -1,5 +1,6 @@
 import { AxiosError, type AxiosResponse } from 'axios'
 import { describe, expect, it } from 'vitest'
+import { StorageUploadError } from '../../../api/storage/upload'
 import {
   CURRENT_PASSWORD_REQUIRED_MESSAGE,
   NEW_PASSWORD_REQUIRED_MESSAGE,
@@ -8,6 +9,14 @@ import {
   PASSWORD_MISMATCH_MESSAGE,
   PASSWORD_UNCHANGED_MESSAGE,
   passwordChangeFailure,
+  PROFILE_IMAGE_MAX_SIZE,
+  PROFILE_IMAGE_NAME_MESSAGE,
+  PROFILE_IMAGE_REGISTER_FAILED_MESSAGE,
+  PROFILE_IMAGE_SIZE_MESSAGE,
+  PROFILE_IMAGE_TYPE_MESSAGE,
+  PROFILE_IMAGE_UPLOAD_FAILED_MESSAGE,
+  profileImageError,
+  profileImageFailure,
 } from '../logic/accountErrors'
 import { DUPLICATE_NICKNAME_MESSAGE } from '../logic/signupErrors'
 import {
@@ -131,5 +140,108 @@ describe('passwordChangeFailure', () => {
       kind: 'general',
       message: GENERAL,
     })
+  })
+})
+
+describe('profileImageError', () => {
+  const file = (size: number, type = 'image/png', name = 'profile.png') =>
+    new File([new Uint8Array(size)], name, { type })
+
+  it.each(['image/jpeg', 'image/png', 'image/webp'])(
+    '%s는 5MB까지 통과한다',
+    (type) => {
+      expect(profileImageError(file(PROFILE_IMAGE_MAX_SIZE, type))).toBe('')
+    },
+  )
+
+  it.each(['image/gif', 'image/svg+xml', ''])(
+    '허용하지 않는 형식(%s)을 막는다',
+    (type) => {
+      expect(profileImageError(file(1, type))).toBe(PROFILE_IMAGE_TYPE_MESSAGE)
+    },
+  )
+
+  it('0바이트와 5MB 초과를 막는다', () => {
+    expect(profileImageError(file(0))).toBe(PROFILE_IMAGE_SIZE_MESSAGE)
+    expect(profileImageError(file(PROFILE_IMAGE_MAX_SIZE + 1))).toBe(
+      PROFILE_IMAGE_SIZE_MESSAGE,
+    )
+  })
+
+  it('파일명은 255자까지 통과하고 256자부터 막는다', () => {
+    const name = (length: number) => `${'a'.repeat(length - 4)}.png`
+    expect(profileImageError(file(1, 'image/png', name(255)))).toBe('')
+    expect(profileImageError(file(1, 'image/png', name(256)))).toBe(
+      PROFILE_IMAGE_NAME_MESSAGE,
+    )
+  })
+
+  it('여러 규칙을 어기면 형식 → 크기 → 파일명 순서로 하나만 안내한다', () => {
+    expect(profileImageError(file(0, 'image/gif', 'a'.repeat(300)))).toBe(
+      PROFILE_IMAGE_TYPE_MESSAGE,
+    )
+    expect(profileImageError(file(0, 'image/png', 'a'.repeat(300)))).toBe(
+      PROFILE_IMAGE_SIZE_MESSAGE,
+    )
+  })
+})
+
+describe('profileImageFailure', () => {
+  it('Storage 업로드 실패(연결 실패 포함)와 발급의 Storage 연동 실패는 업로드 실패 문구다', () => {
+    expect(profileImageFailure(new StorageUploadError(403))).toBe(
+      PROFILE_IMAGE_UPLOAD_FAILED_MESSAGE,
+    )
+    expect(profileImageFailure(new StorageUploadError(0))).toBe(
+      PROFILE_IMAGE_UPLOAD_FAILED_MESSAGE,
+    )
+    expect(profileImageFailure(apiError(502, 'EXTERNAL_SERVICE_ERROR'))).toBe(
+      PROFILE_IMAGE_UPLOAD_FAILED_MESSAGE,
+    )
+  })
+
+  it.each([
+    ['contentType', PROFILE_IMAGE_TYPE_MESSAGE],
+    ['fileSize', PROFILE_IMAGE_SIZE_MESSAGE],
+    ['fileName', PROFILE_IMAGE_NAME_MESSAGE],
+  ])('발급 검증 실패(%s)는 사전 검증과 같은 문구다', (field, message) => {
+    expect(
+      profileImageFailure(
+        apiError(400, 'VALIDATION_FAILED', [{ field, reason: '위반' }]),
+      ),
+    ).toBe(message)
+  })
+
+  it('발급 검증 필드가 여럿이면 형식 → 크기 → 파일명 순서로 고른다', () => {
+    expect(
+      profileImageFailure(
+        apiError(400, 'VALIDATION_FAILED', [
+          { field: 'fileName', reason: '위반' },
+          { field: 'fileSize', reason: '위반' },
+        ]),
+      ),
+    ).toBe(PROFILE_IMAGE_SIZE_MESSAGE)
+  })
+
+  it('등록 검증 실패(imageUrl)는 등록 실패 문구다', () => {
+    expect(
+      profileImageFailure(
+        apiError(400, 'VALIDATION_FAILED', [
+          { field: 'imageUrl', reason: '형식' },
+        ]),
+      ),
+    ).toBe(PROFILE_IMAGE_REGISTER_FAILED_MESSAGE)
+  })
+
+  it('필드를 알 수 없는 검증 실패·네트워크·5xx·권한·형식 오류는 공통 문구다', () => {
+    expect(profileImageFailure(apiError(400, 'VALIDATION_FAILED'))).toBe(
+      GENERAL,
+    )
+    expect(profileImageFailure(apiError(400, 'INVALID_REQUEST'))).toBe(GENERAL)
+    expect(profileImageFailure(networkError())).toBe(NETWORK)
+    expect(profileImageFailure(apiError(500, 'INTERNAL_SERVER_ERROR'))).toBe(
+      NETWORK,
+    )
+    expect(profileImageFailure(apiError(403, 'ACCESS_DENIED'))).toBe(GENERAL)
+    expect(profileImageFailure(new Error('응답 형식'))).toBe(GENERAL)
   })
 })

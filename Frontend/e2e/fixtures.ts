@@ -64,3 +64,15 @@ export async function loginAdmin(page: Page) {
 }
 
 export const toast = (page: Page) => page.locator('.toast')
+
+// 로그인 상태 헤더의 프로필 이미지 버튼. 누르면 마이페이지·로그아웃 메뉴가 펼쳐진다(GR-132).
+export const accountMenuButton = (page: Page) =>
+  page.locator('.site-header').getByRole('button', { name: '계정 메뉴' })
+
+export async function goToMyPage(page: Page) {
+  await accountMenuButton(page).click()
+  await page
+    .locator('.site-header')
+    .getByRole('link', { name: '마이페이지', exact: true })
+    .click()
+}

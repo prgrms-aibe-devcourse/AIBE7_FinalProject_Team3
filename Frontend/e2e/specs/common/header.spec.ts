@@ -1,4 +1,12 @@
-import { expect, getAuth, login, loginSeller, test } from '../../fixtures'
+import {
+  accountMenuButton,
+  expect,
+  getAuth,
+  goToMyPage,
+  login,
+  loginSeller,
+  test,
+} from '../../fixtures'
 
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/v1/seller-applications/me', (route) =>
@@ -22,7 +30,7 @@ test('일반 회원은 MY에서 신청하고 신청 상태로 판매자 메뉴�
     header.getByRole('link', { name: /셀러 전환|SELLER/ }),
   ).toHaveCount(0)
   await login(page)
-  await header.getByRole('link', { name: 'MY', exact: true }).click()
+  await goToMyPage(page)
   await expect(page).toHaveURL(/#\/my$/)
   await page.getByRole('link', { name: '판매자 신청 ↗', exact: true }).click()
   await expect(page).toHaveURL(/seller\/apply/)
@@ -47,9 +55,7 @@ test('일반 회원은 MY에서 신청하고 신청 상태로 판매자 메뉴�
     await expect(
       header.getByRole('link', { name: 'GRAB', exact: true }),
     ).toBeVisible()
-    await expect(
-      header.getByRole('link', { name: 'MY', exact: true }),
-    ).toBeVisible()
+    await expect(accountMenuButton(page)).toBeVisible()
     await expect(
       header.getByRole('link', { name: 'SELLER', exact: true }),
     ).toHaveCount(0)
@@ -84,7 +90,7 @@ test('판매자 링크는 새로고침·권한 재조회·로그아웃·계정 �
     header.getByRole('link', { name: 'WISH', exact: true }),
   ).toBeVisible()
   await expect(seller).toBeVisible()
-  await header.getByRole('link', { name: 'MY', exact: true }).click()
+  await goToMyPage(page)
   await expect(page).toHaveURL(/#\/my$/)
   await page.getByRole('button', { name: '로그아웃', exact: true }).click()
   await expect(seller).toHaveCount(0)

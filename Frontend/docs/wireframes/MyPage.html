@@ -25,6 +25,12 @@
         DROPS · ORDERS · INVENTORY · SALES, SHOP으로 복귀.
       </p>
       <p class="note">
+        헤더 MY(GR-132): 로그인 상태에서는 원형 프로필 이미지 버튼("계정 메뉴",
+        없거나 로드 실패 시 닉네임 첫 글자 + 라임 원). 누르면 아래로 마이페이지
+        · 로그아웃 메뉴가 펼쳐지고 Esc·바깥 클릭·화면 이동으로 닫힌다. 터치 영역
+        44px 이상. 비로그인 "로그인"과 판매자 작업 공간 헤더는 그대로.
+      </p>
+      <p class="note">
         구성(GR-160): 계정 카드 → 주문·WISH(PC 2 : 1) → 계정 설정. 모바일은 계정
         카드 → 주문 → WISH → 계정 설정 한 열. 주요 행동은 검정, 상태 강조는
         라임. <a href="../DESIGN.md">공통 기준</a>
@@ -57,9 +63,10 @@
           </div>
         </div>
         <small>
-          프로필 이미지가 없으면 닉네임 첫 글자를 라임 원에 표시한다. 개수는
-          주문·WISH 목록의 전체 개수(totalElements)만 쓰고, 조회 중·실패 시
-          숫자를 비워 둔다. 긴 이메일은 줄바꿈한다.
+          프로필 이미지가 없거나 불러오지 못하면 닉네임 첫 글자를 라임 원에
+          표시한다. 등록·삭제 후 헤더 아바타와 함께 바뀐다. 개수는 주문·WISH
+          목록의 전체 개수(totalElements)만 쓰고, 조회 중·실패 시 숫자를 비워
+          둔다. 긴 이메일은 줄바꿈한다.
         </small>
       </section>
 
@@ -99,9 +106,8 @@
         <h2>계정 설정</h2>
         <div class="list-row">
           <strong>프로필 이미지</strong
-          ><span class="secondary"
-            >JPG·PNG·WEBP, 5MB 이하 · GR-132 연동 전 안내만</span
-          >
+          ><span class="secondary">JPG, PNG, WebP · 5MB 이하</span
+          ><span class="control">변경</span>
         </div>
         <div class="list-row">
           <strong>닉네임</strong><span class="secondary">드롭헌터</span
@@ -121,8 +127,8 @@
           <strong>로그아웃</strong><span class="control">로그아웃</span>
         </div>
         <small>
-          판매자 행은 승인된 판매자에게 작업 공간, 운영자에게 판매자 신청 심사
-          링크로 바뀐다.
+          프로필 이미지 행은 모든 계정 유형에 둔다. 판매자 행은 승인된
+          판매자에게 작업 공간, 운영자에게 판매자 신청 심사 링크로 바뀐다.
         </small>
       </section>
 
@@ -133,6 +139,36 @@
           바깥·Esc·닫기·취소로 닫고 포커스는 "변경" 버튼으로 돌아간다. 저장 성공
           시 닫고 토스트.
         </p>
+        <section class="panel soft stack" aria-label="프로필 이미지 변경 모달">
+          <div class="row">
+            <h2>프로필 이미지 변경</h2>
+            <span class="control">✕</span>
+          </div>
+          <div class="row">
+            <span class="picture" style="width: 96px; border-radius: 50%"
+              >미리보기</span
+            >
+            <div class="controls">
+              <span class="control">이미지 선택</span
+              ><span class="control">삭제</span>
+            </div>
+          </div>
+          <small>
+            현재 이미지(없으면 기본 표시) → 파일을 고르면 같은 자리에
+            미리보기(요청 없음). 삭제는 등록된 이미지가 있을 때만, 확인 없이
+            바로 삭제. 형식·크기 안내와 실패 문구는 이 아래 한 곳(role="alert"),
+            실패해도 기존 이미지 유지.
+          </small>
+          <div class="controls">
+            <span class="control">취소</span
+            ><span class="control primary">저장</span>
+          </div>
+          <small>
+            저장: 업로드 URL 발급 → Storage 업로드 → 등록. 처리 중에는 이미지
+            선택·삭제·저장을 함께 막는다. 저장 버튼은 검증을 통과한 파일을
+            골랐을 때만 활성.
+          </small>
+        </section>
         <div class="split">
           <section class="panel soft stack" aria-label="닉네임 변경 모달">
             <div class="row">
