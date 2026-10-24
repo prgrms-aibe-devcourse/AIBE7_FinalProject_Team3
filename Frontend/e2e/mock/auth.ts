@@ -29,8 +29,15 @@ const SIGNUP_PATHS: Record<string, SignupStep> = {
   '/api/v1/auth/oauth2/signup': 'social',
 }
 
-// 내 정보 수정(1.10 닉네임, 1.11 비밀번호, GR-131). 오류는 failAccount로 다음 응답부터 차례로 바꾼다.
-export type AccountApi = 'nickname' | 'password'
+// 내 정보 수정(1.10 닉네임, 1.11 비밀번호, GR-131)과 프로필 이미지(IMAGE_UPLOAD 1.2, 1.12·1.13, GR-132).
+// 오류는 failAccount로 다음 응답부터 차례로 바꾼다. 프로필 이미지는 같은 경로에 PUT·DELETE가 있어 메서드까지 본다.
+// Storage 업로드(storage.grab.test/upload/**)는 fixture의 installDropImageUploads가 처리한다.
+export type AccountApi =
+  | 'nickname'
+  | 'password'
+  | 'profileImageUploadUrl'
+  | 'profileImage'
+  | 'profileImageDelete'
 export type AccountRequest = {
   api: AccountApi
   body: unknown
@@ -38,8 +45,22 @@ export type AccountRequest = {
 }
 
 const ACCOUNT_PATHS: Record<string, AccountApi> = {
-  '/api/v1/users/me': 'nickname',
-  '/api/v1/users/me/password': 'password',
+  'PATCH /api/v1/users/me': 'nickname',
+  'PATCH /api/v1/users/me/password': 'password',
+  'POST /api/v1/users/me/profile-image/upload-url': 'profileImageUploadUrl',
+  'PUT /api/v1/users/me/profile-image': 'profileImage',
+  'DELETE /api/v1/users/me/profile-image': 'profileImageDelete',
+}
+
+// 발급마다 새 UUID 경로를 준다(서버와 같음). 표시 이미지는 fixture가 로컬 이미지로 바꾼다.
+const profileImageUpload = (sequence: number) => {
+  const id = `00000000-0000-4000-8000-${String(sequence).padStart(12, '0')}`
+  return {
+    imageId: id,
+    uploadUrl: `https://storage.grab.test/upload/profile/${id}?token=fixture`,
+    imageUrl: `https://storage.grab.test/images/profile/${id}.png`,
+    expiresAt: '2026-10-01T12:00:00+09:00',
+  }
 }
 
 // 소셜 로그인 시작(1.4)은 실제 제공자로 가지 않고 콜백 결과 주소로 바로 302한다(GR-47 M00-05).
@@ -54,6 +75,9 @@ export type AuthState = {
   provider: AuthProvider
   nickname: string
   email: string
+  // 등록(1.12)·삭제(1.13)가 바꾸고 users/me가 돌려주는 값. 새로고침 유지 확인에 쓴다.
+  profileImageUrl: string | null
+  profileImageUploads: number
   // LOCAL 로그인·비밀번호 변경(1.11)이 비교하는 현재 비밀번호
   password: string
   // 다음 보호 API 요청을 한 번 401로 만든다. 재발급 후 재시도 성공 시나리오에 쓴다.
@@ -108,7 +132,7 @@ const userBody = (state: AuthState) => ({
     nickname: state.nickname,
     provider: state.provider,
     roles: state.roles,
-    profileImageUrl: null,
+    profileImageUrl: state.profileImageUrl,
     createdAt: '2026-10-15T00:00:00Z',
   },
   message: null,
@@ -124,6 +148,8 @@ export function installAuthApi(
     provider: 'LOCAL',
     nickname: '드롭헌터',
     email: DEMO_EMAIL,
+    profileImageUrl: null,
+    profileImageUploads: 0,
     password: DEMO_PASSWORD,
     accessExpired: false,
     invalidSession: false,
@@ -132,7 +158,13 @@ export function installAuthApi(
     refreshCount: 0,
     signupReplies: { request: [], confirm: [], signup: [], social: [] },
     signupRequests: [],
-    accountReplies: { nickname: [], password: [] },
+    accountReplies: {
+      nickname: [],
+      password: [],
+      profileImageUploadUrl: [],
+      profileImage: [],
+      profileImageDelete: [],
+    },
     accountRequests: [],
     socialCallbackQuery: 'result=success',
     socialStarts: [],
@@ -337,16 +369,18 @@ export function installAuthApi(
       return
     }
 
-    const accountApi = ACCOUNT_PATHS[path]
-    if (accountApi && method === 'PATCH') {
+    const accountApi = ACCOUNT_PATHS[`${method} ${path}`]
+    if (accountApi) {
       if (!state.loggedIn || state.invalidSession) {
         await unauthorized(route, 'AUTHENTICATION_REQUIRED')
         return
       }
-      const body = route.request().postDataJSON() as {
+      // DELETE는 본문이 없어 null이다
+      const body = (route.request().postDataJSON() ?? {}) as {
         nickname?: string
         currentPassword?: string
         newPassword?: string
+        imageUrl?: string
       }
       state.accountRequests.push({
         api: accountApi,
@@ -380,6 +414,33 @@ export function installAuthApi(
         // 서버처럼 앞뒤 공백을 제거해 저장하고 1.9와 같은 7개 필드로 응답한다
         state.nickname = (body.nickname ?? '').trim()
         await json(route, userBody(state))
+        return
+      }
+      if (accountApi === 'profileImageUploadUrl') {
+        state.profileImageUploads += 1
+        await json(route, {
+          success: true,
+          data: profileImageUpload(state.profileImageUploads),
+          message: null,
+        })
+        return
+      }
+      if (accountApi === 'profileImage') {
+        // 1.12 응답은 1.10과 달리 두 필드다
+        state.profileImageUrl = body.imageUrl ?? null
+        await json(route, {
+          success: true,
+          data: {
+            userId: userBody(state).data.userId,
+            profileImageUrl: state.profileImageUrl,
+          },
+          message: null,
+        })
+        return
+      }
+      if (accountApi === 'profileImageDelete') {
+        state.profileImageUrl = null
+        await route.fulfill({ status: 204 })
         return
       }
       if (body.currentPassword !== state.password) {
