@@ -1,6 +1,8 @@
 import {
+  accountMenuButton,
   expect,
   getAuth,
+  goToMyPage,
   login,
   loginSeller,
   test,
@@ -8,7 +10,7 @@ import {
   type Page,
 } from '../../fixtures'
 
-// 마이페이지 프로필 이미지 등록·변경·삭제와 헤더 아바타(GR-132).
+// 마이페이지 프로필 이미지 등록·변경·삭제와 헤더 계정 메뉴(GR-132).
 // 발급·등록·삭제는 installAuthApi, Storage 업로드는 installDropImageUploads가 처리한다.
 // 오류는 failAccount('profileImageUploadUrl' | 'profileImage' | 'profileImageDelete', ...)로 바꾸고,
 // 요청 순서·CSRF는 accountRequests로 확인한다.
@@ -29,10 +31,12 @@ const NETWORK = '연결에 실패했어요. 잠시 뒤 다시 시도해주세요
 const IMAGE_1 = 'https://storage.grab.test/images/profile/'
 
 const card = (page: Page) => page.getByRole('region', { name: '내 계정' })
-const headerLink = (page: Page) =>
+// 헤더 프로필 이미지는 계정 메뉴 버튼 안에 있다
+const headerLink = accountMenuButton
+const menuItem = (page: Page, name: '마이페이지' | '로그아웃') =>
   page
     .locator('.site-header')
-    .getByRole('link', { name: '마이페이지', exact: true })
+    .getByRole(name === '마이페이지' ? 'link' : 'button', { name, exact: true })
 const editButton = (page: Page) =>
   page
     .getByRole('group', { name: '프로필 이미지' })
@@ -448,7 +452,7 @@ test('이미지를 불러오지 못하면 카드·헤더가 기본 표시로 바
   await expect(headerLink(page).locator('.avatar')).toHaveText('드')
 })
 
-test('헤더는 로그인 시 마이페이지 아바타, 비로그인 시 로그인, 판매자 작업 공간에서는 숨긴다', async ({
+test('헤더는 비로그인 시 로그인, 로그인 시 계정 메뉴 버튼, 판매자 작업 공간에서는 숨긴다', async ({
   page,
 }) => {
   await page.goto('/')
@@ -460,7 +464,7 @@ test('헤더는 로그인 시 마이페이지 아바타, 비로그인 시 로그
 
   await loginSeller(page)
   await expect(headerLink(page).locator('.avatar')).toHaveText('드')
-  await headerLink(page).click()
+  await goToMyPage(page)
   await expect(page).toHaveURL(/#\/my$/)
 
   await page.goto('/#/seller')
@@ -468,6 +472,68 @@ test('헤더는 로그인 시 마이페이지 아바타, 비로그인 시 로그
     header.getByRole('link', { name: 'DASHBOARD', exact: true }),
   ).toBeVisible()
   await expect(headerLink(page)).toHaveCount(0)
+})
+
+test('계정 메뉴는 누르면 펼치고 Esc·바깥 클릭·화면 이동으로 닫는다', async ({
+  page,
+}) => {
+  await login(page)
+  const button = headerLink(page)
+  await expect(button).toHaveAttribute('aria-expanded', 'false')
+  await expect(menuItem(page, '마이페이지')).toHaveCount(0)
+
+  await button.click()
+  await expect(button).toHaveAttribute('aria-expanded', 'true')
+  await expect(menuItem(page, '마이페이지')).toBeVisible()
+  await expect(menuItem(page, '로그아웃')).toBeVisible()
+  await button.click()
+  await expect(menuItem(page, '마이페이지')).toHaveCount(0)
+
+  // 키보드: Enter로 열고 Tab으로 항목을 오가며 Esc는 버튼으로 포커스를 돌려준다
+  await button.focus()
+  await page.keyboard.press('Enter')
+  await page.keyboard.press('Tab')
+  await expect(menuItem(page, '마이페이지')).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(menuItem(page, '로그아웃')).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(menuItem(page, '로그아웃')).toHaveCount(0)
+  await expect(button).toBeFocused()
+
+  await button.click()
+  await page.locator('main').click({ position: { x: 5, y: 5 } })
+  await expect(menuItem(page, '마이페이지')).toHaveCount(0)
+
+  await button.click()
+  await menuItem(page, '마이페이지').click()
+  await expect(page).toHaveURL(/#\/my$/)
+  await expect(menuItem(page, '마이페이지')).toHaveCount(0)
+})
+
+test('계정 메뉴의 로그아웃은 성공하면 WISH로 가고, 실패하면 안내 후 로그인 상태를 유지한다', async ({
+  page,
+}) => {
+  await login(page)
+  await page.goto('/#/grab')
+  getAuth(page).failLogout()
+  await headerLink(page).click()
+  await menuItem(page, '로그아웃').click()
+  await expect(toast(page)).toHaveText(
+    '로그아웃하지 못했어요. 잠시 뒤 다시 시도해주세요.',
+  )
+  // 시도가 끝나면 메뉴는 닫히고 로그인 상태는 그대로다
+  await expect(menuItem(page, '로그아웃')).toHaveCount(0)
+  await expect(headerLink(page)).toBeVisible()
+  expect(getAuth(page).state.loggedIn).toBe(true)
+
+  getAuth(page).state.logoutFails = false
+  await headerLink(page).click()
+  await menuItem(page, '로그아웃').click()
+  await expect(page).toHaveURL(/#\/wish$/)
+  await expect(
+    page.locator('.site-header').getByRole('link', { name: '로그인' }),
+  ).toBeVisible()
+  expect(getAuth(page).state.loggedIn).toBe(false)
 })
 
 test('서명 업로드 URL을 화면 주소·브라우저 저장소에 남기지 않는다', async ({

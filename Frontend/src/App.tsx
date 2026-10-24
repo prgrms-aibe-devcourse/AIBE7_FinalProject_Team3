@@ -42,6 +42,17 @@ export default function App() {
   const { user, status, authenticated, login, refresh, logout } = useAuth()
   const { wishes, wishesReady, toggleWish } = useWish(authenticated, notify)
 
+  // 헤더 계정 메뉴의 로그아웃(GR-132). 마이페이지 로그아웃과 같이 성공하면 WISH로 이동하고,
+  // 실패하면 로그인 상태를 유지한 채 안내한다.
+  const logoutFromHeader = async () => {
+    try {
+      await logout()
+      navigate('/wish')
+    } catch {
+      notify('로그아웃하지 못했어요. 잠시 뒤 다시 시도해주세요.')
+    }
+  }
+
   const shared: SharedProps = {
     authenticated,
     authStatus: status,
@@ -57,7 +68,13 @@ export default function App() {
         authenticated={authenticated}
         seller={isSeller(user)}
         account={
-          user ? { imageUrl: user.profileImageUrl, name: user.nickname } : null
+          user
+            ? {
+                imageUrl: user.profileImageUrl,
+                name: user.nickname,
+                onLogout: logoutFromHeader,
+              }
+            : null
         }
       />
       <main>

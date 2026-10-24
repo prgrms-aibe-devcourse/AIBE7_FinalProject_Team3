@@ -1,9 +1,14 @@
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import wordmark from '../../assets/images/grab-wordmark.png'
-import Avatar from '../Avatar/Avatar'
+import AccountMenu from './AccountMenu'
 
-// 로그인 상태 MY 링크에 그릴 프로필 이미지와 기본 표시용 이름(GR-132). 값은 App이 내 정보에서 넘긴다.
-export type HeaderAccount = { imageUrl: string | null; name: string }
+// 로그인 상태 계정 메뉴에 그릴 프로필 이미지·기본 표시용 이름과 로그아웃 처리(GR-132).
+// 값과 로그아웃 후 이동·실패 안내는 App이 맡는다.
+export type HeaderAccount = {
+  imageUrl: string | null
+  name: string
+  onLogout: () => Promise<void>
+}
 
 export default function Header({
   authenticated,
@@ -52,12 +57,14 @@ export default function Header({
             SHOP ↗
           </Link>
         )}
-        {/* 로그인 상태 MY는 프로필 이미지로 그린다. 이미지는 장식이고 링크 이름은 "마이페이지"다. */}
+        {/* 로그인 상태는 프로필 이미지 버튼으로 마이페이지·로그아웃 메뉴를 연다 */}
         {!sellerMode &&
           (authenticated && account ? (
-            <Link className="account-avatar" to="/my" aria-label="마이페이지">
-              <Avatar src={account.imageUrl} name={account.name} size={36} />
-            </Link>
+            <AccountMenu
+              imageUrl={account.imageUrl}
+              name={account.name}
+              onLogout={account.onLogout}
+            />
           ) : (
             <Link className="account-button" to="/login">
               로그인

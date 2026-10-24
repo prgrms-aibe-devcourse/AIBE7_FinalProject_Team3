@@ -1,6 +1,7 @@
 import {
   expect,
   getAuth,
+  goToMyPage,
   login,
   loginSeller,
   test,
@@ -153,7 +154,7 @@ for (const { name, path, actions } of pages) {
 
 test('MY: 가로 넘침 없이 핵심 버튼에 닿는다', async ({ page }) => {
   await login(page)
-  await page.getByRole('link', { name: '마이페이지', exact: true }).click()
+  await goToMyPage(page)
   await expectReachable(page, page.getByRole('button', { name: '취소' }))
   await expectNoHorizontalOverflow(page)
 })
@@ -166,7 +167,7 @@ test('MY 계정 설정: 모달에 오류를 표시해도 가로 넘침 없이 �
     code: 'DUPLICATE_NICKNAME',
   })
   await login(page)
-  await page.getByRole('link', { name: '마이페이지', exact: true }).click()
+  await goToMyPage(page)
 
   await page
     .getByRole('group', { name: '닉네임' })
@@ -221,12 +222,22 @@ test('MY 프로필 이미지: 미리보기·오류를 표시해도 가로 넘침
     code: 'EXTERNAL_SERVICE_ERROR',
   })
   await login(page)
-  const headerLink = page
+  // 헤더 계정 메뉴를 펼쳐도 가로 넘침 없이 두 항목에 닿는다
+  await page
     .locator('.site-header')
-    .getByRole('link', { name: '마이페이지', exact: true })
-  await expectReachable(page, headerLink)
+    .getByRole('button', { name: '계정 메뉴' })
+    .click()
+  for (const action of [
+    page.locator('.site-header').getByRole('link', { name: '마이페이지' }),
+    page.locator('.site-header').getByRole('button', { name: '로그아웃' }),
+  ]) {
+    await expectReachable(page, action)
+  }
   await expectNoHorizontalOverflow(page)
-  await headerLink.click()
+  await page
+    .locator('.site-header')
+    .getByRole('link', { name: '마이페이지' })
+    .click()
 
   await page
     .getByRole('group', { name: '프로필 이미지' })
