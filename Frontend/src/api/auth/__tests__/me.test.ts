@@ -1,7 +1,15 @@
 import { AxiosError, type AxiosResponse } from 'axios'
-import { beforeEach, expect, test } from 'vitest'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { api } from '../../client'
-import { changeMyPassword, updateMyNickname } from '../me'
+import { StorageUploadError } from '../../storage/upload'
+import {
+  changeMyPassword,
+  registerProfileImage,
+  removeProfileImage,
+  requestProfileImageUploadUrl,
+  updateMyNickname,
+  uploadProfileImage,
+} from '../me'
 import { configureAuthSession, installAuthSession } from '../session'
 
 type AdapterConfig = {
@@ -73,6 +81,10 @@ const failure = (status: number, code: string) => ({
 beforeEach(() => {
   configureAuthSession({ onSessionExpired: () => undefined })
   installAuthSession()
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 test('닉네임 수정은 입력값을 가공하지 않고 보내고 내 정보를 돌려준다', async () => {
@@ -160,4 +172,147 @@ test('Access 만료 401은 재발급 후 한 번 다시 보낸다', async () => 
     'POST /auth/refresh',
     'PATCH /users/me',
   ])
+})
+
+// 프로필 이미지(IMAGE_UPLOAD 1.2, MEMBER_AUTH 1.12·1.13, GR-132)
+const upload = {
+  imageId: '1d0f9e8c-7b6a-4539-8412-6c5d4e3f2a1b',
+  uploadUrl:
+    'https://storage.example.com/upload/profiles/1d0f9e8c.png?token=signed',
+  imageUrl: 'https://storage.example.com/public/profiles/1d0f9e8c.png',
+  expiresAt: '2026-10-24T12:00:00+09:00',
+}
+const profile = { userId: me.userId, profileImageUrl: upload.imageUrl }
+const file = () => new File(['image'], '프로필.png', { type: 'image/png' })
+
+function useProfileApi(storageStatus = 200) {
+  useAdapter((config) => {
+    if (config.url === '/auth/csrf') return { status: 204 }
+    if (config.url === '/users/me/profile-image/upload-url') {
+      return { status: 200, data: { success: true, data: upload } }
+    }
+    if (config.url === '/users/me/profile-image') {
+      if (config.method === 'delete') return { status: 204 }
+      return { status: 200, data: { success: true, data: profile } }
+    }
+    throw new Error(`예상하지 못한 요청: ${config.url}`)
+  })
+  const fetch = vi
+    .fn()
+    .mockResolvedValue(new Response('{}', { status: storageStatus }))
+  vi.stubGlobal('fetch', fetch)
+  return fetch
+}
+
+test('프로필 이미지 업로드 URL은 파일 메타데이터로 발급받는다', async () => {
+  useProfileApi()
+  const input = {
+    fileName: '프로필.png',
+    contentType: 'image/png',
+    fileSize: 5,
+  }
+  await expect(requestProfileImageUploadUrl(input)).resolves.toEqual(upload)
+  const request = calls.find((call) => call.url.endsWith('/upload-url'))
+  expect(request).toMatchObject({
+    method: 'POST',
+    url: '/users/me/profile-image/upload-url',
+    body: input,
+    credentials: true,
+  })
+})
+
+test('프로필 이미지 업로드는 발급 후 Storage에 쿠키 없이 PUT하고 imageUrl만 돌려준다', async () => {
+  const fetch = useProfileApi()
+  const image = file()
+  const signal = new AbortController().signal
+  await expect(uploadProfileImage(image, signal)).resolves.toBe(upload.imageUrl)
+  expect(calls.find((call) => call.url.endsWith('/upload-url'))?.body).toEqual({
+    fileName: image.name,
+    contentType: image.type,
+    fileSize: image.size,
+  })
+  expect(fetch).toHaveBeenCalledWith(upload.uploadUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'image/png' },
+    body: image,
+    credentials: 'omit',
+    referrerPolicy: 'no-referrer',
+    signal,
+  })
+  // 업로드 단계에서는 등록하지 않는다
+  expect(requests()).not.toContain('PUT /users/me/profile-image')
+})
+
+test('Storage 업로드가 실패하면 StorageUploadError로 끝난다', async () => {
+  useProfileApi(403)
+  await expect(
+    uploadProfileImage(file(), new AbortController().signal),
+  ).rejects.toEqual(new StorageUploadError(403))
+})
+
+test('발급 응답 형식이 다르거나 발급 도중 취소되면 Storage에 올리지 않는다', async () => {
+  const fetch = useProfileApi()
+  useAdapter((config) => {
+    if (config.url === '/auth/csrf') return { status: 204 }
+    return {
+      status: 200,
+      data: { success: true, data: { ...upload, uploadUrl: '' } },
+    }
+  })
+  await expect(
+    uploadProfileImage(file(), new AbortController().signal),
+  ).rejects.toThrow('업로드 URL 응답 형식')
+
+  const controller = new AbortController()
+  useAdapter((config) => {
+    if (config.url === '/auth/csrf') return { status: 204 }
+    controller.abort()
+    return { status: 200, data: { success: true, data: upload } }
+  })
+  await expect(uploadProfileImage(file(), controller.signal)).rejects.toThrow()
+  expect(fetch).not.toHaveBeenCalled()
+})
+
+test('프로필 이미지 등록은 imageUrl을 그대로 보내고 두 필드를 돌려준다', async () => {
+  useProfileApi()
+  await expect(registerProfileImage(upload.imageUrl)).resolves.toEqual(profile)
+  const request = calls.find((call) => call.url === '/users/me/profile-image')
+  expect(request).toMatchObject({
+    method: 'PUT',
+    body: { imageUrl: upload.imageUrl },
+    credentials: true,
+  })
+})
+
+test.each([
+  ['data 없음', { success: true, data: null }],
+  ['profileImageUrl 없음', { success: true, data: { userId: me.userId } }],
+  ['실패 응답', { success: false, data: profile }],
+])('프로필 이미지 등록 응답 형식 오류(%s)를 거부한다', async (_, body) => {
+  useAdapter((config) => {
+    if (config.url === '/auth/csrf') return { status: 204 }
+    return { status: 200, data: body }
+  })
+  await expect(registerProfileImage(upload.imageUrl)).rejects.toThrow(
+    '프로필 이미지 등록 응답 형식이 올바르지 않습니다.',
+  )
+})
+
+test('프로필 이미지 등록 검증 실패(400)는 재시도 없이 전파한다', async () => {
+  useAdapter((config) => {
+    if (config.url === '/auth/csrf') return { status: 204 }
+    return failure(400, 'VALIDATION_FAILED')
+  })
+  await expect(registerProfileImage(upload.imageUrl)).rejects.toMatchObject({
+    response: { status: 400 },
+  })
+  expect(requests()).toEqual(['GET /auth/csrf', 'PUT /users/me/profile-image'])
+})
+
+test('프로필 이미지 삭제는 본문 없이 DELETE하고 204로 끝난다', async () => {
+  useProfileApi()
+  await expect(removeProfileImage()).resolves.toBeUndefined()
+  const request = calls.find((call) => call.url === '/users/me/profile-image')
+  expect(request).toMatchObject({ method: 'DELETE', body: undefined })
+  expect(request?.credentials).toBe(true)
 })
