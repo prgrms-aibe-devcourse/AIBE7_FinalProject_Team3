@@ -22,7 +22,7 @@ test('일반 회원은 MY에서 신청하고 신청 상태로 판매자 메뉴�
     header.getByRole('link', { name: /셀러 전환|SELLER/ }),
   ).toHaveCount(0)
   await login(page)
-  await header.getByRole('link', { name: 'MY', exact: true }).click()
+  await header.getByRole('link', { name: '마이페이지', exact: true }).click()
   await expect(page).toHaveURL(/#\/my$/)
   await page.getByRole('link', { name: '판매자 신청 ↗', exact: true }).click()
   await expect(page).toHaveURL(/seller\/apply/)
@@ -48,7 +48,7 @@ test('일반 회원은 MY에서 신청하고 신청 상태로 판매자 메뉴�
       header.getByRole('link', { name: 'GRAB', exact: true }),
     ).toBeVisible()
     await expect(
-      header.getByRole('link', { name: 'MY', exact: true }),
+      header.getByRole('link', { name: '마이페이지', exact: true }),
     ).toBeVisible()
     await expect(
       header.getByRole('link', { name: 'SELLER', exact: true }),
@@ -84,7 +84,7 @@ test('판매자 링크는 새로고침·권한 재조회·로그아웃·계정 �
     header.getByRole('link', { name: 'WISH', exact: true }),
   ).toBeVisible()
   await expect(seller).toBeVisible()
-  await header.getByRole('link', { name: 'MY', exact: true }).click()
+  await header.getByRole('link', { name: '마이페이지', exact: true }).click()
   await expect(page).toHaveURL(/#\/my$/)
   await page.getByRole('button', { name: '로그아웃', exact: true }).click()
   await expect(seller).toHaveCount(0)

@@ -37,7 +37,7 @@ test.describe('WISH', () => {
     await expect(mug.getByRole('button')).toHaveText('✓ WISHED')
     await expect(mug).toContainText('187 WISH')
 
-    await page.getByRole('link', { name: 'MY', exact: true }).click()
+    await page.getByRole('link', { name: '마이페이지', exact: true }).click()
     const wishPanel = page
       .locator('.panel')
       .filter({ has: page.getByRole('heading', { name: 'WISH' }) })
@@ -82,7 +82,7 @@ test.describe('WISH 서버 연동', () => {
   test('마이페이지 WISH를 20개씩 페이지로 본다', async ({ page }) => {
     await installCatalogScenario(page, 'wishes')
     await login(page)
-    await page.getByRole('link', { name: 'MY', exact: true }).click()
+    await page.getByRole('link', { name: '마이페이지', exact: true }).click()
     const wishPanel = page
       .locator('.panel')
       .filter({ has: page.getByRole('heading', { name: 'WISH' }) })
@@ -96,7 +96,7 @@ test.describe('WISH 서버 연동', () => {
   test('담은 WISH가 없으면 빈 상태를 보여준다', async ({ page }) => {
     await installCatalogScenario(page, 'no-wishes')
     await login(page)
-    await page.getByRole('link', { name: 'MY', exact: true }).click()
+    await page.getByRole('link', { name: '마이페이지', exact: true }).click()
     await expect(page.getByText('아직 담은 WISH가 없어요.')).toBeVisible()
   })
 

@@ -48,7 +48,13 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Header authenticated={authenticated} seller={isSeller(user)} />
+      <Header
+        authenticated={authenticated}
+        seller={isSeller(user)}
+        account={
+          user ? { imageUrl: user.profileImageUrl, name: user.nickname } : null
+        }
+      />
       <main>
         <Routes>
           <Route path="/" element={<HomePage {...shared} />} />

@@ -148,7 +148,7 @@ for (const { name, path, actions } of pages) {
 
 test('MY: 가로 넘침 없이 핵심 버튼에 닿는다', async ({ page }) => {
   await login(page)
-  await page.getByRole('link', { name: 'MY', exact: true }).click()
+  await page.getByRole('link', { name: '마이페이지', exact: true }).click()
   await expectReachable(page, page.getByRole('button', { name: '취소' }))
   await expectNoHorizontalOverflow(page)
 })
@@ -161,7 +161,7 @@ test('MY 계정 설정: 모달에 오류를 표시해도 가로 넘침 없이 �
     code: 'DUPLICATE_NICKNAME',
   })
   await login(page)
-  await page.getByRole('link', { name: 'MY', exact: true }).click()
+  await page.getByRole('link', { name: '마이페이지', exact: true }).click()
 
   await page
     .getByRole('group', { name: '닉네임' })

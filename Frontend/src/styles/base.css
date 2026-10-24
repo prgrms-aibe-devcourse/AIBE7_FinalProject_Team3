@@ -276,6 +276,17 @@ textarea:focus-visible,
   font-size: 12px;
   font-weight: 800;
 }
+/* 로그인 상태 MY 링크(GR-132): 44px 터치 영역 안에 40px 프로필 이미지. 흰 이미지도 헤더와 구분되게 테두리를 둔다. */
+.account-avatar {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+}
+.account-avatar .avatar {
+  border: 1px solid var(--line);
+}
 
 .primary-button {
   display: inline-flex;
