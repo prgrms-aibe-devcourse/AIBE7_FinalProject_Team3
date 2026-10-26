@@ -76,15 +76,32 @@ seed.sql 실행 직후 바로 k6를 돌려야 한다(DROP 상태가 WISH, `sale_
 
 ## 5. 로그인 동시 폭주 (login-burst)
 
-로그인 비밀번호 검증(Argon2id, 해시 1회에 약 19MiB)이 동시에 몰릴 때 nano 환경이 어느 VU
+로그인 비밀번호 검증(Argon2id, 해시 1회에 약 19MiB)이 동시에 몰릴 때 제한 환경이 어느 VU
 단계부터 무너지는지 본다(GR-161). 아래 명령은 모두 `Backend/`에서 Git Bash로 실행한다.
+결과는 [login-burst/result.md](login-burst/result.md)에 있다.
+
+이 시나리오는 nano 설정(`compose.loadtest.yaml`만 사용)이 아니라 **t3.micro 기준 임시 설정**으로 측정했다.
+nano 설정은 힙 밖 메모리만 약 300MiB라 512MiB 안에 들어가지 않는다. 스왑이 없으면 로그인 1명 부하에서도
+OOM-kill되고, 스왑이 있으면 GC 정지가 스왑 속도에 묶인다(result.md 부록). 임시 설정 파일은 저장소에 두지
+않으므로 저장소 밖(예: 임시 폴더)에 아래 내용으로 만들어 세 번째 `-f`로 얹는다.
+
+```yaml
+# compose.micro.yaml (저장소 밖). memswap_limit을 mem_limit과 같게 두어 스왑을 막는다
+services:
+  backend:
+    mem_limit: 1g
+    memswap_limit: 1g
+    environment:
+      JDK_JAVA_OPTIONS: -Xmx512m -Xlog:gc   # environment는 값 전체를 덮어쓰므로 -Xlog:gc도 다시 적는다
+```
 
 **준비**
 
 ```
-docker compose -f compose.yaml -f compose.loadtest.yaml up -d --build
-docker compose logs backend | head -3     # NOTE: Picked up JDK_JAVA_OPTIONS: -Xmx384m -Xlog:gc 확인
-docker compose logs backend | grep '\[gc\] Using'   # nano 제한에서는 Serial
+docker compose -f compose.yaml -f compose.loadtest.yaml -f <임시 폴더>/compose.micro.yaml up -d --build
+docker inspect backend-backend-1 --format 'Memory={{.HostConfig.Memory}} MemorySwap={{.HostConfig.MemorySwap}}'  # 둘 다 1073741824(스왑 없음)
+docker compose logs backend | head -3     # NOTE: Picked up JDK_JAVA_OPTIONS: -Xmx512m -Xlog:gc 확인
+docker compose logs backend | grep '\[gc\] Using'   # CPU 1개 제한에서는 Serial
 docker compose exec -T postgres psql -U grab -d grab -f - < k6/common/accounts-seed.sql
 
 # 측정 전 Redis 상태 기록(측정 후와 비교해 로그인 폭주가 남긴 증가량을 본다)
