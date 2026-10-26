@@ -34,7 +34,7 @@
 //   docker inspect backend-backend-1 --format 'Memory={{.HostConfig.Memory}} MemorySwap={{.HostConfig.MemorySwap}}'
 //     → 둘 다 1073741824(스왑 없음)
 //   docker compose logs backend | head -3              → NOTE: Picked up JDK_JAVA_OPTIONS: -Xmx512m -Xlog:gc
-//   docker compose logs backend | grep '\[gc\] Using'  → CPU 1개 제한에서는 Serial
+//   docker compose logs backend | grep '\[gc\] Using'  → 메모리 1GiB(1792MB 미만)에서는 CPU 수와 관계없이 Serial
 //   docker compose exec -T postgres psql -U grab -d grab -f - < k6/common/accounts-seed.sql
 //   측정 전 Redis 상태를 기록한다(측정 후와 비교해 로그인 폭주가 남긴 증가량을 본다):
 //   docker compose exec -T redis redis-cli DBSIZE
