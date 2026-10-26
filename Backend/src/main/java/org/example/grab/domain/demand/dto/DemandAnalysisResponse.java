@@ -36,8 +36,11 @@ public record DemandAnalysisResponse(
     public record Conversion(SampleSelection selection, OwnConversion own, MarketConversion market) {
     }
 
+    // rateLow·rateHigh는 전환율의 95% 윌슨 구간이며 예상 범위(low·high) 계산에 쓴다(DEMAND.md 1.4)
     public record OwnConversion(
             BigDecimal rate,
+            BigDecimal rateLow,
+            BigDecimal rateHigh,
             BigDecimal avgQuantityPerBuyer,
             ConversionConfidence confidence,
             int dropCount,
@@ -47,6 +50,8 @@ public record DemandAnalysisResponse(
 
     public record MarketConversion(
             BigDecimal rate,
+            BigDecimal rateLow,
+            BigDecimal rateHigh,
             BigDecimal avgQuantityPerBuyer,
             ConversionConfidence confidence,
             String dropCountBand,
@@ -55,7 +60,7 @@ public record DemandAnalysisResponse(
     ) {
         // 시장 평균 집계(GR-142 ②) 전이거나 최소 집계 단위에 미달한 경우
         public static MarketConversion unavailable() {
-            return new MarketConversion(null, null, ConversionConfidence.NONE, "NONE", null, null);
+            return new MarketConversion(null, null, null, null, ConversionConfidence.NONE, "NONE", null, null);
         }
     }
 

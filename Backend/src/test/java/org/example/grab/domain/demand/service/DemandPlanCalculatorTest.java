@@ -27,8 +27,10 @@ class DemandPlanCalculatorTest {
     private static final ConversionSample OWN_LOW = new ConversionSample(3, 85, 34, 34);
     // 내 실적: DROP 10개, WISH 200명 중 50명이 75개 구매 → 전환율 0.25, 구매자당 1.5개, 신뢰도 HIGH
     private static final ConversionSample OWN_HIGH = new ConversionSample(10, 200, 50, 75);
+    // 시장 평균: 전환율 0.30, 윌슨 구간 0.27~0.33(WISH 약 1,740명 기준), 신뢰도 HIGH
     private static final MarketConversion MARKET_HIGH = new MarketConversion(
-            new BigDecimal("0.30"), new BigDecimal("1.0"), ConversionConfidence.HIGH, "10_TO_19", 1740L,
+            new BigDecimal("0.30"), new BigDecimal("0.27"), new BigDecimal("0.33"), new BigDecimal("1.0"),
+            ConversionConfidence.HIGH, "10_TO_19", 1740L,
             OffsetDateTime.parse("2026-10-22T00:00:00+09:00"));
     private static final List<DemandOption> THREE_OPTIONS = List.of(
             new DemandOption(1001, "블랙 / M", 40, 0),
@@ -47,9 +49,10 @@ class DemandPlanCalculatorTest {
         assertThat(result.own().confidence()).isEqualTo(ConversionConfidence.LOW);
         assertThat(result.assumptions().conversionRate().source()).isEqualTo(AssumptionSource.MARKET);
         assertThat(result.assumptions().safetyStockRate().source()).isEqualTo(AssumptionSource.DEFAULT);
-        assertThat(result.plan().low()).isEqualTo(100);
+        // low = floor(420 × 0.27 × 1.0), high = ceil(420 × 0.33 × 1.0)
+        assertThat(result.plan().low()).isEqualTo(113);
         assertThat(result.plan().expected()).isEqualTo(126);
-        assertThat(result.plan().high()).isEqualTo(152);
+        assertThat(result.plan().high()).isEqualTo(139);
         assertThat(result.plan().recommended()).isEqualTo(139);
         assertThat(result.plan().currentTotalQuantity()).isEqualTo(120);
         assertThat(result.plan().differenceFromCurrent()).isEqualTo(19);
@@ -58,17 +61,19 @@ class DemandPlanCalculatorTest {
     }
 
     @Test
-    @DisplayName("시장 평균이 없으면 내 실적을 기본 기준으로 쓰고 신뢰도 LOW는 넓은 범위와 표본 부족을 표시한다")
+    @DisplayName("시장 평균이 없으면 내 실적을 기본 기준으로 쓰고 범위는 내 실적의 윌슨 구간으로 계산한다")
     void calculate_usesOwnWhenMarketUnavailable() {
         // when
         DemandPlanCalculator.Result result = DemandPlanCalculator.calculate(
                 100, OWN_LOW, MarketConversion.unavailable(), THREE_OPTIONS, DemandCalculateRequest.defaults());
 
-        // then: base = 100 × 0.40 × 1.0 = 40, u = 0.4
+        // then: base = 100 × 0.40 × 1.0 = 40, 전환율 구간 0.30~0.51
+        assertThat(result.own().rateLow()).isEqualByComparingTo("0.30");
+        assertThat(result.own().rateHigh()).isEqualByComparingTo("0.51");
         assertThat(result.assumptions().conversionRate()).isEqualTo(new Assumption(new BigDecimal("0.40"), AssumptionSource.OWN));
-        assertThat(result.plan().low()).isEqualTo(24);
+        assertThat(result.plan().low()).isEqualTo(30);
         assertThat(result.plan().expected()).isEqualTo(40);
-        assertThat(result.plan().high()).isEqualTo(56);
+        assertThat(result.plan().high()).isEqualTo(51);
         assertThat(result.plan().recommended()).isEqualTo(44);
         assertThat(result.dataGaps()).containsExactly(DemandDataGap.SMALL_CONVERSION_SAMPLE);
     }
@@ -80,12 +85,12 @@ class DemandPlanCalculatorTest {
         DemandPlanCalculator.Result result = DemandPlanCalculator.calculate(
                 100, OWN_HIGH, MARKET_HIGH, THREE_OPTIONS, DemandCalculateRequest.defaults());
 
-        // then: base = 100 × 0.25 × 1.5 = 37.5
+        // then: base = 100 × 0.25 × 1.5 = 37.5, 전환율 구간 0.19~0.32
         assertThat(result.assumptions().conversionRate().source()).isEqualTo(AssumptionSource.OWN);
         assertThat(result.assumptions().avgQuantityPerBuyer().value()).isEqualByComparingTo("1.5");
         assertThat(result.plan().expected()).isEqualTo(38);
-        assertThat(result.plan().low()).isEqualTo(30);
-        assertThat(result.plan().high()).isEqualTo(45);
+        assertThat(result.plan().low()).isEqualTo(28);
+        assertThat(result.plan().high()).isEqualTo(48);
         assertThat(result.plan().recommended()).isEqualTo(42);
     }
 
@@ -154,6 +159,19 @@ class DemandPlanCalculatorTest {
     }
 
     @Test
+    @DisplayName("판매자 입력 전환율의 범위 상단은 전환율 1을 넘지 않는다")
+    void calculate_capsSellerInputRangeAtOne() {
+        // when
+        DemandPlanCalculator.Result result = DemandPlanCalculator.calculate(
+                100, ConversionSample.empty(), MarketConversion.unavailable(), THREE_OPTIONS,
+                new DemandCalculateRequest(null, new BigDecimal("0.90"), null));
+
+        // then: 0.90 × 1.3 = 1.17이지만 상단은 100 × 1.0 × 1.0
+        assertThat(result.plan().low()).isEqualTo(63);
+        assertThat(result.plan().high()).isEqualTo(100);
+    }
+
+    @Test
     @DisplayName("기준이 하나도 없을 때 판매자 입력 전환율은 구매자당 수량 기본값 1을 쓴다")
     void calculate_sellerInputWithoutAnyBasisUsesDefaultQuantity() {
         // when
@@ -189,9 +207,13 @@ class DemandPlanCalculatorTest {
                 100, new ConversionSample(3, 30, 0, 0), MarketConversion.unavailable(), THREE_OPTIONS,
                 DemandCalculateRequest.defaults());
 
-        // then
+        // then: 전환율이 0이어도 윌슨 구간 상단은 0보다 커서 범위 상단이 남는다
         assertThat(result.own().rate()).isEqualByComparingTo("0");
+        assertThat(result.own().rateLow()).isEqualByComparingTo("0");
+        assertThat(result.own().rateHigh()).isEqualByComparingTo("0.12");
         assertThat(result.own().avgQuantityPerBuyer()).isEqualByComparingTo("1.0");
+        assertThat(result.plan().low()).isZero();
+        assertThat(result.plan().high()).isEqualTo(12);
         assertThat(result.plan().recommended()).isZero();
         assertThat(result.plan().options()).extracting(OptionPlan::recommendedQuantity).containsExactly(0, 0, 0);
     }
@@ -209,6 +231,24 @@ class DemandPlanCalculatorTest {
     @DisplayName("신뢰도는 표본 DROP 수와 WISH 수 경계값으로 판정한다")
     void confidenceOf_boundaries(int dropCount, long wishers, ConversionConfidence expected) {
         assertThat(DemandPlanCalculator.confidenceOf(dropCount, wishers)).isEqualTo(expected);
+    }
+
+    // 기대값은 윌슨 점수 구간 공식을 별도로 계산해 소수 둘째 자리에서 하한 내림·상한 올림한 값이다
+    @ParameterizedTest(name = "구매 {0}명 / WISH {1}명 → {2} ~ {3}")
+    @CsvSource({
+            "6, 20, 0.14, 0.52",
+            "30, 100, 0.21, 0.40",
+            "34, 85, 0.30, 0.51",
+            "1000, 2000, 0.47, 0.53",
+            "0, 30, 0.00, 0.12",
+            "20, 20, 0.83, 1.00"
+    })
+    @DisplayName("전환율 구간은 표본이 적을수록 넓고 0~1을 벗어나지 않는다")
+    void wilsonInterval_matchesFormula(long converted, long wishers, BigDecimal low, BigDecimal high) {
+        DemandPlanCalculator.RateInterval interval = DemandPlanCalculator.wilsonInterval(converted, wishers);
+
+        assertThat(interval.low()).isEqualByComparingTo(low);
+        assertThat(interval.high()).isEqualByComparingTo(high);
     }
 
     @Test

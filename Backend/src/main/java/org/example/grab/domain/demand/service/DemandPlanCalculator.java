@@ -15,6 +15,7 @@ import org.example.grab.domain.demand.dto.DemandDataGap;
 import org.example.grab.domain.demand.dto.DemandOption;
 
 import java.math.BigDecimal;
+import java.math.MathContext;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -30,9 +31,11 @@ public final class DemandPlanCalculator {
 
     static final BigDecimal DEFAULT_SAFETY_STOCK_RATE = new BigDecimal("0.1");
     private static final BigDecimal DEFAULT_AVG_QUANTITY = new BigDecimal("1.0");
+    // 판매자 입력 전환율은 표본이 없어 통계 구간을 만들 수 없으므로 가정한 폭을 쓴다(DEMAND.md 1.9)
     private static final BigDecimal SELLER_INPUT_RANGE = new BigDecimal("0.3");
-    private static final BigDecimal HIGH_RANGE = new BigDecimal("0.2");
-    private static final BigDecimal LOW_RANGE = new BigDecimal("0.4");
+    // 95% 신뢰수준의 정규분포 임계값
+    private static final BigDecimal Z = new BigDecimal("1.96");
+    private static final MathContext PRECISION = MathContext.DECIMAL64;
 
     private DemandPlanCalculator() {
     }
@@ -40,7 +43,10 @@ public final class DemandPlanCalculator {
     public record Result(OwnConversion own, Assumptions assumptions, Plan plan, List<DemandDataGap> dataGaps) {
     }
 
-    private record BasisAssumption(Assumption rate, Assumption avgQuantity) {
+    record RateInterval(BigDecimal low, BigDecimal high) {
+    }
+
+    private record SelectedRate(Assumption rate, Assumption avgQuantity, RateInterval interval) {
     }
 
     public static Result calculate(
@@ -56,25 +62,23 @@ public final class DemandPlanCalculator {
             dataGaps.add(DemandDataGap.NO_ACTIVE_WISH);
         }
 
-        Assumption conversionRate = null;
-        Assumption avgQuantity = null;
-        BigDecimal range = null;
+        SelectedRate selected = null;
         if (request.conversionRate() != null) {
-            conversionRate = new Assumption(request.conversionRate(), AssumptionSource.SELLER_INPUT);
-            avgQuantity = defaultBasis == null
+            BigDecimal rate = request.conversionRate();
+            Assumption avgQuantity = defaultBasis == null
                     ? new Assumption(DEFAULT_AVG_QUANTITY, AssumptionSource.DEFAULT)
-                    : basisAssumption(defaultBasis, own, market).avgQuantity();
-            range = SELLER_INPUT_RANGE;
+                    : basisRate(defaultBasis, own, market).avgQuantity();
+            selected = new SelectedRate(new Assumption(rate, AssumptionSource.SELLER_INPUT), avgQuantity,
+                    new RateInterval(
+                            rate.multiply(BigDecimal.ONE.subtract(SELLER_INPUT_RANGE)),
+                            rate.multiply(BigDecimal.ONE.add(SELLER_INPUT_RANGE)).min(BigDecimal.ONE)));
         } else {
             ConversionBasis basis = request.conversionBasis() != null ? request.conversionBasis() : defaultBasis;
             ConversionConfidence confidence = basis == null ? ConversionConfidence.NONE : confidenceOf(basis, own, market);
             if (confidence == ConversionConfidence.NONE) {
                 dataGaps.add(DemandDataGap.NO_CONVERSION_SAMPLE);
             } else {
-                BasisAssumption selected = basisAssumption(basis, own, market);
-                conversionRate = selected.rate();
-                avgQuantity = selected.avgQuantity();
-                range = confidence == ConversionConfidence.HIGH ? HIGH_RANGE : LOW_RANGE;
+                selected = basisRate(basis, own, market);
                 if (confidence == ConversionConfidence.LOW) {
                     dataGaps.add(DemandDataGap.SMALL_CONVERSION_SAMPLE);
                 }
@@ -84,12 +88,13 @@ public final class DemandPlanCalculator {
         Assumption safetyStockRate = request.safetyStockRate() == null
                 ? new Assumption(DEFAULT_SAFETY_STOCK_RATE, AssumptionSource.DEFAULT)
                 : new Assumption(request.safetyStockRate(), AssumptionSource.SELLER_INPUT);
-        Assumptions assumptions = new Assumptions(conversionRate, avgQuantity, safetyStockRate);
-
-        BigDecimal base = activeWishCount == 0 || conversionRate == null
-                ? null
-                : BigDecimal.valueOf(activeWishCount).multiply(conversionRate.value()).multiply(avgQuantity.value());
-        return new Result(own, assumptions, toPlan(base, range, safetyStockRate.value(), options), List.copyOf(dataGaps));
+        Assumptions assumptions = selected == null
+                ? new Assumptions(null, null, safetyStockRate)
+                : new Assumptions(selected.rate(), selected.avgQuantity(), safetyStockRate);
+        Plan plan = activeWishCount == 0 || selected == null
+                ? emptyPlan(options)
+                : toPlan(activeWishCount, selected, safetyStockRate.value(), options);
+        return new Result(own, assumptions, plan, List.copyOf(dataGaps));
     }
 
     static ConversionConfidence confidenceOf(int dropCount, long wishers) {
@@ -102,18 +107,39 @@ public final class DemandPlanCalculator {
         return ConversionConfidence.NONE;
     }
 
+    /*
+        전환율의 95% 윌슨 점수 구간. 표본이 적을수록 넓어지고, 전환율이 0이나 1에 가까워도 구간이 0~1을 벗어나지 않는다.
+        응답에 보이는 값으로 검산할 수 있게 소수 둘째 자리로 맞추되, 범위가 좁아지지 않도록 하한은 내림·상한은 올림한다.
+     */
+    static RateInterval wilsonInterval(long converted, long wishers) {
+        BigDecimal n = BigDecimal.valueOf(wishers);
+        BigDecimal p = BigDecimal.valueOf(converted).divide(n, PRECISION);
+        BigDecimal zSquared = Z.multiply(Z);
+        BigDecimal denominator = BigDecimal.ONE.add(zSquared.divide(n, PRECISION));
+        BigDecimal center = p.add(zSquared.divide(n.multiply(BigDecimal.valueOf(2)), PRECISION))
+                .divide(denominator, PRECISION);
+        BigDecimal variance = p.multiply(BigDecimal.ONE.subtract(p)).divide(n, PRECISION)
+                .add(zSquared.divide(n.multiply(n).multiply(BigDecimal.valueOf(4)), PRECISION));
+        BigDecimal halfWidth = Z.multiply(variance.sqrt(PRECISION)).divide(denominator, PRECISION);
+        return new RateInterval(
+                center.subtract(halfWidth).max(BigDecimal.ZERO).setScale(2, RoundingMode.FLOOR),
+                center.add(halfWidth).min(BigDecimal.ONE).setScale(2, RoundingMode.CEILING));
+    }
+
     private static OwnConversion toOwnConversion(ConversionSample sample) {
         ConversionConfidence confidence = confidenceOf(sample.dropCount(), sample.wishers());
         if (confidence == ConversionConfidence.NONE) {
-            return new OwnConversion(null, null, confidence, sample.dropCount(), sample.wishers());
+            return new OwnConversion(null, null, null, null, confidence, sample.dropCount(), sample.wishers());
         }
         BigDecimal rate = BigDecimal.valueOf(sample.converted())
                 .divide(BigDecimal.valueOf(sample.wishers()), 2, RoundingMode.HALF_UP);
+        RateInterval interval = wilsonInterval(sample.converted(), sample.wishers());
         BigDecimal avgQuantity = sample.converted() == 0
                 ? DEFAULT_AVG_QUANTITY
                 : BigDecimal.valueOf(sample.quantity())
                         .divide(BigDecimal.valueOf(sample.converted()), 1, RoundingMode.HALF_UP);
-        return new OwnConversion(rate, avgQuantity, confidence, sample.dropCount(), sample.wishers());
+        return new OwnConversion(rate, interval.low(), interval.high(), avgQuantity, confidence,
+                sample.dropCount(), sample.wishers());
     }
 
     // 신뢰도가 높은 기준을 쓰고, 같으면 본인 데이터가 더 직접적인 근거이므로 내 실적을 쓴다
@@ -136,32 +162,45 @@ public final class DemandPlanCalculator {
         return basis == ConversionBasis.OWN ? own.confidence() : market.confidence();
     }
 
-    private static BasisAssumption basisAssumption(ConversionBasis basis, OwnConversion own, MarketConversion market) {
+    private static SelectedRate basisRate(ConversionBasis basis, OwnConversion own, MarketConversion market) {
         if (basis == ConversionBasis.OWN) {
-            return new BasisAssumption(
+            return new SelectedRate(
                     new Assumption(own.rate(), AssumptionSource.OWN),
-                    new Assumption(own.avgQuantityPerBuyer(), AssumptionSource.OWN));
+                    new Assumption(own.avgQuantityPerBuyer(), AssumptionSource.OWN),
+                    new RateInterval(own.rateLow(), own.rateHigh()));
         }
-        return new BasisAssumption(
+        return new SelectedRate(
                 new Assumption(market.rate(), AssumptionSource.MARKET),
-                new Assumption(market.avgQuantityPerBuyer(), AssumptionSource.MARKET));
+                new Assumption(market.avgQuantityPerBuyer(), AssumptionSource.MARKET),
+                new RateInterval(market.rateLow(), market.rateHigh()));
     }
 
-    private static Plan toPlan(BigDecimal base, BigDecimal range, BigDecimal safetyStockRate, List<DemandOption> options) {
-        int currentTotal = options.stream().mapToInt(DemandOption::totalQuantity).sum();
-        if (base == null) {
-            List<OptionPlan> optionPlans = options.stream()
-                    .map(option -> new OptionPlan(option.optionId(), option.name(), option.totalQuantity(), null))
-                    .toList();
-            return new Plan(null, null, null, null, currentTotal, null, optionPlans);
-        }
-        int low = base.multiply(BigDecimal.ONE.subtract(range)).setScale(0, RoundingMode.FLOOR).intValueExact();
+    private static Plan emptyPlan(List<DemandOption> options) {
+        List<OptionPlan> optionPlans = options.stream()
+                .map(option -> new OptionPlan(option.optionId(), option.name(), option.totalQuantity(), null))
+                .toList();
+        return new Plan(null, null, null, null, currentTotal(options), null, optionPlans);
+    }
+
+    private static Plan toPlan(long activeWishCount, SelectedRate selected, BigDecimal safetyStockRate,
+                               List<DemandOption> options) {
+        BigDecimal wishes = BigDecimal.valueOf(activeWishCount);
+        BigDecimal avgQuantity = selected.avgQuantity().value();
+        BigDecimal base = wishes.multiply(selected.rate().value()).multiply(avgQuantity);
+        int low = wishes.multiply(selected.interval().low()).multiply(avgQuantity)
+                .setScale(0, RoundingMode.FLOOR).intValueExact();
         int expected = base.setScale(0, RoundingMode.HALF_UP).intValueExact();
-        int high = base.multiply(BigDecimal.ONE.add(range)).setScale(0, RoundingMode.CEILING).intValueExact();
+        int high = wishes.multiply(selected.interval().high()).multiply(avgQuantity)
+                .setScale(0, RoundingMode.CEILING).intValueExact();
         int recommended = base.multiply(BigDecimal.ONE.add(safetyStockRate))
                 .setScale(0, RoundingMode.CEILING).intValueExact();
+        int currentTotal = currentTotal(options);
         return new Plan(low, expected, high, recommended, currentTotal, recommended - currentTotal,
                 allocate(recommended, options, currentTotal));
+    }
+
+    private static int currentTotal(List<DemandOption> options) {
+        return options.stream().mapToInt(DemandOption::totalQuantity).sum();
     }
 
     /*
