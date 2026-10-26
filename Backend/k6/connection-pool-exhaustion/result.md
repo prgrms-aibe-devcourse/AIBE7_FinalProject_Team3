@@ -1,6 +1,6 @@
 # DB 커넥션 풀 고갈 (connection-pool-exhaustion, GR-156)
 
-> 공통 실행 환경·전제는 `../RESULTS.md` 참고.
+> 공통 실행 환경·전제는 `../README.md` 참고.
 
 HikariCP 풀 크기는 `application.yml`에 미지정 → 기본값 **10**. 주문 쓰기(`order_burst`,
 VU 15)와 목록/상세 읽기(`read_burst`, VU 15)를 합쳐 풀 크기의 3배(30 VU)를 20초간

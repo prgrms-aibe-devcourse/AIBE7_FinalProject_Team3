@@ -1,6 +1,6 @@
 # 드롭 오픈 순간 스파이크 (drop-open-spike, GR-152)
 
-> 공통 실행 환경·전제는 `../RESULTS.md` 참고.
+> 공통 실행 환경·전제는 `../README.md` 참고.
 
 WISH 상태 DROP(`sale_starts_at` = seed 30초 뒤)을 대상으로, 목록/상세 조회가
 0→50 VU로 램프업하다가 오픈 시각에 구매 VU 30명이 한꺼번에 주문을 시도하는

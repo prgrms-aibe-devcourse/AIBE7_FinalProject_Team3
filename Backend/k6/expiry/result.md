@@ -1,6 +1,6 @@
 # 결제 대기 만료 + 취소 동시성 (expiry, GR-151)
 
-> 공통 실행 환경·전제는 `../RESULTS.md` 참고.
+> 공통 실행 환경·전제는 `../README.md` 참고.
 
 주문 생성 → `payment_expires_at`을 과거로 수동 조정(배치 주기 10초) → 취소 요청.
 **통과** — 만료 배치가 먼저 처리(`status=EXPIRED`, `release_reason=EXPIRED`,

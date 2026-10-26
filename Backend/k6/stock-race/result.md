@@ -1,6 +1,6 @@
 # 재고 경쟁 (stock-race, GR-151)
 
-> 공통 실행 환경·전제는 `../RESULTS.md` 참고.
+> 공통 실행 환경·전제는 `../README.md` 참고.
 
 재고 5개에 VU 20명이 동시 주문. **3회 실행, 전부 통과** (성공 5건 / 나머지 422
 `INSUFFICIENT_STOCK`, `verify.sql` 음수재고·초과판매 0행).

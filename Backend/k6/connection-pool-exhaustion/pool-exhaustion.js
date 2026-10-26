@@ -38,6 +38,9 @@ export const options = {
             duration: DURATION,
         },
     },
+    thresholds: {
+        pool_exhaustion_failures_total: ['count==0'],
+    },
 };
 
 export function setup() {
@@ -70,6 +73,10 @@ export function orderBurst(data) {
 
     const ok = check(res, {
         '주문 201(성공) 또는 422(재고부족)': (r) => r.status === 201 || r.status === 422,
+        '422면 INSUFFICIENT_STOCK': (r) => {
+            if (r.status !== 422) return true;
+            return JSON.parse(r.body).error.code === 'INSUFFICIENT_STOCK';
+        },
     });
     if (!ok) {
         exhaustionFailures.add(1);
