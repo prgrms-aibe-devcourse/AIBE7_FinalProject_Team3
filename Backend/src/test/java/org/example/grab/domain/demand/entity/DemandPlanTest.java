@@ -63,6 +63,39 @@ class DemandPlanTest {
                 .isInstanceOf(IllegalStateException.class);
     }
 
+    @Test
+    @DisplayName("설명 결과는 PENDING에서 한 번만 기록하고 결정한 계획에도 기록한다")
+    void recordExplanation_recordsOnceFromPending() {
+        // given
+        DemandPlan plan = DemandPlan.draft(100L, 7L, "{}", "OWN", "{}", "v1", ExplanationStatus.PENDING);
+        plan.decide(DemandPlanStatus.REJECTED, null, null, NOW);
+
+        // when
+        boolean first = plan.recordExplanation(ExplanationStatus.GENERATED, "{\"summary\":\"요약\"}",
+                "gemini-2.5-flash", "v1", 812);
+        boolean second = plan.recordExplanation(ExplanationStatus.FAILED, null, null, "v1", null);
+
+        // then
+        assertThat(first).isTrue();
+        assertThat(second).isFalse();
+        assertThat(plan.getExplanationStatus()).isEqualTo(ExplanationStatus.GENERATED);
+        assertThat(plan.getExplanation()).isEqualTo("{\"summary\":\"요약\"}");
+        assertThat(plan.getLlmModel()).isEqualTo("gemini-2.5-flash");
+        assertThat(plan.getExplanationTokens()).isEqualTo(812);
+    }
+
+    @Test
+    @DisplayName("설명이 꺼진 계획에는 기록하지 않고, 설명은 GENERATED에만 저장한다")
+    void recordExplanation_rejectsInvalidRecord() {
+        assertThat(draft().recordExplanation(ExplanationStatus.GENERATED, "{}", "m", "v1", 1)).isFalse();
+
+        DemandPlan pending = DemandPlan.draft(100L, 7L, "{}", "OWN", "{}", "v1", ExplanationStatus.PENDING);
+        assertThatThrownBy(() -> pending.recordExplanation(ExplanationStatus.DISCARDED, "{}", "m", "v1", 1))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> pending.recordExplanation(ExplanationStatus.DISABLED, null, null, "v1", null))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
     private static DemandPlan draft() {
         return DemandPlan.draft(100L, 7L, "{}", "OWN", "{}", "v1", ExplanationStatus.DISABLED);
     }

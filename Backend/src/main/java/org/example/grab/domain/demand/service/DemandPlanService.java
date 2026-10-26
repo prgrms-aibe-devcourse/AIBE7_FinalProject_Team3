@@ -12,6 +12,9 @@ import org.example.grab.domain.demand.entity.DemandPlan;
 import org.example.grab.domain.demand.entity.DemandPlanStatus;
 import org.example.grab.domain.demand.entity.ExplanationStatus;
 import org.example.grab.domain.demand.error.DemandErrorCode;
+import org.example.grab.domain.demand.explanation.DemandExplanationClient;
+import org.example.grab.domain.demand.explanation.DemandExplanationPrompt;
+import org.example.grab.domain.demand.explanation.DemandPlanSavedEvent;
 import org.example.grab.domain.demand.repository.DemandAnalysisRepository;
 import org.example.grab.domain.demand.repository.DemandAnalysisRepository.TargetDrop;
 import org.example.grab.domain.demand.repository.DemandPlanRepository;
@@ -19,6 +22,7 @@ import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,6 +55,8 @@ public class DemandPlanService {
     private final DemandAnalysisRepository demandAnalysisRepository;
     private final DemandPlanRepository demandPlanRepository;
     private final ObjectMapper objectMapper;
+    private final DemandExplanationClient explanationClient;
+    private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
 
     @Autowired
@@ -58,9 +64,12 @@ public class DemandPlanService {
             DemandAnalysisService demandAnalysisService,
             DemandAnalysisRepository demandAnalysisRepository,
             DemandPlanRepository demandPlanRepository,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            DemandExplanationClient explanationClient,
+            ApplicationEventPublisher eventPublisher
     ) {
-        this(demandAnalysisService, demandAnalysisRepository, demandPlanRepository, objectMapper, Clock.systemUTC());
+        this(demandAnalysisService, demandAnalysisRepository, demandPlanRepository, objectMapper, explanationClient,
+                eventPublisher, Clock.systemUTC());
     }
 
     DemandPlanService(
@@ -68,24 +77,29 @@ public class DemandPlanService {
             DemandAnalysisRepository demandAnalysisRepository,
             DemandPlanRepository demandPlanRepository,
             ObjectMapper objectMapper,
+            DemandExplanationClient explanationClient,
+            ApplicationEventPublisher eventPublisher,
             Clock clock
     ) {
         this.demandAnalysisService = demandAnalysisService;
         this.demandAnalysisRepository = demandAnalysisRepository;
         this.demandPlanRepository = demandPlanRepository;
         this.objectMapper = objectMapper;
+        this.explanationClient = explanationClient;
+        this.eventPublisher = eventPublisher;
         this.clock = clock;
     }
 
     /*
         클라이언트가 보낸 계산 결과는 받지 않고 저장 시점 데이터로 다시 계산해 남긴다(DEMAND-005).
         권한·상태 확인은 계산(analyze)에서 함께 한다.
-        LLM 설명(GR-146)이 아직 없어 설명 생성은 꺼진 상태(DISABLED)로 저장한다.
+        LLM 모델이 설정돼 있으면 PENDING으로 저장하고 커밋 후 설명 생성을 시작한다. 없으면 DISABLED로 저장한다(DEMAND.md 2.3).
      */
     @Transactional
     public DemandPlanResponse save(long sellerId, long userId, long dropId, DemandCalculateRequest request) {
         DemandAnalysisResponse analysis = demandAnalysisService.analyze(sellerId, dropId, request);
         Assumption conversionRate = analysis.assumptions().conversionRate();
+        boolean explain = explanationClient.available();
         DemandPlan plan = demandPlanRepository.save(DemandPlan.draft(
                 dropId,
                 userId,
@@ -93,7 +107,11 @@ public class DemandPlanService {
                 conversionRate == null ? null : conversionRate.source().name(),
                 objectMapper.writeValueAsString(analysis),
                 analysis.calculationVersion(),
-                ExplanationStatus.DISABLED));
+                explain ? ExplanationStatus.PENDING : ExplanationStatus.DISABLED));
+        if (explain) {
+            eventPublisher.publishEvent(new DemandPlanSavedEvent(
+                    plan.getUuid(), DemandExplanationPrompt.input(analysis, objectMapper)));
+        }
         return toResponse(plan, analysis, OffsetDateTime.now(clock));
     }
 

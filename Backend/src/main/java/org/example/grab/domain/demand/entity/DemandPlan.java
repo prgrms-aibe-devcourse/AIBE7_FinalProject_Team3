@@ -71,6 +71,15 @@ public class DemandPlan extends UUIDEntity {
     @Column(columnDefinition = "jsonb")
     private String explanation;
 
+    @Column(name = "llm_model", length = 100)
+    private String llmModel;
+
+    @Column(name = "prompt_version", length = 20)
+    private String promptVersion;
+
+    @Column(name = "explanation_tokens")
+    private Integer explanationTokens;
+
     private DemandPlan(Long dropId, Long createdBy, String assumptions, String conversionBasis, String result,
                        String calculationVersion, ExplanationStatus explanationStatus) {
         this.dropId = Objects.requireNonNull(dropId);
@@ -105,5 +114,29 @@ public class DemandPlan extends UUIDEntity {
         this.decidedQuantities = decidedQuantities;
         this.decisionReason = reason;
         this.decidedAt = Objects.requireNonNull(decidedAt);
+    }
+
+    /*
+        설명 생성 결과는 PENDING에서 한 번만 기록한다. 이미 기록됐으면 false를 돌려주고 바꾸지 않는다.
+        설명은 GENERATED에만 저장하고, 검증에 실패한 응답 원문은 남기지 않는다(DEMAND.md 3절).
+        설명 상태는 판매자의 결정과 무관해 결정 후에 도착해도 기록한다.
+     */
+    public boolean recordExplanation(ExplanationStatus outcome, String explanationJson, String model,
+                                     String promptVersion, Integer tokens) {
+        if (explanationStatus != ExplanationStatus.PENDING) {
+            return false;
+        }
+        if (outcome == ExplanationStatus.PENDING || outcome == ExplanationStatus.DISABLED) {
+            throw new IllegalArgumentException("설명 생성 결과는 GENERATED·DISCARDED·FAILED 중 하나입니다.");
+        }
+        if ((outcome == ExplanationStatus.GENERATED) != (explanationJson != null)) {
+            throw new IllegalArgumentException("설명은 GENERATED에만 저장합니다.");
+        }
+        this.explanationStatus = outcome;
+        this.explanation = explanationJson;
+        this.llmModel = model;
+        this.promptVersion = promptVersion;
+        this.explanationTokens = tokens;
+        return true;
     }
 }

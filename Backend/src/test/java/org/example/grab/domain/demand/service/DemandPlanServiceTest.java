@@ -23,6 +23,8 @@ import org.example.grab.domain.demand.entity.DemandPlan;
 import org.example.grab.domain.demand.entity.DemandPlanStatus;
 import org.example.grab.domain.demand.entity.ExplanationStatus;
 import org.example.grab.domain.demand.error.DemandErrorCode;
+import org.example.grab.domain.demand.explanation.DemandExplanationClient;
+import org.example.grab.domain.demand.explanation.DemandPlanSavedEvent;
 import org.example.grab.domain.demand.repository.DemandAnalysisRepository;
 import org.example.grab.domain.demand.repository.DemandAnalysisRepository.TargetDrop;
 import org.example.grab.domain.demand.repository.DemandPlanRepository;
@@ -33,6 +35,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -66,6 +69,8 @@ class DemandPlanServiceTest {
     private DemandAnalysisService demandAnalysisService;
     private DemandAnalysisRepository demandAnalysisRepository;
     private DemandPlanRepository demandPlanRepository;
+    private DemandExplanationClient explanationClient;
+    private ApplicationEventPublisher eventPublisher;
     private DemandPlanService service;
 
     @BeforeEach
@@ -73,9 +78,30 @@ class DemandPlanServiceTest {
         demandAnalysisService = mock(DemandAnalysisService.class);
         demandAnalysisRepository = mock(DemandAnalysisRepository.class);
         demandPlanRepository = mock(DemandPlanRepository.class);
+        explanationClient = mock(DemandExplanationClient.class);
+        eventPublisher = mock(ApplicationEventPublisher.class);
         service = new DemandPlanService(demandAnalysisService, demandAnalysisRepository, demandPlanRepository,
-                objectMapper, Clock.fixed(Instant.from(NOW), ZoneOffset.UTC));
+                objectMapper, explanationClient, eventPublisher, Clock.fixed(Instant.from(NOW), ZoneOffset.UTC));
         given(demandPlanRepository.save(any())).willAnswer(invocation -> invocation.getArgument(0));
+    }
+
+    @Test
+    @DisplayName("LLM 모델이 설정돼 있으면 PENDING으로 저장하고 집계값으로 만든 입력과 함께 설명을 요청한다")
+    void save_requestsExplanationWhenModelAvailable() {
+        // given
+        given(explanationClient.available()).willReturn(true);
+        given(demandAnalysisService.analyze(SELLER_ID, DROP_ID, DemandCalculateRequest.defaults()))
+                .willReturn(analysis());
+
+        // when
+        DemandPlanResponse response = service.save(SELLER_ID, USER_ID, DROP_ID, DemandCalculateRequest.defaults());
+
+        // then
+        assertThat(response.explanationStatus()).isEqualTo(ExplanationStatus.PENDING);
+        ArgumentCaptor<DemandPlanSavedEvent> event = ArgumentCaptor.forClass(DemandPlanSavedEvent.class);
+        verify(eventPublisher).publishEvent(event.capture());
+        assertThat(event.getValue().planId()).isEqualTo(response.planId());
+        assertThat(event.getValue().input()).contains("\"recommended\":44").doesNotContain("블랙");
     }
 
     @Test
