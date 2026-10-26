@@ -8,6 +8,8 @@
 `verify.sql` 기준 idempotency_key당 주문 1건 초과 0행. 메모리 419.9MiB/512MiB
 (82.0%), OOM-kill 없음.
 
+## 2026-10-23 최초 실행 (호스트 스왑 켜진 환경 — `memswap_limit` 추가 전)
+
 동시 동일요청 8건 + 같은 키·다른 본문 1건. **통과** — 체크 13/13 성공, `verify.sql`
 기준 idempotency_key당 주문 1건 초과 0행, 실제 생성 주문 2건(동시 요청 1건 + 최초
 요청 1건).
@@ -15,10 +17,11 @@
 - 동시 동일요청: 8개 VU 중 1건만 201, 나머지는 같은 주문을 반환(멱등성 정상)
 - 같은 키·다른 본문: 409 `DUPLICATE_IDEMPOTENCY_KEY`
 
-리소스: backend CPU 24.72%, 메모리 479MiB/512MiB(93.56%) — 지금까지 시나리오 중
-메모리 사용량이 가장 높았다(OOM까지는 여유 있었음).
+리소스: backend CPU 24.72%, 메모리 479MiB/512MiB(93.56%) — 호스트 스왑이 만든
+여유 메모리(최대 1GiB)가 섞인 수치라 `memswap_limit` 추가 후 82.0%로 다시 측정됐다.
 
 ## 결론
 
-idempotency_key당 주문 1건 초과 **미발생**. OOM까지는 여유 있었으나 메모리 93.56%로
-nano에서 빠듯한 케이스 중 하나.
+idempotency_key당 주문 1건 초과 **미발생**. 최신(2026-10-26, 스왑 차단) 수치는
+메모리 82.0%로, 같은 조건에서 재검증한 다섯 시나리오 중 [connection-pool-exhaustion](../connection-pool-exhaustion/result.md)(90.63%)이
+가장 빠듯했다.
