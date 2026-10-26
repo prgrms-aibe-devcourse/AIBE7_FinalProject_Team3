@@ -11,6 +11,8 @@ services:
       DB_USERNAME: grab
       DB_PASSWORD: ${DB_PASSWORD:-grab}
       TOSS_SECRET_KEY: ${TOSS_SECRET_KEY:-}
+      # GR-154/155 부하테스트에서 토스 샌드박스 대신 MockPaymentGateway를 쓸지. 기본은 꺼짐(운영과 동일)
+      GRAB_PAYMENT_MOCK_GATEWAY_ENABLED: ${GRAB_PAYMENT_MOCK_GATEWAY_ENABLED:-false}
       DATA_GO_KR_SERVICE_KEY: ${DATA_GO_KR_SERVICE_KEY:-}
       # 기본값을 두지 않는다. .env에 없으면 빈 값이 전달되어 backend가 기동에 실패한다
       JWT_SECRET: ${JWT_SECRET}

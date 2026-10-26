@@ -47,3 +47,4 @@ verify.sql 실행 명령은 각 SQL 파일 상단 주석을 본다.
 | 드롭 오픈 순간 스파이크 | [`drop-open-spike/`](drop-open-spike/spike.js) | 오픈 순간 조회 램프업 + 주문 스파이크에 서버가 버티는지 (seed.sql 실행 직후 바로 돌려야 함) | [result.md](drop-open-spike/result.md) |
 | 평상시 조회 | [`steady-read/`](steady-read/steady-read.js) | 캐시 없는 상태의 목록/상세 조회 하한선 | [result.md](steady-read/result.md) |
 | DB 커넥션 풀 고갈 | [`connection-pool-exhaustion/`](connection-pool-exhaustion/pool-exhaustion.js) | 풀 크기(기본 10)보다 뚜렷이 많은 동시 요청에 타임아웃/5xx가 나는지 | [result.md](connection-pool-exhaustion/result.md) |
+| 결제 배치 롱런(soak) | [`payment-batch-soak/`](payment-batch-soak/payment-batch-soak.js) | 평상시 수준 주문·결제·취소 트래픽을 장시간 유지해 결제 배치의 메모리·커넥션 누수 여부를 확인 (`GRAB_PAYMENT_MOCK_GATEWAY_ENABLED=true`로 실행해 실제 토스를 안 때림) | [result.md](payment-batch-soak/result.md) |
