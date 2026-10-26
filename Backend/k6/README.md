@@ -87,3 +87,16 @@ DROP_ID/OPTION_ID를 넘길 필요 없다 — k6가 `keyword`로 seed.sql이 만
 조회 캐시(Redis)는 아직 없어서(TECHSTACK.md 87절) 이 결과는 캐시 없이 DB가
 평상시 조회를 얼마나 버티는지의 하한선이며, DB 커넥션(HikariCP) 사용량은
 GR-159 Grafana 대시보드로 함께 본다.
+
+## 6. DB 커넥션 풀 고갈 (06-connection-pool-exhaustion)
+
+```
+docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/06-connection-pool-exhaustion/seed.sql
+k6 run -e DROP_ID=1 -e OPTION_ID=1 Backend/k6/06-connection-pool-exhaustion/pool-exhaustion.js
+docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/06-connection-pool-exhaustion/verify.sql
+```
+HikariCP 풀 크기(application.yml에 미지정 → 기본값 10)보다 뚜렷이 많은 동시
+요청(주문 쓰기 VU + 목록/상세 읽기 VU 합 30)을 걸어, 커넥션이 바닥났을 때
+요청이 대기하다 처리되는지 타임아웃/5xx로 실패하는지 본다. 커넥션 대기
+큐 길이는 `/actuator/prometheus`의 `hikaricp_connections_pending`(또는 GR-159
+Grafana HikariCP 패널)로 함께 확인한다.
