@@ -30,16 +30,23 @@ threshold `fault_http_failures_total count==0` 통과. 설정한 비율과 실�
 
 - 재고 정합성 위반 0행
 - 최종 결제 상태: `CANCELED` 470, `FAILED` 62, `SUCCEEDED` 49 — `UNKNOWN` 남은 것 없음
-- `stuck_in_progress_payments` 0건, `stuck_in_progress_cancellations` 0건
+- `stuck_in_progress_payments` 0건, `stuck_in_progress_cancellations`(생성 후 2분 지난 것) 0건
 - 결제당 보정 환불 기록 중복 0건(`uq_payment_cancellations_compensation` 제약과 일치)
 - `unresolved_reconciliation` 0건
+
+이 3분 스모크 당시엔 `verify.sql`에 생성 시각과 무관한 전체 미해결 취소 집계
+(`unresolved_cancellations_total`)가 없어, 위 수치는 "오래(2분 이상) 방치된 취소는
+없었다"는 것까지만 보여준다. 결제 쪽은 `UNKNOWN` 남은 것 없음을 상태 분포로 직접
+확인했지만, 취소 쪽은 같은 수준의 전수 확인을 이 실행에서는 하지 못했다 — 재실행
+시 `unresolved_cancellations_total`도 함께 확인해야 한다.
 
 ## 결론
 
 MockPaymentGateway의 장애 주입이 의도대로 동작하고(비율·지연 모두 설정값과
 일치), `PaymentBatchService`의 진행 중 결제 정리·취소 재요청 배치가 주입된
-결과불명을 전부 해소했다. 보정 환불 기록 중복 생성도 없었고 재고 정합성도
-깨지지 않았다.
+결제 결과불명을 전부 해소했다(상태 분포로 확인). 취소 결과불명은 오래 방치된
+건이 없음을 확인했고(전수 확인은 다음 실행에서 보강 필요), 보정 환불 기록
+중복 생성도 없었고 재고 정합성도 깨지지 않았다.
 
 **완료 조건 대비 현황**:
 - [x] PG 장애를 로컬에서 재현하는 방법이 정해지고 문서화된다(MockPaymentGateway

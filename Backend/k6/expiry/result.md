@@ -24,7 +24,7 @@
 
 ## 2026-10-26(이어서): G1GC 명시 재검증 — nano·micro 둘 다 통과
 
-`JDK_JAVA_OPTIONS`에 `-XX:+UseG1GC`를 명시하고 nano·micro 양쪽에서 다시 실행. 둘 다 **통과**(재고 정확히 한 번만 반환). 결과·수치에 의미 있는 차이는 없었다(nano 메모리 94.79%, micro 45.57%).
+`JDK_JAVA_OPTIONS`에 `-XX:+UseG1GC`를 명시하고 nano·micro 양쪽에서 다시 실행. 둘 다 **통과**(재고 정확히 한 번만 반환). 실행 종료 시점 메모리: nano 94.79%, micro 45.57%.
 
 ## 결론
 

@@ -58,8 +58,9 @@ JOIN drops d ON d.id = o.drop_id
 WHERE d.name = 'k6 PG장애주입 상품'
   AND pc.status IN ('REQUESTED', 'UNKNOWN');
 
--- 4) 결제당 보정 환불 기록은 하나뿐이어야 한다(uq_payment_cancellations_compensation이
---    DB 레벨에서 막아주지만, 실제로 중복 생성 시도가 있었는지 여기서도 확인한다. 0행 기대).
+-- 4) 결제당 보정 환불 기록은 하나뿐이어야 한다(저장된 기록만 센다. uq_payment_cancellations_compensation이
+--    DB 레벨에서 막아주므로 중복 INSERT 시도 자체는 여기 남지 않고 거부된다 — 시도 횟수까지 보려면
+--    애플리케이션 로그나 제약 위반 메트릭을 별도로 봐야 한다. 0행 기대).
 SELECT pc.payment_id, COUNT(*) AS compensation_count
 FROM payment_cancellations pc
 WHERE pc.purpose = 'LATE_APPROVAL_COMPENSATION'
