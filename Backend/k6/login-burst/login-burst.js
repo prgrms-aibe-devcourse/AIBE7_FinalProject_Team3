@@ -17,9 +17,9 @@
 //   EMAIL, PASSWORD  MODE의 기본 계정 대신 쓸 값
 //
 // 사전 준비: common/accounts-seed.sql
-//   k6 run -e VUS=20 Backend/k6/05-login-burst/login-burst.js
-//   k6 run -e VUS=20 -e SHAPE=burst Backend/k6/05-login-burst/login-burst.js
-//   k6 run -e VUS=20 -e MODE=fail Backend/k6/05-login-burst/login-burst.js
+//   k6 run -e VUS=20 Backend/k6/login-burst/login-burst.js
+//   k6 run -e VUS=20 -e SHAPE=burst Backend/k6/login-burst/login-burst.js
+//   k6 run -e VUS=20 -e MODE=fail Backend/k6/login-burst/login-burst.js
 //
 // success 모드는 로그인마다 Redis에 세션 키 2개(TTL 14일)를 남긴다. 측정이 끝나면 README 5절의 정리 절차를 따른다.
 import http from 'k6/http';
