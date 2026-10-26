@@ -18,29 +18,42 @@
 
 ### 1.2 전환율 표본 선택
 
-후보는 `status = ENDED`, `close_reason = TIME_EXPIRED`이고 활성 WISH가 1 이상인 DROP이며 분석 대상 DROP은 제외한다. 표본은 최대 20개다.
+후보는 `status = ENDED`, `close_reason = TIME_EXPIRED`이고 활성 WISH가 1 이상인 DROP이며 분석 대상 DROP은 제외한다. 후보를 본인 DROP과 다른 판매자 DROP으로 나눠 두 기준의 전환율을 따로 계산하고, 섞지 않는다.
+
+| 전환율 기준 | 표본 | 표본 수 |
+| --- | --- | --- |
+| `OWN` (내 실적) | 본인의 후보 DROP | 최대 20개 |
+| `MARKET` (시장 평균) | 다른 판매자의 후보 DROP 중 `closed_at`이 오늘 0시(KST) 이전인 DROP(1.3) | 최대 20개 |
+
+각 기준 안에서 표본은 아래 방법으로 고른다.
 
 | 기준 | 선택 방법 | 사용 조건 |
 | --- | --- | --- |
-| `SIMILAR` | 대상과 후보의 임베딩 코사인 유사도가 0.75 이상인 DROP을 유사도 순으로 선택 | 대상 DROP의 임베딩이 있고(GR-147), 결과 신뢰도가 `NONE`이 아닐 때 |
+| `SIMILAR` | 대상과 후보의 임베딩 코사인 유사도가 0.75 이상인 DROP을 유사도 순으로 선택 | 대상 DROP의 임베딩이 있고(GR-147), 해당 기준의 결과 신뢰도가 `NONE`이 아닐 때 |
 | `CATEGORY` | 같은 `category_id`의 DROP을 `closed_at` 최신순으로 선택 | 그 외 모든 경우(GR-147 구현 전 기본값) |
 
 유사도 기준값은 설정(`grab.demand.similarity.min-score`)으로 바꾼다.
 
 ### 1.3 다른 판매자 데이터 보호
 
-다른 판매자의 DROP별 판매 실적은 노출하지 않는다(DEMAND-008).
+다른 판매자의 DROP별 판매 실적은 노출하지 않는다(DEMAND-008). 내 실적은 본인 데이터이므로 정확한 값과 표본 수를 그대로 보여 주고, 시장 평균에만 아래 규칙을 적용한다.
 
-- 선택한 표본을 본인 DROP과 다른 판매자 DROP으로 나눈다. 다른 판매자 DROP이 10개 이상이고 서로 다른 판매자가 5명 이상일 때만 다른 판매자 DROP을 표본에 포함한다(`scope: OWN_AND_OTHERS`). 미달이면 본인 DROP만 쓴다(`scope: OWN_ONLY`).
+- **최소 집계 단위**: 시장 표본이 DROP 10개 이상이고 서로 다른 판매자가 5명 이상일 때만 시장 평균을 계산한다. 미달이면 시장 평균의 신뢰도는 `NONE`이고 값은 `null`이다.
+- **기준 시점 고정**: 시장 표본은 오늘 0시(KST) 이전에 종료된 DROP으로 제한해 하루 동안 값이 바뀌지 않게 한다. 별도 스냅샷 테이블·배치 없이 조회 조건으로 처리하고, 기준 시점을 `market.asOf`로 반환한다.
+- **반올림**: 시장 평균 전환율은 정수 %(소수 둘째 자리, 예: 0.30), 구매자당 평균 수량은 소수 첫째 자리로 반올림한 값을 계산과 응답에 쓴다.
+- **구간 표시**: 시장 표본 수는 구간(`NONE`, `10_TO_19`, `20_PLUS`)으로만, 표본 WISH 수는 10 단위 내림으로 표시한다.
+- **기준 분리**: 본인 DROP을 시장 표본에 넣지 않는다. 본인 값과 섞은 합산값을 보여 주면 판매자가 자기 실적을 빼서 다른 판매자 값을 역산할 수 있기 때문이다.
 - 응답·저장 스냅샷·LLM 입력에는 집계값만 담는다. 다른 판매자의 상품명·브랜드·DROP ID·DROP별 수치는 담지 않는다.
-- 다른 판매자 표본 수는 구간(`NONE`, `10_TO_19`, `20_PLUS`)으로만, 표본 WISH 수는 10 단위 내림으로 표시한다. 본인 표본 수는 그대로 표시한다.
-- 전환율은 소수 둘째 자리, 구매자당 평균 수량은 소수 첫째 자리로 반올림한 값을 계산과 응답에 쓴다.
+
+**한계**: 날짜별 값을 비교해 그사이 종료된 DROP의 실적을 추정하는 차분 공격은 위 규칙으로 어려워지지만 완전히 막히지 않는다. 하루에 종료된 시장 DROP이 하나뿐이면 반올림 후에도 일부 정보가 드러날 수 있다. 통계에 잡음을 섞는 차분 프라이버시는 현재 규모에 비해 과하다고 보고 적용하지 않는다.
 
 ### 1.4 전환율
 
 - 표본 DROP마다 `wishers` = 활성 WISH 수, `converted` = 그중 해당 DROP에 결제 확정(`paid_at` 있음)·미취소(`canceled_at` 없음) 주문이 한 건 이상 있는 사용자 수, `quantity` = 그 주문들의 `order_items.quantity` 합계.
-- `conversionRate` = Σ`converted` / Σ`wishers`, `avgQuantityPerBuyer` = Σ`quantity` / Σ`converted` (Σ`converted`가 0이면 1).
+- 기준(`OWN`, `MARKET`)마다 `conversionRate` = Σ`converted` / Σ`wishers`, `avgQuantityPerBuyer` = Σ`quantity` / Σ`converted` (Σ`converted`가 0이면 1)를 따로 계산한다. 내 실적의 전환율은 소수 둘째 자리로 반올림한다.
 - WISH 없이 구매한 사용자는 포함하지 않는다. 예상 수량이 실제보다 낮게 나올 수 있다는 점을 응답의 `notes`에 표시한다.
+
+신뢰도는 기준마다 따로 판정한다. 시장 평균은 1.3의 최소 집계 단위에 미달하면 `NONE`이다.
 
 | 신뢰도 | 조건 | 예상 범위 폭 `u` |
 | --- | --- | --- |
@@ -49,7 +62,18 @@
 | `NONE` | 그 외 | - |
 | `SELLER_INPUT` | 판매자가 전환율을 직접 입력 | 0.3 |
 
-### 1.5 판매 계획
+### 1.5 계획에 쓸 전환율 기준
+
+| `assumptions.conversionRate.source` | 사용하는 값 | 선택 방법 |
+| --- | --- | --- |
+| `OWN` | 내 실적의 전환율·구매자당 평균 수량 | 판매자가 `conversionBasis: OWN` 지정, 또는 기본값 |
+| `MARKET` | 시장 평균의 전환율·구매자당 평균 수량 | 판매자가 `conversionBasis: MARKET` 지정, 또는 기본값 |
+| `SELLER_INPUT` | 판매자가 입력한 전환율, 구매자당 평균 수량은 기본 기준의 값(없으면 1) | 판매자가 `conversionRate` 입력 |
+
+- 기본값은 신뢰도가 높은 기준이다(`HIGH` > `LOW`). 같으면 `OWN`을 쓰고, 둘 다 `NONE`이면 기준이 없다.
+- 판매자가 신뢰도 `NONE`인 기준을 지정하면 범위·추천 수량 없이 `NO_CONVERSION_SAMPLE`을 반환한다.
+
+### 1.6 판매 계획
 
 ```text
 base        = activeWishCount × conversionRate × avgQuantityPerBuyer
@@ -59,23 +83,24 @@ high        = ceil(base × (1 + u))
 recommended = ceil(base × (1 + safetyStockRate))
 ```
 
-- 기본 가정: `conversionRate`는 표본 전환율(신뢰도 `NONE`이면 없음), `safetyStockRate`는 0.1.
+- 기본 가정: `conversionRate`·`avgQuantityPerBuyer`는 1.5의 기본 기준 값(기준이 없으면 없음), `safetyStockRate`는 0.1.
+- `u`는 사용한 기준의 신뢰도(1.4)를 따른다.
 - 입력 범위: `0 < conversionRate ≤ 1`, `0 ≤ safetyStockRate ≤ 1`, 각각 소수 둘째 자리까지. 벗어나면 `VALIDATION_FAILED`.
 - 옵션별 배분: `recommended`를 활성 옵션(`is_active = true`)의 현재 `total_quantity` 비율로 나눈다. 정수 배분은 최대 나머지 방식이며 나머지가 같으면 `sort_order`, `id` 순이다.
 - 현재 판매 수량 합계(`currentTotalQuantity`)와 차이(`differenceFromCurrent`)를 함께 반환한다.
 - 계산 로직을 바꾸면 `calculationVersion`을 올린다(초기 `v1`, 유사 상품 기준 도입 시 `v2`).
 
-### 1.6 데이터 부족
+### 1.7 데이터 부족
 
 | `dataGaps` 코드 | 조건 | 결과 |
 | --- | --- | --- |
 | `NO_ACTIVE_WISH` | `activeWishCount = 0` | 범위·추천 수량 없음 |
-| `NO_CONVERSION_SAMPLE` | 신뢰도 `NONE`이고 판매자 입력 전환율 없음 | 범위·추천 수량 없음 |
-| `SMALL_CONVERSION_SAMPLE` | 신뢰도 `LOW` | 범위를 넓혀 계산, 추천 수량은 제공 |
+| `NO_CONVERSION_SAMPLE` | 사용할 기준이 없거나 지정한 기준의 신뢰도가 `NONE`이고, 판매자 입력 전환율 없음 | 범위·추천 수량 없음 |
+| `SMALL_CONVERSION_SAMPLE` | 사용한 기준의 신뢰도 `LOW` | 범위를 넓혀 계산, 추천 수량은 제공 |
 
-범위·추천 수량이 없으면 `plan`의 수량 필드가 `null`이다. 판매자는 전환율을 직접 입력해 다시 계산할 수 있다.
+범위·추천 수량이 없으면 `plan`의 수량 필드가 `null`이다. 판매자는 다른 기준을 고르거나 전환율을 직접 입력해 다시 계산할 수 있다.
 
-### 1.7 제안 표시 조건
+### 1.8 제안 표시 조건
 
 `suggestion.ready`는 `activeWishCount ≥ 30` 또는 `hoursUntilSaleStart ≤ 48`일 때 `true`다. 기준값은 설정(`grab.demand.suggestion.*`)으로 바꾼다.
 
@@ -113,30 +138,39 @@ GET /api/v1/seller/drops/{dropId}/demand-analysis
       "trendApproximate": true
     },
     "conversion": {
-      "rate": 0.32,
-      "avgQuantityPerBuyer": 1.0,
-      "confidence": "HIGH",
       "selection": "CATEGORY",
-      "scope": "OWN_AND_OTHERS",
-      "ownDropCount": 2,
-      "otherDropCountBand": "10_TO_19",
-      "sampleWishCount": 1830
+      "own": {
+        "rate": 0.4,
+        "avgQuantityPerBuyer": 1.0,
+        "confidence": "LOW",
+        "dropCount": 3,
+        "wishCount": 85
+      },
+      "market": {
+        "rate": 0.3,
+        "avgQuantityPerBuyer": 1.0,
+        "confidence": "HIGH",
+        "dropCountBand": "10_TO_19",
+        "wishCount": 1740,
+        "asOf": "2026-10-22T00:00:00+09:00"
+      }
     },
     "assumptions": {
-      "conversionRate": { "value": 0.32, "source": "SAMPLE" },
+      "conversionRate": { "value": 0.3, "source": "MARKET" },
+      "avgQuantityPerBuyer": { "value": 1.0, "source": "MARKET" },
       "safetyStockRate": { "value": 0.1, "source": "DEFAULT" }
     },
     "plan": {
-      "low": 107,
-      "expected": 134,
-      "high": 162,
-      "recommended": 148,
+      "low": 100,
+      "expected": 126,
+      "high": 152,
+      "recommended": 139,
       "currentTotalQuantity": 120,
-      "differenceFromCurrent": 28,
+      "differenceFromCurrent": 19,
       "options": [
-        { "optionId": 1001, "name": "블랙 / M", "currentQuantity": 40, "recommendedQuantity": 50 },
-        { "optionId": 1002, "name": "블랙 / L", "currentQuantity": 40, "recommendedQuantity": 49 },
-        { "optionId": 1003, "name": "화이트 / M", "currentQuantity": 40, "recommendedQuantity": 49 }
+        { "optionId": 1001, "name": "블랙 / M", "currentQuantity": 40, "recommendedQuantity": 47 },
+        { "optionId": 1002, "name": "블랙 / L", "currentQuantity": 40, "recommendedQuantity": 46 },
+        { "optionId": 1003, "name": "화이트 / M", "currentQuantity": 40, "recommendedQuantity": 46 }
       ]
     },
     "dataGaps": [],
@@ -145,8 +179,8 @@ GET /api/v1/seller/drops/{dropId}/demand-analysis
 }
 ```
 
-- `assumptions.*.source`: `SAMPLE`(표본), `DEFAULT`(기본값), `SELLER_INPUT`(판매자 입력).
-- `conversion`은 1.3의 보호 규칙을 적용한 집계값이다. 신뢰도가 `NONE`이면 `rate`·`avgQuantityPerBuyer`가 `null`이다.
+- `conversion.own`·`conversion.market`: 두 기준을 항상 함께 반환한다. 신뢰도가 `NONE`이면 `rate`·`avgQuantityPerBuyer`가 `null`이다. `market`은 1.3의 보호 규칙을 적용한 집계값이다.
+- `assumptions.*.source`: `OWN`(내 실적), `MARKET`(시장 평균), `DEFAULT`(기본값), `SELLER_INPUT`(판매자 입력). 사용할 기준이 없으면 `conversionRate`·`avgQuantityPerBuyer`는 `null`이다.
 - 옵션 `name`은 옵션 그룹 순서대로 값을 ` / `로 이은 표시명이다.
 
 ### 2.2 가정 변경 재계산
@@ -161,12 +195,16 @@ POST /api/v1/seller/drops/{dropId}/demand-analysis/calculate
 
 ```json
 {
-  "conversionRate": 0.25,
+  "conversionBasis": "OWN",
   "safetyStockRate": 0.05
 }
 ```
 
-두 필드 모두 선택이며 생략하면 기본 가정을 쓴다. 응답은 2.1과 같고 저장하지 않는다.
+- `conversionBasis`: 선택, `OWN` 또는 `MARKET`. 생략하면 1.5의 기본 기준을 쓴다.
+- `conversionRate`: 선택, 판매자가 직접 정한 전환율. `conversionBasis`와 함께 보내면 `VALIDATION_FAILED`.
+- `safetyStockRate`: 선택, 생략하면 기본값.
+
+응답은 2.1과 같고 저장하지 않는다.
 
 ### 2.3 판매 계획 저장
 
@@ -212,11 +250,14 @@ GET /api/v1/seller/demand-plans/{planId}
     "decision": null,
     "explanationStatus": "GENERATED",
     "explanation": {
-      "summary": "활성 WISH 420명과 비슷한 상품의 전환율 32%를 적용하면 예상 주문 수량은 134개입니다.",
-      "reasons": ["본인과 다른 판매자의 비슷한 종료 상품을 함께 본 표본이라 신뢰도가 높습니다."],
+      "summary": "활성 WISH 420명에 같은 카테고리 시장 평균 전환율 30%를 적용하면 예상 주문 수량은 126개입니다.",
+      "reasons": [
+        "내 실적 전환율 40%는 표본 DROP 3개로 신뢰도가 낮아, 신뢰도가 높은 시장 평균을 기준으로 했습니다.",
+        "내 실적이 시장 평균보다 높으므로 내 실적 기준으로 다시 계산해 비교할 수 있습니다."
+      ],
       "risks": ["WISH 없이 구매한 사용자가 많으면 예상보다 빨리 품절될 수 있습니다."],
       "dataGaps": [],
-      "notRecommended": ["예상 수량 134개만 준비하면 예상 범위 상단 162개에 미치지 못합니다."]
+      "notRecommended": ["예상 수량 126개만 준비하면 예상 범위 상단 152개에 미치지 못합니다."]
     }
   }
 }
@@ -257,7 +298,8 @@ POST /api/v1/seller/demand-plans/{planId}/decision
 
 ## 3. LLM 설명 생성
 
-- 입력: 저장된 `result`·`assumptions`와 카테고리명·본인 DROP의 옵션 표시명. 회원 정보, 원본 행, 다른 판매자의 개별 데이터는 보내지 않는다(NFR-012). 옵션 표시명은 판매자 입력이므로 지시가 아닌 데이터로 구분해 전달한다.
+- 입력: 저장된 계산 결과의 집계값과 코드값만 보낸다(`result`의 수치·신뢰도·표본 구간, 계산에 사용한 `assumptions`). 회원 정보, 원본 행, 다른 판매자의 개별 데이터는 보내지 않는다(DEMAND-007, NFR-012).
+- 상품명·카테고리명·옵션 표시명처럼 판매자가 입력한 텍스트는 보내지 않는다. 프롬프트 주입 경로를 없애고, 옵션명 속 숫자(예: 250mm)가 수치 검증을 방해하지 않게 하기 위해서다. 옵션은 배분 순서 번호(옵션 1, 2, …)로 전달하고 화면에서 표시명과 짝지어 보여 준다.
 - 출력: `summary`(문자열), `reasons`·`risks`·`dataGaps`·`notRecommended`(문자열 배열)의 JSON.
 - 수치 검증: 출력 문자열의 모든 숫자가 입력의 수치(정수, 소수, 백분율 환산값)와 같은지 대조한다. 하나라도 다르면 `DISCARDED`로 기록하고 응답 원문은 저장하지 않는다.
 - 호출 시간 제한 10초, 재시도하지 않는다. 실패하면 `FAILED`로 기록한다. 계획 저장·조회·결정은 설명과 관계없이 동작한다.
@@ -267,7 +309,7 @@ POST /api/v1/seller/demand-plans/{planId}/decision
 
 | 지표 | 태그 | 용도 |
 | --- | --- | --- |
-| `grab.demand.plan.saved` | `selection`, `scope` | 계획 저장 수, 표본 기준별 비율 |
+| `grab.demand.plan.saved` | `selection`, `basis`(`own`, `market`, `seller_input`, `none`) | 계획 저장 수, 표본·전환율 기준별 비율 |
 | `grab.demand.plan.decided` | `status` | 수락·수정·거절 비율 |
 | `grab.demand.explanation` | `outcome`(`generated`, `discarded`, `failed`) | 설명 생성 결과 |
 | `grab.demand.explanation.duration` | `model` | LLM 응답 시간 |

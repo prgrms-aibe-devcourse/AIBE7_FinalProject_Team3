@@ -18,8 +18,8 @@
 | API Docs | SpringDoc OpenAPI / Swagger UI | 3.1.0 | Spring Boot 4 기반 API 명세를 자동 생성하고 프론트엔드와 공유한다. |
 | Monitoring Endpoint | Spring Boot Actuator | Boot 관리 | 상태 확인, 메트릭 노출 및 배포 성공 여부를 검증한다. |
 | Scheduling | Spring `@Scheduled` + PostgreSQL 인덱스 폴링 | Boot 관리 | DROP 상태(WISH→GRAB→ENDED) 자동 전환, 결제 배치(진행 중 결제 정리·결제 대기 만료·결제 취소 재요청·보정 환불), 배송 단계 Mock 진행. 별도 스케줄러 인프라 없이 기존 DB·인덱스만 사용한다(1.1절, 1.2절). 스케줄러 스레드는 4개(`spring.task.scheduling.pool.size`)로 두어 작업끼리 서로를 기다리지 않게 한다. 기본값 1이면 결제 배치의 PG 지연이 DROP 판매 시작 전환까지 늦춘다. |
-| AI | Spring AI + Google GenAI(Gemini) | 2.0.x | 저장된 판매 계획의 설명을 구조화 JSON으로 생성한다. 계산에는 쓰지 않는다. 모델명은 설정값이며 평가셋으로 비교해 정한다(1.3절, GR-146). |
-| AI Embedding | Spring AI + Google GenAI Embedding | 2.0.x | 유사 상품 표본 선택용 DROP 임베딩을 생성한다(1.3절, GR-147). |
+| AI | Spring AI + Google GenAI(Gemini) | 2.0.x | 도입 제안, 팀 결정 대기. 저장된 판매 계획의 설명을 구조화 JSON으로 생성한다. 계산에는 쓰지 않는다. 모델명은 설정값이며 평가셋으로 비교해 정한다(1.3절, GR-146). |
+| AI Embedding | Spring AI + Google GenAI Embedding | 2.0.x | 도입 제안, 팀 결정 대기. 유사 상품 표본 선택용 DROP 임베딩을 생성한다(1.3절, GR-147). |
 
 ### 1.1 DROP 상태 자동 전환 선정 이유 (GR-18)
 
@@ -93,7 +93,7 @@
 | LLM이 수량까지 판단 | 구현이 짧음 | 같은 입력에도 결과가 달라지고 수치를 검증할 기준이 없음 |
 | LLM 없이 계산만 | 의존성·비용 없음 | 근거·위험을 판매자가 직접 해석해야 함 |
 
-**LLM 제공자와 프레임워크**: `build.gradle`에 보류 상태로 있던 Spring AI Google GenAI 스타터(채팅·임베딩)를 활성화한다. Spring Boot 설정·관측(Micrometer)과 통합된다. 모델 호출은 인터페이스 뒤에 두어 제공자를 설정으로 바꿀 수 있게 한다. 활성화 시 AGENTS.md의 Spring AI 보류 규칙을 함께 수정한다.
+**LLM 제공자와 프레임워크 (제안, 팀 결정 대기)**: `build.gradle`에 보류 상태로 있는 Spring AI Google GenAI 스타터(채팅·임베딩)를 쓰는 안을 제안한다. Spring Boot 설정·관측(Micrometer)과 통합된다. 모델 호출은 인터페이스 뒤에 두어 제공자를 설정으로 바꿀 수 있게 한다. 현재는 AGENTS.md 규칙에 따라 보류 상태를 유지하며, 팀이 승인하면 의존성을 활성화하고 AGENTS.md의 보류 규칙을 함께 수정한다. 승인 전에는 LLM이 필요 없는 계산·저장 기능(GR-142~144)만 진행한다.
 
 **전환율 표본 선택**
 
@@ -110,7 +110,7 @@
 1. **판단 근거가 재현된다.** 계산은 결정적이고 저장 시점 결과를 스냅샷으로 남기므로 같은 계획을 다시 설명하거나 감사할 수 있다.
 2. **LLM이 수치를 바꿀 수 없다.** 설명의 숫자를 계산 결과와 대조해 다르면 버린다.
 3. **LLM·임베딩이 없어도 동작한다.** 호출 실패·시간 초과는 설명 상태로만 남고, 임베딩이 없으면 카테고리 기준으로 계산한다.
-4. **다른 판매자의 실적을 보호한다.** 다른 판매자 데이터는 판매자 5명·DROP 10개 이상일 때만 집계값으로 쓰고 개별 상품·수치는 응답과 LLM 입력에 넣지 않는다.
+4. **다른 판매자의 실적을 보호한다.** 내 실적과 시장 평균을 섞지 않고 나눠 보여 준다. 시장 평균은 판매자 5명·DROP 10개 이상일 때만 계산하고, 하루 단위 기준 시점 고정·정수 % 반올림·표본 수 구간 표시로 날짜별 값 비교를 통한 역산을 어렵게 한다. 개별 상품·수치는 응답과 LLM 입력에 넣지 않는다.
 
 운영·고도화 기준:
 
@@ -265,7 +265,7 @@ SSE의 초기 연결·조회 주기·부하 조건과 수용 기준은 [실시�
 | --- | --- | --- |
 | Unit Test | JUnit Jupiter, Mockito, AssertJ | 도메인 상태 전이, 금액 계산, 검증 로직을 테스트한다. |
 | Repository Test | `@DataJpaTest` | JPA 매핑, 제약조건, 잠금 쿼리 및 조회 쿼리를 검증한다. |
-| Integration Test | Spring Boot Test + Testcontainers | 실제 PostgreSQL 환경에서 주문·재고·결제 트랜잭션을 검증한다. GR-147부터 pgvector 포함 이미지를 쓴다. |
+| Integration Test | Spring Boot Test + Testcontainers | 실제 PostgreSQL 환경에서 주문·재고·결제 트랜잭션을 검증한다. GR-147을 진행하면 pgvector 포함 이미지로 바꾼다(이미지 선택은 팀 결정 대기). |
 | API Test | MockMvc | 인증·권한, 요청 검증 및 API 응답 계약을 테스트한다. |
 | Mail Test | GreenMail | 이메일 인증 코드 발송을 실제 발송 없이 검증한다. |
 | Load Test | k6 | 동시 주문, 재고 선점, 결제 완료 API의 VU·RPS와 Threshold를 검증한다. |

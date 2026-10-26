@@ -438,8 +438,9 @@ MVP는 주문당 배송 한 건만 지원한다. 배송 상태는 `orders.status
 | `public_id` | UUID | O | UQ, 외부 노출 식별자 |
 | `drop_id` | BIGINT | O | FK drops |
 | `created_by` | BIGINT | O | FK users, 계획을 저장한 판매자 회원 |
-| `assumptions` | JSONB | O | 계산에 사용한 가정(전환율·안전 재고율과 각각의 출처) |
-| `result` | JSONB | O | 저장 시점 계산 결과 스냅샷(수요 데이터, 표본 기준·범위, 예상 범위, 추천 수량, 옵션별 배분, 신뢰도, 부족한 데이터). 다른 판매자의 DROP별 값은 담지 않는다. |
+| `assumptions` | JSONB | O | 계산에 사용한 가정(전환율·구매자당 평균 수량·안전 재고율과 각각의 출처) |
+| `conversion_basis` | VARCHAR(20) | X | 계획에 쓴 전환율 기준: `OWN`, `MARKET`, `SELLER_INPUT`. 사용할 기준이 없으면 NULL |
+| `result` | JSONB | O | 저장 시점 계산 결과 스냅샷(수요 데이터, 내 실적·시장 평균 전환율과 표본 기준·수, 예상 범위, 추천 수량, 옵션별 배분, 신뢰도, 부족한 데이터). 다른 판매자 데이터는 보호 규칙을 적용한 시장 평균 집계값만 담는다. |
 | `calculation_version` | VARCHAR(20) | O | 계산 로직 버전 |
 | `status` | VARCHAR(20) | O | `DRAFT`, `ACCEPTED`, `MODIFIED`, `REJECTED` |
 | `decided_quantities` | JSONB | X | `MODIFIED`일 때 판매자가 정한 옵션별 수량 |
@@ -456,6 +457,7 @@ MVP는 주문당 배송 한 건만 지원한다. 배송 상태는 `orders.status
 - 결정은 `drop_options`·`drops`를 변경하지 않는다. 판매 수량 반영은 범위 밖(후속)이다.
 - 저장과 결정은 `drops.status = WISH`이고 서버 시각이 `sale_starts_at` 이전일 때만 허용한다.
 - `explanation_status`: 저장 직후 `PENDING`, 수치 검증 통과 시 `GENERATED`, 검증 실패 시 `DISCARDED`(응답 원문은 저장하지 않음), 호출 실패·시간 초과 시 `FAILED`. 설명 상태는 계획의 결정 상태와 무관하다.
+- `conversion_basis`는 `assumptions`의 전환율 출처를 그대로 옮긴 값이다. 어느 기준을 고른 계획이 실제 판매량에 가까웠는지 집계할 때 JSONB를 풀지 않고 조회하려고 컬럼으로 둔다.
 - 실제 판매 결과(판매 수량·품절 여부)는 저장하지 않고 지표 집계 시 주문 데이터에서 계산한다.
 
 #### `drop_embeddings` (GR-147)
