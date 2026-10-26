@@ -95,6 +95,11 @@ grab:
     # 부하테스트(GR-154, GR-155)에서 토스 샌드박스 대신 MockPaymentGateway를 쓸지. 운영에서는 켜지 않는다.
     mock-gateway:
       enabled: ${GRAB_PAYMENT_MOCK_GATEWAY_ENABLED:false}
+      # GR-155 장애 주입 비율(0~1). 전부 기본값 0이면 GR-154처럼 항상 성공하는 기존 동작과 같다.
+      confirm-failure-rate: ${GRAB_MOCK_CONFIRM_FAILURE_RATE:0}
+      confirm-unknown-rate: ${GRAB_MOCK_CONFIRM_UNKNOWN_RATE:0}
+      cancel-unknown-rate: ${GRAB_MOCK_CANCEL_UNKNOWN_RATE:0}
+      resolve-delay-seconds: ${GRAB_MOCK_RESOLVE_DELAY_SECONDS:20}
   # 국세청 사업자등록 상태조회(GR-90, SELLER-005). 서비스키가 없으면 검증을 생략하고 PENDING 접수로 넘어간다.
   nts:
     business-registration:

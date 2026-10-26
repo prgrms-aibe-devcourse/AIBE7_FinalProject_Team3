@@ -7,40 +7,64 @@ import org.example.grab.domain.payment.gateway.PaymentGateway;
 import org.example.grab.domain.payment.gateway.PaymentGatewayResult;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.DoubleSupplier;
 
 /*
     부하테스트(GR-154, GR-155)에서 실제 토스페이먼츠 샌드박스를 호출하지 않도록 쓰는 가짜 PG.
     토스 샌드박스는 기능 검증용이라 장시간·고빈도 호출을 보내면 레이트리밋·키 정지로 이어질 수 있어,
     배치·트랜잭션·DB 쪽 부하만 보고 싶을 때는 이 구현체로 PaymentGateway를 바꿔치기한다(운영에서는 쓰지 않는다).
-    항상 승인·취소에 성공한다. 실패를 섞고 싶으면(장애 주입) 별도 설정으로 확장한다.
+    기본은 항상 성공이고, GR-155(PG 장애 주입)에서는 grab.payment.mock-gateway의 비율 설정으로
+    승인 거절·결과불명·취소 결과불명을 섞는다. 결과불명은 즉시 풀어주지 않고
+    resolveDelay가 지난 뒤에야 확정시켜서, PaymentService의 즉시 조회로 바로 끝나버리지 않고
+    PaymentBatchService(진행 중 결제 정리·취소 재요청)가 나중에 다시 물어봐서 해결하는
+    경로를 실제로 태우게 한다.
  */
 public class MockPaymentGateway implements PaymentGateway {
 
     private static final String NOT_FOUND_CODE = "MOCK_PAYMENT_NOT_FOUND";
+    private static final String INJECTED_FAILURE_CODE = "MOCK_INJECTED_FAILURE";
 
-    // resolve()가 이전 승인 결과를 lookup으로 다시 조회할 때 같은 결과를 돌려주기 위한 기록.
+    // resolve()/lookup()이 확정된 승인 결과를 다시 조회할 때 같은 결과를 돌려주기 위한 기록.
     private final ConcurrentHashMap<String, PaymentGatewayResult> approvals = new ConcurrentHashMap<>();
+    // confirm()에서 결과불명으로 떨어진 결제가, resolveDelay가 지나야 조회로 확정되게 하기 위한 보류 기록.
+    private final ConcurrentHashMap<String, PendingConfirm> pendingConfirms = new ConcurrentHashMap<>();
     // 같은 멱등 키로 취소를 다시 요청하면(GR-87 취소 재요청 배치) 최초 결과를 그대로 돌려주기 위한 기록.
     private final ConcurrentHashMap<String, PaymentCancelResult> cancellations = new ConcurrentHashMap<>();
+    // cancel()에서 결과불명으로 떨어진 취소가, resolveDelay가 지나야 재요청으로 확정되게 하기 위한 보류 기록.
+    private final ConcurrentHashMap<String, Instant> pendingCancels = new ConcurrentHashMap<>();
     private final Clock clock;
+    private final MockPaymentGatewayProperties properties;
+    // 테스트가 Math.random() 대신 확률을 주입할 수 있게 하기 위함. 기본은 실제 난수.
+    private final DoubleSupplier random;
 
-    public MockPaymentGateway() {
-        this(Clock.systemUTC());
+    private record PendingConfirm(String orderId, long amount, Instant readyAt) {
     }
 
-    MockPaymentGateway(Clock clock) {
+    public MockPaymentGateway(MockPaymentGatewayProperties properties) {
+        this(properties, Clock.systemUTC(), Math::random);
+    }
+
+    MockPaymentGateway(MockPaymentGatewayProperties properties, Clock clock, DoubleSupplier random) {
+        this.properties = properties;
         this.clock = clock;
+        this.random = random;
     }
 
     @Override
     public PaymentGatewayResult confirm(PaymentConfirmCommand command) {
-        PaymentGatewayResult result = PaymentGatewayResult.approved(
-                "DONE", command.orderId(), command.amount(), OffsetDateTime.now(clock));
-        approvals.put(command.paymentKey(), result);
-        return result;
+        if (random.getAsDouble() < properties.confirmFailureRate()) {
+            return PaymentGatewayResult.notApproved(null, INJECTED_FAILURE_CODE, "장애 주입: 결제 승인 거절");
+        }
+        if (random.getAsDouble() < properties.confirmUnknownRate()) {
+            Instant readyAt = clock.instant().plusSeconds(properties.resolveDelaySeconds());
+            pendingConfirms.put(command.paymentKey(), new PendingConfirm(command.orderId(), command.amount(), readyAt));
+            return PaymentGatewayResult.unknown(null, INJECTED_FAILURE_CODE, "장애 주입: 결제 승인 결과 불명");
+        }
+        return approve(command.paymentKey(), command.orderId(), command.amount());
     }
 
     @Override
@@ -49,11 +73,38 @@ public class MockPaymentGateway implements PaymentGateway {
         if (approved != null) {
             return approved;
         }
+        PendingConfirm pending = pendingConfirms.get(paymentKey);
+        if (pending != null) {
+            if (clock.instant().isBefore(pending.readyAt())) {
+                return PaymentGatewayResult.unknown(null, INJECTED_FAILURE_CODE, "장애 주입: 결제 승인 결과 불명(대기 중)");
+            }
+            pendingConfirms.remove(paymentKey);
+            return approve(paymentKey, pending.orderId(), pending.amount());
+        }
         return PaymentGatewayResult.notApproved(null, NOT_FOUND_CODE, "모킹된 결제 기록이 없습니다.");
+    }
+
+    private PaymentGatewayResult approve(String paymentKey, String orderId, long amount) {
+        PaymentGatewayResult result = PaymentGatewayResult.approved("DONE", orderId, amount, OffsetDateTime.now(clock));
+        approvals.put(paymentKey, result);
+        return result;
     }
 
     @Override
     public PaymentCancelResult cancel(PaymentCancelCommand command) {
+        PaymentCancelResult cached = cancellations.get(command.idempotencyKey());
+        if (cached != null) {
+            return cached;
+        }
+        Instant readyAt = pendingCancels.get(command.idempotencyKey());
+        if (readyAt == null && random.getAsDouble() < properties.cancelUnknownRate()) {
+            readyAt = clock.instant().plusSeconds(properties.resolveDelaySeconds());
+            pendingCancels.put(command.idempotencyKey(), readyAt);
+        }
+        if (readyAt != null && clock.instant().isBefore(readyAt)) {
+            return PaymentCancelResult.unknown(null, INJECTED_FAILURE_CODE, "장애 주입: 결제 취소 결과 불명(대기 중)");
+        }
+        pendingCancels.remove(command.idempotencyKey());
         return cancellations.computeIfAbsent(command.idempotencyKey(), key -> PaymentCancelResult.canceled(
                 "CANCELED", UUID.randomUUID().toString(), OffsetDateTime.now(clock)));
     }
