@@ -35,6 +35,9 @@ export const options = {
 };
 
 export function setup() {
+    // 로그인을 먼저 한다. k6 v2는 Secure 쿠키도 http로 다시 보내므로, 다른 요청이 받아 둔 XSRF-TOKEN이
+    // 쿠키 저장소에 있으면 /auth/csrf가 새 쿠키를 내려주지 않아 login()이 실패한다.
+    const session = login('k6-buyer@loadtest.local', 'LoadTest1234!');
     const res = http.get(`${BASE_URL}/api/v1/drops?keyword=${encodeURIComponent(KEYWORD)}&size=100`);
     if (res.status !== 200) {
         throw new Error(`시드 데이터 조회 실패: status=${res.status}. 06-sse-stream/seed.sql을 먼저 실행하세요.`);
@@ -44,7 +47,6 @@ export function setup() {
         const stockRes = http.get(`${BASE_URL}/api/v1/drops/${d.dropId}/stocks`);
         return { dropId: d.dropId, optionId: JSON.parse(stockRes.body).data.options[0].optionId };
     });
-    const session = login('k6-buyer@loadtest.local', 'LoadTest1234!');
     return { session, hot: drops[0], others: drops.slice(1) };
 }
 
