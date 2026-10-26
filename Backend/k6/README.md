@@ -120,4 +120,5 @@ docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/06-sse-st
 - 연결 제한 동작(같은 IP 21번째 연결 429, 201번째 연결 503) 확인은 오버라이드를 끄고 따로 한다:
   `GRAB_STOCKSTREAM_MAXCONNECTIONSPERIP=20 GRAB_STOCKSTREAM_CONNECTRATEMAX=30 docker compose ... up -d` 후
   `CONNECTIONS=25 node ...sse-clients.mjs`의 `statuses`에서 429 5건을 확인한다.
-  201번째 연결 503은 기본 오버라이드 상태에서 `CONNECTIONS=205`로 실행해 503 5건을 확인한다.
+  201번째 연결 503은 기본 오버라이드 상태(IP 상한 1000 > 전체 상한 200)에서 `CONNECTIONS=205`로 실행해
+  503 5건을 확인한다. 서버는 IP 제한을 먼저 검사하므로 IP 상한이 200 이하면 429가 먼저 난다.

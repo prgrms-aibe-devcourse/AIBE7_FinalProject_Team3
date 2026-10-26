@@ -13,8 +13,9 @@ services:
       JDK_JAVA_OPTIONS: -Xmx384m
       # SSE 부하테스트(GR-157, k6/06-sse-stream)는 모든 연결이 로컬 한 IP에서 나간다.
       # 기본값(IP당 20 연결·60초당 30 요청)이면 21번째 연결부터 429라 200 연결을 만들 수 없어 부하테스트에서만 푼다.
-      # 서버 전체 상한(max-connections=200)은 그대로 둔다. 제한 동작 자체를 볼 때는 20/30을 넘겨 실행한다.
-      GRAB_STOCKSTREAM_MAXCONNECTIONSPERIP: ${GRAB_STOCKSTREAM_MAXCONNECTIONSPERIP:-200}
+      # 서버 전체 상한(max-connections=200)은 그대로 둔다. IP 제한을 먼저 검사하므로 IP 상한을 전체 상한보다 크게 둬야
+      # 201번째 연결에서 503(전체 상한)을 볼 수 있다. IP 제한 동작 자체를 볼 때는 20/30을 넘겨 실행한다.
+      GRAB_STOCKSTREAM_MAXCONNECTIONSPERIP: ${GRAB_STOCKSTREAM_MAXCONNECTIONSPERIP:-1000}
       GRAB_STOCKSTREAM_CONNECTRATEMAX: ${GRAB_STOCKSTREAM_CONNECTRATEMAX:-1000}
 
   postgres:
