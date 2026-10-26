@@ -5,6 +5,11 @@
 services:
   backend:
     mem_limit: 512m
+    # mem_limit만 주면 호스트에 스왑이 켜져 있을 때 도커가 메모리 한도의 2배(최대 1GiB)까지 스왑으로
+    # 더 쓰게 허용한다 — 호스트 스왑 설정에 따라 테스트 결과(특히 OOM 여부)가 달라진다.
+    # memswap_limit을 mem_limit과 같게 고정해 스왑을 안 쓰게 만들고(운영 t3.nano도 기본 스왑 없음),
+    # 호스트 스왑 설정과 무관하게 항상 순수 512MB 한도로 돈다.
+    memswap_limit: 512m
     cpus: 1
     environment:
       # JDK17은 컨테이너 메모리 한도의 1/4을 기본 힙으로 잡는다(128MB) — Spring Boot 기동엔 빠듯해

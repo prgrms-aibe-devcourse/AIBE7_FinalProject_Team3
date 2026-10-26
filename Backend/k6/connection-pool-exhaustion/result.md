@@ -2,6 +2,16 @@
 
 > 공통 실행 환경·전제는 `../README.md` 참고.
 
+## 2026-10-26 재검증: `memswap_limit` 추가(스왑 차단) + 검증 보강(threshold, 422 사유 확인) 후에도 통과
+
+`memswap_limit: 512m`으로 스왑을 막고, `pool_exhaustion_failures_total` threshold와
+422 사유(`INSUFFICIENT_STOCK`) 검증을 추가한 뒤 재실행. 체크 1810/1810(100%)
+성공, threshold `count==0` 통과, HikariCP `pending=0`·`timeout_total=0`(acquire
+최대 1.2s) — **통과**. 메모리 464MiB/512MiB(90.63%)까지 올라갔지만 OOM-kill
+없음. 같은 메모리 압박 조건에서 [drop-open-spike](../drop-open-spike/result.md)는
+죽었으므로, 이 시나리오의 통과가 nano 전체의 여유를 의미하지는 않는다 — 실제로
+90%대는 다섯 시나리오 중 가장 높은 축이라 빠듯한 편이다.
+
 HikariCP 풀 크기는 `application.yml`에 미지정 → 기본값 **10**. 주문 쓰기(`order_burst`,
 VU 15)와 목록/상세 읽기(`read_burst`, VU 15)를 합쳐 풀 크기의 3배(30 VU)를 20초간
 동시에 걸었다. 재고는 10000개로 넉넉히 둬서 재고부족이 아니라 순수 커넥션 경합만

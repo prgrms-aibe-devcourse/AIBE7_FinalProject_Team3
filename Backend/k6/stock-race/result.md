@@ -2,6 +2,15 @@
 
 > 공통 실행 환경·전제는 `../README.md` 참고.
 
+## 2026-10-26 재검증: `memswap_limit` 추가(스왑 차단) 후에도 통과
+
+`compose.loadtest.yaml`에 `memswap_limit: 512m`을 추가해 호스트 스왑에 기대지
+않는 순수 512MB 한도로 다시 실행. 재고 5개에 VU 20명 동시 주문 → **통과**
+(성공 5건, 나머지 422 `INSUFFICIENT_STOCK`, `verify.sql` 초과판매·음수재고 0행,
+threshold `stock_race_success_total count==5` 통과). 실행 직후 메모리
+416.7MiB/512MiB(81.39%), OOM-kill 없음. (같은 조건에서 [drop-open-spike](../drop-open-spike/result.md)는
+서버가 죽었으니, 이 시나리오가 통과했다고 nano 전체가 안전하다는 뜻은 아니다.)
+
 재고 5개에 VU 20명이 동시 주문. **3회 실행, 전부 통과** (성공 5건 / 나머지 422
 `INSUFFICIENT_STOCK`, `verify.sql` 음수재고·초과판매 0행).
 
