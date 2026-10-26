@@ -26,10 +26,12 @@ rm -f $O/$NAME-*
 
 docker compose exec -T postgres psql -U grab -d grab -f - < k6/06-sse-stream/seed.sql > $O/$NAME-seed.txt 2>&1
 
-# backend·postgres CPU/메모리를 3초 간격으로 남긴다. 줄 앞은 epoch 초.
+BACKEND=$(docker compose ps -q backend)
+# backend·postgres CPU/메모리와 backend cgroup 스왑 사용량을 3초 간격으로 남긴다. 줄 앞은 epoch 초.
 ( while true; do
     docker stats --no-stream --format '{{.Name}} {{.CPUPerc}} {{.MemUsage}} {{.MemPerc}}' \
       | grep -E 'backend-1|postgres-1' | sed "s/^/$(date +%s) /"
+    echo "$(date +%s) backend-swap $(docker exec $BACKEND cat /sys/fs/cgroup/memory.swap.current 2>/dev/null || echo down)"
     sleep 3
   done ) > $O/$NAME-stats.txt &
 STATS=$!
@@ -85,6 +87,9 @@ console.log(`주문 p50 ${s.med?.toFixed(1)}ms / p95 ${s["p(95)"]?.toFixed(1)}ms
 grep -E 'checks_failed|http_req_failed' $O/$NAME-k6.txt
 [ "$CONNS" -gt 0 ] && echo "전달 지연: $(tr -d ' \n' < $O/$NAME-latency.json)"
 cat $O/$NAME-prom.txt
+awk '/backend-swap/{if($3=="down")down=1; else if($3>sw)sw=$3} END{printf "backend 스왑 최대 %.1fMiB%s\n", sw/1048576, down?" (측정 중 컨테이너 응답 없음)":""}' $O/$NAME-stats.txt
+docker inspect $BACKEND --format 'backend 상태 {{.State.Status}}, OOMKilled={{.State.OOMKilled}}, 재시작 {{.RestartCount}}회'
+docker exec $BACKEND sh -c 'grep -E "^oom_kill " /sys/fs/cgroup/memory.events' 2>/dev/null | sed 's/^/cgroup /'
 awk '/backend-1/{gsub("%","",$3); gsub("%","",$7); c+=$3; n++; if($3>m)m=$3; if($7>mm)mm=$7}
      END{printf "backend CPU 평균 %.1f%% / 최대 %.1f%%, 메모리 최대 %.1f%%\n", c/n, m, mm}' $O/$NAME-stats.txt
 echo "결과: $O/$NAME-*"
