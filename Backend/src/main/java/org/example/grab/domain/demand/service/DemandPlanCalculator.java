@@ -13,10 +13,12 @@ import org.example.grab.domain.demand.dto.DemandAnalysisResponse.Plan;
 import org.example.grab.domain.demand.dto.DemandCalculateRequest;
 import org.example.grab.domain.demand.dto.DemandDataGap;
 import org.example.grab.domain.demand.dto.DemandOption;
+import org.example.grab.domain.demand.dto.MarketSample;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -36,6 +38,9 @@ public final class DemandPlanCalculator {
     // 95% 신뢰수준의 정규분포 임계값
     private static final BigDecimal Z = new BigDecimal("1.96");
     private static final MathContext PRECISION = MathContext.DECIMAL64;
+    // 시장 평균 최소 집계 단위(DEMAND.md 1.3). 개별 판매자 실적이 드러나지 않게 한다.
+    static final int MARKET_MIN_DROPS = 10;
+    static final int MARKET_MIN_SELLERS = 5;
 
     private DemandPlanCalculator() {
     }
@@ -124,6 +129,31 @@ public final class DemandPlanCalculator {
         return new RateInterval(
                 center.subtract(halfWidth).max(BigDecimal.ZERO).setScale(2, RoundingMode.FLOOR),
                 center.add(halfWidth).min(BigDecimal.ONE).setScale(2, RoundingMode.CEILING));
+    }
+
+    /*
+        다른 판매자 표본 합계를 응답·계산용 시장 평균으로 바꾼다(DEMAND.md 1.3).
+        판매자 5명·DROP 10개 미만이면 값을 만들지 않고, 표본 수는 구간으로, WISH 수는 10 단위 내림으로만 내보낸다.
+        전환율은 정수 %로 반올림하고 구간은 원래 집계값으로 계산한 뒤 정수 %로 하한 내림·상한 올림한다.
+     */
+    public static MarketConversion toMarketConversion(MarketSample sample, OffsetDateTime asOf) {
+        if (sample.dropCount() < MARKET_MIN_DROPS || sample.sellerCount() < MARKET_MIN_SELLERS) {
+            return MarketConversion.unavailable(asOf);
+        }
+        ConversionConfidence confidence = confidenceOf(sample.dropCount(), sample.wishers());
+        if (confidence == ConversionConfidence.NONE) {
+            return MarketConversion.unavailable(asOf);
+        }
+        BigDecimal rate = BigDecimal.valueOf(sample.converted())
+                .divide(BigDecimal.valueOf(sample.wishers()), 2, RoundingMode.HALF_UP);
+        RateInterval interval = wilsonInterval(sample.converted(), sample.wishers());
+        BigDecimal avgQuantity = sample.converted() == 0
+                ? DEFAULT_AVG_QUANTITY
+                : BigDecimal.valueOf(sample.quantity())
+                        .divide(BigDecimal.valueOf(sample.converted()), 1, RoundingMode.HALF_UP);
+        String dropCountBand = sample.dropCount() >= 20 ? "20_PLUS" : "10_TO_19";
+        return new MarketConversion(rate, interval.low(), interval.high(), avgQuantity, confidence,
+                dropCountBand, sample.wishers() / 10 * 10, asOf);
     }
 
     private static OwnConversion toOwnConversion(ConversionSample sample) {

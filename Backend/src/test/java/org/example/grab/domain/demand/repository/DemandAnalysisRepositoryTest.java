@@ -2,6 +2,7 @@ package org.example.grab.domain.demand.repository;
 
 import org.example.grab.domain.demand.dto.ConversionSample;
 import org.example.grab.domain.demand.dto.DemandOption;
+import org.example.grab.domain.demand.dto.MarketSample;
 import org.example.grab.domain.demand.repository.DemandAnalysisRepository.TargetDrop;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -217,6 +218,56 @@ class DemandAnalysisRepositoryTest {
         // when & then
         assertThat(demandAnalysisRepository.findOwnConversionSample(sellerId, categoryId, target, 20))
                 .isEqualTo(ConversionSample.empty());
+    }
+
+    @Test
+    @DisplayName("시장 표본은 다른 판매자의 기준 시점 이전 종료 DROP만 쓰고 서로 다른 판매자 수를 함께 센다")
+    void findMarketConversionSample_filtersOtherSellersBeforeAsOf() {
+        // given: 기준 시점 = 오늘 0시(KST)라고 가정
+        OffsetDateTime asOf = now;
+        Long sellerA = insertSeller();
+        Long sellerB = insertSeller();
+
+        // 판매자 A: DROP 2개(WISH 2명 중 1명이 2개 구매, WISH 1명 미구매)
+        Long a1 = insertDrop(sellerA, categoryId, "ENDED", "TIME_EXPIRED", asOf.minusDays(1));
+        insertOrder(a1, insertWishUser(a1, false), true, false, 2);
+        insertWishUser(a1, false);
+        Long a2 = insertDrop(sellerA, categoryId, "ENDED", "TIME_EXPIRED", asOf.minusDays(2));
+        insertWishUser(a2, false);
+        // 판매자 B: DROP 1개(WISH 1명이 1개 구매), 기준 시점 1시간 전 종료
+        Long b1 = insertDrop(sellerB, categoryId, "ENDED", "TIME_EXPIRED", asOf.minusHours(1));
+        insertOrder(b1, insertWishUser(b1, false), true, false, 1);
+
+        // 빠지는 DROP: 본인 DROP, 기준 시점에 정확히 종료, 기준 시점 이후 종료, 다른 카테고리
+        Long own = insertDrop(sellerId, categoryId, "ENDED", "TIME_EXPIRED", asOf.minusDays(1));
+        insertOrder(own, insertWishUser(own, false), true, false, 5);
+        insertWishUser(insertDrop(sellerB, categoryId, "ENDED", "TIME_EXPIRED", asOf), false);
+        insertWishUser(insertDrop(sellerB, categoryId, "ENDED", "TIME_EXPIRED", asOf.plusHours(1)), false);
+        insertWishUser(insertDrop(sellerB, otherCategoryId, "ENDED", "TIME_EXPIRED", asOf.minusDays(1)), false);
+
+        // when
+        MarketSample sample = demandAnalysisRepository.findMarketConversionSample(sellerId, categoryId, asOf, 20);
+
+        // then: DROP 3개·판매자 2명, WISH 4명 중 2명이 3개 구매
+        assertThat(sample).isEqualTo(new MarketSample(3, 2, 4, 2, 3));
+    }
+
+    @Test
+    @DisplayName("시장 표본의 판매자 수는 최대 개수로 고른 최근 표본 안에서 센다")
+    void findMarketConversionSample_countsSellersWithinLimit() {
+        // given
+        Long oldest = insertDrop(insertSeller(), categoryId, "ENDED", "TIME_EXPIRED", now.minusDays(3));
+        Long middle = insertDrop(insertSeller(), categoryId, "ENDED", "TIME_EXPIRED", now.minusDays(2));
+        Long latest = insertDrop(insertSeller(), categoryId, "ENDED", "TIME_EXPIRED", now.minusDays(1));
+        insertWishUser(oldest, false);
+        insertWishUser(middle, false);
+        insertWishUser(latest, false);
+
+        // when
+        MarketSample sample = demandAnalysisRepository.findMarketConversionSample(sellerId, categoryId, now, 2);
+
+        // then
+        assertThat(sample).isEqualTo(new MarketSample(2, 2, 2, 0, 0));
     }
 
     private Long insertUser() {

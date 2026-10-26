@@ -10,6 +10,7 @@ import org.example.grab.domain.demand.dto.DemandAnalysisResponse.MarketConversio
 import org.example.grab.domain.demand.dto.DemandAnalysisResponse.Suggestion;
 import org.example.grab.domain.demand.dto.DemandCalculateRequest;
 import org.example.grab.domain.demand.dto.DemandOption;
+import org.example.grab.domain.demand.dto.MarketSample;
 import org.example.grab.domain.demand.dto.SampleSelection;
 import org.example.grab.domain.demand.error.DemandErrorCode;
 import org.example.grab.domain.demand.repository.DemandAnalysisRepository;
@@ -78,8 +79,13 @@ public class DemandAnalysisService {
         ConversionSample ownSample = drop.categoryId() == null
                 ? ConversionSample.empty()
                 : demandAnalysisRepository.findOwnConversionSample(sellerId, drop.categoryId(), dropId, MAX_SAMPLE_DROPS);
-        // 시장 평균은 다른 판매자 데이터 보호 규칙과 함께 GR-142 ②에서 계산한다
-        MarketConversion market = MarketConversion.unavailable();
+        // 시장 표본은 오늘 0시(KST) 이전 종료분으로 고정해 하루 동안 값이 바뀌지 않게 한다(DEMAND.md 1.3)
+        OffsetDateTime marketAsOf = now.atZoneSameInstant(KST).toLocalDate().atStartOfDay(KST).toOffsetDateTime();
+        MarketSample marketSample = drop.categoryId() == null
+                ? MarketSample.empty()
+                : demandAnalysisRepository.findMarketConversionSample(
+                        sellerId, drop.categoryId(), marketAsOf, MAX_SAMPLE_DROPS);
+        MarketConversion market = DemandPlanCalculator.toMarketConversion(marketSample, marketAsOf);
         List<DemandOption> options = demandAnalysisRepository.findActiveOptions(dropId);
 
         DemandPlanCalculator.Result result = DemandPlanCalculator.calculate(

@@ -1,6 +1,7 @@
 package org.example.grab.domain.demand.service;
 
 import org.example.grab.domain.demand.config.DemandSuggestionProperties;
+import org.example.grab.domain.demand.dto.AssumptionSource;
 import org.example.grab.domain.demand.dto.ConversionConfidence;
 import org.example.grab.domain.demand.dto.ConversionSample;
 import org.example.grab.domain.demand.dto.DemandAnalysisResponse;
@@ -8,6 +9,7 @@ import org.example.grab.domain.demand.dto.DemandAnalysisResponse.DailyWish;
 import org.example.grab.domain.demand.dto.DemandCalculateRequest;
 import org.example.grab.domain.demand.dto.DemandDataGap;
 import org.example.grab.domain.demand.dto.DemandOption;
+import org.example.grab.domain.demand.dto.MarketSample;
 import org.example.grab.domain.demand.dto.SampleSelection;
 import org.example.grab.domain.demand.error.DemandErrorCode;
 import org.example.grab.domain.demand.repository.DemandAnalysisRepository;
@@ -29,6 +31,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
@@ -51,6 +55,8 @@ class DemandAnalysisServiceTest {
         repository = mock(DemandAnalysisRepository.class);
         service = new DemandAnalysisService(repository, new DemandSuggestionProperties(30, 48),
                 Clock.fixed(Instant.from(NOW), ZoneOffset.UTC));
+        given(repository.findMarketConversionSample(anyLong(), anyLong(), any(), anyInt()))
+                .willReturn(MarketSample.empty());
     }
 
     @Test
@@ -88,6 +94,30 @@ class DemandAnalysisServiceTest {
         assertThat(response.plan().expected()).isEqualTo(40);
         assertThat(response.dataGaps()).containsExactly(DemandDataGap.SMALL_CONVERSION_SAMPLE);
         assertThat(response.notes()).containsExactly(DemandAnalysisService.WISH_ONLY_NOTE);
+    }
+
+    @Test
+    @DisplayName("시장 표본은 오늘 0시(KST) 이전 종료분으로 조회하고 보호 규칙을 거친 값만 응답한다")
+    void analyze_queriesMarketAsOfStartOfDay() {
+        // given: KST 2026-10-22 14:00 → 기준 시점 2026-10-22 00:00 KST
+        OffsetDateTime asOf = OffsetDateTime.parse("2026-10-22T00:00:00+09:00");
+        givenTarget("WISH", NOW.plusDays(1));
+        given(repository.countActiveWishes(DROP_ID)).willReturn(420L);
+        given(repository.findOwnConversionSample(SELLER_ID, CATEGORY_ID, DROP_ID, 20)).willReturn(ConversionSample.empty());
+        given(repository.findMarketConversionSample(SELLER_ID, CATEGORY_ID, asOf, 20))
+                .willReturn(new MarketSample(12, 6, 1745, 523, 600));
+
+        // when
+        DemandAnalysisResponse response = service.analyze(SELLER_ID, DROP_ID, DemandCalculateRequest.defaults());
+
+        // then
+        assertThat(response.conversion().market().asOf()).isEqualTo(asOf);
+        assertThat(response.conversion().market().rate()).isEqualByComparingTo("0.30");
+        assertThat(response.conversion().market().dropCountBand()).isEqualTo("10_TO_19");
+        assertThat(response.conversion().market().wishCount()).isEqualTo(1740L);
+        assertThat(response.assumptions().conversionRate().source()).isEqualTo(AssumptionSource.MARKET);
+        // base = 420 × 0.30 × 1.1(600 / 523 반올림)
+        assertThat(response.plan().expected()).isEqualTo(139);
     }
 
     @Test

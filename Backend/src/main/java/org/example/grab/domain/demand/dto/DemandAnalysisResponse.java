@@ -58,9 +58,9 @@ public record DemandAnalysisResponse(
             Long wishCount,
             OffsetDateTime asOf
     ) {
-        // 시장 평균 집계(GR-142 ②) 전이거나 최소 집계 단위에 미달한 경우
-        public static MarketConversion unavailable() {
-            return new MarketConversion(null, null, null, null, ConversionConfidence.NONE, "NONE", null, null);
+        // 최소 집계 단위·신뢰도 기준에 미달하면 값 없이 기준 시점만 내보낸다
+        public static MarketConversion unavailable(OffsetDateTime asOf) {
+            return new MarketConversion(null, null, null, null, ConversionConfidence.NONE, "NONE", null, asOf);
         }
     }
 

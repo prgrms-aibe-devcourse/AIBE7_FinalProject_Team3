@@ -10,6 +10,7 @@ import org.example.grab.domain.demand.dto.DemandAnalysisResponse.OptionPlan;
 import org.example.grab.domain.demand.dto.DemandCalculateRequest;
 import org.example.grab.domain.demand.dto.DemandDataGap;
 import org.example.grab.domain.demand.dto.DemandOption;
+import org.example.grab.domain.demand.dto.MarketSample;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -27,11 +28,12 @@ class DemandPlanCalculatorTest {
     private static final ConversionSample OWN_LOW = new ConversionSample(3, 85, 34, 34);
     // 내 실적: DROP 10개, WISH 200명 중 50명이 75개 구매 → 전환율 0.25, 구매자당 1.5개, 신뢰도 HIGH
     private static final ConversionSample OWN_HIGH = new ConversionSample(10, 200, 50, 75);
+    private static final OffsetDateTime AS_OF = OffsetDateTime.parse("2026-10-22T00:00:00+09:00");
     // 시장 평균: 전환율 0.30, 윌슨 구간 0.27~0.33(WISH 약 1,740명 기준), 신뢰도 HIGH
     private static final MarketConversion MARKET_HIGH = new MarketConversion(
             new BigDecimal("0.30"), new BigDecimal("0.27"), new BigDecimal("0.33"), new BigDecimal("1.0"),
-            ConversionConfidence.HIGH, "10_TO_19", 1740L,
-            OffsetDateTime.parse("2026-10-22T00:00:00+09:00"));
+            ConversionConfidence.HIGH, "10_TO_19", 1740L, AS_OF);
+    private static final MarketConversion NO_MARKET = MarketConversion.unavailable(AS_OF);
     private static final List<DemandOption> THREE_OPTIONS = List.of(
             new DemandOption(1001, "블랙 / M", 40, 0),
             new DemandOption(1002, "블랙 / L", 40, 1),
@@ -65,7 +67,7 @@ class DemandPlanCalculatorTest {
     void calculate_usesOwnWhenMarketUnavailable() {
         // when
         DemandPlanCalculator.Result result = DemandPlanCalculator.calculate(
-                100, OWN_LOW, MarketConversion.unavailable(), THREE_OPTIONS, DemandCalculateRequest.defaults());
+                100, OWN_LOW, NO_MARKET, THREE_OPTIONS, DemandCalculateRequest.defaults());
 
         // then: base = 100 × 0.40 × 1.0 = 40, 전환율 구간 0.30~0.51
         assertThat(result.own().rateLow()).isEqualByComparingTo("0.30");
@@ -113,7 +115,7 @@ class DemandPlanCalculatorTest {
     void calculate_rejectsRequestedBasisWithoutSample() {
         // when
         DemandPlanCalculator.Result result = DemandPlanCalculator.calculate(
-                420, OWN_LOW, MarketConversion.unavailable(), THREE_OPTIONS,
+                420, OWN_LOW, NO_MARKET, THREE_OPTIONS,
                 new DemandCalculateRequest(ConversionBasis.MARKET, null, null));
 
         // then
@@ -130,7 +132,7 @@ class DemandPlanCalculatorTest {
     void calculate_returnsNoPlanWithoutAnySample() {
         // when
         DemandPlanCalculator.Result result = DemandPlanCalculator.calculate(
-                420, ConversionSample.empty(), MarketConversion.unavailable(), THREE_OPTIONS,
+                420, ConversionSample.empty(), NO_MARKET, THREE_OPTIONS,
                 DemandCalculateRequest.defaults());
 
         // then
@@ -144,7 +146,7 @@ class DemandPlanCalculatorTest {
     void calculate_usesSellerInputRate() {
         // when
         DemandPlanCalculator.Result result = DemandPlanCalculator.calculate(
-                100, OWN_HIGH, MarketConversion.unavailable(), THREE_OPTIONS,
+                100, OWN_HIGH, NO_MARKET, THREE_OPTIONS,
                 new DemandCalculateRequest(null, new BigDecimal("0.20"), new BigDecimal("0.05")));
 
         // then: base = 100 × 0.20 × 1.5 = 30
@@ -163,7 +165,7 @@ class DemandPlanCalculatorTest {
     void calculate_capsSellerInputRangeAtOne() {
         // when
         DemandPlanCalculator.Result result = DemandPlanCalculator.calculate(
-                100, ConversionSample.empty(), MarketConversion.unavailable(), THREE_OPTIONS,
+                100, ConversionSample.empty(), NO_MARKET, THREE_OPTIONS,
                 new DemandCalculateRequest(null, new BigDecimal("0.90"), null));
 
         // then: 0.90 × 1.3 = 1.17이지만 상단은 100 × 1.0 × 1.0
@@ -176,7 +178,7 @@ class DemandPlanCalculatorTest {
     void calculate_sellerInputWithoutAnyBasisUsesDefaultQuantity() {
         // when
         DemandPlanCalculator.Result result = DemandPlanCalculator.calculate(
-                50, ConversionSample.empty(), MarketConversion.unavailable(), THREE_OPTIONS,
+                50, ConversionSample.empty(), NO_MARKET, THREE_OPTIONS,
                 new DemandCalculateRequest(null, new BigDecimal("0.50"), null));
 
         // then
@@ -204,7 +206,7 @@ class DemandPlanCalculatorTest {
     void calculate_handlesSampleWithoutBuyer() {
         // when
         DemandPlanCalculator.Result result = DemandPlanCalculator.calculate(
-                100, new ConversionSample(3, 30, 0, 0), MarketConversion.unavailable(), THREE_OPTIONS,
+                100, new ConversionSample(3, 30, 0, 0), NO_MARKET, THREE_OPTIONS,
                 DemandCalculateRequest.defaults());
 
         // then: 전환율이 0이어도 윌슨 구간 상단은 0보다 커서 범위 상단이 남는다
@@ -280,5 +282,69 @@ class DemandPlanCalculatorTest {
 
         // then: 2.5씩, 나머지가 같으므로 sort_order가 앞선 B가 1개 더 받는다
         assertThat(plans).extracting(OptionPlan::recommendedQuantity).containsExactly(2, 3);
+    }
+
+    @Test
+    @DisplayName("시장 평균은 전환율을 정수 %로, 표본 수는 구간으로, WISH 수는 10 단위 내림으로만 내보낸다")
+    void toMarketConversion_appliesProtectionRounding() {
+        // given: DROP 12개·판매자 6명, WISH 1,745명 중 523명이 600개 구매 → 전환율 0.29971, 구매자당 1.147
+        MarketSample sample = new MarketSample(12, 6, 1745, 523, 600);
+
+        // when
+        MarketConversion market = DemandPlanCalculator.toMarketConversion(sample, AS_OF);
+
+        // then: 구간은 원래 집계값(0.2787~0.3216)으로 계산한 뒤 정수 %로 내림·올림
+        assertThat(market).isEqualTo(new MarketConversion(
+                new BigDecimal("0.30"), new BigDecimal("0.27"), new BigDecimal("0.33"), new BigDecimal("1.1"),
+                ConversionConfidence.HIGH, "10_TO_19", 1740L, AS_OF));
+    }
+
+    @Test
+    @DisplayName("시장 표본이 DROP 20개면 표본 수 구간은 20_PLUS다")
+    void toMarketConversion_bandsTwentyDrops() {
+        MarketConversion market = DemandPlanCalculator.toMarketConversion(
+                new MarketSample(20, 9, 400, 100, 100), AS_OF);
+
+        assertThat(market.dropCountBand()).isEqualTo("20_PLUS");
+        assertThat(market.wishCount()).isEqualTo(400L);
+    }
+
+    @ParameterizedTest(name = "DROP {0}개·판매자 {1}명·WISH {2}명 → 시장 평균 없음")
+    @CsvSource({
+            "9, 5, 1000",
+            "10, 4, 1000",
+            "30, 1, 5000",
+            "10, 5, 19"
+    })
+    @DisplayName("최소 집계 단위(판매자 5명·DROP 10개)나 신뢰도 기준에 미달하면 시장 평균 값을 하나도 내보내지 않는다")
+    void toMarketConversion_hidesBelowMinimum(int dropCount, int sellerCount, long wishers) {
+        // when
+        MarketConversion market = DemandPlanCalculator.toMarketConversion(
+                new MarketSample(dropCount, sellerCount, wishers, wishers / 3, wishers / 3), AS_OF);
+
+        // then: 표본 수·WISH 수도 숨겨 미달 상태의 개별 실적을 짐작할 단서를 남기지 않는다
+        assertThat(market).isEqualTo(NO_MARKET);
+        assertThat(market.rate()).isNull();
+        assertThat(market.wishCount()).isNull();
+        assertThat(market.dropCountBand()).isEqualTo("NONE");
+    }
+
+    @Test
+    @DisplayName("시장 평균이 내 실적보다 신뢰도가 높으면 기본 기준이 되고, 시장 구간으로 범위를 계산한다")
+    void calculate_usesMarketFromSample() {
+        // given: 시장 DROP 10개·판매자 5명, WISH 40명 중 10명 구매 → 신뢰도 LOW, 구간 0.14~0.41
+        MarketConversion market = DemandPlanCalculator.toMarketConversion(new MarketSample(10, 5, 40, 10, 10), AS_OF);
+
+        // when
+        DemandPlanCalculator.Result result = DemandPlanCalculator.calculate(
+                100, ConversionSample.empty(), market, THREE_OPTIONS, DemandCalculateRequest.defaults());
+
+        // then: base = 100 × 0.25 × 1.0
+        assertThat(result.assumptions().conversionRate())
+                .isEqualTo(new Assumption(new BigDecimal("0.25"), AssumptionSource.MARKET));
+        assertThat(result.plan().low()).isEqualTo(14);
+        assertThat(result.plan().expected()).isEqualTo(25);
+        assertThat(result.plan().high()).isEqualTo(41);
+        assertThat(result.dataGaps()).containsExactly(DemandDataGap.SMALL_CONVERSION_SAMPLE);
     }
 }

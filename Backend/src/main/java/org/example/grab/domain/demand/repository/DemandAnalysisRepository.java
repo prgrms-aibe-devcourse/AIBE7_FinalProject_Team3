@@ -2,6 +2,7 @@ package org.example.grab.domain.demand.repository;
 
 import org.example.grab.domain.demand.dto.ConversionSample;
 import org.example.grab.domain.demand.dto.DemandOption;
+import org.example.grab.domain.demand.dto.MarketSample;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -91,40 +92,65 @@ public class DemandAnalysisRepository {
         WISH 없이 구매한 사용자는 세지 않는다.
      */
     public ConversionSample findOwnConversionSample(long sellerId, long categoryId, long excludedDropId, int limit) {
-        String sql = """
-                WITH samples AS (
-                    SELECT d.id
-                    FROM drops d
-                    WHERE d.seller_id = :sellerId AND d.category_id = :categoryId AND d.id <> :excludedDropId
-                      AND d.status = 'ENDED' AND d.close_reason = 'TIME_EXPIRED'
-                      AND EXISTS (SELECT 1 FROM wishes w WHERE w.drop_id = d.id AND w.canceled_at IS NULL)
-                    ORDER BY d.closed_at DESC, d.id DESC
-                    LIMIT :limit
-                ), buyers AS (
-                    SELECT o.drop_id, o.buyer_id, SUM(oi.quantity) AS quantity
-                    FROM orders o
-                    JOIN samples s ON s.id = o.drop_id
-                    JOIN order_items oi ON oi.order_id = o.id
-                    WHERE o.paid_at IS NOT NULL AND o.canceled_at IS NULL
-                    GROUP BY o.drop_id, o.buyer_id
-                )
-                SELECT (SELECT COUNT(*) FROM samples) AS drop_count,
-                       COUNT(w.id) AS wishers,
-                       COUNT(b.buyer_id) AS converted,
-                       COALESCE(SUM(b.quantity), 0) AS quantity
-                FROM samples s
-                JOIN wishes w ON w.drop_id = s.id AND w.canceled_at IS NULL
-                LEFT JOIN buyers b ON b.drop_id = w.drop_id AND b.buyer_id = w.user_id
-                """;
         MapSqlParameterSource parameters = new MapSqlParameterSource()
                 .addValue("sellerId", sellerId)
                 .addValue("categoryId", categoryId)
                 .addValue("excludedDropId", excludedDropId)
                 .addValue("limit", limit);
+        String sql = CONVERSION_AGGREGATE.formatted("d.seller_id = :sellerId AND d.id <> :excludedDropId");
         return jdbcTemplate.queryForObject(sql, parameters, (resultSet, rowNumber) -> new ConversionSample(
                 resultSet.getInt("drop_count"),
                 resultSet.getLong("wishers"),
                 resultSet.getLong("converted"),
                 resultSet.getLong("quantity")));
     }
+
+    /*
+        시장 평균 표본은 다른 판매자의 같은 카테고리 종료 DROP이다(DEMAND.md 1.2·1.3).
+        본인 DROP을 섞으면 합산값에서 자기 실적을 빼 다른 판매자 값을 역산할 수 있어 제외한다.
+        closedBefore(오늘 0시 KST) 이전 종료분만 써서 하루 동안 값이 바뀌지 않게 한다.
+        최소 집계 단위 판정에 쓰도록 표본의 서로 다른 판매자 수도 함께 센다. 이 합계는 서버 안에서만 쓴다.
+     */
+    public MarketSample findMarketConversionSample(long sellerId, long categoryId, OffsetDateTime closedBefore, int limit) {
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("sellerId", sellerId)
+                .addValue("categoryId", categoryId)
+                .addValue("closedBefore", closedBefore)
+                .addValue("limit", limit);
+        String sql = CONVERSION_AGGREGATE.formatted("d.seller_id <> :sellerId AND d.closed_at < :closedBefore");
+        return jdbcTemplate.queryForObject(sql, parameters, (resultSet, rowNumber) -> new MarketSample(
+                resultSet.getInt("drop_count"),
+                resultSet.getInt("seller_count"),
+                resultSet.getLong("wishers"),
+                resultSet.getLong("converted"),
+                resultSet.getLong("quantity")));
+    }
+
+    // %s에는 표본 DROP을 고르는 판매자·기간 조건이 들어간다. 나머지 표본 조건과 전환 집계는 두 기준이 같다.
+    private static final String CONVERSION_AGGREGATE = """
+            WITH samples AS (
+                SELECT d.id, d.seller_id
+                FROM drops d
+                WHERE %s AND d.category_id = :categoryId
+                  AND d.status = 'ENDED' AND d.close_reason = 'TIME_EXPIRED'
+                  AND EXISTS (SELECT 1 FROM wishes w WHERE w.drop_id = d.id AND w.canceled_at IS NULL)
+                ORDER BY d.closed_at DESC, d.id DESC
+                LIMIT :limit
+            ), buyers AS (
+                SELECT o.drop_id, o.buyer_id, SUM(oi.quantity) AS quantity
+                FROM orders o
+                JOIN samples s ON s.id = o.drop_id
+                JOIN order_items oi ON oi.order_id = o.id
+                WHERE o.paid_at IS NOT NULL AND o.canceled_at IS NULL
+                GROUP BY o.drop_id, o.buyer_id
+            )
+            SELECT (SELECT COUNT(*) FROM samples) AS drop_count,
+                   (SELECT COUNT(DISTINCT seller_id) FROM samples) AS seller_count,
+                   COUNT(w.id) AS wishers,
+                   COUNT(b.buyer_id) AS converted,
+                   COALESCE(SUM(b.quantity), 0) AS quantity
+            FROM samples s
+            JOIN wishes w ON w.drop_id = s.id AND w.canceled_at IS NULL
+            LEFT JOIN buyers b ON b.drop_id = w.drop_id AND b.buyer_id = w.user_id
+            """;
 }
