@@ -52,6 +52,11 @@ export const options = {
     },
     thresholds: {
         fault_http_failures_total: ['count==0'],
+        // 장애 주입이 실제로 섞였는지 확인한다(세 결과 전부 1건 이상). 0건이면 장애 주입이 전혀
+        // 안 됐다는 뜻이므로 비율 설정(GRAB_MOCK_*_RATE)이나 DURATION/VUS를 확인해야 한다.
+        fault_payment_failed_total: ['count>0'],
+        fault_payment_unknown_total: ['count>0'],
+        fault_cancel_unknown_total: ['count>0'],
     },
 };
 

@@ -56,10 +56,13 @@ public class MockPaymentGateway implements PaymentGateway {
 
     @Override
     public PaymentGatewayResult confirm(PaymentConfirmCommand command) {
-        if (random.getAsDouble() < properties.confirmFailureRate()) {
+        // 실패·결과불명 구간을 한 번의 난수로 나눠, 설정한 두 비율이 서로 독립적으로 적용되게 한다
+        // (각각 따로 굴리면 실제 결과불명 비율이 설정값보다 낮아진다).
+        double roll = random.getAsDouble();
+        if (roll < properties.confirmFailureRate()) {
             return PaymentGatewayResult.notApproved(null, INJECTED_FAILURE_CODE, "장애 주입: 결제 승인 거절");
         }
-        if (random.getAsDouble() < properties.confirmUnknownRate()) {
+        if (roll < properties.confirmFailureRate() + properties.confirmUnknownRate()) {
             Instant readyAt = clock.instant().plusSeconds(properties.resolveDelaySeconds());
             pendingConfirms.put(command.paymentKey(), new PendingConfirm(command.orderId(), command.amount(), readyAt));
             return PaymentGatewayResult.unknown(null, INJECTED_FAILURE_CODE, "장애 주입: 결제 승인 결과 불명");
@@ -78,16 +81,18 @@ public class MockPaymentGateway implements PaymentGateway {
             if (clock.instant().isBefore(pending.readyAt())) {
                 return PaymentGatewayResult.unknown(null, INJECTED_FAILURE_CODE, "장애 주입: 결제 승인 결과 불명(대기 중)");
             }
+            // 먼저 확정 결과를 기록(동시 조회끼리도 최초 결과로 수렴)한 뒤에 보류 기록을 치운다.
+            PaymentGatewayResult result = approve(paymentKey, pending.orderId(), pending.amount());
             pendingConfirms.remove(paymentKey);
-            return approve(paymentKey, pending.orderId(), pending.amount());
+            return result;
         }
         return PaymentGatewayResult.notApproved(null, NOT_FOUND_CODE, "모킹된 결제 기록이 없습니다.");
     }
 
+    // computeIfAbsent로 동시 호출이 겹쳐도 같은 paymentKey에는 최초 승인 결과만 기록·반환한다.
     private PaymentGatewayResult approve(String paymentKey, String orderId, long amount) {
-        PaymentGatewayResult result = PaymentGatewayResult.approved("DONE", orderId, amount, OffsetDateTime.now(clock));
-        approvals.put(paymentKey, result);
-        return result;
+        return approvals.computeIfAbsent(paymentKey,
+                key -> PaymentGatewayResult.approved("DONE", orderId, amount, OffsetDateTime.now(clock)));
     }
 
     @Override

@@ -23,4 +23,22 @@ public record MockPaymentGatewayProperties(
         @DefaultValue("0") double cancelUnknownRate,
         @DefaultValue("20") long resolveDelaySeconds
 ) {
+    public MockPaymentGatewayProperties {
+        requireRate(confirmFailureRate, "confirmFailureRate");
+        requireRate(confirmUnknownRate, "confirmUnknownRate");
+        requireRate(cancelUnknownRate, "cancelUnknownRate");
+        if (confirmFailureRate + confirmUnknownRate > 1) {
+            throw new IllegalArgumentException(
+                    "confirmFailureRate + confirmUnknownRate must be <= 1, got " + confirmFailureRate + " + " + confirmUnknownRate);
+        }
+        if (resolveDelaySeconds < 0) {
+            throw new IllegalArgumentException("resolveDelaySeconds must be >= 0, got " + resolveDelaySeconds);
+        }
+    }
+
+    private static void requireRate(double rate, String name) {
+        if (rate < 0 || rate > 1) {
+            throw new IllegalArgumentException(name + " must be between 0 and 1, got " + rate);
+        }
+    }
 }

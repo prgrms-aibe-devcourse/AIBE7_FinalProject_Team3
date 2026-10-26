@@ -47,6 +47,17 @@ WHERE d.name = 'k6 PG장애주입 상품'
   AND pc.status IN ('REQUESTED', 'UNKNOWN')
   AND pc.created_at < now() - interval '2 minutes';
 
+-- 3-1) 생성 시각과 무관하게 테스트 종료 시점에 미해결로 남은 취소 전체 건수(참고용 스냅샷).
+--      stuck_in_progress_cancellations(2분 경과분)와 달리, 방금 생성돼 아직 2분이 안 지난
+--      미해결 건까지 포함한 전체 규모를 보기 위함.
+SELECT COUNT(*) AS unresolved_cancellations_total
+FROM payment_cancellations pc
+JOIN payments p ON p.id = pc.payment_id
+JOIN orders o ON o.id = p.order_id
+JOIN drops d ON d.id = o.drop_id
+WHERE d.name = 'k6 PG장애주입 상품'
+  AND pc.status IN ('REQUESTED', 'UNKNOWN');
+
 -- 4) 결제당 보정 환불 기록은 하나뿐이어야 한다(uq_payment_cancellations_compensation이
 --    DB 레벨에서 막아주지만, 실제로 중복 생성 시도가 있었는지 여기서도 확인한다. 0행 기대).
 SELECT pc.payment_id, COUNT(*) AS compensation_count
