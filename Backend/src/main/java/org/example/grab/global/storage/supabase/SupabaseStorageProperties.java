@@ -9,17 +9,19 @@ import java.time.Duration;
 /**
  * Supabase Storage 연동 설정(grab.storage.supabase.*).
  *
- * @param url             프로젝트 URL. 비어 있으면 서명 업로드 URL 발급을 시도하지 않는다
- * @param secretKey       RLS를 우회하는 서버 전용 키. 저장소·이미지·로그·응답에 남기지 않는다
- * @param bucket          DROP 이미지 버킷 이름. 버킷의 허용 MIME·크기 제한과 서버 검증값을 같게 유지한다
- * @param documentsBucket 판매자 신청 서류(암호문) 비공개 버킷 이름(GR-91)
+ * @param url                 프로젝트 URL. 비어 있으면 서명 업로드 URL 발급을 시도하지 않는다
+ * @param secretKey           RLS를 우회하는 서버 전용 키. 저장소·이미지·로그·응답에 남기지 않는다
+ * @param dropImagesBucket    DROP 이미지 공개 버킷 이름. 버킷의 허용 MIME·크기 제한과 서버 검증값을 같게 유지한다
+ * @param documentsBucket     판매자 신청 서류(암호문) 비공개 버킷 이름(GR-91)
+ * @param profileImagesBucket 회원 프로필 이미지 공개 버킷 이름(GR-130). 버킷의 허용 MIME·크기 제한과 서버 검증값을 같게 유지한다
  */
 @ConfigurationProperties("grab.storage.supabase")
 public record SupabaseStorageProperties(
         @DefaultValue("") String url,
         @DefaultValue("") String secretKey,
-        @DefaultValue("drop-images") String bucket,
+        @DefaultValue("drop-images") String dropImagesBucket,
         @DefaultValue("seller-documents") String documentsBucket,
+        @DefaultValue("profile-images") String profileImagesBucket,
         @DefaultValue("3s") Duration connectTimeout,
         @DefaultValue("5s") Duration readTimeout
 ) {
@@ -29,8 +31,9 @@ public record SupabaseStorageProperties(
     public String toString() {
         return "SupabaseStorageProperties[url=" + url
                 + ", secretKey=" + (StringUtils.hasText(secretKey) ? "masked" : "empty")
-                + ", bucket=" + bucket
+                + ", dropImagesBucket=" + dropImagesBucket
                 + ", documentsBucket=" + documentsBucket
+                + ", profileImagesBucket=" + profileImagesBucket
                 + ", connectTimeout=" + connectTimeout
                 + ", readTimeout=" + readTimeout + "]";
     }

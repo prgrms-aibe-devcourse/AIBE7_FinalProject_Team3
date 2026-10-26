@@ -96,8 +96,9 @@ grab:
     supabase:
       url: ${SUPABASE_URL:}
       secret-key: ${SUPABASE_SECRET_KEY:}
-      bucket: ${SUPABASE_DROP_IMAGE_BUCKET:drop-images}
+      drop-images-bucket: ${SUPABASE_DROP_IMAGE_BUCKET:drop-images}
       documents-bucket: ${SUPABASE_SELLER_DOCUMENT_BUCKET:seller-documents}
+      profile-images-bucket: ${SUPABASE_PROFILE_IMAGE_BUCKET:profile-images}
       connect-timeout: 3s
       read-timeout: 5s
   # 판매자 서류 봉투 암호화 마스터키(GR-91). Base64 AES-256 키, 기본값 없음(KMS 연동 없음)

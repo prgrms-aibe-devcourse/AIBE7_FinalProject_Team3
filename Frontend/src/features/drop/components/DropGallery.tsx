@@ -1,13 +1,11 @@
 import { useState } from 'react'
-import type { DetailImage, DropStatus } from '../../../types/drop'
+import type { DetailImage } from '../../../types/drop'
 
 export default function DropGallery({
   name,
-  status,
   images,
 }: {
   name: string
-  status: DropStatus
   images: DetailImage[]
 }) {
   const [selected, setSelected] = useState(0)
@@ -32,9 +30,6 @@ export default function DropGallery({
             상품 이미지 준비 중
           </span>
         )}
-        <span className={`badge ${status === 'WISH' ? 'lime' : ''}`}>
-          {status}
-        </span>
       </div>
       {images.length > 1 && (
         <div className="detail-thumbnails" aria-label="갤러리 이미지 선택">

@@ -26,7 +26,7 @@ const detail = {
   optionGroups: [
     { id: '1', name: '착용감', values: [{ id: '11', label: '릴랙스' }] },
   ],
-  skus: [{ id: 2001, selections: { '1': '11' }, price: 43000, stock: 5 }],
+  skus: [{ id: 2001, selections: { '1': '11' }, price: 43000 }],
   actions: { wishable: false, wishCancelable: false, orderable: true },
 } as unknown as DropDetail
 

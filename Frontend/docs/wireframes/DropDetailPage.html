@@ -5,6 +5,46 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>소비자 상품 상세 와이어프레임</title>
     <link rel="stylesheet" href="wireframe.css" />
+    <style>
+      .detail-state {
+        padding: 20px 0;
+        border-block: 1px solid var(--line);
+      }
+      .detail-number {
+        display: block;
+        font-size: 48px;
+        font-variant-numeric: tabular-nums;
+        line-height: 1.2;
+      }
+      .detail-mobile-stock {
+        display: none;
+      }
+      @media (max-width: 720px) {
+        body {
+          padding-bottom: 100px;
+        }
+        .detail-purchase {
+          position: fixed;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          padding: 16px;
+          background: #fff;
+          border-top: 1px solid var(--line);
+          display: flex;
+          gap: 24px;
+          align-items: center;
+          z-index: 1;
+        }
+        .detail-mobile-stock {
+          display: block;
+        }
+        .detail-purchase .control {
+          flex: 1;
+          text-align: center;
+        }
+      }
+    </style>
   </head>
   <body>
     <header>
@@ -42,15 +82,54 @@
           <small>GALLERY 한 장이면 썸네일 목록 숨김</small>
         </section>
         <section class="panel stack">
-          <span class="tag">WISH / GRAB</span>
-          <h1>상품명 · 브랜드</h1>
-          <p>상품 설명 요약 · 최저가</p>
-          <span class="field">옵션 선택</span
-          ><span class="field">수량 선택</span
-          ><span class="field">판매 기간 · 재고</span
-          ><span class="control primary">WISH 또는 GRAB</span>
+          <p class="muted">브랜드명</p>
+          <h1>상품명</h1>
+          <h2>43,000원 <small>최저가</small></h2>
+          <p>판매 기간 · 10월 24일 오후 8시 – 10월 31일 오후 8시</p>
+          <p>배송 · 3,000원 · 결제 후 순차 출고</p>
+          <div class="detail-state">
+            <span>남은 수량</span
+            ><strong class="detail-number">37<small>개</small></strong>
+          </div>
+          <span class="field">착용감 선택</span>
+          <span class="field">소매 선택</span>
+          <span class="field">수량 선택</span>
+          <p>상품 합계 · 43,000원</p>
+          <div class="detail-purchase">
+            <span class="detail-mobile-stock"
+              >남은 수량<br /><strong>37개</strong></span
+            >
+            <span class="control primary">GRAB 하기</span>
+          </div>
         </section>
       </div>
+      <section class="section panel">
+        <h2>상태 영역 변형</h2>
+        <div class="detail-state">
+          <p>WISH · 오픈 예정</p>
+          <h3>10월 24일 오후 8시 오픈</h3>
+          <p>128 WISH</p>
+          <span class="control primary">WISH 등록하기</span>
+        </div>
+        <div class="detail-state">
+          <p>오픈까지</p>
+          <strong class="detail-number">09:59</strong>
+          <p>10월 24일 오후 8시 오픈 · 128 WISH</p>
+        </div>
+        <div class="detail-state">
+          <p>10개 이하 · 숫자 색만 변경</p>
+          <strong class="detail-number" style="color: #c8493e"
+            >3<small>개</small></strong
+          >
+        </div>
+        <p>종료: 이 DROP은 판매가 종료됐어요.</p>
+        <p>취소: 이 DROP은 판매가 취소됐어요.</p>
+        <p>품절: 이 DROP은 품절됐어요.</p>
+        <p class="muted">
+          옵션별 재고(예: 270 · 3개 남음), 타이머와 240ms 숫자 전환을 적용한다.
+          reduced motion이면 즉시 표시.
+        </p>
+      </section>
       <section class="section">
         <h2>상품 상세 설명</h2>
         <p>실제 상품 설명 텍스트</p>

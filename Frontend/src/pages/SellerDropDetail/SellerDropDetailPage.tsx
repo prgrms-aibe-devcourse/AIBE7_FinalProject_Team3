@@ -84,7 +84,11 @@ export default function SellerDropDetailPage({
   if (query.isPending)
     return (
       <div role="status">
-        <EmptyState title="DROP 상세를 불러오는 중이에요." variant="page" />
+        <EmptyState
+          loading
+          title="DROP 상세를 불러오는 중이에요."
+          variant="page"
+        />
       </div>
     )
   if (apiErrorCode(query.error) === 'DROP_ACCESS_DENIED')
@@ -260,7 +264,7 @@ export default function SellerDropDetailPage({
           </div>
           {stocks.isPending ? (
             <div role="status">
-              <EmptyState title="옵션 재고를 불러오는 중이에요." />
+              <EmptyState loading title="옵션 재고를 불러오는 중이에요." />
             </div>
           ) : stocks.isError ? (
             <div className="seller-drops-result" role="alert">

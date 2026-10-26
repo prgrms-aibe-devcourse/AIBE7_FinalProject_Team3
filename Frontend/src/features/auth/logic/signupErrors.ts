@@ -21,7 +21,7 @@ export type SignupFailure =
 export const NETWORK_MESSAGE = '연결에 실패했어요. 잠시 뒤 다시 시도해주세요.'
 const GENERAL_MESSAGE = '요청을 처리하지 못했어요. 다시 시도해주세요.'
 const EMAIL_FORMAT_MESSAGE = '이메일 주소를 확인해주세요.'
-const DUPLICATE_NICKNAME_MESSAGE = '이미 사용 중인 닉네임이에요.'
+export const DUPLICATE_NICKNAME_MESSAGE = '이미 사용 중인 닉네임이에요.'
 const RESEND_TOO_SOON_MESSAGE =
   '인증 코드를 너무 자주 요청했어요. 잠시 뒤 다시 요청해주세요.'
 export const DUPLICATE_EMAIL_MESSAGE =

@@ -517,7 +517,7 @@ GET /api/v1/users/me
     "nickname": "드롭헌터",
     "provider": "LOCAL",
     "roles": ["USER", "SELLER"],
-    "profileImageUrl": "https://cdn.example.com/images/profile.jpg",
+    "profileImageUrl": "https://<project>.supabase.co/storage/v1/object/public/profile-images/profiles/6f1a2b3c-4d5e-4f70-8192-a3b4c5d6e7f8/1d0f9e8c-7b6a-4539-8412-6c5d4e3f2a1b.jpg",
     "createdAt": "2026-09-18T14:00:00+09:00"
   }
 }
@@ -563,7 +563,7 @@ PATCH /api/v1/users/me
     "nickname": "한정판수집가",
     "provider": "LOCAL",
     "roles": ["USER", "SELLER"],
-    "profileImageUrl": "https://cdn.example.com/images/profile.jpg",
+    "profileImageUrl": "https://<project>.supabase.co/storage/v1/object/public/profile-images/profiles/6f1a2b3c-4d5e-4f70-8192-a3b4c5d6e7f8/1d0f9e8c-7b6a-4539-8412-6c5d4e3f2a1b.jpg",
     "createdAt": "2026-09-18T14:00:00+09:00"
   }
 }
@@ -658,26 +658,64 @@ PUT /api/v1/users/me/profile-image
 ```
 
 - **인증**: 필요 (`USER`)
+- **CSRF**: `X-XSRF-TOKEN` 헤더 필요
+
+LOCAL·소셜 회원 모두 사용할 수 있다. 먼저 [이미지 업로드 API 1.2절](IMAGE_UPLOAD.md#12-내-프로필-이미지-업로드-url-발급)에서 URL을 발급받아 Supabase에 파일을 업로드한 뒤 이 API로 등록한다.
 
 **요청:**
 
 ```json
 {
-  "imageUrl": "https://cdn.example.com/images/profile-uuid.jpg"
+  "imageUrl": "https://<project>.supabase.co/storage/v1/object/public/profile-images/profiles/6f1a2b3c-4d5e-4f70-8192-a3b4c5d6e7f8/1d0f9e8c-7b6a-4539-8412-6c5d4e3f2a1b.jpg"
 }
 ```
 
-**응답:**
+**응답:** `200 OK`
 
 ```json
 {
   "success": true,
   "data": {
     "userId": "6f1a2b3c-4d5e-4f70-8192-a3b4c5d6e7f8",
-    "profileImageUrl": "https://cdn.example.com/images/profile-uuid.jpg"
+    "profileImageUrl": "https://<project>.supabase.co/storage/v1/object/public/profile-images/profiles/6f1a2b3c-4d5e-4f70-8192-a3b4c5d6e7f8/1d0f9e8c-7b6a-4539-8412-6c5d4e3f2a1b.jpg"
   }
 }
 ```
+
+- 요청 필드는 `imageUrl` 하나이며 누락·`null`·빈 문자열·공백만 있는 값은 거부한다. 앞뒤 공백을 제거하거나 URL을 가공하지 않는다.
+- URL은 현재 설정된 프로필 버킷의 공개 주소와 `profiles/{요청자 public_id}/{이미지 UUID}.{확장자}` 경로로 만든 값과 정확히 같아야 한다. 이미지 UUID는 소문자 정규형, 확장자는 `jpg`·`png`·`webp`만 허용한다. 외부 URL·타인 경로·DROP 이미지 URL·쿼리 문자열·대소문자 변형·경로 조작(`..`, 인코딩된 `/`)은 거부한다.
+- 검증은 본인 경로와 URL 형식 비교로 처리한다. 실제 발급 이력이나 저장소의 객체 존재는 조회하지 않는다. 업로드 전이나 이미 삭제된 URL을 등록하면 검증을 통과해도 깨진 이미지가 표시될 수 있다.
+- `users.profile_image_url`에는 검증한 공개 URL 전체를 그대로 저장하며, 1.9·1.10의 `profileImageUrl`에도 반영된다. 프로젝트 주소나 버킷 이름을 바꾸면 기존 데이터의 URL도 갱신해야 한다.
+- 현재와 같은 URL을 다시 등록해도 `200`으로 성공하고 파일 삭제를 요청하지 않는다.
+- 응답의 `userId`는 내부 ID가 아닌 `public_id`다. 1.10과 달리 프로필 이미지 하위 자원만 수정하므로 응답은 `{ userId, profileImageUrl }` 두 필드다. 클라이언트는 `['auth', 'me']` 캐시의 `profileImageUrl`만 갱신한다.
+
+**이전 객체 정리(1.12·1.13 공통):**
+
+- 회원 행을 `SELECT ... FOR UPDATE`로 잠그고 이전 URL 조회와 DB 변경을 같은 트랜잭션에서 처리한다.
+- 교체·삭제한 이전 파일은 DB 커밋 성공 후 삭제한다. 롤백하면 파일을 삭제하지 않는다.
+- 이전 URL이 현재 설정의 프로필 버킷과 본인 경로·UUID·허용 확장자 규칙에 맞을 때만 삭제한다. 이전 값이 `null`이거나 형식 밖이면 삭제를 요청하지 않는다.
+- 저장소 삭제가 실패해도 DB 변경과 성공 응답을 유지한다. 내부 회원 ID와 실패 사유만 WARN 로그로 남기며, 남은 파일의 자동 재시도·정리 배치는 이번 범위에 없다.
+- 삭제는 요청 스레드에서 동기로 실행하므로 성공 응답이 Supabase 삭제 응답 시간만큼 늦어질 수 있다.
+- 저장소에서 삭제해도 공개 URL이 CDN 캐시에 남아 잠시 열릴 수 있다. 2026-10-22 실제 확인에서는 약 1~2분 뒤 접근이 끊겼으며, 이는 캐시 만료 시간의 보장값이 아니다.
+
+**판정 순서:**
+
+인증·권한·CSRF 검사를 통과한 요청에 다음 순서를 적용한다.
+
+1. 요청 형식·필수값 검증 (`INVALID_REQUEST`·`VALIDATION_FAILED`, 400)
+2. 회원 잠금 조회·존재·ACTIVE 상태 확인 (`AUTHENTICATION_REQUIRED`, 401)
+3. 본인 프로필 이미지 URL 형식 확인 (`VALIDATION_FAILED`, 400, `field` = `imageUrl`)
+4. 공개 URL 저장·DB 커밋
+5. 이전 객체 정리 후 변경된 프로필 이미지 정보로 200 응답
+
+**오류 코드:**
+
+- `INVALID_REQUEST`(400): 요청 본문 형식 오류
+- `VALIDATION_FAILED`(400): `imageUrl` 누락·빈 값 또는 본인 프로필 이미지 URL 형식 불일치 (`fieldErrors`의 `field` = `imageUrl`)
+- `AUTHENTICATION_REQUIRED`(401): `access_token` 쿠키 없음, 회원 없음·정지·탈퇴
+- `INVALID_TOKEN`(401): 만료·변조된 Access Token
+- `ACCESS_DENIED`(403): `USER` 권한 없음 또는 CSRF 토큰 누락·불일치
+- `INTERNAL_SERVER_ERROR`(500): DB 장애 등 서버 오류. 커밋 후 이전 객체 삭제 실패는 이 API의 오류 응답으로 바꾸지 않는다.
 
 ### 1.13 내 프로필 이미지 삭제
 
@@ -686,8 +724,30 @@ DELETE /api/v1/users/me/profile-image
 ```
 
 - **인증**: 필요 (`USER`)
+- **CSRF**: `X-XSRF-TOKEN` 헤더 필요
+
+LOCAL·소셜 회원 모두 사용할 수 있으며 요청 본문은 없다.
 
 **응답:** `204 No Content`
+
+- `profile_image_url`을 `null`로 바꾼다. 이후 내 정보 조회의 `profileImageUrl`은 키를 생략하지 않고 `null`로 반환한다.
+- 이미지가 없어도 같은 `204`로 성공한다. 클라이언트는 성공 시 `['auth', 'me']` 캐시의 `profileImageUrl`을 `null`로 갱신한다.
+- 이전 파일의 커밋 후 삭제·실패 처리·CDN 캐시 한계는 1.12절의 공통 정리 규칙을 따른다.
+
+**판정 순서:**
+
+인증·권한·CSRF 검사를 통과한 요청에 다음 순서를 적용한다.
+
+1. 회원 잠금 조회·존재·ACTIVE 상태 확인 (`AUTHENTICATION_REQUIRED`, 401)
+2. 프로필 이미지 값을 `null`로 저장·DB 커밋
+3. 이전 객체 정리 후 본문 없이 204 응답
+
+**오류 코드:**
+
+- `AUTHENTICATION_REQUIRED`(401): `access_token` 쿠키 없음, 회원 없음·정지·탈퇴
+- `INVALID_TOKEN`(401): 만료·변조된 Access Token
+- `ACCESS_DENIED`(403): `USER` 권한 없음 또는 CSRF 토큰 누락·불일치
+- `INTERNAL_SERVER_ERROR`(500): DB 장애 등 서버 오류. 커밋 후 이전 객체 삭제 실패는 이 API의 오류 응답으로 바꾸지 않는다.
 
 ---
 

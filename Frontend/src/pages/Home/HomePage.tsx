@@ -37,7 +37,11 @@ function HomeSection({
 
       {state.status === 'loading' ? (
         <div role="status" aria-live="polite">
-          <EmptyState title="인기 상품을 불러오는 중이에요." variant="block" />
+          <EmptyState
+            loading
+            title="인기 상품을 불러오는 중이에요."
+            variant="block"
+          />
         </div>
       ) : state.status === 'error' ? (
         <div className="catalog-error" role="alert">

@@ -1,6 +1,6 @@
 # GRAB Frontend
 
-React와 TypeScript로 만든 GRAB MVP 화면 초안입니다. 주요 화면은 Mock 데이터를 사용하며 공개 카테고리 API만 최소 연동했습니다.
+React와 TypeScript로 만든 GRAB MVP 프론트엔드입니다. 화면별 Mock과 실제 API 연동 범위는 아래 "Mock 화면과 API 연동 경계"를 따릅니다.
 
 ## 실행
 
@@ -95,6 +95,9 @@ npx playwright show-trace test-results/<테스트>/trace.zip
 - 로딩·빈 결과·오류·권한 부족·상태별 버튼의 화면 상태를 준비합니다. Mock 버튼은 로컬 데모 동작이며 실제 주문·결제·판매자 승인·배송 처리로 안내하지 않습니다.
 - 실제 연동 이슈에서는 Mock 공급 부분을 `src/api/client.ts` 요청과 TanStack Query로 교체하고, API 응답을 화면용 데이터로 바꾸는 코드는 해당 `src/features`에 둡니다. 쓰이지 않게 된 Mock만 제거하고 화면 배치와 컴포넌트는 유지합니다.
 - LOCAL 회원가입(이메일 인증 코드 요청·확인·가입 완료)은 Mock 없이 실제 백엔드 API를 사용합니다(GR-31). KAKAO·GOOGLE 소셜 로그인(시작·콜백 `/auth/callback`·소셜 가입 `/signup?type=social`)도 실제 백엔드를 사용합니다(GR-47).
+- 마이페이지 닉네임 수정(`PATCH /api/v1/users/me`)과 LOCAL 계정의 비밀번호 변경(`PATCH /api/v1/users/me/password`)은 실제 백엔드 API를 사용합니다(GR-131, `src/api/auth/me.ts`). 계정 설정 행의 "변경"으로 여는 각각의 모달 폼으로 처리하며(GR-160) 닉네임 저장 성공 시 응답으로 `['auth', 'me']` 캐시를 교체합니다. 비밀번호 변경 성공 시 모달을 닫고 기존 로그인 세션을 유지합니다.
+- 마이페이지 프로필 이미지 등록·변경·삭제도 실제 백엔드 API를 사용합니다(GR-132). 업로드 URL 발급(`POST /api/v1/users/me/profile-image/upload-url`) → 서명 URL로 Storage에 직접 `PUT` → 등록(`PUT /api/v1/users/me/profile-image`) 순서이며, 삭제는 `DELETE /api/v1/users/me/profile-image`입니다. 성공하면 `['auth', 'me']` 캐시의 `profileImageUrl`만 바꿔 계정 카드와 헤더가 함께 갱신됩니다. Storage `PUT`은 DROP 이미지와 같은 `src/api/storage/upload.ts`를 쓰고, 서명 URL은 화면·주소·브라우저 저장소에 남기지 않습니다.
+- 로그인 상태 헤더는 MY 글자 대신 프로필 이미지(없으면 닉네임 첫 글자) 버튼을 두고, 누르면 마이페이지·로그아웃 메뉴를 펼칩니다(GR-132, `src/components/Header/AccountMenu.tsx`). E2E에서 헤더로 마이페이지에 갈 때는 `e2e/fixtures.ts`의 `goToMyPage`를 씁니다.
 - 인증 쿠키·CSRF·401 재시도는 `src/api/client.ts`의 공통 클라이언트와 `src/api/auth/`가 처리합니다(GR-45). 저장 결과·도메인 서버 오류·중복 요청 검증은 각 화면의 실제 API 연동 단계에서 확인합니다. 화면 초안의 Mock 성공 상태를 서버 처리 성공의 증거로 취급하지 않습니다.
 
 화면별 PR 범위와 검증 항목은 해당 Linear 이슈에, 로컬 작업 순서는 `todo/page-renewal.md`에 적습니다. `todo/`는 git에서 제외되는 개인 작업 메모입니다.
@@ -104,6 +107,8 @@ npx playwright show-trace test-results/<테스트>/trace.zip
 백엔드를 먼저 실행한 뒤 `npm run dev`로 프론트엔드를 띄웁니다. 프론트엔드는 `/api/v1` 상대 경로로 요청하고 Vite가 백엔드에 프록시합니다. 기본 주소는 `http://localhost:8080`입니다. 다른 백엔드를 사용하려면 `.env.example`을 `.env.local`로 복사하고 `VITE_API_PROXY_TARGET`에 백엔드 원점 주소(예: `https://api.example.com`, `/api/v1` 제외)를 설정합니다. 값이 없거나 공백이면 기본 주소를 사용합니다. `.env`·`.env.local`·`.env.[mode]` 설정은 [Vite의 `loadEnv`](https://vite.dev/config/#using-environment-variables-in-config)로 읽으며 변경 후 개발 서버를 재시작해야 합니다. 실제 환경 파일은 git에서 제외하고 `.env.example`만 공유합니다. 이 설정은 개발 서버 프록시용이며, 배포 서버에서는 `/api`를 백엔드로 전달하도록 별도로 설정합니다.
 
 결제 화면은 토스페이먼츠 테스트 결제창을 엽니다. `.env.local`의 `VITE_TOSS_CLIENT_KEY`에 백엔드 `TOSS_SECRET_KEY`와 짝이 되는 테스트 클라이언트 키(`test_ck_`로 시작, API 개별 연동 키)를 넣습니다. 클라이언트 키는 빌드 시 번들에 포함되는 공개 값이지만, 키 값은 `.env.example`에 적지 않고 이름만 둡니다. 값이 없으면 결제창을 열지 않고 결제 설정이 없다고 안내합니다. 배포 빌드에서도 같은 이름의 환경 변수를 설정해야 합니다.
+
+링크 공유 미리보기(Open Graph)는 `index.html`의 `og:*` 태그와 `public/og-image.jpg`(1200×630, 메인 히어로 배경에서 잘라냄)를 사용합니다. 크롤러는 절대 URL만 읽으므로 배포 빌드에 `VITE_SITE_URL`(배포된 프론트엔드 원점 주소, 끝의 `/` 제외)을 설정해야 합니다. 값이 없으면 빌드가 경고(`%VITE_SITE_URL% is not defined`)를 내고 태그에 자리표시자가 그대로 남아 미리보기가 뜨지 않습니다. 해시 라우팅이라 모든 경로가 같은 미리보기를 공유합니다. 배포 후 카카오·Facebook 공유 디버거로 확인하고, 이미지를 바꾸면 디버거에서 캐시를 초기화합니다.
 
 LOCAL 로그인·회원가입과 `users/me`는 실제 백엔드가 필요합니다. 백엔드 없이 `npm run dev`만 띄우면 인증 요청이 401이 되어 비로그인 상태로 동작합니다. 소셜 로그인은 실제 KAKAO·GOOGLE 키가 설정된 백엔드가 필요하며, 제공자 콘솔 설정과 확인 절차는 `Backend/docs/migration.md` 8절을 따릅니다. 개발 서버의 프록시를 거쳐 시작해도 제공자 콜백 주소(`redirect_uri`)는 백엔드 주소(8080)로 만들어집니다. Vite 프록시 설정을 바꾸면서 `changeOrigin`을 빼면 5173으로 바뀌니 주의합니다. E2E는 실제 제공자로 이동하지 않고 `e2e/mock/auth.ts`가 콜백 결과 주소로 바로 보냅니다.
 

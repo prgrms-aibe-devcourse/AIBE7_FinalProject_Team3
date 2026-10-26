@@ -1,0 +1,13 @@
+# 부하테스트 전용 오버라이드. 운영보다 낮은 스펙(AWS t3.nano: 1vCPU/0.5GB)으로 제한해
+# "이보다 약한 환경에서도 재고 동시성이 깨지지 않는다"는 하한선을 검증한다.
+# 평소 개발 명령(`docker compose up`)에는 영향 없음. 부하테스트할 때만 명시적으로 합쳐서 쓴다:
+#   docker compose -f compose.yaml -f compose.loadtest.yaml up --build
+services:
+  backend:
+    mem_limit: 512m
+    cpus: 1
+    environment:
+      # JDK17은 컨테이너 메모리 한도의 1/4을 기본 힙으로 잡는다(128MB) — Spring Boot 기동엔 빠듯해
+      # 메타스페이스·스레드 스택 몫을 남기고 힙을 명시한다. OOM 발생 시 이 값부터 낮춰 원인을 좁힌다.
+      # JAVA_TOOL_OPTS는 이 이미지의 java 런처에 인식되지 않아 무시된다(검증 완료) — JDK_JAVA_OPTIONS를 쓴다.
+      JDK_JAVA_OPTIONS: -Xmx384m

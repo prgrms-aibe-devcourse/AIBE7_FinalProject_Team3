@@ -3,8 +3,8 @@ import { expect, login, test, toast } from '../../fixtures'
 test.describe('상품 주문', () => {
   test('로그인 전 주문은 로그인 화면으로 보낸다', async ({ page }) => {
     await page.goto('/#/drops/201')
-    await page.getByLabel('착용감').selectOption({ label: '릴랙스' })
-    await page.getByLabel('소매').selectOption({ label: '롱' })
+    await page.getByLabel('착용감').selectOption('1')
+    await page.getByLabel('소매').selectOption('2')
     await page.getByRole('button', { name: '로그인 후 GRAB ↗' }).click()
 
     await expect(page).toHaveURL(/#\/login$/)
@@ -13,8 +13,8 @@ test.describe('상품 주문', () => {
 
   test('품절 옵션은 주문할 수 없다', async ({ page }) => {
     await page.goto('/#/drops/201')
-    await page.getByLabel('착용감').selectOption({ label: '와이드' })
-    await page.getByLabel('소매').selectOption({ label: '롱' })
+    await page.getByLabel('착용감').selectOption('2')
+    await page.getByLabel('소매').selectOption('2')
 
     await expect(page.getByText('품절', { exact: true })).toBeVisible()
     await expect(
@@ -32,8 +32,8 @@ test.describe('상품 주문', () => {
       .getByRole('link')
       .click()
 
-    await page.getByLabel('착용감').selectOption({ label: '릴랙스' })
-    await page.getByLabel('소매').selectOption({ label: '롱' })
+    await page.getByLabel('착용감').selectOption('1')
+    await page.getByLabel('소매').selectOption('2')
     await expect(page.getByText('재고 5개')).toBeVisible()
     await page.getByLabel('수량').fill('2')
     await expect(page.locator('.total-row')).toContainText('86,000원')

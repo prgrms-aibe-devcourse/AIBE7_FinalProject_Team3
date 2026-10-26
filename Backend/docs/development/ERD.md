@@ -35,7 +35,7 @@
 | `email`             | VARCHAR(254) | O   | UQ, 정규화 후 저장                       |
 | `password_hash`     | VARCHAR(255) | 조건부 | LOCAL 회원만 필수, Argon2id 해시 저장       |
 | `nickname`          | VARCHAR(100) | O   | 닉네임, 대소문자 무시 UQ                   |
-| `profile_image_url` | VARCHAR(500) | X   | 이미지 객체 키 또는 영속 URL                 |
+| `profile_image_url` | VARCHAR(500) | X   | 서버 발급 형식으로 검증한 본인 프로필 공개 이미지 URL 전체. 미등록·삭제 시 NULL |
 | `role`              | VARCHAR(20)  | O   | `USER`, `ADMIN`                    |
 | `status`            | VARCHAR(20)  | O   | `ACTIVE`, `SUSPENDED`, `WITHDRAWN` |
 | `provider`          | VARCHAR(20)  | O   | `LOCAL`, `KAKAO`, `GOOGLE`         |

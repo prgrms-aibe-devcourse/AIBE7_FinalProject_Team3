@@ -1,10 +1,12 @@
 import {
   expect,
+  goToMyPage,
   loginAdmin,
   loginSeller,
   test,
   type Page,
 } from '../../fixtures'
+import { FIXED_NOW, getPublicApiState } from '../../mock/api'
 import { BUYER_ORDER_IDS } from '../../mock/api/buyerOrders'
 import { installCatalogScenario } from '../../mock/catalog'
 import { installHomeScenario } from '../../mock/home'
@@ -42,6 +44,30 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
     })
   }
 
+  test('wish-detail-countdown', async ({ page }) => {
+    getPublicApiState(page).drops.find(
+      (drop) => drop.dropId === 102,
+    )!.saleStartsAt = new Date(FIXED_NOW.getTime() + 5 * 60_000).toISOString()
+    await page.goto('/#/drops/102')
+    await expect(page.locator('.detail-countdown')).toHaveText('05:00')
+    await shot(page, 'wish-detail-countdown')
+  })
+
+  test('grab-detail-low-stock', async ({ page }) => {
+    getPublicApiState(page)
+      .drops.find((drop) => drop.dropId === 201)!
+      .options.forEach((option) => {
+        option.availableStock = option.optionId === 2012 ? 3 : 0
+      })
+    await page.goto('/#/drops/201')
+    await page.getByLabel('착용감').selectOption('1')
+    await page.getByLabel('소매').selectOption('2')
+    await expect(
+      page.locator('.detail-state .detail-stock-current'),
+    ).toHaveText('3')
+    await shot(page, 'grab-detail-low-stock')
+  })
+
   test('my', async ({ page }) => {
     await page.route('**/api/v1/seller-applications/me', (route) =>
       route.fulfill({
@@ -57,7 +83,7 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
     await page.getByLabel('이메일').fill('grab@example.com')
     await page.getByLabel('비밀번호').fill('password1234')
     await page.getByRole('button', { name: '로그인', exact: true }).click()
-    await page.getByRole('link', { name: 'MY', exact: true }).click()
+    await goToMyPage(page)
     // WISH 패널도 로딩 상태를 role=status로 두므로 토스트만 확인하고, 목록 로딩이 끝난 뒤 촬영한다.
     await settleToast(page)
     await expect(page.getByText('매일을 담는 캔버스 토트')).toBeVisible()

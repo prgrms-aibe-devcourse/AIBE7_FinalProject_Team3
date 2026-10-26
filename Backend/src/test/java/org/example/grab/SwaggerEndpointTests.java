@@ -57,6 +57,9 @@ class SwaggerEndpointTests {
             "user,/api/v1/auth/oauth2/{provider}",
             "user,/api/v1/auth/oauth2/signup",
             "user,/api/v1/users/me",
+            // GR-130: 프로필 이미지 업로드 URL 발급·등록·삭제
+            "user,/api/v1/users/me/profile-image/upload-url",
+            "user,/api/v1/users/me/profile-image",
             "wish,/api/v1/drops/{dropId}/wish"
     })
     void exposesDomainApiDocs(String group, String path) throws Exception {
@@ -175,6 +178,10 @@ class SwaggerEndpointTests {
         assertInteger(publicStock.path("optionId"), "int64");
         assertInteger(publicStock.path("availableStock"), "int32");
         assertThat(publicStock.path("soldOut").path("type").asText()).isEqualTo("boolean");
+        // GR-148: 공개 재고 옵션의 세 필드는 항상 채워지므로 필수로 노출해 생성 타입이 선택 필드가 되지 않게 한다
+        List<String> publicStockRequired = new ArrayList<>();
+        schemas.path("PublicDropStockOption").path("required").forEach(name -> publicStockRequired.add(name.asText()));
+        assertThat(publicStockRequired).containsExactlyInAnyOrder("optionId", "availableStock", "soldOut");
 
         JsonNode sellerDetail = schemas.path("SellerDropDetailOption").path("properties");
         assertThat(propertyNames(sellerDetail)).containsExactlyInAnyOrder(
@@ -312,6 +319,29 @@ class SwaggerEndpointTests {
         assertThat(patchData.path("$ref").asText()).isNotBlank().isEqualTo(getData.path("$ref").asText());
         assertThat(propertyNames(deref(doc, patchData).path("properties"))).containsExactlyInAnyOrder(
                 "userId", "email", "nickname", "provider", "roles", "profileImageUrl", "createdAt");
+    }
+
+    // GR-130 M05-04: 세 엔드포인트가 user 그룹에 노출되고, PUT 응답 data는 두 필드(M00-05), DELETE는 204다
+    @Test
+    @DisplayName("프로필 이미지 업로드 URL 발급·등록·삭제가 user 그룹에 노출되고 PUT 응답 data는 userId·profileImageUrl 두 필드다")
+    void exposesProfileImageEndpoints() throws Exception {
+        JsonNode doc = readApiDoc("/v3/api-docs/user");
+        JsonNode upload = doc.path("paths").path("/api/v1/users/me/profile-image/upload-url").path("post");
+        JsonNode register = doc.path("paths").path("/api/v1/users/me/profile-image").path("put");
+        JsonNode remove = doc.path("paths").path("/api/v1/users/me/profile-image").path("delete");
+
+        assertThat(upload.isMissingNode()).isFalse();
+        assertThat(register.isMissingNode()).isFalse();
+        assertThat(remove.isMissingNode()).isFalse();
+        assertThat(propertyNames(deref(doc, responseSchema(upload.path("requestBody"))).path("properties")))
+                .containsExactlyInAnyOrder("fileName", "contentType", "fileSize");
+        assertThat(propertyNames(deref(doc, responseSchema(register.path("requestBody"))).path("properties")))
+                .containsExactlyInAnyOrder("imageUrl");
+        JsonNode putData = deref(doc, deref(doc, responseSchema(register.path("responses").path("200")))
+                .path("properties").path("data"));
+        assertThat(propertyNames(putData.path("properties"))).containsExactlyInAnyOrder("userId", "profileImageUrl");
+        assertThat(remove.path("responses").has("204")).isTrue();
+        assertThat(remove.has("requestBody")).isFalse();
     }
 
     private JsonNode readApiDoc(String uri) throws Exception {

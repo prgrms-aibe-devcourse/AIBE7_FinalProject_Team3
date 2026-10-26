@@ -1,6 +1,7 @@
 import {
   expect,
   getAuth,
+  goToMyPage,
   login,
   loginSeller,
   test,
@@ -8,6 +9,11 @@ import {
 } from '../../fixtures'
 import type { Locator } from '@playwright/test'
 import { BUYER_ORDER_IDS } from '../../mock/api/buyerOrders'
+
+// tsconfig에 Node 타입이 없어 필요한 Buffer 메서드만 선언한다(seller-drop-form.spec.ts와 같음)
+declare const Buffer: {
+  from(value: string, encoding: string): Uint8Array
+}
 
 // 페이지 전체에 가로 스크롤이 생기지 않는다. 표처럼 의도적으로 안쪽에서 스크롤하는 영역은 해당하지 않는다.
 async function expectNoHorizontalOverflow(page: Page) {
@@ -59,7 +65,7 @@ const pages: {
   {
     name: 'WISH 상세',
     path: '/#/drops/102',
-    actions: (page) => [page.getByRole('button', { name: '♡ WISH 등록하기' })],
+    actions: (page) => [page.getByRole('button', { name: 'WISH 등록하기' })],
   },
   {
     name: 'GRAB 상세',
@@ -148,8 +154,113 @@ for (const { name, path, actions } of pages) {
 
 test('MY: 가로 넘침 없이 핵심 버튼에 닿는다', async ({ page }) => {
   await login(page)
-  await page.getByRole('link', { name: 'MY', exact: true }).click()
+  await goToMyPage(page)
   await expectReachable(page, page.getByRole('button', { name: '취소' }))
+  await expectNoHorizontalOverflow(page)
+})
+
+test('MY 계정 설정: 모달에 오류를 표시해도 가로 넘침 없이 저장 버튼에 닿는다', async ({
+  page,
+}) => {
+  getAuth(page).failAccount('nickname', {
+    status: 409,
+    code: 'DUPLICATE_NICKNAME',
+  })
+  await login(page)
+  await goToMyPage(page)
+
+  await page
+    .getByRole('group', { name: '닉네임' })
+    .getByRole('button', { name: '변경' })
+    .click()
+  const nickname = page.getByRole('dialog', { name: '닉네임 변경' })
+  await page.getByLabel('새 닉네임').fill('새닉네임')
+  await nickname.getByRole('button', { name: '저장', exact: true }).click()
+  await expect(page.getByText('이미 사용 중인 닉네임이에요.')).toBeVisible()
+  for (const action of [
+    nickname.getByRole('button', { name: '닫기' }),
+    page.getByLabel('새 닉네임'),
+    nickname.getByRole('button', { name: '취소' }),
+    nickname.getByRole('button', { name: '저장', exact: true }),
+  ]) {
+    await expectReachable(page, action)
+  }
+  await expectNoHorizontalOverflow(page)
+  await page.keyboard.press('Escape')
+
+  await page
+    .getByRole('group', { name: '비밀번호' })
+    .getByRole('button', { name: '변경' })
+    .click()
+  const password = page.getByRole('dialog', { name: '비밀번호 변경' })
+  await page.getByLabel('현재 비밀번호', { exact: true }).fill('password1234')
+  await page.getByLabel('새 비밀번호', { exact: true }).fill('NewPassword456!')
+  await page
+    .getByLabel('새 비밀번호 확인', { exact: true })
+    .fill('NewPassword457!')
+  await password
+    .getByRole('button', { name: '비밀번호 변경', exact: true })
+    .click()
+  await expect(page.getByText('새 비밀번호가 일치하지 않아요.')).toBeVisible()
+  for (const action of [
+    password.getByRole('button', { name: '닫기' }),
+    page.getByLabel('새 비밀번호 확인', { exact: true }),
+    password.getByRole('button', { name: '비밀번호 변경', exact: true }),
+  ]) {
+    await expectReachable(page, action)
+  }
+  await expectNoHorizontalOverflow(page)
+})
+
+test('MY 프로필 이미지: 미리보기·오류를 표시해도 가로 넘침 없이 모든 버튼에 닿는다', async ({
+  page,
+}) => {
+  const auth = getAuth(page)
+  auth.state.profileImageUrl = 'https://storage.grab.test/images/profile/a.png'
+  auth.failAccount('profileImageUploadUrl', {
+    status: 502,
+    code: 'EXTERNAL_SERVICE_ERROR',
+  })
+  await login(page)
+  // 헤더 계정 메뉴를 펼쳐도 가로 넘침 없이 두 항목에 닿는다
+  await page
+    .locator('.site-header')
+    .getByRole('button', { name: '계정 메뉴' })
+    .click()
+  for (const action of [
+    page.locator('.site-header').getByRole('link', { name: '마이페이지' }),
+    page.locator('.site-header').getByRole('button', { name: '로그아웃' }),
+  ]) {
+    await expectReachable(page, action)
+  }
+  await expectNoHorizontalOverflow(page)
+  await page
+    .locator('.site-header')
+    .getByRole('link', { name: '마이페이지' })
+    .click()
+
+  await page
+    .getByRole('group', { name: '프로필 이미지' })
+    .getByRole('button', { name: '변경' })
+    .click()
+  const dialog = page.getByRole('dialog', { name: '프로필 이미지 변경' })
+  await dialog.locator('input[type="file"]').setInputFiles({
+    // 파일명이 길어도 화면에 쓰지 않으므로 배치가 바뀌지 않는다
+    name: `${'긴파일명'.repeat(40)}.png`,
+    mimeType: 'image/png',
+    buffer: Buffer.from('image', 'utf8'),
+  })
+  await dialog.getByRole('button', { name: '저장', exact: true }).click()
+  await expect(dialog.getByRole('alert')).toBeVisible()
+  for (const action of [
+    dialog.getByRole('button', { name: '닫기' }),
+    dialog.getByRole('button', { name: '이미지 선택' }),
+    dialog.getByRole('button', { name: '삭제' }),
+    dialog.getByRole('button', { name: '취소' }),
+    dialog.getByRole('button', { name: '저장', exact: true }),
+  ]) {
+    await expectReachable(page, action)
+  }
   await expectNoHorizontalOverflow(page)
 })
 
@@ -289,4 +400,46 @@ test('키보드 포커스가 입력란에 보인다', async ({ page }) => {
   await expectFocusRing(page.getByLabel('상품명'))
   await expectFocusRing(page.getByLabel('상품 설명'))
   await expectFocusRing(page.getByLabel('카테고리'))
+})
+
+// 첫 조회 중 짧은 본문 때문에 푸터가 화면 안으로 올라왔다가 내려가지 않는다
+test('화면 이동 후 첫 조회 중에는 푸터를 보이지 않는다', async ({ page }) => {
+  let release = () => {}
+  const held = new Promise<void>((resolve) => (release = resolve))
+  await page.route(/\/api\/v1\/drops\/\d+(\?.*)?$/, async (route) => {
+    await held
+    await route.fallback()
+  })
+  await page.goto('/#/wish')
+  const list = page.getByRole('region', { name: 'WISH 상품 목록' })
+  await expect(list.getByRole('article').first()).toBeVisible()
+  // 매 프레임 로딩 표시와 푸터가 함께 화면에 보였는지 기록한다(첫 프레임 깜빡임 포함)
+  await page.evaluate(() => {
+    const w = window as unknown as { footerFlashes: number }
+    w.footerFlashes = 0
+    const tick = () => {
+      const footer = document.querySelector('footer')
+      const visible =
+        !!footer &&
+        footer.getClientRects().length > 0 &&
+        footer.getBoundingClientRect().top < innerHeight
+      const loading = document
+        .querySelector('main')
+        ?.textContent?.includes('불러오는 중이에요')
+      if (visible && loading) w.footerFlashes++
+      requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  })
+  await list.getByRole('heading').first().getByRole('link').click()
+  await expect(page.getByText('상품 정보를 불러오는 중이에요.')).toBeVisible()
+  await expect(page.getByRole('contentinfo')).toHaveCount(0)
+  release()
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+  await expect(page.getByRole('contentinfo')).toHaveCount(1)
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { footerFlashes: number }).footerFlashes,
+    ),
+  ).toBe(0)
 })

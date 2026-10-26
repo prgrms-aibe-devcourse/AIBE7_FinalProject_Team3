@@ -142,9 +142,6 @@
       'shipping'
       'cancel';
   }
-  .order-panel {
-    grid-row: 1;
-  }
   .auth-copy {
     min-height: 230px;
     padding: 30px 28px;
@@ -305,13 +302,55 @@
   .buyer-item strong {
     justify-self: start;
   }
+  .modal {
+    width: 100%;
+    max-width: none;
+    margin: auto 0 0;
+    border-radius: 14px 14px 0 0;
+  }
+  .modal[open] {
+    animation: modal-sheet 240ms ease-out;
+  }
+  .modal-panel {
+    padding: 20px 20px 28px;
+  }
+  .account-edit-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
   .account-panel {
     padding: 20px;
   }
-  .account-heading,
+  .account-heading {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 16px;
+  }
+  .account-heading .account-stats {
+    grid-column: 1 / -1;
+  }
+  .account-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+  .account-stats div:first-child {
+    padding-left: 0;
+  }
   .account-edit {
     display: grid;
     grid-template-columns: 1fr;
+  }
+  .panel.account-settings {
+    padding: 8px 20px 12px;
+  }
+  .settings-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .settings-row > p {
+    grid-column: 1 / -1;
+    grid-row: 2;
   }
   .compact-item img {
     width: 56px;
@@ -323,14 +362,36 @@
     justify-self: start;
   }
   .compact-item.order {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'status amount'
+      'info info'
+      'action action';
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+  }
+  .compact-item.order > .order-status {
+    grid-area: status;
+    justify-self: start;
+  }
+  .compact-item.order > div {
+    grid-area: info;
   }
   .compact-item.order > b {
-    grid-column: 1;
+    grid-area: amount;
+    grid-column: auto;
+    justify-self: end;
+  }
+  .compact-item.order > a {
+    grid-area: action;
+    min-height: 44px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .modal[open],
+  .modal[open]::backdrop {
+    animation: none;
+  }
   *,
   *::before,
   *::after {
