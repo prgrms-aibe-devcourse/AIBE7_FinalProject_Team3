@@ -1,0 +1,398 @@
+/* 수요 분석 제안서(GR-144). 판매자 화면의 panel·option-stock·status-pill을 재사용한다. */
+.seller-demand-page .panel-heading {
+  background: var(--soft);
+}
+.seller-demand-page > .demand-section,
+.seller-demand-page > .demand-columns,
+.seller-demand-page > .demand-notes {
+  margin-top: 20px;
+}
+.seller-demand-page > .seller-drops-heading + * {
+  margin-top: 0;
+}
+.demand-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  gap: 20px;
+}
+.demand-columns > .panel {
+  min-width: 0;
+}
+/* 공통 .panel + .panel 간격이 두 열의 윗선을 어긋나게 하지 않도록 한다 */
+.demand-columns .panel + .panel {
+  margin-top: 0;
+}
+
+.demand-plan,
+.demand-evidence,
+.demand-assumption-form,
+.demand-plan-detail {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+}
+.demand-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+.demand-metrics > div {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.demand-metrics > div.is-primary {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink);
+}
+.demand-metrics dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.demand-metrics dd {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+}
+.demand-metrics small,
+.demand-hint,
+.demand-basis small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.demand-uncalculated {
+  margin: 0;
+  font-weight: 700;
+}
+.demand-gaps {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.demand-gaps li {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border-left: 3px solid var(--lime);
+  background: var(--soft);
+  font-size: 12px;
+}
+.demand-options {
+  padding: 0;
+}
+/* 네 열이라 모바일 폭(390px)에서도 가로 스크롤 없이 들어가게 한다 */
+.demand-options table {
+  min-width: 300px;
+}
+.demand-options td {
+  font-variant-numeric: tabular-nums;
+}
+
+.demand-facts,
+.demand-assumptions,
+.demand-decision-result {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+.demand-facts {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.demand-facts div {
+  display: grid;
+  gap: 4px;
+}
+.demand-facts dt,
+.demand-assumptions dt,
+.demand-decision-result dt {
+  color: var(--muted);
+  font-size: 11px;
+}
+.demand-facts dd {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.demand-facts small,
+.demand-assumptions small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+.demand-bases {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.demand-basis {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.demand-basis.is-used {
+  border-color: var(--ink);
+}
+.demand-basis h3 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+}
+.demand-basis h3 span {
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: var(--lime);
+  font-size: 10px;
+}
+.demand-basis strong {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.demand-basis strong small {
+  font-size: 12px;
+}
+.demand-basis p {
+  margin: 0;
+  font-size: 12px;
+}
+.demand-assumptions div,
+.demand-decision-result div {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 8px;
+  font-size: 12px;
+}
+.demand-assumptions dd,
+.demand-decision-result dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.demand-assumption-form fieldset,
+.demand-decision-form fieldset {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.demand-assumption-form legend,
+.demand-decision-form legend {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.demand-assumption-form fieldset label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.demand-assumption-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.demand-assumption-fields label,
+.demand-decision-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.demand-assumption-fields input,
+.demand-decision-form input,
+.demand-decision-form textarea {
+  min-height: 42px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+  font-weight: 500;
+}
+.demand-assumption-fields input:disabled {
+  background: var(--soft);
+}
+.demand-decision-form textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+.demand-assumption-actions,
+.demand-decision-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.demand-change {
+  margin: 0;
+  padding: 12px 14px;
+  background: #efffc9;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.demand-notes {
+  display: grid;
+  gap: 4px;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.demand-history {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.demand-history > li + li {
+  border-top: 1px solid var(--line);
+}
+.demand-history-toggle {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 18px 22px;
+  border: 0;
+  background: #fff;
+  text-align: left;
+}
+.demand-history-toggle:hover {
+  background: #fafbf7;
+}
+.demand-history-toggle strong {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.demand-history-toggle small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.demand-plan-detail {
+  border-top: 1px dashed var(--line);
+  background: #fcfcfa;
+}
+.demand-plan-detail .demand-plan {
+  padding: 0;
+}
+.demand-plan-detail .demand-hint {
+  margin: 0;
+}
+.demand-decision,
+.demand-decision-form {
+  display: grid;
+  gap: 12px;
+}
+.demand-decision-form fieldset {
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+}
+.demand-decision-actions .text-link {
+  border: 0;
+  background: none;
+}
+.demand-explanation {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.demand-explanation p,
+.demand-explanation h4,
+.demand-explanation-pending {
+  margin: 0;
+}
+.demand-explanation h4 {
+  font-size: 12px;
+}
+.demand-explanation ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.demand-explanation-pending {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.demand-suggestion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-top: 20px;
+  padding: 22px 24px;
+  border-left: 4px solid var(--lime);
+}
+.demand-suggestion h2 {
+  margin: 0 0 6px;
+  font-size: 17px;
+}
+.demand-suggestion p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+@media (max-width: 1000px) {
+  .demand-columns {
+    grid-template-columns: 1fr;
+  }
+  /* 모바일에서는 가정 수정을 근거 데이터보다 먼저 보여 준다(SellerDemandPage.md) */
+  .demand-assumption-panel {
+    order: -1;
+  }
+  .demand-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 720px) {
+  .demand-plan,
+  .demand-evidence,
+  .demand-assumption-form,
+  .demand-plan-detail {
+    padding: 16px;
+  }
+  .demand-metrics dd {
+    font-size: 22px;
+  }
+  .demand-facts,
+  .demand-bases,
+  .demand-assumption-fields {
+    grid-template-columns: 1fr;
+  }
+  .demand-history-toggle {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    padding: 16px;
+  }
+  .demand-history-toggle small {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .demand-suggestion {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

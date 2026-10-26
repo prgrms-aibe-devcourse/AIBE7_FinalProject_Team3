@@ -16,6 +16,7 @@ import OrderDetailPage from './pages/OrderDetail/OrderDetailPage'
 import SignupPage from './pages/Signup/SignupPage'
 import NotFoundPage from './pages/NotFound/NotFoundPage'
 import SellerDashboardPage from './pages/SellerDashboard/SellerDashboardPage'
+import SellerDemandPage from './pages/SellerDemand/SellerDemandPage'
 import SellerDropDetailPage from './pages/SellerDropDetail/SellerDropDetailPage'
 import SellerDropFormPage from './pages/SellerDropForm/SellerDropFormPage'
 import SellerDropsPage from './pages/SellerDrops/SellerDropsPage'
@@ -181,6 +182,16 @@ export default function App() {
                 onPublished={(id) =>
                   navigate(`/seller/drops/${id}`, { replace: true })
                 }
+                notify={notify}
+              />
+            }
+          />
+          <Route
+            path="/seller/drops/:dropId/demand"
+            element={
+              <SellerDemandPage
+                user={user}
+                authStatus={status}
                 notify={notify}
               />
             }

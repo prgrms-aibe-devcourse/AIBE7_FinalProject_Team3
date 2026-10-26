@@ -9,6 +9,7 @@ import {
 import { getCategories } from '../../api/category/categories'
 import EmptyState from '../../components/EmptyState/EmptyState'
 import AuthLoading from '../../features/auth/components/AuthLoading'
+import DemandSuggestionCard from '../../features/demand/components/DemandSuggestionCard'
 import {
   apiErrorCode,
   isAdmin,
@@ -330,6 +331,11 @@ export default function SellerDropDetailPage({
           )}
         </section>
       </div>
+      <DemandSuggestionCard
+        dropId={id}
+        status={drop.status}
+        saleStartsAt={drop.saleStartsAt}
+      />
       <section className="panel seller-drop-related">
         <h2>관련 작업</h2>
         <div>
@@ -345,6 +351,14 @@ export default function SellerDropDetailPage({
           <Link className="secondary-button" to={`/seller/sales?dropId=${id}`}>
             판매 실적 ↗
           </Link>
+          {drop.status !== 'DRAFT' && (
+            <Link
+              className="secondary-button"
+              to={`/seller/drops/${id}/demand`}
+            >
+              수요 분석 ↗
+            </Link>
+          )}
           {drop.status !== 'DRAFT' && (
             <Link className="secondary-button" to={`/drops/${id}`}>
               소비자 화면 ↗

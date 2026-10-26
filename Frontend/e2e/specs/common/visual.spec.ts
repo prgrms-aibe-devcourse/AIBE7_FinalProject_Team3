@@ -172,6 +172,16 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
     await shot(page, 'seller-drop-detail')
   })
 
+  test('seller-demand', async ({ page }) => {
+    await loginSeller(page)
+    await page.evaluate(() => {
+      window.location.hash = '#/seller/drops/101/demand'
+    })
+    await settleToast(page)
+    await expect(page.locator('.demand-metrics')).toBeVisible()
+    await shot(page, 'seller-demand')
+  })
+
   test('seller-inventory', async ({ page }) => {
     await loginSeller(page)
     await page.evaluate(() => {
