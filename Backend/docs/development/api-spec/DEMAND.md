@@ -40,7 +40,7 @@
 
 - **최소 집계 단위**: 시장 표본이 DROP 10개 이상이고 서로 다른 판매자가 5명 이상일 때만 시장 평균을 계산한다. 미달이면 시장 평균의 신뢰도는 `NONE`이고 값은 `null`이다.
 - **기준 시점 고정**: 시장 표본은 오늘 0시(KST) 이전에 종료된 DROP으로 제한해 하루 동안 값이 바뀌지 않게 한다. 별도 스냅샷 테이블·배치 없이 조회 조건으로 처리하고, 기준 시점을 `market.asOf`로 반환한다.
-- **반올림**: 시장 평균 전환율은 정수 %(소수 둘째 자리, 예: 0.30), 구매자당 평균 수량은 소수 첫째 자리로 반올림한 값을 계산과 응답에 쓴다.
+- **반올림**: 시장 평균 전환율은 정수 %(소수 둘째 자리, 예: 0.30), 구매자당 평균 수량은 소수 첫째 자리로 반올림한 값을 계산과 응답에 쓴다. 전환율 구간(1.4)은 원래 집계값으로 계산한 뒤 같은 자릿수로 하한은 내림, 상한은 올림한다.
 - **구간 표시**: 시장 표본 수는 구간(`NONE`, `10_TO_19`, `20_PLUS`)으로만, 표본 WISH 수는 10 단위 내림으로 표시한다.
 - **기준 분리**: 본인 DROP을 시장 표본에 넣지 않는다. 본인 값과 섞은 합산값을 보여 주면 판매자가 자기 실적을 빼서 다른 판매자 값을 역산할 수 있기 때문이다.
 - 응답·저장 스냅샷·LLM 입력에는 집계값만 담는다. 다른 판매자의 상품명·브랜드·DROP ID·DROP별 수치는 담지 않는다.
@@ -53,14 +53,26 @@
 - 기준(`OWN`, `MARKET`)마다 `conversionRate` = Σ`converted` / Σ`wishers`, `avgQuantityPerBuyer` = Σ`quantity` / Σ`converted` (Σ`converted`가 0이면 1)를 따로 계산한다. 내 실적의 전환율은 소수 둘째 자리, 구매자당 평균 수량은 소수 첫째 자리로 반올림한 값을 계산과 응답에 쓴다. 시장 평균(1.3)과 같은 정밀도라 두 기준을 나란히 비교할 수 있고, 응답에 보이는 값으로 계산하므로 판매자가 화면 수치로 검산한 결과와 LLM 설명의 수치 검증(3절) 대상이 계산 결과와 일치한다.
 - WISH 없이 구매한 사용자는 포함하지 않는다. 예상 수량이 실제보다 낮게 나올 수 있다는 점을 응답의 `notes`에 표시한다.
 
-신뢰도는 기준마다 따로 판정한다. 시장 평균은 1.3의 최소 집계 단위에 미달하면 `NONE`이다.
+**전환율 구간**: 기준마다 전환율의 95% 윌슨 점수 구간(`rateLow`, `rateHigh`)을 계산하고, 예상 범위(1.6)는 이 구간으로 정한다. 하한은 소수 둘째 자리 내림, 상한은 올림해 범위가 좁아지지 않게 한다.
 
-| 신뢰도 | 조건 | 예상 범위 폭 `u` |
+```text
+p = Σconverted / Σwishers,  n = Σwishers,  z = 1.96
+center = (p + z²/2n) / (1 + z²/n)
+half   = z × √(p(1-p)/n + z²/4n²) / (1 + z²/n)
+rateLow = center - half,  rateHigh = center + half
+```
+
+- 고정 폭(예: ±20%) 대신 표본 크기로 범위를 정한다. 같은 전환율 0.30이어도 WISH 20명이면 0.14~0.52, 100명이면 0.21~0.40, 2,000명이면 0.28~0.33처럼 표본이 많을수록 좁아진다.
+- 윌슨 구간은 단순 정규근사(p ± z√(p(1-p)/n))와 달리 표본이 작거나 전환율이 0·1에 가까워도 0~1을 벗어나지 않고, 구매자가 0명인 표본에서도 상한이 0보다 크다.
+- 한계: WISH 사용자를 서로 독립인 시행으로 보므로, 상품마다 전환율이 다른 차이(DROP 간 분산)는 반영하지 않는다. 실제 불확실성은 구간보다 클 수 있으며 1.9의 백테스트로 보정한다. 구매자당 평균 수량의 불확실성도 범위에 넣지 않는다.
+
+**신뢰도**: 기준마다 따로 판정하며 범위 폭이 아니라 계산 여부와 기본 기준 선택(1.5)에 쓴다. 시장 평균은 1.3의 최소 집계 단위에 미달하면 `NONE`이다.
+
+| 신뢰도 | 조건 | 용도 |
 | --- | --- | --- |
-| `HIGH` | 표본 DROP 10개 이상, Σ`wishers` 100 이상 | 0.2 |
-| `LOW` | 표본 DROP 3개 이상, Σ`wishers` 20 이상 | 0.4 |
-| `NONE` | 그 외 | - |
-| `SELLER_INPUT` | 판매자가 전환율을 직접 입력 | 0.3 |
+| `HIGH` | 표본 DROP 10개 이상, Σ`wishers` 100 이상 | 기본 기준 선택 시 우선 |
+| `LOW` | 표본 DROP 3개 이상, Σ`wishers` 20 이상 | 계산하되 `SMALL_CONVERSION_SAMPLE` 표시 |
+| `NONE` | 그 외 | 계산하지 않음 |
 
 ### 1.5 계획에 쓸 전환율 기준
 
@@ -77,14 +89,14 @@
 
 ```text
 base        = activeWishCount × conversionRate × avgQuantityPerBuyer
-low         = floor(base × (1 - u))
+low         = floor(activeWishCount × rateLow × avgQuantityPerBuyer)
 expected    = round(base)
-high        = ceil(base × (1 + u))
+high        = ceil(activeWishCount × rateHigh × avgQuantityPerBuyer)
 recommended = ceil(base × (1 + safetyStockRate))
 ```
 
 - 기본 가정: `conversionRate`·`avgQuantityPerBuyer`는 1.5의 기본 기준 값(기준이 없으면 없음), `safetyStockRate`는 0.1.
-- `u`는 사용한 기준의 신뢰도(1.4)를 따른다.
+- `rateLow`·`rateHigh`는 사용한 기준의 전환율 구간(1.4)이다. 판매자가 전환율을 직접 입력하면 표본이 없어 통계 구간을 만들 수 없으므로 `rateLow = conversionRate × 0.7`, `rateHigh = min(conversionRate × 1.3, 1)`을 쓴다(1.9).
 - 반올림 방향은 값의 역할에 따라 다르다. `expected`는 판매량 예측이라 반올림해 위·아래 어느 쪽으로도 치우치지 않게 하고(실제 판매량과의 오차 측정에 사용), `low`·`high`는 범위가 좁아지지 않게 각각 내림·올림한다. `recommended`는 준비 수량이라 올림해 소수점 아래 수요 때문에 모자라지 않게 한다. 생산·발주 단위(최소 생산 수량, 묶음 단위) 맞춤은 범위 밖이며 판매자가 결정을 기록할 때(2.6) 반영한다.
 - 입력 범위: `0 < conversionRate ≤ 1`, `0 ≤ safetyStockRate ≤ 1`, 각각 소수 둘째 자리까지. 벗어나면 `VALIDATION_FAILED`.
 - 옵션별 배분: `recommended`를 활성 옵션(`is_active = true`)의 현재 `total_quantity` 비율로 나눈다. 정수 배분은 최대 나머지 방식이며 나머지가 같으면 `sort_order`, `id` 순이다.
@@ -97,13 +109,29 @@ recommended = ceil(base × (1 + safetyStockRate))
 | --- | --- | --- |
 | `NO_ACTIVE_WISH` | `activeWishCount = 0` | 범위·추천 수량 없음 |
 | `NO_CONVERSION_SAMPLE` | 사용할 기준이 없거나 지정한 기준의 신뢰도가 `NONE`이고, 판매자 입력 전환율 없음 | 범위·추천 수량 없음 |
-| `SMALL_CONVERSION_SAMPLE` | 사용한 기준의 신뢰도 `LOW` | 범위를 넓혀 계산, 추천 수량은 제공 |
+| `SMALL_CONVERSION_SAMPLE` | 사용한 기준의 신뢰도 `LOW` | 계산하고 추천 수량도 제공. 표본이 적어 범위가 넓다는 점을 알린다 |
 
 범위·추천 수량이 없으면 `plan`의 수량 필드가 `null`이다. 판매자는 다른 기준을 고르거나 전환율을 직접 입력해 다시 계산할 수 있다.
 
 ### 1.8 제안 표시 조건
 
 `suggestion.ready`는 `activeWishCount ≥ 30` 또는 `hoursUntilSaleStart ≤ 48`일 때 `true`다. 기준값은 설정(`grab.demand.suggestion.*`)으로 바꾼다.
+
+### 1.9 설정값의 근거와 보정
+
+계산식의 입력(WISH 수, 구매자 수, 수량, 옵션 비율)은 실측값이고, 전환율 구간은 통계식(1.4)으로 정한다. 아래 값은 실측으로 검증하지 않은 초기 가정이며, 근거와 보정 방법을 함께 둔다.
+
+| 값 | 초기값 | 근거 | 성격 |
+| --- | --- | --- | --- |
+| 구간 신뢰수준 | 95% (`z = 1.96`) | 통계에서 가장 널리 쓰는 기준 | 관행 |
+| 신뢰도 `LOW` 기준 | DROP 3개·WISH 20명 | 상품 하나의 특성에 좌우되지 않을 최소 DROP 수와, 구매자 한두 명 차이로 전환율이 크게 흔들리지 않을 최소 인원 | 가정 |
+| 신뢰도 `HIGH` 기준 | DROP 10개·WISH 100명 | 전환율 0.30에서 구간 폭이 약 ±0.09로 줄어드는 인원과 여러 상품이 섞이는 DROP 수 | 가정 |
+| 판매자 입력 범위 | ±30% | 표본이 없는 판단 값이라 통계 구간을 만들 수 없어 둔 폭 | 가정 |
+| 안전 재고율 | 10% | 재고 관리에서 흔히 쓰는 출발값. 판매자가 0~100%로 바꾼다 | 관행 |
+| 표본 최대 DROP 수 | 20개 | 오래된 판매 결과가 섞이지 않게 최근 결과만 사용 | 가정 |
+| 시장 평균 최소 집계 단위 | 판매자 5명·DROP 10개 | 개별 판매자가 식별되지 않게 하는 최소 집계 단위(k-익명성) | 보호 관행 |
+
+**보정 방법**: 종료된 DROP이 쌓이면 각 DROP의 판매 시작 시점 데이터로 계획을 다시 계산하고 실제 판매량과 비교하는 백테스트를 한다. 실제 판매량이 `low`~`high` 안에 든 비율(목표 약 95%)과 `expected`의 평균 절대 백분율 오차(MAPE)를 기준별로 기록하고, 구간 적중률이 목표보다 낮으면 DROP 간 분산을 반영한 구간으로 바꾸거나 신뢰도 기준을 올린다. 평가 기록은 GR-146의 평가 지표와 함께 관리하며, 값을 바꾸면 `calculationVersion`을 올린다.
 
 ## 2. 판매자 수요 분석 API
 
@@ -142,6 +170,8 @@ GET /api/v1/seller/drops/{dropId}/demand-analysis
       "selection": "CATEGORY",
       "own": {
         "rate": 0.4,
+        "rateLow": 0.3,
+        "rateHigh": 0.51,
         "avgQuantityPerBuyer": 1.0,
         "confidence": "LOW",
         "dropCount": 3,
@@ -149,6 +179,8 @@ GET /api/v1/seller/drops/{dropId}/demand-analysis
       },
       "market": {
         "rate": 0.3,
+        "rateLow": 0.27,
+        "rateHigh": 0.33,
         "avgQuantityPerBuyer": 1.0,
         "confidence": "HIGH",
         "dropCountBand": "10_TO_19",
@@ -162,9 +194,9 @@ GET /api/v1/seller/drops/{dropId}/demand-analysis
       "safetyStockRate": { "value": 0.1, "source": "DEFAULT" }
     },
     "plan": {
-      "low": 100,
+      "low": 113,
       "expected": 126,
-      "high": 152,
+      "high": 139,
       "recommended": 139,
       "currentTotalQuantity": 120,
       "differenceFromCurrent": 19,
@@ -180,7 +212,7 @@ GET /api/v1/seller/drops/{dropId}/demand-analysis
 }
 ```
 
-- `conversion.own`·`conversion.market`: 두 기준을 항상 함께 반환한다. 신뢰도가 `NONE`이면 `rate`·`avgQuantityPerBuyer`가 `null`이다. `market`은 1.3의 보호 규칙을 적용한 집계값이다.
+- `conversion.own`·`conversion.market`: 두 기준을 항상 함께 반환한다. `rateLow`·`rateHigh`는 전환율 구간(1.4)이다. 신뢰도가 `NONE`이면 `rate`·`rateLow`·`rateHigh`·`avgQuantityPerBuyer`가 `null`이다. `market`은 1.3의 보호 규칙을 적용한 집계값이다.
 - `assumptions.*.source`: `OWN`(내 실적), `MARKET`(시장 평균), `DEFAULT`(기본값), `SELLER_INPUT`(판매자 입력). 사용할 기준이 없으면 `conversionRate`·`avgQuantityPerBuyer`는 `null`이다.
 - 옵션 `name`은 옵션 그룹 순서대로 값을 ` / `로 이은 표시명이다.
 
@@ -258,7 +290,7 @@ GET /api/v1/seller/demand-plans/{planId}
       ],
       "risks": ["WISH 없이 구매한 사용자가 많으면 예상보다 빨리 품절될 수 있습니다."],
       "dataGaps": [],
-      "notRecommended": ["예상 수량 126개만 준비하면 예상 범위 상단 152개에 미치지 못합니다."]
+      "notRecommended": ["예상 수량 126개만 준비하면 예상 범위 상단 139개에 미치지 못합니다."]
     }
   }
 }
