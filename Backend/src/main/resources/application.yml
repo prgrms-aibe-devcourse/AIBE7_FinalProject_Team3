@@ -76,6 +76,11 @@ grab:
     # SHIPPED 이후 배송 단계(집화완료→간선상차→간선하차→배송출발→배송완료) 자동 진행 간격(GR-86)
     stage-interval: ${GRAB_MOCK_DELIVERY_STAGE_INTERVAL:30s}
     poll-interval: ${GRAB_MOCK_DELIVERY_POLL_INTERVAL:10s}
+  # 판매자 화면이 수요 분석을 먼저 제안하는 기준(DEMAND.md 1.8)
+  demand:
+    suggestion:
+      min-active-wishes: 30
+      hours-before-start: 48
   drop-transition:
     enabled: ${GRAB_DROP_TRANSITION_ENABLED:true}
     fixed-delay: 10s
@@ -161,6 +166,8 @@ springdoc:
       packages-to-scan: org.example.grab.domain.category
     - group: dashboard
       packages-to-scan: org.example.grab.domain.dashboard
+    - group: demand
+      packages-to-scan: org.example.grab.domain.demand
     - group: drop
       packages-to-scan: org.example.grab.domain.drop
     - group: order
