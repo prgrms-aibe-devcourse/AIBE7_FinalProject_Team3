@@ -17,6 +17,7 @@
 | [PAYMENT.md](PAYMENT.md) | 결제 |
 | [INVENTORY.md](INVENTORY.md) | 재고 조회 |
 | [IMAGE_UPLOAD.md](IMAGE_UPLOAD.md) | 이미지 업로드 |
+| [DEMAND.md](DEMAND.md) | 판매자 수요 분석·판매 계획 |
 
 ## 2. 전체 API 목록 요약
 
@@ -158,6 +159,19 @@
 
 > 발급된 `uploadUrl`로 클라이언트가 Supabase Storage에 이미지를 직접 업로드하고, 응답의 `{ imageId, imageUrl }`을 DROP 생성·수정 요청의 GALLERY `images` 또는 DETAIL `detailImages`에 사용합니다. DROP당 GALLERY는 최대 5개, DETAIL은 최대 15개입니다.
 
+### 2.11 판매자 수요 분석 (GR-140)
+
+| Method | Endpoint | 인증 | 용도 |
+| --- | --- | --- | --- |
+| GET | `/api/v1/seller/drops/{dropId}/demand-analysis` | SELLER | 수요 데이터와 기본 가정의 판매 계획 조회 |
+| POST | `/api/v1/seller/drops/{dropId}/demand-analysis/calculate` | SELLER | 가정을 바꿔 판매 계획 재계산 (저장하지 않음) |
+| POST | `/api/v1/seller/drops/{dropId}/demand-plans` | SELLER | 판매 계획 저장 및 LLM 설명 생성 시작 |
+| GET | `/api/v1/seller/drops/{dropId}/demand-plans` | SELLER | DROP별 판매 계획 이력 조회 |
+| GET | `/api/v1/seller/demand-plans/{planId}` | SELLER | 판매 계획 상세·설명 조회 |
+| POST | `/api/v1/seller/demand-plans/{planId}/decision` | SELLER | 수락·수정·거절 결정 기록 (재고 미반영) |
+
+> 계산은 서버가 하고 LLM은 저장된 계획의 설명만 만듭니다. 제안과 결정은 재고·가격·판매 상태를 바꾸지 않습니다. 다른 판매자의 판매 데이터는 익명 집계값으로만 사용합니다. 구현 시 OpenAPI `demand` 그룹을 추가합니다.
+
 ---
 
 ## 3. 전체 API 간단 요약
@@ -174,6 +188,7 @@
 | 배송 | 7 | 판매자 주문 조회 및 배송 상태 관리 |
 | 대시보드 | 3 | 판매자 운영 통계 |
 | 이미지 | 1 | 상품 이미지 업로드 |
-| **합계** | **55** | |
+| 수요 분석 | 6 | 수요 분석, 판매 계획 저장·결정 |
+| **합계** | **61** | |
 
 ---
