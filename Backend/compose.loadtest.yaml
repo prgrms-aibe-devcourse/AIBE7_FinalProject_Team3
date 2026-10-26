@@ -5,6 +5,9 @@
 services:
   backend:
     mem_limit: 512m
+    # memswap_limit을 지정하지 않으면 Docker가 메모리만큼 스왑(512MiB)을 더 허용해, 한도를 넘어도 OOM 대신 스왑으로
+    # 버틴다. t3.nano는 기본 스왑이 없으므로 메모리와 같은 값으로 둬 스왑을 끈다(GR-157).
+    memswap_limit: 512m
     cpus: 1
     environment:
       # JDK17은 컨테이너 메모리 한도의 1/4을 기본 힙으로 잡는다(128MB) — Spring Boot 기동엔 빠듯해
