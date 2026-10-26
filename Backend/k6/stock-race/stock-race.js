@@ -3,9 +3,9 @@
 //
 // 사전 준비: common/accounts-seed.sql, stock-race/seed.sql 실행 후 출력된
 // drop_id/option_id를 -e로 넘긴다.
-//   k6 run -e DROP_ID=1 -e OPTION_ID=1 Backend/k6/stock-race/stock-race.js
+//   k6 run -e DROP_ID=1 -e OPTION_ID=1 k6/stock-race/stock-race.js
 //
-// 실행 후 검증: Backend/k6/stock-race/verify.sql (옵션 재고 음수 여부, 총 판매량 <= 초기재고)
+// 실행 후 검증: k6/stock-race/verify.sql (옵션 재고 음수 여부, 총 판매량 <= 초기재고)
 import http from 'k6/http';
 import { check } from 'k6';
 import { Counter } from 'k6/metrics';
@@ -73,5 +73,5 @@ export default function (data) {
 }
 
 export function teardown() {
-    console.log('완료: Backend/k6/stock-race/verify.sql로 재고 음수 여부·총 판매량을 확인하세요.');
+    console.log('완료: k6/stock-race/verify.sql로 재고 음수 여부·총 판매량을 확인하세요.');
 }

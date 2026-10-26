@@ -5,7 +5,7 @@
 --
 -- 사용 (01-create-order.js 출력의 ORDER_ID를 그대로 넣는다):
 --   docker compose exec -T postgres psql -U grab -d grab \
---     -v order_id="'<ORDER_ID>'" -f - < Backend/k6/expiry/02-backdate.sql
+--     -v order_id="'<ORDER_ID>'" -f - < k6/expiry/02-backdate.sql
 -- ck_orders_payment_expiry 제약(payment_expires_at > created_at)이 있어 created_at도
 -- 같이 당긴다. order_items/stock_reservations의 created_at은 이 제약과 무관해 안 건드려도 된다.
 --

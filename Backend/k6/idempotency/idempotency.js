@@ -6,7 +6,7 @@
 //
 // 사전 준비: common/accounts-seed.sql, idempotency/seed.sql을 실행해 이 시나리오 전용
 // DROP/옵션을 만든다(stock-race와 재고 풀이 분리돼 있어 서로 영향 없음).
-//   k6 run -e DROP_ID=1 -e OPTION_ID=1 Backend/k6/idempotency/idempotency.js
+//   k6 run -e DROP_ID=1 -e OPTION_ID=1 k6/idempotency/idempotency.js
 import http from 'k6/http';
 import { check } from 'k6';
 import { BASE_URL, login, primeCookies, authHeaders } from '../common/lib/auth.js';
@@ -107,5 +107,5 @@ export function sameKeyDifferentBody(data) {
 }
 
 export function teardown() {
-    console.log('완료: Backend/k6/idempotency/verify.sql로 idempotency_key당 주문이 1건인지 확인하세요.');
+    console.log('완료: k6/idempotency/verify.sql로 idempotency_key당 주문이 1건인지 확인하세요.');
 }

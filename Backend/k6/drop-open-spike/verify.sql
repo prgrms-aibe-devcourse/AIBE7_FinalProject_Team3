@@ -1,5 +1,5 @@
 -- PERF-002 검증: 스파이크 이후 상태 전환과 재고 정합성을 확인한다.
---   docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/drop-open-spike/verify.sql
+--   docker compose exec -T postgres psql -U grab -d grab -f - < k6/drop-open-spike/verify.sql
 
 -- 1) WISH -> GRAB 전환이 됐는지 (안 됐다면 OPEN_DELAY_SECONDS 경과 전에 조회한 것).
 SELECT id, status, sale_starts_at, grab_started_at

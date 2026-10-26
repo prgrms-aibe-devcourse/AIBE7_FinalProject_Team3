@@ -7,9 +7,9 @@
 // 사전 준비: common/accounts-seed.sql, drop-open-spike/seed.sql 실행 후 출력된
 // drop_id/option_id를 -e로 넘긴다. seed.sql의 sale_starts_at 간격(기본 30초)과
 // OPEN_DELAY_SECONDS를 맞춰서, seed 직후 바로 이 스크립트를 실행한다.
-//   k6 run -e DROP_ID=1 -e OPTION_ID=1 Backend/k6/drop-open-spike/spike.js
+//   k6 run -e DROP_ID=1 -e OPTION_ID=1 k6/drop-open-spike/spike.js
 //
-// 실행 후 검증: Backend/k6/drop-open-spike/verify.sql (상태 전환, 재고 정합성)
+// 실행 후 검증: k6/drop-open-spike/verify.sql (상태 전환, 재고 정합성)
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { Counter } from 'k6/metrics';

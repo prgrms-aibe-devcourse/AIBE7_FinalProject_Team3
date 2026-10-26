@@ -1,6 +1,6 @@
--- 재고 경쟁 시나리오 전용 DROP/옵션. 먼저 Backend/k6/common/accounts-seed.sql을 실행해 계정을
+-- 재고 경쟁 시나리오 전용 DROP/옵션. 먼저 k6/common/accounts-seed.sql을 실행해 계정을
 -- 만들어둔 상태여야 한다. 재실행 가능하도록 이 시나리오가 만든 주문까지 먼저 지운다.
---   docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/stock-race/seed.sql
+--   docker compose exec -T postgres psql -U grab -d grab -f - < k6/stock-race/seed.sql
 BEGIN;
 
 DELETE FROM stock_reservations

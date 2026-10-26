@@ -12,7 +12,7 @@
 > `BASE_URL=http://host.docker.internal:8080`)한다.
 
 ```
-Backend/k6/
+k6/
 ├── common/                 # 모든 시나리오가 공유
 │   ├── accounts-seed.sql    # 테스트 계정(관리자/판매자/구매자) — 한 번만 실행
 │   └── lib/                 # 로그인·CSRF·UUID 헬퍼
@@ -30,7 +30,7 @@ Backend/k6/
    `docker compose -f compose.yaml -f compose.loadtest.yaml up --build`)
 3. 테스트 계정 시드 (최초 1회, 재실행해도 안전):
    ```
-   docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/common/accounts-seed.sql
+   docker compose exec -T postgres psql -U grab -d grab -f - < k6/common/accounts-seed.sql
    ```
    테스트 계정: `k6-buyer@loadtest.local` / `LoadTest1234!` (자체 로그인, 카카오·구글·Toss 미사용).
 

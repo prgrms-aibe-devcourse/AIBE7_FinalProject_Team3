@@ -1,9 +1,9 @@
 -- 커넥션 풀 고갈 시나리오 전용 DROP/옵션(GR-156). 재고를 넉넉히 둬서 주문이
 -- INSUFFICIENT_STOCK 없이 거의 다 성공하게 해, 재고 부족이 아니라 순수하게
 -- 동시 DB 커넥션 수요(주문 쓰기 + 목록/상세 읽기)로 풀이 바닥나는지만 본다.
--- 먼저 Backend/k6/common/accounts-seed.sql을 실행해 계정을 만들어둔 상태여야 한다.
+-- 먼저 k6/common/accounts-seed.sql을 실행해 계정을 만들어둔 상태여야 한다.
 -- 재실행 가능하도록 이 시나리오가 만든 주문부터 먼저 지운다.
---   docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/connection-pool-exhaustion/seed.sql
+--   docker compose exec -T postgres psql -U grab -d grab -f - < k6/connection-pool-exhaustion/seed.sql
 BEGIN;
 
 DELETE FROM stock_reservations

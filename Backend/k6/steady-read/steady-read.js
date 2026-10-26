@@ -7,7 +7,7 @@
 //   - random_read: 목록 조회 후 매번 다른 드롭을 상세조회 (분산)
 //
 // 사전 준비: common/accounts-seed.sql, steady-read/seed.sql 실행.
-//   k6 run Backend/k6/steady-read/steady-read.js
+//   k6 run k6/steady-read/steady-read.js
 //
 // 실행 중 DB 커넥션(HikariCP) 사용량은 GR-159 Grafana 대시보드로 함께 본다.
 import http from 'k6/http';
