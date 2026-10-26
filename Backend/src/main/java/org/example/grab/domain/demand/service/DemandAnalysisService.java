@@ -65,14 +65,8 @@ public class DemandAnalysisService {
     @Transactional(readOnly = true)
     public DemandAnalysisResponse analyze(long sellerId, long dropId, DemandCalculateRequest request) {
         OffsetDateTime now = OffsetDateTime.now(clock);
-        TargetDrop drop = demandAnalysisRepository.findTargetDrop(dropId)
-                .orElseThrow(() -> new BusinessException(DropErrorCode.DROP_NOT_FOUND));
-        if (drop.sellerId() != sellerId) {
-            throw new BusinessException(DropErrorCode.DROP_ACCESS_DENIED);
-        }
-        if (!"WISH".equals(drop.status()) || !now.isBefore(drop.saleStartsAt())) {
-            throw new BusinessException(DemandErrorCode.DEMAND_ANALYSIS_UNAVAILABLE);
-        }
+        TargetDrop drop = findOwnedDrop(sellerId, dropId);
+        requireAnalyzable(drop, now);
 
         long activeWishCount = demandAnalysisRepository.countActiveWishes(dropId);
         long hoursUntilSaleStart = Duration.between(now, drop.saleStartsAt()).toHours();
@@ -102,6 +96,24 @@ public class DemandAnalysisService {
                 result.plan(),
                 result.dataGaps(),
                 List.of(WISH_ONLY_NOTE));
+    }
+
+    // 없는 DROP은 404, 다른 판매자의 DROP은 403이다. 소유권을 먼저 확인해 남의 DROP은 집계하지 않는다.
+    @Transactional(readOnly = true)
+    public TargetDrop findOwnedDrop(long sellerId, long dropId) {
+        TargetDrop drop = demandAnalysisRepository.findTargetDrop(dropId)
+                .orElseThrow(() -> new BusinessException(DropErrorCode.DROP_NOT_FOUND));
+        if (drop.sellerId() != sellerId) {
+            throw new BusinessException(DropErrorCode.DROP_ACCESS_DENIED);
+        }
+        return drop;
+    }
+
+    // 상태 전환 배치가 늦을 수 있으므로 저장 상태와 함께 서버 시각으로도 판매 시작 전인지 확인한다
+    public static void requireAnalyzable(TargetDrop drop, OffsetDateTime now) {
+        if (!"WISH".equals(drop.status()) || !now.isBefore(drop.saleStartsAt())) {
+            throw new BusinessException(DemandErrorCode.DEMAND_ANALYSIS_UNAVAILABLE);
+        }
     }
 
     // 오늘을 포함한 최근 14일(KST)을 등록이 없는 날도 0으로 채워 날짜순으로 반환한다
