@@ -27,6 +27,8 @@ public class MockPaymentGateway implements PaymentGateway {
 
     private static final String NOT_FOUND_CODE = "MOCK_PAYMENT_NOT_FOUND";
     private static final String INJECTED_FAILURE_CODE = "MOCK_INJECTED_FAILURE";
+    // pendingCancels에서 "결과불명 없이 즉시 취소"로 결정됐음을 표시하는 표지값.
+    private static final Instant IMMEDIATE = Instant.MIN;
 
     // resolve()/lookup()이 확정된 승인 결과를 다시 조회할 때 같은 결과를 돌려주기 위한 기록.
     private final ConcurrentHashMap<String, PaymentGatewayResult> approvals = new ConcurrentHashMap<>();
@@ -101,12 +103,13 @@ public class MockPaymentGateway implements PaymentGateway {
         if (cached != null) {
             return cached;
         }
-        Instant readyAt = pendingCancels.get(command.idempotencyKey());
-        if (readyAt == null && random.getAsDouble() < properties.cancelUnknownRate()) {
-            readyAt = clock.instant().plusSeconds(properties.resolveDelaySeconds());
-            pendingCancels.put(command.idempotencyKey(), readyAt);
-        }
-        if (readyAt != null && clock.instant().isBefore(readyAt)) {
+        // computeIfAbsent로 결과불명 여부 추첨을 키당 한 번만 실행해, 같은 키로 동시에 들어와도
+        // 결과가 갈리지 않게 한다(먼저 온 호출의 추첨 결과로 수렴).
+        Instant readyAt = pendingCancels.computeIfAbsent(command.idempotencyKey(), key ->
+                random.getAsDouble() < properties.cancelUnknownRate()
+                        ? clock.instant().plusSeconds(properties.resolveDelaySeconds())
+                        : IMMEDIATE);
+        if (!readyAt.equals(IMMEDIATE) && clock.instant().isBefore(readyAt)) {
             return PaymentCancelResult.unknown(null, INJECTED_FAILURE_CODE, "장애 주입: 결제 취소 결과 불명(대기 중)");
         }
         pendingCancels.remove(command.idempotencyKey());

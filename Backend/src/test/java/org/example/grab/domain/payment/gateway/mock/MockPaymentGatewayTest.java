@@ -13,8 +13,18 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.DoubleSupplier;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -141,6 +151,47 @@ class MockPaymentGatewayTest {
 
         PaymentCancelResult afterResolved = gateway.cancel(CANCEL_COMMAND);
         assertThat(afterResolved).isEqualTo(resolved);
+    }
+
+    @Test
+    @DisplayName("같은 멱등 키로 cancel()을 동시에 호출해도 결과불명 추첨이 단 한 번만 일어나 결과가 갈리지 않는다")
+    void cancelDecidesUnknownOnceUnderConcurrency() throws Exception {
+        MockPaymentGatewayProperties properties = new MockPaymentGatewayProperties(0, 0, 0.5, 20);
+        AtomicInteger rollCount = new AtomicInteger();
+        DoubleSupplier countingRoll = () -> {
+            rollCount.incrementAndGet();
+            return 0.0; // cancelUnknownRate(0.5)보다 항상 작게 해 결과불명으로 떨어지게 한다
+        };
+        MockPaymentGateway gateway = new MockPaymentGateway(properties, Clock.systemUTC(), countingRoll);
+
+        int threadCount = 20;
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch ready = new CountDownLatch(threadCount);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            List<Future<PaymentCancelResult>> futures = IntStream.range(0, threadCount)
+                    .mapToObj(i -> executor.submit(() -> {
+                        ready.countDown();
+                        start.await();
+                        return gateway.cancel(CANCEL_COMMAND);
+                    }))
+                    .collect(Collectors.toList());
+            ready.await();
+            start.countDown();
+
+            List<PaymentCancelResult> results = new ArrayList<>();
+            for (Future<PaymentCancelResult> future : futures) {
+                results.add(future.get(5, TimeUnit.SECONDS));
+            }
+
+            // 결과불명 여부 추첨이 키당 한 번만 일어났는지(동시 호출끼리 재추첨하지 않았는지)와,
+            // 그 덕에 20개 호출 전부 같은 결과(UNKNOWN)로 수렴했는지를 함께 본다.
+            assertThat(rollCount.get()).isEqualTo(1);
+            assertThat(results).allSatisfy(result ->
+                    assertThat(result.outcome()).isEqualTo(PaymentCancelResult.Outcome.UNKNOWN));
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     private static final class MutableClock extends Clock {
