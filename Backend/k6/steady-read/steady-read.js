@@ -6,8 +6,8 @@
 //   - hot_read: 인기 드롭 1개를 반복 상세조회 (같은 행에 쏠림)
 //   - random_read: 목록 조회 후 매번 다른 드롭을 상세조회 (분산)
 //
-// 사전 준비: common/accounts-seed.sql, 05-steady-read/seed.sql 실행.
-//   k6 run Backend/k6/05-steady-read/steady-read.js
+// 사전 준비: common/accounts-seed.sql, steady-read/seed.sql 실행.
+//   k6 run Backend/k6/steady-read/steady-read.js
 //
 // 실행 중 DB 커넥션(HikariCP) 사용량은 GR-159 Grafana 대시보드로 함께 본다.
 import http from 'k6/http';
@@ -39,11 +39,11 @@ export const options = {
 export function setup() {
     const res = http.get(`${BASE_URL}/api/v1/drops?keyword=${encodeURIComponent(KEYWORD)}&size=20`);
     if (res.status !== 200) {
-        throw new Error(`시드 데이터 조회 실패: status=${res.status} body=${res.body}. 05-steady-read/seed.sql을 먼저 실행하세요.`);
+        throw new Error(`시드 데이터 조회 실패: status=${res.status} body=${res.body}. steady-read/seed.sql을 먼저 실행하세요.`);
     }
     const content = JSON.parse(res.body).data.content;
     if (content.length < 2) {
-        throw new Error('05-steady-read/seed.sql이 만든 더미 DROP이 부족합니다. seed.sql을 먼저 실행하세요.');
+        throw new Error('steady-read/seed.sql이 만든 더미 DROP이 부족합니다. seed.sql을 먼저 실행하세요.');
     }
     const sorted = content.slice().sort((a, b) => a.name.localeCompare(b.name));
     return {

@@ -1,7 +1,7 @@
 -- 평상시 조회(목록/상세) 부하테스트 전용 더미 DROP 15개(GR-153).
 -- 하나는 "인기 드롭"(반복 조회용)으로 쓰고, 나머지 14개는 랜덤 조회 풀로 쓴다.
 -- 재실행 가능하도록 이 시나리오가 만든 DROP부터 먼저 지운다.
---   docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/05-steady-read/seed.sql
+--   docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/steady-read/seed.sql
 BEGIN;
 
 DELETE FROM drop_notifications

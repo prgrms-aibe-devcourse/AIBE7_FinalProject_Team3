@@ -6,9 +6,9 @@
 // order_burst(쓰기)+read_burst(읽기) VU 합이 풀 크기 10보다 뚜렷이 많도록
 // constant-vus로 동시 유지한다.
 //
-// 사전 준비: common/accounts-seed.sql, 06-connection-pool-exhaustion/seed.sql 실행 후
+// 사전 준비: common/accounts-seed.sql, connection-pool-exhaustion/seed.sql 실행 후
 // 출력된 drop_id/option_id를 -e로 넘긴다.
-//   k6 run -e DROP_ID=1 -e OPTION_ID=1 Backend/k6/06-connection-pool-exhaustion/pool-exhaustion.js
+//   k6 run -e DROP_ID=1 -e OPTION_ID=1 Backend/k6/connection-pool-exhaustion/pool-exhaustion.js
 //
 // 실행 중 HikariCP 활성/대기 커넥션 수는 GR-159 Grafana 대시보드(또는
 // /actuator/prometheus의 hikaricp_connections_active, hikaricp_connections_pending)로 본다.

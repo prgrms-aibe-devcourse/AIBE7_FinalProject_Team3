@@ -2,7 +2,7 @@
 // k6은 DB 드라이버가 없어 payment_expires_at을 직접 당길 수 없으므로,
 // 01-create-order.js → 02-backdate.sql → 03-cancel-order.js 순서로 3단계에 나눠 실행한다.
 //
-//   k6 run -e DROP_ID=1 -e OPTION_ID=1 Backend/k6/03-expiry/01-create-order.js
+//   k6 run -e DROP_ID=1 -e OPTION_ID=1 Backend/k6/expiry/01-create-order.js
 //   (콘솔에 출력된 ORDER_ID를 다음 단계에 쓴다)
 import http from 'k6/http';
 import { check } from 'k6';

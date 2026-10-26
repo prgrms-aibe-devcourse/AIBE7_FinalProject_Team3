@@ -1,5 +1,5 @@
 -- GR-156 검증: 커넥션 풀이 바닥났더라도 재고 정합성은 깨지면 안 된다(초과판매·음수재고 0행 기대).
---   docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/06-connection-pool-exhaustion/verify.sql
+--   docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/connection-pool-exhaustion/verify.sql
 
 SELECT o.id AS option_id, o.total_quantity, o.reserved_quantity, o.sold_quantity,
        o.total_quantity - o.reserved_quantity - o.sold_quantity AS remaining

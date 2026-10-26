@@ -2,7 +2,7 @@
 -- sale_starts_at을 가까운 미래로 둬서, DropTransitionScheduler(10초 주기)가
 -- k6 실행 도중 WISH -> GRAB으로 자동 전환하게 한다.
 -- spike.js의 OPEN_DELAY_SECONDS(기본 30)와 아래 간격을 맞춰야 한다.
---   docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/04-drop-open-spike/seed.sql
+--   docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/drop-open-spike/seed.sql
 BEGIN;
 
 DELETE FROM stock_reservations

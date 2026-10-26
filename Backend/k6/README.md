@@ -2,16 +2,25 @@
 
 로컬 백엔드(`localhost:8080`)만 대상으로 한다. 운영/외부 서비스로는 쏘지 않는다.
 
+> 각 시나리오 결과는 **운영 캐파시티 수치가 아니라 하한선 검증**이다. 목표는
+> 운영(t3.small, 2vCPU/2GB)보다 약한 t3.nano(1vCPU/0.5GB) 환경에서도 재고
+> 동시성이 깨지지 않는다는 것을 확인하는 것이고, 정확한 RPS·응답시간을
+> 측정하는 것이 아니다. nano 제한 환경으로 돌릴 때는 `docker compose -f
+> compose.yaml -f compose.loadtest.yaml up --build`(backend: 1 vCPU, 512MiB,
+> `-Xmx384m`)를 쓰고, k6는 로컬 바이너리 대신 `grafana/k6` 도커 이미지로
+> 실행(`--add-host=host.docker.internal:host-gateway`,
+> `BASE_URL=http://host.docker.internal:8080`)한다.
+
 ```
 Backend/k6/
 ├── common/                 # 모든 시나리오가 공유
 │   ├── accounts-seed.sql    # 테스트 계정(관리자/판매자/구매자) — 한 번만 실행
 │   └── lib/                 # 로그인·CSRF·UUID 헬퍼
-├── 01-stock-race/           # 시나리오마다 자기 전용 DROP/옵션(seed.sql)과 검증(verify.sql)을 둔다
-├── 02-idempotency/
-├── 03-expiry/
-├── 04-drop-open-spike/
-└── 05-steady-read/
+├── stock-race/              # 시나리오마다 자기 전용 DROP/옵션(seed.sql)과 검증(verify.sql)을 둔다
+├── idempotency/
+├── expiry/
+├── drop-open-spike/
+└── steady-read/
 ```
 
 ## 0. 사전 준비
@@ -25,78 +34,16 @@ Backend/k6/
    ```
    테스트 계정: `k6-buyer@loadtest.local` / `LoadTest1234!` (자체 로그인, 카카오·구글·Toss 미사용).
 
-## 1. 재고 경쟁 (01-stock-race)
+## 1. 시나리오
 
-```
-docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/01-stock-race/seed.sql
-k6 run -e DROP_ID=1 -e OPTION_ID=1 Backend/k6/01-stock-race/stock-race.js
-docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/01-stock-race/verify.sql
-```
-재고 5개에 VU 20명이 동시 주문 → 성공 5건, 나머지 `INSUFFICIENT_STOCK`(422).
+실행 명령과 사전 준비는 각 시나리오 스크립트(`.js`) 상단 주석에 있다. seed.sql/
+verify.sql 실행 명령은 각 SQL 파일 상단 주석을 본다.
 
-## 2. 멱등성 (02-idempotency)
-
-```
-docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/02-idempotency/seed.sql
-k6 run -e DROP_ID=1 -e OPTION_ID=1 Backend/k6/02-idempotency/idempotency.js
-docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/02-idempotency/verify.sql
-```
-
-## 3. 결제 대기 만료 + 취소 동시성 (03-expiry, 3단계로 나눠 실행)
-
-k6는 DB에 직접 접근할 수 없어 `payment_expires_at`(10분 고정)을 당기는 단계만 SQL로 수동 처리한다.
-
-```
-docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/03-expiry/seed.sql
-
-k6 run -e DROP_ID=1 -e OPTION_ID=1 Backend/k6/03-expiry/01-create-order.js
-# 콘솔에 출력된 ORDER_ID를 아래에 복사
-
-docker compose exec -T postgres psql -U grab -d grab -v order_id="'<ORDER_ID>'" -f - < Backend/k6/03-expiry/02-backdate.sql
-
-k6 run -e ORDER_ID=<ORDER_ID> Backend/k6/03-expiry/03-cancel-order.js
-
-docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/03-expiry/verify.sql
-```
-취소 요청과 배치(10초 주기)가 같은 주문을 두고 경합한다. 어느 쪽이 먼저 처리하든
-재고는 한 번만 반환돼야 한다.
-
-## 4. 드롭 오픈 순간 스파이크 (04-drop-open-spike)
-
-```
-docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/04-drop-open-spike/seed.sql
-k6 run -e DROP_ID=1 -e OPTION_ID=1 Backend/k6/04-drop-open-spike/spike.js
-docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/04-drop-open-spike/verify.sql
-```
-seed.sql 실행 직후 바로 k6를 돌려야 한다(DROP 상태가 WISH, `sale_starts_at`이 30초 뒤로
-잡혀 있음). 목록/상세 조회가 램프업하다가 오픈 시각에 일부 VU가 주문을 시도한다.
-레이트리밋이 없으므로 유입 제한 없이 그대로 받았을 때 서버가 버티는지(응답 불가·
-재시작 여부는 `docker stats`/`docker compose logs backend`로 확인), 재고 정합성이
-깨지지 않는지를 본다.
-
-## 5. 평상시 조회 (05-steady-read)
-
-```
-docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/05-steady-read/seed.sql
-k6 run Backend/k6/05-steady-read/steady-read.js
-docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/05-steady-read/verify.sql
-```
-DROP_ID/OPTION_ID를 넘길 필요 없다 — k6가 `keyword`로 seed.sql이 만든 더미 DROP
-풀을 직접 조회한다. 인기 드롭 1개를 반복 상세조회(`hot_read`)하는 트래픽과, 매번
-다른 드롭을 조회(`random_read`)하는 트래픽을 동시에 steady-state로 유지한다.
-조회 캐시(Redis)는 아직 없어서(TECHSTACK.md 87절) 이 결과는 캐시 없이 DB가
-평상시 조회를 얼마나 버티는지의 하한선이며, DB 커넥션(HikariCP) 사용량은
-GR-159 Grafana 대시보드로 함께 본다.
-
-## 6. DB 커넥션 풀 고갈 (06-connection-pool-exhaustion)
-
-```
-docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/06-connection-pool-exhaustion/seed.sql
-k6 run -e DROP_ID=1 -e OPTION_ID=1 Backend/k6/06-connection-pool-exhaustion/pool-exhaustion.js
-docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/06-connection-pool-exhaustion/verify.sql
-```
-HikariCP 풀 크기(application.yml에 미지정 → 기본값 10)보다 뚜렷이 많은 동시
-요청(주문 쓰기 VU + 목록/상세 읽기 VU 합 30)을 걸어, 커넥션이 바닥났을 때
-요청이 대기하다 처리되는지 타임아웃/5xx로 실패하는지 본다. 커넥션 대기
-큐 길이는 `/actuator/prometheus`의 `hikaricp_connections_pending`(또는 GR-159
-Grafana HikariCP 패널)로 함께 확인한다.
+| 시나리오 | 폴더 | 무엇을 보는지 | 결과 |
+|---|---|---|---|
+| 재고 경쟁 | [`stock-race/`](stock-race/stock-race.js) | 재고 5개에 VU 20명 동시 주문 → 초과판매 여부 | [result.md](stock-race/result.md) |
+| 멱등성 | [`idempotency/`](idempotency/idempotency.js) | 동일 Idempotency-Key 동시 요청 → 중복 주문 여부 | [result.md](idempotency/result.md) |
+| 결제 대기 만료 + 취소 동시성 | [`expiry/`](expiry/01-create-order.js) | 만료 배치와 취소 요청이 같은 주문을 두고 경합할 때 재고가 한 번만 반환되는지 (k6가 DB에 직접 접근할 수 없어 01→02(SQL로 payment_expires_at 수동 조정)→03 3단계로 나눠 실행) | [result.md](expiry/result.md) |
+| 드롭 오픈 순간 스파이크 | [`drop-open-spike/`](drop-open-spike/spike.js) | 오픈 순간 조회 램프업 + 주문 스파이크에 서버가 버티는지 (seed.sql 실행 직후 바로 돌려야 함) | [result.md](drop-open-spike/result.md) |
+| 평상시 조회 | [`steady-read/`](steady-read/steady-read.js) | 캐시 없는 상태의 목록/상세 조회 하한선 | [result.md](steady-read/result.md) |
+| DB 커넥션 풀 고갈 | [`connection-pool-exhaustion/`](connection-pool-exhaustion/pool-exhaustion.js) | 풀 크기(기본 10)보다 뚜렷이 많은 동시 요청에 타임아웃/5xx가 나는지 | [result.md](connection-pool-exhaustion/result.md) |

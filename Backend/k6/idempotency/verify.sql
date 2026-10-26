@@ -1,7 +1,7 @@
 -- 멱등성 검증: 같은 (buyer, idempotency_key)로 주문이 2건 이상 생기면 안 된다(0행 기대).
 -- orders.uq_orders_buyer_idempotency 유니크 제약으로 이미 DB 레벨에서 막히지만,
 -- 애플리케이션 로직(OrderIdempotencyService)이 의도대로 동작했는지 다시 한번 확인한다.
---   docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/02-idempotency/verify.sql
+--   docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/idempotency/verify.sql
 SELECT o.buyer_id, o.idempotency_key, COUNT(*)
 FROM orders o
 JOIN drops d ON d.id = o.drop_id

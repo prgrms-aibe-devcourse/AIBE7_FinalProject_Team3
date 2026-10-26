@@ -1,11 +1,11 @@
 -- PERF-002 검증: 스파이크 이후 상태 전환과 재고 정합성을 확인한다.
---   docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/04-drop-open-spike/verify.sql
+--   docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/drop-open-spike/verify.sql
 
 -- 1) WISH -> GRAB 전환이 됐는지 (안 됐다면 OPEN_DELAY_SECONDS 경과 전에 조회한 것).
 SELECT id, status, sale_starts_at, grab_started_at
 FROM drops WHERE name = 'k6 오픈스파이크 상품';
 
--- 2) 음수재고·초과판매 여부(0행 기대, 01-stock-race/verify.sql과 동일 조건).
+-- 2) 음수재고·초과판매 여부(0행 기대, stock-race/verify.sql과 동일 조건).
 SELECT o.id AS option_id, o.total_quantity, o.reserved_quantity, o.sold_quantity, o.withheld_quantity
 FROM drop_options o
 JOIN drops d ON d.id = o.drop_id

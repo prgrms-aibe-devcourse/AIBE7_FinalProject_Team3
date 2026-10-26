@@ -1,5 +1,5 @@
 -- STOCK-001/NFR-003 검증: 음수 재고·초과 판매가 없어야 한다(0행 기대).
---   docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/01-stock-race/verify.sql
+--   docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/stock-race/verify.sql
 SELECT o.id AS option_id, o.total_quantity, o.reserved_quantity, o.sold_quantity, o.withheld_quantity
 FROM drop_options o
 JOIN drops d ON d.id = o.drop_id

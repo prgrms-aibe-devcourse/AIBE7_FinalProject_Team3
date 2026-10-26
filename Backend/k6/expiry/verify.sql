@@ -1,7 +1,7 @@
 -- STOCK-005 검증: 만료 배치와 취소 요청이 경합해도 재고가 한 번만 반환돼야 한다.
 -- order_item 1건당 stock_reservations 행도 1건이어야 하고(released_at, release_reason 둘 다
 -- 채워짐), release_reason은 'EXPIRED' 또는 'ORDER_CANCELED' 중 하나만 찍혀야 한다(중복 반환 없음).
---   docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/03-expiry/verify.sql
+--   docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/expiry/verify.sql
 SELECT o.order_number, o.status, oi.option_id, sr.status AS reservation_status,
        sr.release_reason, sr.release_destination, sr.released_at
 FROM orders o
