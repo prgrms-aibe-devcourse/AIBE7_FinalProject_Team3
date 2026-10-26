@@ -37,7 +37,7 @@ public record MockPaymentGatewayProperties(
     }
 
     private static void requireRate(double rate, String name) {
-        if (rate < 0 || rate > 1) {
+        if (!Double.isFinite(rate) || rate < 0 || rate > 1) {
             throw new IllegalArgumentException(name + " must be between 0 and 1, got " + rate);
         }
     }

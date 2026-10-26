@@ -88,6 +88,12 @@ public class MockPaymentGateway implements PaymentGateway {
             pendingConfirms.remove(paymentKey);
             return result;
         }
+        // 동시 호출이 그 사이 위 분기를 먼저 끝내 approve()는 됐는데 pendingConfirms.remove()까지
+        // 끝난 뒤일 수 있어, 이 스레드가 pendingConfirms를 못 보고 왔더라도 approvals를 한 번 더 본다.
+        approved = approvals.get(paymentKey);
+        if (approved != null) {
+            return approved;
+        }
         return PaymentGatewayResult.notApproved(null, NOT_FOUND_CODE, "모킹된 결제 기록이 없습니다.");
     }
 
@@ -110,10 +116,20 @@ public class MockPaymentGateway implements PaymentGateway {
                         ? clock.instant().plusSeconds(properties.resolveDelaySeconds())
                         : IMMEDIATE);
         if (!readyAt.equals(IMMEDIATE) && clock.instant().isBefore(readyAt)) {
+            // 동시 호출이 그 사이 이미 확정했을 수 있다(바로 아래에서 cancellations에 먼저 쓰고
+            // pendingCancels를 나중에 지우므로, 이 스레드는 지워지기 전의 pendingCancels를 보고
+            // 다시 추첨해 버린 것일 수 있음). 재추첨 결과를 쓰기 전에 이미 끝난 결과가 있는지 본다.
+            PaymentCancelResult resolved = cancellations.get(command.idempotencyKey());
+            if (resolved != null) {
+                return resolved;
+            }
             return PaymentCancelResult.unknown(null, INJECTED_FAILURE_CODE, "장애 주입: 결제 취소 결과 불명(대기 중)");
         }
-        pendingCancels.remove(command.idempotencyKey());
-        return cancellations.computeIfAbsent(command.idempotencyKey(), key -> PaymentCancelResult.canceled(
+        // 먼저 확정 결과를 기록한 뒤에 보류 기록을 치운다(동시 호출이 그 사이 재추첨해도
+        // 결국 이 결과로 수렴하도록).
+        PaymentCancelResult result = cancellations.computeIfAbsent(command.idempotencyKey(), key -> PaymentCancelResult.canceled(
                 "CANCELED", UUID.randomUUID().toString(), OffsetDateTime.now(clock)));
+        pendingCancels.remove(command.idempotencyKey());
+        return result;
     }
 }
