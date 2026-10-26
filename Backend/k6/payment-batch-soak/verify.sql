@@ -9,6 +9,29 @@ WHERE d.name = 'k6 결제배치 롱런 상품'
   AND (o.reserved_quantity < 0 OR o.sold_quantity < 0 OR o.withheld_quantity < 0
        OR o.reserved_quantity + o.sold_quantity + o.withheld_quantity > o.total_quantity);
 
+-- 위 제약 검사만으로는 범위 안이지만 실제 예약 원장(stock_reservations)과 어긋나는 경우(카운터
+-- 드리프트)를 못 잡는다. HELD/COMMITTED/RELEASED(WITHHELD) 수량을 직접 집계해 옵션 카운터와
+-- 대조한다(0행 기대).
+SELECT o.id AS option_id,
+       o.reserved_quantity, COALESCE(agg.held_qty, 0) AS held_qty,
+       o.sold_quantity, COALESCE(agg.committed_qty, 0) AS committed_qty,
+       o.withheld_quantity, COALESCE(agg.withheld_qty, 0) AS withheld_qty
+FROM drop_options o
+JOIN drops d ON d.id = o.drop_id
+LEFT JOIN (
+    SELECT oi.option_id,
+           SUM(oi.quantity) FILTER (WHERE sr.status = 'HELD') AS held_qty,
+           SUM(oi.quantity) FILTER (WHERE sr.status = 'COMMITTED') AS committed_qty,
+           SUM(oi.quantity) FILTER (WHERE sr.status = 'RELEASED' AND sr.release_destination = 'WITHHELD') AS withheld_qty
+    FROM stock_reservations sr
+    JOIN order_items oi ON oi.id = sr.order_item_id
+    GROUP BY oi.option_id
+) agg ON agg.option_id = o.id
+WHERE d.name = 'k6 결제배치 롱런 상품'
+  AND (o.reserved_quantity <> COALESCE(agg.held_qty, 0)
+       OR o.sold_quantity <> COALESCE(agg.committed_qty, 0)
+       OR o.withheld_quantity <> COALESCE(agg.withheld_qty, 0));
+
 -- 참고용: 배치가 실제로 상태를 얼마나 굴렸는지(만료·취소·결제완료 건수).
 SELECT o.status, COUNT(*) AS order_count
 FROM orders o
