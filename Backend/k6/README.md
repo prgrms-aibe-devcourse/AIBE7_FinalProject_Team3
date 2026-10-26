@@ -111,6 +111,14 @@ node Backend/k6/06-sse-stream/analyze.mjs Backend/k6/06-sse-stream/out/sse.json 
 docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/06-sse-stream/verify.sql
 ```
 
+한 회차를 한 번에 돌리려면 `run.sh`를 쓴다. 위 단계에 더해 `docker stats`와 Prometheus 지표(HikariCP·SSE)까지
+`out/<이름>-*`에 남기고 요약을 출력한다. 주문 시간은 60초 이상으로 둔다(Prometheus 스크랩 15초).
+
+```
+Backend/k6/06-sse-stream/run.sh r0 0 50 300     # 이름, SSE 연결 수, 주문/초, 주문 시간(초) — SSE 비활성 기준선
+Backend/k6/06-sse-stream/run.sh r2 200 50 300   # 피크
+```
+
 - **SSE 비활성 기준선**: 터미널 2만 같은 RATE·DURATION으로 돌린 주문 p95(`http_req_duration{name:order}`).
   SSE 활성 시 악화가 10% 이내인지 비교한다(REALTIME_STOCK.md 13.2).
 - k6를 도커 이미지로 돌릴 때는 `-v "$PWD/Backend/k6:/k6"`로 마운트하고 경로를 `/k6/...`로,
