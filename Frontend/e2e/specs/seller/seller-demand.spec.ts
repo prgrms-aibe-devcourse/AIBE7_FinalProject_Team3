@@ -79,6 +79,18 @@ test('계획을 저장하고 수정 수량으로 한 번만 결정한다', async
   await expect(history.getByRole('button', { name: '수락' })).toHaveCount(0)
 })
 
+test('거절한 계획은 목록에서 사라진다', async ({ page }) => {
+  await loginSeller(page)
+  await page.goto('/#/seller/drops/101/demand')
+  await page.getByRole('button', { name: '이 가정으로 계획 저장' }).click()
+  const history = page.locator('.demand-history')
+  await history.getByRole('button', { name: '거절' }).click()
+  await history.getByRole('button', { name: '거절 확정' }).click()
+  await expect(toast(page)).toContainText('계획을 거절했어요.')
+  await expect(page.getByText('저장한 계획이 없어요.')).toBeVisible()
+  await expect(page.locator('.demand-history')).toHaveCount(0)
+})
+
 test('판매가 시작된 DROP은 분석 대신 안내와 계획 이력을 보여 준다', async ({
   page,
 }) => {

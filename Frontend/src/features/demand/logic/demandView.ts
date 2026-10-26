@@ -97,6 +97,10 @@ export const SOURCE_LABEL: Record<string, string> = {
   SELLER_INPUT: '직접 입력',
 }
 
+// 거절한 계획은 화면에서만 숨긴다. 기록은 서버에 남아 거절 비율 집계에 쓰인다(GR-146)
+export const visiblePlans = <T extends { status?: string }>(plans?: T[]) =>
+  (plans ?? []).filter((plan) => plan.status !== 'REJECTED')
+
 export const PLAN_STATUS_LABEL: Record<string, string> = {
   DRAFT: '결정 전',
   ACCEPTED: '수락',

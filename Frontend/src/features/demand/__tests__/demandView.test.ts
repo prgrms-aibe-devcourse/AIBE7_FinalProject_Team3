@@ -6,6 +6,7 @@ import {
   demandErrorMessage,
   currentGap,
   hoursLabel,
+  visiblePlans,
   initialAssumptionForm,
   marketSampleLabel,
   percent,
@@ -186,4 +187,15 @@ test('알 수 없는 오류는 권한·일반 오류로 안내한다', () => {
     '판매자 권한이 필요해요.',
   )
   expect(demandErrorMessage(new Error('network'))).toContain('잠시 후')
+})
+
+test('거절한 계획은 목록에서 빼고 나머지 순서는 유지한다', () => {
+  expect(
+    visiblePlans([
+      { planId: 'a', status: 'DRAFT' },
+      { planId: 'b', status: 'REJECTED' },
+      { planId: 'c', status: 'ACCEPTED' },
+    ]).map((plan) => plan.planId),
+  ).toEqual(['a', 'c'])
+  expect(visiblePlans(undefined)).toEqual([])
 })

@@ -18,7 +18,10 @@ import DemandAssumptionForm from '../../features/demand/components/DemandAssumpt
 import DemandEvidence from '../../features/demand/components/DemandEvidence'
 import DemandPlanHistory from '../../features/demand/components/DemandPlanHistory'
 import DemandPlanOverview from '../../features/demand/components/DemandPlanOverview'
-import { demandErrorMessage } from '../../features/demand/logic/demandView'
+import {
+  demandErrorMessage,
+  visiblePlans,
+} from '../../features/demand/logic/demandView'
 import {
   useCalculateDemand,
   useDecideDemandPlan,
@@ -143,7 +146,11 @@ export default function SellerDemandPage({
   }
   const onDecide = async (planId: string, request: DemandDecisionRequest) => {
     await decide.mutateAsync({ planId, request })
-    notify('계획 결정을 기록했어요.')
+    notify(
+      request.status === 'REJECTED'
+        ? '계획을 거절했어요. 거절한 계획은 목록에 표시하지 않아요.'
+        : '계획 결정을 기록했어요.',
+    )
   }
 
   return (
@@ -244,7 +251,10 @@ export default function SellerDemandPage({
         <div className="panel-heading">
           <div>
             <h2>저장한 계획</h2>
-            <p>최근 저장순 · 결정은 계획마다 한 번만 기록돼요.</p>
+            <p>
+              최근 저장순 · 결정은 계획마다 한 번만 기록돼요. 거절한 계획은
+              표시하지 않아요.
+            </p>
           </div>
         </div>
         {plans.isPending ? (
@@ -268,7 +278,7 @@ export default function SellerDemandPage({
         ) : (
           <>
             <DemandPlanHistory
-              plans={plans.data.content ?? []}
+              plans={visiblePlans(plans.data.content)}
               openPlanId={openPlanId}
               decidable={!unavailable && !analysis.isError}
               onToggle={(planId) =>
