@@ -1,0 +1,14 @@
+# 부하테스트 전용 오버라이드. AWS t3.micro(vCPU 2개, 1GiB, 베이스라인 CPU 성능 vCPU당
+# 10%) 수준으로 제한한다. compose.loadtest-nano.yaml(t3.nano, 512MiB)과 같은 backend
+# 서비스를 겹쳐 쓰므로 둘 중 하나만 골라서 합친다:
+#   docker compose -f compose.yaml -f compose.loadtest-micro.yaml up --build
+# 평소 개발 명령(`docker compose up`)에는 영향 없음.
+services:
+  backend:
+    mem_limit: 1g
+    # 호스트 스왑에 기대지 않도록 memswap_limit을 mem_limit과 같게 고정한다(nano와 같은 이유).
+    memswap_limit: 1g
+    cpus: 2
+    environment:
+      # 컨테이너 메모리의 75%를 힙으로 둔다(nano의 384m/512m 비율과 동일하게 맞춤).
+      JDK_JAVA_OPTIONS: -Xmx768m
