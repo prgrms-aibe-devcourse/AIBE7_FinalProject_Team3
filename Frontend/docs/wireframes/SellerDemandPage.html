@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>판매자 수요 분석 제안서 와이어프레임</title>
+    <link rel="stylesheet" href="wireframe.css" />
+  </head>
+  <body>
+    <header>
+      <span class="route">/seller/drops/:dropId/demand</span>
+      <h1>판매자 수요 분석 제안서 와이어프레임</h1>
+      <p class="muted">배치와 동선을 검토하는 화면 초안 · 실제 API 동작 없음</p>
+      <nav aria-label="와이어프레임 이동">
+        <a href="SellerDashboardPage.html">판매자 종합</a
+        ><a href="SellerDropsPage.html">DROP 관리</a
+        ><a href="SellerDropDetailPage.html">DROP 상세</a
+        ><a href="SellerDemandPage.html">수요 분석</a>
+      </nav>
+    </header>
+    <main>
+      <p class="note">
+        디자인 기준: 판매자 화면 기준을 적용한다. 예상 판매량과 준비 권장 수량을
+        이름·설명으로 구분하고, 시장 평균은 구간·근사치로만 표시한다.
+        <a href="../DESIGN.md">공통 기준</a>
+      </p>
+      <section class="section-head">
+        <div>
+          <span class="control">← DROP 상세</span>
+          <h1>수요 분석 제안서</h1>
+          <p>DROP 이름 · 계산 시각 · 판매 시작까지 N시간</p>
+        </div>
+      </section>
+      <section class="section panel stack">
+        <h2>판매 계획</h2>
+        <div class="grid cols-4">
+          <div class="metric">
+            예상 판매량<br /><strong>126개</strong><br />범위 113~139
+          </div>
+          <div class="metric">
+            준비 권장 수량<br /><strong>139개</strong><br />안전 재고 10% 포함
+          </div>
+          <div class="metric">현재 준비 수량<br /><strong>120개</strong></div>
+          <div class="metric">
+            권장보다 부족<br /><strong>19개</strong><br />많으면 "권장보다 많음"
+          </div>
+        </div>
+        <p class="muted">
+          데이터 부족 시: 숫자 대신 부족한 데이터와 다음 행동(다른 기준 선택 ·
+          전환율 직접 입력)
+        </p>
+        <div class="list-row">
+          <strong>옵션</strong><span class="secondary">현재 준비 수량</span
+          ><span class="secondary">추천 수량</span
+          ><span class="secondary">권장 대비</span>
+        </div>
+        <div class="list-row">
+          <strong>블랙 / M</strong><span class="secondary">40</span
+          ><span class="secondary">47</span
+          ><span class="secondary">7개 부족</span>
+        </div>
+        <div class="list-row">
+          <strong>블랙 / L</strong><span class="secondary">40</span
+          ><span class="secondary">46</span
+          ><span class="secondary">6개 부족</span>
+        </div>
+      </section>
+      <section class="section split">
+        <div class="panel stack">
+          <h2>근거 데이터</h2>
+          <p>활성 WISH 420명 · 판매 시작까지 40시간 · 최근 14일 등록(근사치)</p>
+          <div class="grid cols-2">
+            <div class="card">
+              <strong>내 실적</strong><br />전환율 40% (30~51%)<br />구매자당
+              1.0개 · 신뢰도 낮음<br />DROP 3개 · WISH 85명
+            </div>
+            <div class="card">
+              <strong>시장 평균 · 계획에 사용</strong><br />전환율 30%
+              (27~33%)<br />구매자당 1.0개 · 신뢰도 높음<br />DROP 10~19개 ·
+              WISH 약 1,740명 · 오늘 0시 기준
+            </div>
+          </div>
+          <p class="muted">
+            가정: 전환율 30%(시장 평균) · 구매자당 1.0개(시장 평균) · 안전 재고
+            10%(기본값)
+          </p>
+        </div>
+        <div class="panel stack">
+          <h2>가정 수정</h2>
+          <div class="controls">
+            <span class="chip">자동</span><span class="chip">내 실적</span
+            ><span class="chip">시장 평균</span
+            ><span class="chip">직접 입력</span>
+          </div>
+          <div class="field">전환율 (%) — 직접 입력일 때</div>
+          <div class="field">안전 재고율 (%)</div>
+          <div class="controls">
+            <span class="control">다시 계산</span
+            ><span class="control primary">이 가정으로 계획 저장</span>
+          </div>
+          <p class="muted">기본 제안 대비: 준비 권장 139 → 120개 (−19)</p>
+        </div>
+      </section>
+      <p class="note">
+        WISH 없이 구매한 사용자는 전환율에 포함하지 않았습니다 · 제안은
+        참고용이며 재고를 바꾸지 않습니다
+      </p>
+      <section class="section panel stack">
+        <h2>저장한 계획</h2>
+        <div class="list-row">
+          <strong>DRAFT · 준비 권장 120개</strong
+          ><span class="secondary">10월 22일 14:05 저장</span
+          ><span class="control">열기 ▾</span>
+        </div>
+        <div class="panel soft stack">
+          <p>저장 시점 판매 계획 · 옵션별 배분 (위와 같은 형식)</p>
+          <p class="muted">LLM 설명: 생성된 경우에만 표시</p>
+          <div class="controls">
+            <span class="control">수락</span
+            ><span class="control">수정 후 확정</span
+            ><span class="control">거절</span>
+          </div>
+          <div class="field">수정: 옵션별 수량 · 사유(선택, 500자)</div>
+        </div>
+        <div class="list-row">
+          <strong>MODIFIED · 준비 권장 139개</strong
+          ><span class="secondary">10월 21일 저장 · 10월 21일 결정</span
+          ><span class="control">열기 ▾</span>
+        </div>
+      </section>
+    </main>
+    <footer>
+      화면별 동작·예외·조회 조건은
+      <a href="../pages/SellerDemandPage.md">SellerDemandPage.md</a>를
+      확인하세요.
+    </footer>
+  </body>
+</html>
