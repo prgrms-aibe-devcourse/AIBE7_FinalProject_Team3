@@ -22,6 +22,8 @@ const orderRejected = new Counter('sse_order_rejected_total');
 const orderServerError = new Counter('sse_order_server_error_total');
 
 export const options = {
+    // 판정 기준(SLA)이 아니라, setup 요청을 뺀 주문만의 응답시간을 요약에 따로 내기 위한 빈 threshold다.
+    thresholds: { 'http_req_duration{name:order}': [] },
     scenarios: {
         orders: {
             executor: 'constant-arrival-rate',
