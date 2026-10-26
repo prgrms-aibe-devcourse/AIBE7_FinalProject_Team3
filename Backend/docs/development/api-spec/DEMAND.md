@@ -50,7 +50,7 @@
 ### 1.4 전환율
 
 - 표본 DROP마다 `wishers` = 활성 WISH 수, `converted` = 그중 해당 DROP에 결제 확정(`paid_at` 있음)·미취소(`canceled_at` 없음) 주문이 한 건 이상 있는 사용자 수, `quantity` = 그 주문들의 `order_items.quantity` 합계.
-- 기준(`OWN`, `MARKET`)마다 `conversionRate` = Σ`converted` / Σ`wishers`, `avgQuantityPerBuyer` = Σ`quantity` / Σ`converted` (Σ`converted`가 0이면 1)를 따로 계산한다. 내 실적의 전환율은 소수 둘째 자리로 반올림한다.
+- 기준(`OWN`, `MARKET`)마다 `conversionRate` = Σ`converted` / Σ`wishers`, `avgQuantityPerBuyer` = Σ`quantity` / Σ`converted` (Σ`converted`가 0이면 1)를 따로 계산한다. 내 실적의 전환율은 소수 둘째 자리, 구매자당 평균 수량은 소수 첫째 자리로 반올림한 값을 계산과 응답에 쓴다. 시장 평균(1.3)과 같은 정밀도라 두 기준을 나란히 비교할 수 있고, 응답에 보이는 값으로 계산하므로 판매자가 화면 수치로 검산한 결과와 LLM 설명의 수치 검증(3절) 대상이 계산 결과와 일치한다.
 - WISH 없이 구매한 사용자는 포함하지 않는다. 예상 수량이 실제보다 낮게 나올 수 있다는 점을 응답의 `notes`에 표시한다.
 
 신뢰도는 기준마다 따로 판정한다. 시장 평균은 1.3의 최소 집계 단위에 미달하면 `NONE`이다.
@@ -85,6 +85,7 @@ recommended = ceil(base × (1 + safetyStockRate))
 
 - 기본 가정: `conversionRate`·`avgQuantityPerBuyer`는 1.5의 기본 기준 값(기준이 없으면 없음), `safetyStockRate`는 0.1.
 - `u`는 사용한 기준의 신뢰도(1.4)를 따른다.
+- 반올림 방향은 값의 역할에 따라 다르다. `expected`는 판매량 예측이라 반올림해 위·아래 어느 쪽으로도 치우치지 않게 하고(실제 판매량과의 오차 측정에 사용), `low`·`high`는 범위가 좁아지지 않게 각각 내림·올림한다. `recommended`는 준비 수량이라 올림해 소수점 아래 수요 때문에 모자라지 않게 한다. 생산·발주 단위(최소 생산 수량, 묶음 단위) 맞춤은 범위 밖이며 판매자가 결정을 기록할 때(2.6) 반영한다.
 - 입력 범위: `0 < conversionRate ≤ 1`, `0 ≤ safetyStockRate ≤ 1`, 각각 소수 둘째 자리까지. 벗어나면 `VALIDATION_FAILED`.
 - 옵션별 배분: `recommended`를 활성 옵션(`is_active = true`)의 현재 `total_quantity` 비율로 나눈다. 정수 배분은 최대 나머지 방식이며 나머지가 같으면 `sort_order`, `id` 순이다.
 - 현재 판매 수량 합계(`currentTotalQuantity`)와 차이(`differenceFromCurrent`)를 함께 반환한다.
