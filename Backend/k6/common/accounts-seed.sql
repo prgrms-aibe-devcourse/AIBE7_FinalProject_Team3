@@ -1,6 +1,6 @@
 -- k6 테스트 계정(관리자/판매자/구매자). 모든 시나리오가 공유한다 — 한 번만 실행하면 된다.
 -- DROP/옵션처럼 시나리오마다 모양이 다른 데이터는 각 시나리오 폴더의 seed.sql에서 따로 만든다.
---   docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/common/accounts-seed.sql
+--   docker compose exec -T postgres psql -U grab -d grab -f - < k6/common/accounts-seed.sql
 -- 비밀번호(전부 동일): LoadTest1234!
 -- 해시는 SecurityConfig.passwordEncoder()와 동일한 파라미터(Argon2id, m=19456, t=2, p=1)로 생성했다.
 -- 이미 만들어진 계정이 있으면 건드리지 않는다(DELETE하지 않음) — 계정에 주문이 쌓여있어도

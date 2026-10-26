@@ -1,6 +1,6 @@
 // PERF(GR-161): 로그인 동시 폭주. 로그인 비밀번호 검증(Argon2id, 해시 1회에 약 19MiB)이
-// 동시에 몰릴 때 nano 환경(힙 384MiB)이 어느 VU 단계부터 무너지는지 본다.
-// 01~04는 setup()에서 한 번만 로그인하므로, 로그인 자체의 부하는 이 시나리오에서만 측정한다.
+// 동시에 몰릴 때 제한 환경이 어느 VU 단계부터 무너지는지 본다. 결과: login-burst/result.md
+// 다른 시나리오는 setup()에서 한 번만 로그인하므로, 로그인 자체의 부하는 이 시나리오에서만 측정한다.
 //
 // 반복 1회 = 새 사용자 1명이 앱을 열고(CSRF 발급) 로그인하는 흐름이다. think time은 없다.
 // 합격 기준(thresholds)은 두지 않는다. 목표 수치(NFR-006)가 아직 없고, 무너지는 지점을
@@ -16,12 +16,57 @@
 //                   Argon2를 실행하므로 비용은 같고, sellers 조회·JWT·Redis 저장만 빠진다
 //   EMAIL, PASSWORD  MODE의 기본 계정 대신 쓸 값
 //
-// 사전 준비: common/accounts-seed.sql
-//   k6 run -e VUS=20 Backend/k6/login-burst/login-burst.js
-//   k6 run -e VUS=20 -e SHAPE=burst Backend/k6/login-burst/login-burst.js
-//   k6 run -e VUS=20 -e MODE=fail Backend/k6/login-burst/login-burst.js
+// 아래 명령은 모두 Backend/에서 Git Bash로 실행한다.
 //
-// success 모드는 로그인마다 Redis에 세션 키 2개(TTL 14일)를 남긴다. 측정이 끝나면 README 5절의 정리 절차를 따른다.
+// [환경] nano 설정(compose.loadtest.yaml만 사용)이 아니라 t3.micro 기준 임시 설정으로 측정했다.
+// nano 설정(512MiB, -Xmx384m)은 힙 밖 메모리만 약 300MiB라 로그인 1명 부하에서도 OOM-kill된다(result.md 부록).
+// 임시 설정 파일은 저장소에 두지 않는다. 저장소 밖(예: 임시 폴더)에 아래 내용으로 만들어 세 번째 -f로 얹는다.
+//   # compose.micro.yaml. memswap_limit을 mem_limit과 같게 두어 스왑을 막는다
+//   services:
+//     backend:
+//       mem_limit: 1g
+//       memswap_limit: 1g
+//       environment:
+//         JDK_JAVA_OPTIONS: -Xmx512m -Xlog:gc   # environment는 값 전체를 덮어쓰므로 -Xlog:gc도 다시 적는다
+//
+// [준비]
+//   docker compose -f compose.yaml -f compose.loadtest.yaml -f <임시 폴더>/compose.micro.yaml up -d --build
+//   docker inspect backend-backend-1 --format 'Memory={{.HostConfig.Memory}} MemorySwap={{.HostConfig.MemorySwap}}'
+//     → 둘 다 1073741824(스왑 없음)
+//   docker compose logs backend | head -3              → NOTE: Picked up JDK_JAVA_OPTIONS: -Xmx512m -Xlog:gc
+//   docker compose logs backend | grep '\[gc\] Using'  → CPU 1개 제한에서는 Serial
+//   docker compose exec -T postgres psql -U grab -d grab -f - < k6/common/accounts-seed.sql
+//   측정 전 Redis 상태를 기록한다(측정 후와 비교해 로그인 폭주가 남긴 증가량을 본다):
+//   docker compose exec -T redis redis-cli DBSIZE
+//   docker compose exec -T redis redis-cli INFO memory | grep '^used_memory_human'
+//
+// [실행] VU 단계(5 → 10 → 20 → 40, 40에서도 버티면 80)마다 따로 실행한다. 5xx·타임아웃·
+// 힙 OutOfMemoryError·컨테이너 종료가 처음 나온 단계를 한계 단계로 기록한다.
+//   k6 run -e VUS=5 k6/login-burst/login-burst.js                 # steady: 30초 동안 계속 로그인
+//   k6 run -e VUS=5 -e SHAPE=burst k6/login-burst/login-burst.js  # burst: VU마다 1번씩 동시에
+//   k6 run -e VUS=20 -e MODE=fail k6/login-burst/login-burst.js   # 실패 로그인(비교용)
+//   MODE=fail은 success의 한계 단계와 바로 아래 단계에서만 실행한다.
+//
+// [관찰] k6 실행과 함께 다른 터미널에서
+//   CPU·메모리(약 1~2초 간격, Ctrl+C로 멈춤):
+//   while true; do echo "$(date +%T) $(docker stats --no-stream --format '{{.CPUPerc}} {{.MemUsage}}' backend-backend-1)"; done | tee stats.log
+//   실행 후 컨테이너 생존(재시작 정책이 없어 OOM-kill이면 exited로 남는다):
+//   docker inspect backend-backend-1 --format 'Status={{.State.Status}} OOMKilled={{.State.OOMKilled}} RestartCount={{.RestartCount}}'
+//   실행 후 힙 부족과 GC(컨테이너 OOM-kill과 구분해 기록한다):
+//   docker compose logs --since 5m backend | grep -E 'OutOfMemoryError|ERROR'
+//   docker compose logs --since 5m backend | grep '\[gc\]' > gc.log
+//   GC 로그 한 줄은 `Pause Young (Allocation Failure) 210M->48M(370M) 4.123ms` 형태다(GC 전 → 후 힙 사용량,
+//   괄호는 확보된 힙, 끝은 정지 시간). Pause Full이 잦아지거나 GC 뒤에도 사용량이 거의 줄지 않으면 힙이 한계다.
+//   Grafana는 15초 수집이라 짧은 피크를 놓칠 수 있어 보조로만 본다.
+//
+// [정리] success 모드는 로그인마다 Redis에 세션 키 2개(TTL 14일)를 남긴다. 모든 실행이 끝나면 측정 후
+// 상태를 기록하고, k6 계정(k6-buyer@loadtest.local)의 세션만 지운다. 다른 회원의 세션은 남는다.
+//   docker compose exec -T redis redis-cli DBSIZE
+//   docker compose exec -T redis redis-cli INFO memory | grep '^used_memory_human'
+//   USER_ID=$(docker compose exec -T postgres psql -U grab -d grab -tAc "SELECT id FROM users WHERE email = 'k6-buyer@loadtest.local'")
+//   docker compose exec -T redis sh -c 'redis-cli EVAL "$(cat)" 0 "$1"' _ "$USER_ID" < k6/login-burst/cleanup-sessions.lua
+//   docker compose exec -T redis redis-cli DBSIZE   # 측정 전 값으로 돌아왔는지 확인
+// 측정이 끝나면 docker compose up -d로 제한 없는 개발 환경으로 되돌린다.
 import http from 'k6/http';
 import { check } from 'k6';
 import { Counter, Trend } from 'k6/metrics';
