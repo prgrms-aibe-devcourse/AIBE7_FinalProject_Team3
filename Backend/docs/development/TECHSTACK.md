@@ -18,8 +18,8 @@
 | API Docs | SpringDoc OpenAPI / Swagger UI | 3.1.0 | Spring Boot 4 기반 API 명세를 자동 생성하고 프론트엔드와 공유한다. |
 | Monitoring Endpoint | Spring Boot Actuator | Boot 관리 | 상태 확인, 메트릭 노출 및 배포 성공 여부를 검증한다. |
 | Scheduling | Spring `@Scheduled` + PostgreSQL 인덱스 폴링 | Boot 관리 | DROP 상태(WISH→GRAB→ENDED) 자동 전환, 결제 배치(진행 중 결제 정리·결제 대기 만료·결제 취소 재요청·보정 환불), 배송 단계 Mock 진행. 별도 스케줄러 인프라 없이 기존 DB·인덱스만 사용한다(1.1절, 1.2절). 스케줄러 스레드는 4개(`spring.task.scheduling.pool.size`)로 두어 작업끼리 서로를 기다리지 않게 한다. 기본값 1이면 결제 배치의 PG 지연이 DROP 판매 시작 전환까지 늦춘다. |
-| AI | Spring AI + Google GenAI(Gemini) | 2.0.x | 도입 제안, 팀 결정 대기. 저장된 판매 계획의 설명을 구조화 JSON으로 생성한다. 계산에는 쓰지 않는다. 모델명은 설정값이며 평가셋으로 비교해 정한다(1.3절, GR-146). |
-| AI Embedding | Spring AI + Google GenAI Embedding | 2.0.x | 도입 제안, 팀 결정 대기. 유사 상품 표본 선택용 DROP 임베딩을 생성한다(1.3절, GR-147). |
+| AI | Spring AI + Google GenAI(Gemini) | 2.0.x | 팀 합의로 도입(GR-146). 저장된 판매 계획의 설명을 구조화 JSON으로 생성한다. 계산에는 쓰지 않는다. 모델명은 설정값이며 평가셋으로 비교해 정한다(1.3절, GR-146). |
+| AI Embedding | Spring AI + Google GenAI Embedding | 2.0.x | 팀 합의, GR-147에서 활성화. 유사 상품 표본 선택용 DROP 임베딩을 생성한다(1.3절, GR-147). |
 
 ### 1.1 DROP 상태 자동 전환 선정 이유 (GR-18)
 
@@ -93,7 +93,7 @@
 | LLM이 수량까지 판단 | 구현이 짧음 | 같은 입력에도 결과가 달라지고 수치를 검증할 기준이 없음 |
 | LLM 없이 계산만 | 의존성·비용 없음 | 근거·위험을 판매자가 직접 해석해야 함 |
 
-**LLM 제공자와 프레임워크 (제안, 팀 결정 대기)**: `build.gradle`에 보류 상태로 있는 Spring AI Google GenAI 스타터(채팅·임베딩)를 쓰는 안을 제안한다. Spring Boot 설정·관측(Micrometer)과 통합된다. 모델 호출은 인터페이스 뒤에 두어 제공자를 설정으로 바꿀 수 있게 한다. 현재는 AGENTS.md 규칙에 따라 보류 상태를 유지하며, 팀이 승인하면 의존성을 활성화하고 AGENTS.md의 보류 규칙을 함께 수정한다. 승인 전에는 LLM이 필요 없는 계산·저장 기능(GR-142~144)만 진행한다.
+**LLM 제공자와 프레임워크 (팀 합의)**: Spring AI Google GenAI 스타터를 쓴다. Spring Boot 설정·관측(Micrometer)과 통합된다. 모델 호출은 인터페이스 뒤에 두어 제공자를 설정으로 바꿀 수 있게 한다. GR-146에서 채팅 스타터만 활성화하고 임베딩 스타터는 GR-147에서 켠다. 설명 생성은 `DEMAND_LLM_PROVIDER=google-genai`와 `GEMINI_API_KEY`가 있을 때만 켜지며, 기본값(`none`)이면 모델 빈을 만들지 않아 키 없이 기동하고 계획 설명은 `DISABLED`로 저장한다.
 
 **전환율 표본 선택**
 

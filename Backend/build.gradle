@@ -22,7 +22,7 @@ ext {
     set('datasourceMicrometerVersion', "2.3.0")
     set('jjwtVersion', "0.13.0")
     set('greenmailVersion', "2.1.14")
-    // set('springAiVersion', "2.0.1")
+    set('springAiVersion', "2.0.1")
 }
 
 dependencies {
@@ -42,7 +42,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework.boot:spring-boot-starter-mail'
     implementation "io.jsonwebtoken:jjwt-api:${jjwtVersion}"
-    // implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'
+    // 수요 분석 설명 생성(GR-146). 임베딩은 유사 상품 검색(GR-147)에서 켠다
+    implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'
     // implementation 'org.springframework.ai:spring-ai-starter-model-google-genai-embedding'
     compileOnly 'org.projectlombok:lombok'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
@@ -74,7 +75,7 @@ dependencies {
 dependencyManagement {
     imports {
         mavenBom "net.ttddyy.observation:datasource-micrometer-bom:${datasourceMicrometerVersion}"
-        // mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+        mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
     }
 }
 

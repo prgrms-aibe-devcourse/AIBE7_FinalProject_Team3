@@ -31,6 +31,10 @@ services:
       SUPABASE_DROP_IMAGE_BUCKET: ${SUPABASE_DROP_IMAGE_BUCKET:-drop-images}
       SUPABASE_SELLER_DOCUMENT_BUCKET: ${SUPABASE_SELLER_DOCUMENT_BUCKET:-seller-documents}
       SUPABASE_PROFILE_IMAGE_BUCKET: ${SUPABASE_PROFILE_IMAGE_BUCKET:-profile-images}
+      # 수요 분석 설명 LLM(GR-146). 비워 두면 설명 생성 없이 계산만 동작한다
+      DEMAND_LLM_PROVIDER: ${DEMAND_LLM_PROVIDER:-none}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
       # 쿠키를 포함한 요청을 허용할 프론트엔드 Origin. 기본값은 로컬 Vite 개발 서버다
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
       REDIS_HOST: redis
