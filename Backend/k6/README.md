@@ -87,3 +87,37 @@ DROP_ID/OPTION_ID를 넘길 필요 없다 — k6가 `keyword`로 seed.sql이 만
 조회 캐시(Redis)는 아직 없어서(TECHSTACK.md 87절) 이 결과는 캐시 없이 DB가
 평상시 조회를 얼마나 버티는지의 하한선이며, DB 커넥션(HikariCP) 사용량은
 GR-159 Grafana 대시보드로 함께 본다.
+
+## 6. SSE 동시 연결 (06-sse-stream)
+
+k6 기본 이미지는 SSE 스트림을 읽지 못해 연결 유지는 Node(`sse-clients.mjs`, 의존성 없음, Node 18+)가,
+재고 변경 원천인 주문 트래픽은 k6(`order-load.js`)가 맡는다. 반드시 `compose.loadtest.yaml`을 합쳐 띄운다.
+SSE의 IP당 연결 제한을 풀고, postgres에 `pg_stat_statements`를 적재한다(seed.sql이 이것에 의존한다).
+
+```
+docker compose -f compose.yaml -f compose.loadtest.yaml up --build -d
+docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/06-sse-stream/seed.sql
+
+# 터미널 1: SSE 연결 유지 (기본 100개·300초)
+CONNECTIONS=200 DURATION_SEC=300 OUT=Backend/k6/06-sse-stream/out/sse.json \
+  node Backend/k6/06-sse-stream/sse-clients.mjs
+
+# 터미널 2: ready가 다 뜬 뒤(약 RAMP_SEC=20초) 주문 투입. DURATION은 SSE 유지 시간보다 짧게 둔다
+RATE=50 DURATION=4m k6 run --console-output=Backend/k6/06-sse-stream/out/orders.log \
+  Backend/k6/06-sse-stream/order-load.js
+
+# 전달 지연 계산, 재고 정합성·쿼리 호출 수 확인
+node Backend/k6/06-sse-stream/analyze.mjs Backend/k6/06-sse-stream/out/sse.json Backend/k6/06-sse-stream/out/orders.log
+docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/06-sse-stream/verify.sql
+```
+
+- **SSE 비활성 기준선**: 터미널 2만 같은 RATE·DURATION으로 돌린 주문 p95(`http_req_duration{name:order}`).
+  SSE 활성 시 악화가 10% 이내인지 비교한다(REALTIME_STOCK.md 13.2).
+- k6를 도커 이미지로 돌릴 때는 `-v "$PWD/Backend/k6:/k6"`로 마운트하고 경로를 `/k6/...`로,
+  `BASE_URL=http://host.docker.internal:8080`으로 바꾼다. 지연 계산은 두 프로세스의 시계가 같다는 전제라
+  도커 VM 시계 오차가 섞일 수 있다(결과에 기록).
+- 재실행 전에는 seed.sql을 다시 돌린다(주문 정리 + `pg_stat_statements` 초기화).
+- 연결 제한 동작(같은 IP 21번째 연결 429, 201번째 연결 503) 확인은 오버라이드를 끄고 따로 한다:
+  `GRAB_STOCKSTREAM_MAXCONNECTIONSPERIP=20 GRAB_STOCKSTREAM_CONNECTRATEMAX=30 docker compose ... up -d` 후
+  `CONNECTIONS=25 node ...sse-clients.mjs`의 `statuses`에서 429 5건을 확인한다.
+  201번째 연결 503은 기본 오버라이드 상태에서 `CONNECTIONS=205`로 실행해 503 5건을 확인한다.
