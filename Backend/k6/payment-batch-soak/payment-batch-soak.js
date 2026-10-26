@@ -4,8 +4,9 @@
 // 본다. 짧은 스파이크 시나리오로는 이런 누수를 못 본다(GR-149와 같은 전제).
 //
 // 실제 토스 샌드박스를 몇 시간 동안 때리면 레이트리밋·키 정지로 이어질 수 있어,
-// 백엔드를 MockPaymentGateway로 띄운 상태에서 돌린다:
-//   GRAB_PAYMENT_MOCK_GATEWAY_ENABLED=true docker compose -f compose.yaml -f compose.loadtest.yaml up --build
+// 백엔드를 MockPaymentGateway로 띄운 상태에서 돌린다. nano(512MB)는 기본 트래픽만으로도
+// 몇 분 안에 OOM-kill돼 장시간 실행이 안 되므로(result.md 참고) micro로 돌린다:
+//   GRAB_PAYMENT_MOCK_GATEWAY_ENABLED=true docker compose -f compose.yaml -f compose.loadtest-micro.yaml up --build
 //
 // 사전 준비: common/accounts-seed.sql, payment-batch-soak/seed.sql 실행 후
 // 출력된 drop_id/option_id를 -e로 넘긴다.
