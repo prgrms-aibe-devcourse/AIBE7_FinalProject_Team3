@@ -22,6 +22,10 @@
 `reservation_status=RELEASED`)했고, 뒤따른 취소 요청은 `ORDER_NOT_CANCELABLE`로
 거부됐다. 재고는 정확히 한 번만 반환됨(`verify.sql` 0행).
 
+## 2026-10-26(이어서): G1GC 명시 재검증 — nano·micro 둘 다 통과
+
+`JDK_JAVA_OPTIONS`에 `-XX:+UseG1GC`를 명시하고 nano·micro 양쪽에서 다시 실행. 둘 다 **통과**(재고 정확히 한 번만 반환). 결과·수치에 의미 있는 차이는 없었다(nano 메모리 94.79%, micro 45.57%).
+
 ## 결론
 
 재고 이중 복구 **미발생**, 배치·취소 요청 경합에서 재고가 정확히 한 번만 반환됨.
