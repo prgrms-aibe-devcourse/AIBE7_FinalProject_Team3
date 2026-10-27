@@ -47,7 +47,7 @@ export default function DemandExplanationPanel({
       </div>
       {explanation.isPending && (
         <p className="demand-explanation-pending" role="status">
-          설명을 만들고 있어요. 최대 10초 걸려요.
+          설명을 만들고 있어요.
         </p>
       )}
       {explanation.isError && (
