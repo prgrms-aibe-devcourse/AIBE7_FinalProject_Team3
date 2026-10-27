@@ -1,0 +1,14 @@
+[
+  { "name": "date_none", "params": {} },
+  { "name": "date_category", "params": { "categoryId": "1" } },
+  { "name": "date_keyword", "params": { "keyword": "스니커즈" } },
+  { "name": "date_soldout", "params": { "soldOut": "false" } },
+  { "name": "wish_none", "params": { "status": "WISH", "sort": "wishCount,desc" } },
+  { "name": "wish_category", "params": { "status": "WISH", "sort": "wishCount,desc", "categoryId": "1" } },
+  { "name": "wish_keyword", "params": { "status": "WISH", "sort": "wishCount,desc", "keyword": "스니커즈" } },
+  { "name": "wish_soldout", "params": { "status": "WISH", "sort": "wishCount,desc", "soldOut": "false" } },
+  { "name": "grab_none", "params": { "status": "GRAB", "sort": "soldQuantity,desc" } },
+  { "name": "grab_category", "params": { "status": "GRAB", "sort": "soldQuantity,desc", "categoryId": "1" } },
+  { "name": "grab_keyword", "params": { "status": "GRAB", "sort": "soldQuantity,desc", "keyword": "스니커즈" } },
+  { "name": "grab_soldout", "params": { "status": "GRAB", "sort": "soldQuantity,desc", "soldOut": "false" } }
+]

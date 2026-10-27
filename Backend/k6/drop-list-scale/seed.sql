@@ -67,7 +67,8 @@ WHERE email LIKE 'k6-scale-%@loadtest.local';
 
 -- DROP 계획. n으로 상태·카테고리·키워드·품절을 결정한다.
 --   상태: DRAFT 5%, WISH 35%, GRAB 35%, ENDED 20%, CANCELED 5%
---   키워드: 이름 끝에 단어 20종 중 하나(각 5%). 'k6 대용량'은 전체가 걸리는 최악 조건이다.
+--   키워드: 이름 끝에 단어 19종 중 하나(각 약 5%). 'k6 대용량'은 전체가 걸리는 최악 조건이다.
+--   단어(n % 19)·카테고리((n / 20) % 8)는 상태(n % 20)와 겹치지 않는 주기로 골라 특정 상태에 쏠리지 않게 한다.
 --   품절: GRAB의 약 15%, ENDED의 약 40%는 활성 SKU 가용 재고 0.
 CREATE TEMP TABLE k6s_plan ON COMMIT DROP AS
 SELECT n,
@@ -81,8 +82,8 @@ SELECT n,
        'k6 대용량 상품 ' || lpad(n::text, 5, '0') || ' '
            || (ARRAY['후드', '스니커즈', '토트백', '립밤', '이어폰', '머그컵', '원두', '피규어',
                      '셔츠', '부츠', '지갑', '세럼', '키보드', '쿠션', '그래놀라', '포스터',
-                     '자켓', '샌들', '모자', '향수'])[n % 20 + 1] AS name,
-       (ARRAY['FASHION', 'SHOES', 'BAG_ACC', 'BEAUTY', 'DIGITAL', 'LIVING', 'FOOD', 'HOBBY'])[n % 8 + 1] AS category_code,
+                     '자켓', '샌들', '모자'])[n % 19 + 1] AS name,
+       (ARRAY['FASHION', 'SHOES', 'BAG_ACC', 'BEAUTY', 'DIGITAL', 'LIVING', 'FOOD', 'HOBBY'])[(n / 20) % 8 + 1] AS category_code,
        1 + n % 4 AS option_count,
        random() < CASE WHEN n % 20 BETWEEN 8 AND 14 THEN 0.15
                        WHEN n % 20 BETWEEN 15 AND 18 THEN 0.40
