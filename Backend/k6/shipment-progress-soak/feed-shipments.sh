@@ -18,7 +18,7 @@ tick=0
 
 while [ "$(date +%s)" -lt "$deadline" ]; do
     tick=$((tick + 1))
-    docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U grab -d grab <<SQL
+    sql=$(cat <<SQL
 WITH new_orders AS (
     INSERT INTO orders (
         order_number, buyer_id, drop_id, idempotency_key, request_hash, status,
@@ -45,6 +45,12 @@ SELECT id, 'CJ대한통운', 'TRACK-GR172-FEED-${tick}-' || id, 'ship-idem-GR172
        now(), 'COLLECTED', now()
 FROM new_orders;
 SQL
+)
+    # 장시간 무인 실행 중 일시적인 docker/psql 실패로 전체 soak가 중간에 멈추면 안 되므로,
+    # 이 tick만 건너뛰고 다음 주기를 계속 돈다(set -e의 즉시 종료를 여기서만 막음).
+    if ! docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U grab -d grab <<< "$sql"; then
+        echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) tick ${tick} 실패, 다음 주기로 계속 진행" >&2
+    fi
     sleep "$INTERVAL_SECONDS"
 done
 
