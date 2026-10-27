@@ -9,6 +9,20 @@
 SET client_encoding = 'UTF8';
 BEGIN;
 
+-- order_burst(k6)가 실제 /api/v1/orders API로 주문을 만들면 체크아웃 플로우를 타서
+-- shipments·stock_reservations에도 행이 생긴다(seed.sql이 SQL로 직접 꽂는 1000건과
+-- 달리 FK가 RESTRICT라 먼저 지워야 order_items/orders 삭제가 막히지 않는다).
+DELETE FROM shipments
+    WHERE order_id IN (
+        SELECT o.id FROM orders o JOIN drops d ON d.id = o.drop_id
+        WHERE d.name = 'k6 판매자주문조회 상품'
+    );
+DELETE FROM stock_reservations
+    WHERE order_item_id IN (
+        SELECT oi.id FROM order_items oi
+        JOIN drops d ON d.id = oi.drop_id
+        WHERE d.name = 'k6 판매자주문조회 상품'
+    );
 DELETE FROM payments
     WHERE order_id IN (
         SELECT o.id FROM orders o JOIN drops d ON d.id = o.drop_id
