@@ -93,7 +93,7 @@
 | LLM이 수량까지 판단 | 구현이 짧음 | 같은 입력에도 결과가 달라지고 수치를 검증할 기준이 없음 |
 | LLM 없이 계산만 | 의존성·비용 없음 | 근거·위험을 판매자가 직접 해석해야 함 |
 
-**LLM 제공자와 프레임워크 (팀 합의)**: Spring AI Google GenAI 스타터를 쓴다. Spring Boot 설정·관측(Micrometer)과 통합된다. 모델 호출은 인터페이스 뒤에 두어 제공자를 설정으로 바꿀 수 있게 한다. GR-146에서 채팅 스타터만 활성화하고 임베딩 스타터는 GR-147에서 켠다. 설명 생성은 `DEMAND_LLM_PROVIDER=google-genai`와 `GEMINI_API_KEY`가 있을 때만 켜지며, 기본값(`none`)이면 모델 빈을 만들지 않아 키 없이 기동하고 계획 설명은 `DISABLED`로 저장한다.
+**LLM 제공자와 프레임워크 (팀 합의)**: Spring AI Google GenAI 스타터를 쓴다. Spring Boot 설정·관측(Micrometer)과 통합된다. 모델 호출은 인터페이스 뒤에 두어 제공자를 설정으로 바꿀 수 있게 한다. GR-146에서 채팅 스타터만 활성화하고 임베딩 스타터는 GR-147에서 켠다. 설명 생성은 `DEMAND_LLM_PROVIDER=google-genai`와 `GEMINI_API_KEY`가 있을 때만 켜지며, 기본값(`none`)이면 모델 빈을 만들지 않아 키 없이 기동하고 설명 요청은 `DISABLED`로 응답한다(저장하지 않는다).
 
 **전환율 표본 선택**
 

@@ -25,6 +25,8 @@ public final class DemandExplanationValidator {
     private static final List<String> LIST_FIELDS = List.of("reasons", "risks", "dataGaps", "notRecommended");
     // 1,740처럼 천 단위 쉼표가 들어간 수도 하나로 읽는다. 부호는 절댓값으로 비교하므로 읽지 않는다
     private static final Pattern NUMBER = Pattern.compile("\\d{1,3}(?:,\\d{3})+(?:\\.\\d+)?|\\d+(?:\\.\\d+)?");
+    // 시장 표본 DROP 수 구간 코드(DEMAND.md 1.3)
+    private static final Pattern BAND = Pattern.compile("\\d+_(?:TO_\\d+|PLUS)");
 
     private DemandExplanationValidator() {
     }
@@ -88,6 +90,10 @@ public final class DemandExplanationValidator {
     private static void collect(JsonNode node, Set<BigDecimal> allowed) {
         if (node.isNumber()) {
             allowed.add(normalize(node.decimalValue().abs()));
+        } else if (node.isString() && BAND.matcher(node.asString()).matches()) {
+            // 시장 표본 DROP 수 구간 코드(10_TO_19, 20_PLUS)의 끝값은 설명에 "DROP 10~19개"처럼 쓸 수 있다.
+            // 다른 문자열의 숫자는 허용하지 않는다
+            allowed.addAll(numbers(node.asString().replace('_', ' ')));
         }
         for (JsonNode child : node) {
             collect(child, allowed);

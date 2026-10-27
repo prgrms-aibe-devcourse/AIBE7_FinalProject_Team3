@@ -75,4 +75,23 @@ class DemandExplanationValidatorTest {
                         new BigDecimal("2"));
         assertThat(DemandExplanationValidator.numbers("숫자 없음")).isEqualTo(List.of());
     }
+
+    @Test
+    @DisplayName("시장 표본 DROP 수 구간 코드의 끝값은 허용하고, 다른 문자열 속 숫자는 허용하지 않는다")
+    void validate_acceptsMarketBandBounds() {
+        String input = """
+                {"conversion":{"market":{"ratePercent":30,"sampleDropCountBand":"10_TO_19"},
+                               "own":{"sampleDropCountBand":"20_PLUS","note":"옵션 250mm"}}}
+                """;
+
+        assertThat(DemandExplanationValidator.validate(
+                "{\"summary\":\"시장 평균은 DROP 10~19개 표본의 전환율 30%입니다.\"}", input, OBJECT_MAPPER))
+                .isPresent();
+        assertThat(DemandExplanationValidator.validate(
+                "{\"summary\":\"DROP 20개 이상을 비교했습니다.\"}", input, OBJECT_MAPPER))
+                .isPresent();
+        assertThat(DemandExplanationValidator.validate(
+                "{\"summary\":\"250mm 옵션을 권장합니다.\"}", input, OBJECT_MAPPER))
+                .isEmpty();
+    }
 }

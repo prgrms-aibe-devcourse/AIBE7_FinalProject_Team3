@@ -205,7 +205,7 @@ class DemandExplanationServiceTest {
 
     private DemandExplanationService service(TaskExecutor executor, Duration timeout) {
         return new DemandExplanationService(analysisService, client, repository, limitRepository,
-                new DemandExplanationProperties(timeout, 1024, 0, 30), objectMapper, executor, meterRegistry,
+                new DemandExplanationProperties(timeout, timeout.dividedBy(2), 1024, 0, 30), objectMapper, executor, meterRegistry,
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
 }
