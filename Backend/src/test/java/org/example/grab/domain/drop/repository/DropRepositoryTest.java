@@ -703,6 +703,28 @@ class DropRepositoryTest {
     }
 
     @Test
+    @DisplayName("인기 GRAB 판매 수량에는 판매 후 비활성으로 바뀐 SKU의 판매분도 포함한다")
+    void countsSoldQuantityOfDeactivatedOptionsInPopularGrab() {
+        // given: deactivated는 판매 후 비활성이 된 SKU에서 5개, 활성 SKU에서 1개가 팔렸다
+        Long deactivated = insertSellingDrop(DropStatus.GRAB, "비활성 SKU 판매", 20);
+        Long active = insertSellingDrop(DropStatus.GRAB, "활성 SKU 판매", 10);
+        Long retiredOption = insertOptionReturningId(deactivated, 10, 0);
+        Long remainingOption = insertOptionReturningId(deactivated, 10, 1);
+        Long activeOption = insertOptionReturningId(active, 10, 0);
+        insertOrderItem(insertOrder(deactivated, "PAID"), deactivated, retiredOption, 5);
+        insertOrderItem(insertOrder(deactivated, "PAID"), deactivated, remainingOption, 1);
+        insertOrderItem(insertOrder(active, "PAID"), active, activeOption, 3);
+        jdbcTemplate.update("UPDATE drop_options SET is_active = FALSE WHERE id = ?", retiredOption);
+
+        // when
+        List<Long> ids = idsOf(dropRepository.findPopularGrabDrops(
+                null, null, null, OffsetDateTime.now(ZoneOffset.UTC), PageRequest.of(0, 20)));
+
+        // then: 6(비활성 5 + 활성 1) > 3. 활성 SKU만 셌다면 1 < 3으로 순서가 뒤집힌다
+        assertThat(ids).containsExactly(deactivated, active);
+    }
+
+    @Test
     @DisplayName("인기 GRAB 동률은 published_at 내림차순, 그다음 id 내림차순이다")
     void breaksPopularGrabTiesByPublishedAtThenId() {
         // given: 모두 판매 0건
@@ -1175,6 +1197,8 @@ class DropRepositoryTest {
         return orderId;
     }
 
+    // 실제 결제 확정·결제 후 취소는 주문 상태와 같은 트랜잭션에서 sold_quantity를 옮긴다(OrderPaymentService).
+    // 픽스처도 같은 원장을 유지하도록 결제 확정·미취소 주문 수량만큼 판매 수량을 올리고, 가용 재고가 바뀌지 않게 총수량도 같이 늘린다.
     private void insertOrderItem(Long orderId, Long dropId, Long optionId, int quantity) {
         jdbcTemplate.update(
                 """
@@ -1182,6 +1206,14 @@ class DropRepositoryTest {
                 VALUES (?, ?, ?, '기본', 10000, ?)
                 """,
                 orderId, dropId, optionId, quantity);
+        jdbcTemplate.update(
+                """
+                UPDATE drop_options o
+                SET sold_quantity = o.sold_quantity + ?, total_quantity = o.total_quantity + ?
+                FROM orders od
+                WHERE o.id = ? AND od.id = ? AND od.paid_at IS NOT NULL AND od.canceled_at IS NULL
+                """,
+                quantity, quantity, optionId, orderId);
     }
 
     private void insertPaidQuantity(Long dropId, int quantity) {
