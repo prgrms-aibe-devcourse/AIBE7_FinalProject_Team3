@@ -23,13 +23,3 @@ services:
       # JVM은 메모리·CPU가 작은 컨테이너에선 기본 컬렉터를 G1 대신 Serial 등으로 바꿀 수 있다(에르고노믹스).
       # nano/micro 두 환경을 같은 조건으로 비교하려고 컨테이너 크기와 무관하게 G1GC로 고정한다.
       JDK_JAVA_OPTIONS: -Xmx384m -XX:+UseG1GC
-      # SSE 부하테스트(GR-157, k6/sse-stream)는 모든 연결이 로컬 한 IP에서 나간다.
-      # 기본값(IP당 20 연결·60초당 30 요청)이면 21번째 연결부터 429라 200 연결을 만들 수 없어 부하테스트에서만 푼다.
-      # 서버 전체 상한(max-connections=200)은 그대로 둔다. IP 제한을 먼저 검사하므로 IP 상한을 전체 상한보다 크게 둬야
-      # 201번째 연결에서 503(전체 상한)을 볼 수 있다. IP 제한 동작 자체를 볼 때는 20/30을 넘겨 실행한다.
-      GRAB_STOCKSTREAM_MAXCONNECTIONSPERIP: ${GRAB_STOCKSTREAM_MAXCONNECTIONSPERIP:-1000}
-      GRAB_STOCKSTREAM_CONNECTRATEMAX: ${GRAB_STOCKSTREAM_CONNECTRATEMAX:-1000}
-
-  postgres:
-    # 쿼리별 호출 수 측정용(GR-157 → GR-163 비교). Prometheus 15초 스크랩으로는 쿼리 수를 잡지 못한다.
-    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements"]

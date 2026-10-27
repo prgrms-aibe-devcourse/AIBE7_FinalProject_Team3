@@ -1,7 +1,6 @@
 # SSE 부하테스트(GR-157, k6/sse-stream) 전용 오버라이드. 스펙 파일(nano/micro) 뒤에 겹쳐 쓴다:
 #   docker compose -f compose.yaml -f compose.loadtest-micro.yaml -f compose.loadtest-sse.yaml up --build
 # 다른 시나리오의 측정 조건을 바꾸지 않도록 스펙 파일과 분리했다.
-# (compose.loadtest-nano.yaml에는 같은 설정이 이미 들어 있다.)
 services:
   backend:
     environment:
