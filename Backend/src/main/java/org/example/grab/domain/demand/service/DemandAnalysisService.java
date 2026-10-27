@@ -67,9 +67,21 @@ public class DemandAnalysisService {
         OffsetDateTime now = OffsetDateTime.now(clock);
         TargetDrop drop = findOwnedDrop(sellerId, dropId);
         requireAnalyzable(drop, now);
+        return calculate(drop, now, request);
+    }
 
+    // 판매 시작 시점 기록용(DEMAND.md 2.3). 판매자 조회가 아니라 상태 조건을 보지 않고 기본 가정으로 계산한다
+    @Transactional(readOnly = true)
+    public DemandAnalysisResponse analyzeAtSaleStart(TargetDrop drop) {
+        return calculate(drop, OffsetDateTime.now(clock), DemandCalculateRequest.defaults());
+    }
+
+    private DemandAnalysisResponse calculate(TargetDrop drop, OffsetDateTime now, DemandCalculateRequest request) {
+        long dropId = drop.dropId();
+        long sellerId = drop.sellerId();
         long activeWishCount = demandAnalysisRepository.countActiveWishes(dropId);
-        long hoursUntilSaleStart = Duration.between(now, drop.saleStartsAt()).toHours();
+        // 판매 시작 시각이 지났으면(판매 시작 시점 기록) 0으로 둔다
+        long hoursUntilSaleStart = Math.max(0, Duration.between(now, drop.saleStartsAt()).toHours());
         ConversionSample ownSample = drop.categoryId() == null
                 ? ConversionSample.empty()
                 : demandAnalysisRepository.findOwnConversionSample(sellerId, drop.categoryId(), dropId, MAX_SAMPLE_DROPS);
@@ -94,6 +106,7 @@ public class DemandAnalysisService {
                 new Conversion(SampleSelection.CATEGORY, result.own(), market),
                 result.assumptions(),
                 result.plan(),
+                demandAnalysisRepository.findInitialRecommendation(dropId).orElse(null),
                 result.dataGaps(),
                 List.of(WISH_ONLY_NOTE));
     }

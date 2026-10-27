@@ -15,6 +15,7 @@ public record DemandAnalysisResponse(
         Conversion conversion,
         Assumptions assumptions,
         Plan plan,
+        InitialRecommendation initialRecommendation,
         List<DemandDataGap> dataGaps,
         List<String> notes
 ) {
@@ -86,5 +87,18 @@ public record DemandAnalysisResponse(
     }
 
     public record OptionPlan(long optionId, String name, int currentQuantity, Integer recommendedQuantity) {
+    }
+
+    // 공개 시점 재고 추천 기록(DEMAND.md 5.6) 요약. 생성 단계 추천과 WISH 기준 계획을 비교하는 데 쓴다.
+    // 기록에 기준이 없었으면 basis와 수량 필드가 null이다
+    public record InitialRecommendation(
+            OffsetDateTime recordedAt,
+            ConversionBasis basis,
+            Integer low,
+            Integer expected,
+            Integer high,
+            Integer recommended,
+            int preparedTotal
+    ) {
     }
 }

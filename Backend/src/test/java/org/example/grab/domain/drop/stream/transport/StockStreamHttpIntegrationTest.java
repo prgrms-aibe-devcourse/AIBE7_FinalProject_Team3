@@ -111,6 +111,8 @@ class StockStreamHttpIntegrationTest {
         jdbc.update("DELETE FROM order_items WHERE drop_id IN (?, ?)", first, second);
         jdbc.update("DELETE FROM orders WHERE drop_id IN (?, ?)", first, second);
         jdbc.update("DELETE FROM drop_options WHERE drop_id IN (?, ?)", first, second);
+        // 판매 시작 전환 후 수요 분석 기록(GR-175)이 DROP을 참조하므로 먼저 지운다
+        jdbc.update("DELETE FROM demand_analysis_snapshots WHERE drop_id IN (SELECT id FROM drops WHERE seller_id = ?)", sellerId);
         jdbc.update("DELETE FROM drops WHERE seller_id = ?", sellerId);
         jdbc.update("DELETE FROM sellers WHERE id = ?", sellerId);
         jdbc.update("DELETE FROM users WHERE id = ?", userId);
