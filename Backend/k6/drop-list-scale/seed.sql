@@ -47,6 +47,13 @@ DELETE FROM wishes
     WHERE drop_id IN (SELECT id FROM drops WHERE name LIKE 'k6 대용량 %');
 DELETE FROM drop_images
     WHERE drop_id IN (SELECT id FROM drops WHERE name LIKE 'k6 대용량 %');
+DELETE FROM drop_option_value_maps
+    WHERE drop_id IN (SELECT id FROM drops WHERE name LIKE 'k6 대용량 %');
+DELETE FROM drop_option_values
+    WHERE group_id IN (SELECT g.id FROM drop_option_groups g JOIN drops d ON d.id = g.drop_id
+                       WHERE d.name LIKE 'k6 대용량 %');
+DELETE FROM drop_option_groups
+    WHERE drop_id IN (SELECT id FROM drops WHERE name LIKE 'k6 대용량 %');
 DELETE FROM drop_options
     WHERE drop_id IN (SELECT id FROM drops WHERE name LIKE 'k6 대용량 %');
 DELETE FROM drops WHERE name LIKE 'k6 대용량 %';
@@ -138,6 +145,32 @@ SELECT k.drop_id, 10000 + (k.n % 50) * 1000 + o * 500, 0,
        NOT (k.option_count = 4 AND o = 3 AND k.n % 3 = 0), o
 FROM k6s_drops k
 CROSS JOIN LATERAL generate_series(0, k.option_count - 1) AS o;
+
+-- 옵션 그룹(GR-181). 상세 조회는 그룹·값·SKU 매핑까지 읽으므로 실제 상품처럼 구성한다(목록 쿼리는 읽지 않는다).
+--   SKU 1개: 그룹 없음 / 2~3개: 색상 1그룹(값 = SKU 수) / 4개: 색상 2값 × 사이즈 2값
+INSERT INTO drop_option_groups (drop_id, name, sort_order)
+SELECT k.drop_id, g.name, g.sort_order
+FROM k6s_drops k
+CROSS JOIN LATERAL (VALUES ('색상', 0), ('사이즈', 1)) AS g(name, sort_order)
+WHERE k.option_count >= 2 AND (g.name = '색상' OR k.option_count = 4);
+
+INSERT INTO drop_option_values (group_id, value, sort_order)
+SELECT g.id, (CASE g.name WHEN '색상' THEN ARRAY['블랙', '화이트', '네이비'] ELSE ARRAY['M', 'L'] END)[v + 1], v
+FROM k6s_drops k
+JOIN drop_option_groups g ON g.drop_id = k.drop_id
+CROSS JOIN LATERAL generate_series(0, CASE WHEN g.name = '색상' AND k.option_count <> 4 THEN k.option_count - 1 ELSE 1 END) AS v;
+
+INSERT INTO drop_option_value_maps (option_id, group_id, value_id, drop_id)
+SELECT o.id, g.id, val.id, k.drop_id
+FROM k6s_drops k
+JOIN drop_options o ON o.drop_id = k.drop_id
+JOIN drop_option_groups g ON g.drop_id = k.drop_id
+JOIN drop_option_values val ON val.group_id = g.id
+ AND val.sort_order = CASE
+        WHEN k.option_count <> 4 THEN o.sort_order
+        WHEN g.name = '색상' THEN o.sort_order / 2
+        ELSE o.sort_order % 2
+     END;
 
 -- 썸네일 후보 GALLERY 1~3장, DETAIL 1장(목록은 DETAIL을 쓰지 않는다).
 INSERT INTO drop_images (drop_id, image_url, sort_order, alt_text, image_type)
@@ -235,7 +268,8 @@ COMMIT;
 
 -- ANALYZE만 하면 visibility map이 비어 있어 autovacuum이 언제 도느냐에 따라 Index Only Scan 여부가 바뀐다
 -- (측정마다 계획이 달라짐). VACUUM까지 해 seed 직후 상태를 항상 같게 만든다. 트랜잭션 밖에서 실행해야 한다.
-VACUUM (ANALYZE) drops, drop_options, drop_images, wishes, orders, order_items;
+VACUUM (ANALYZE) drops, drop_options, drop_option_groups, drop_option_values, drop_option_value_maps,
+    drop_images, wishes, orders, order_items;
 
 -- 이 seed 밖의 공개 DROP(다른 시나리오 seed 등)도 공개 목록 쿼리 대상이라 측정에 섞인다.
 -- 있으면 경고만 하고 계속한다. 건수가 의미 있게 크면 DB를 초기화하고 다시 넣거나 결과 해석에 감안한다.
