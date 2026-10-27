@@ -428,7 +428,7 @@ MVP는 주문당 배송 한 건만 지원한다. 배송 상태는 `orders.status
 
 ### 1.7 수요 분석 (GR-140)
 
-수요 분석 데이터(활성 WISH 수·추이·전환율)와 생성 단계 재고 추천은 저장하지 않고 조회 시 `wishes`·`orders`·`order_items`에서 계산한다. 공개 시점 재고 추천 스냅샷, 판매 시작 시점 수요 분석 스냅샷, 유사 상품 검색용 임베딩만 기록한다. 판매자가 계획을 저장하거나 결정을 기록하던 `demand_plans`는 GR-175에서 삭제했다(V26). 계산식과 다른 판매자 데이터 보호 규칙은 [수요 분석 API](api-spec/DEMAND.md) 1절을 따른다.
+수요 분석 데이터(활성 WISH 수·추이·전환율)와 생성 단계 재고 추천은 저장하지 않고 조회 시 `wishes`·`orders`·`order_items`에서 계산한다. 공개 시점 재고 추천 스냅샷, 판매 시작 시점 수요 분석 스냅샷, 분석 설명(LLM), 유사 상품 검색용 임베딩만 기록한다. 판매자가 계획을 저장하거나 결정을 기록하던 `demand_plans`는 GR-175에서 삭제했다(V26). 계산식과 다른 판매자 데이터 보호 규칙은 [수요 분석 API](api-spec/DEMAND.md) 1절을 따른다.
 
 #### `demand_analysis_snapshots` (GR-175)
 
@@ -449,6 +449,25 @@ MVP는 주문당 배송 한 건만 지원한다. 배송 상태는 `orders.status
 - 추가만 하고 고치지 않는다. 종료 후 실제 판매량(`drop_options.sold_quantity` 합계)과 비교해 예상 범위 적중률과 `expected` 오차를 집계한다. 범위 적중률은 `result`의 `plan.low`·`plan.high`로 계산한다.
 - 외부에 행 단위로 노출하지 않아 `public_id`를 두지 않는다.
 - 판매자가 계획을 저장하고 결정을 기록하던 `demand_plans`는 이 테이블을 만들면서 삭제했다(V26). 결정이 재고를 바꾸지 않는 기록이라 판매자에게 효과가 없었고, 생성 단계 재고 추천과 역할이 겹쳤다.
+
+#### `demand_explanations` (GR-146)
+
+| 컬럼 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `id` | BIGINT | O | PK |
+| `drop_id` | BIGINT | O | FK drops |
+| `input_hash` | VARCHAR(64) | O | 프롬프트 버전과 LLM 입력 JSON의 SHA-256 16진수. (`drop_id`, `input_hash`) UQ |
+| `status` | VARCHAR(20) | O | `GENERATED`, `DISCARDED` |
+| `explanation` | JSONB | X | 검증을 통과한 설명, `GENERATED`일 때만 값이 있음 |
+| `llm_model` | VARCHAR(100) | X | 응답에 실린 모델명 |
+| `prompt_version` | VARCHAR(20) | O | 설명 프롬프트 버전 |
+| `tokens` | INT | X | 입력·출력 토큰 합계(제공자가 알려 주지 않으면 NULL) |
+| `created_at` | TIMESTAMPTZ | O | 생성 시각 |
+
+- 분석 설명 조회(수요 분석 API 3.4)에서 LLM을 부른 결과 중 `GENERATED`·`DISCARDED`만 남긴다. `FAILED`는 남기지 않아 다음 조회에서 다시 시도한다.
+- 같은 입력이면 다시 부르지 않으려고 (`drop_id`, `input_hash`)를 UQ로 둔다. 동시에 저장하면 먼저 저장된 행이 남는다.
+- 응답 원문은 남기지 않는다. 버린 설명(`DISCARDED`)도 상태만 남겨 같은 입력으로 비용을 다시 쓰지 않게 한다.
+- 외부에 행 단위로 노출하지 않아 `public_id`를 두지 않는다.
 
 #### `drop_stock_recommendations` (GR-167)
 

@@ -224,6 +224,7 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 | `PAYMENT_EXPIRED` | 422 | 결제 유효시간 만료 |
 | `INVALID_SCHEDULE` | 422 | 판매 일정 오류 |
 | `DEMAND_ANALYSIS_UNAVAILABLE` | 409 | 수요 분석 불가 상태 (`WISH`가 아니거나 판매 시작 시각 이후) |
+| `DEMAND_EXPLANATION_LIMIT_EXCEEDED` | 429 | 수요 분석 설명 하루 요청 한도 초과 |
 | `EMAIL_VERIFICATION_ATTEMPTS_EXCEEDED` | 429 | 이메일 인증 코드 확인 시도 횟수 초과 |
 | `EMAIL_VERIFICATION_RESEND_TOO_SOON` | 429 | 이메일 인증 코드 재발송 간격 또는 발송 한도 초과 |
 | `INTERNAL_SERVER_ERROR` | 500 | 처리하지 못한 서버 오류 (Redis·DB 장애 등). 인증 실패가 아니므로 클라이언트는 로그아웃하지 않는다 |
