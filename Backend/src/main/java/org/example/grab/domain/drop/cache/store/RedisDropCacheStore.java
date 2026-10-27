@@ -1,4 +1,4 @@
-package org.example.grab.domain.drop.cache;
+package org.example.grab.domain.drop.cache.store;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;

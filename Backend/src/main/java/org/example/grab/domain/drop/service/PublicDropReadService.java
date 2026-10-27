@@ -1,8 +1,8 @@
 package org.example.grab.domain.drop.service;
 
 import lombok.RequiredArgsConstructor;
-import org.example.grab.domain.drop.cache.DropCacheProperties;
-import org.example.grab.domain.drop.cache.PublicDropCache;
+import org.example.grab.domain.drop.cache.config.DropCacheProperties;
+import org.example.grab.domain.drop.cache.service.PublicDropCache;
 import org.example.grab.domain.drop.dto.response.PublicDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.PublicDropStockResponse;
 import org.springframework.stereotype.Service;

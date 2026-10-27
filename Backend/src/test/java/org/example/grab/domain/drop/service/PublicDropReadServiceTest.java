@@ -1,8 +1,8 @@
 package org.example.grab.domain.drop.service;
 
-import org.example.grab.domain.drop.cache.DropCacheProperties;
-import org.example.grab.domain.drop.cache.InMemoryDropCacheStore;
-import org.example.grab.domain.drop.cache.PublicDropCache;
+import org.example.grab.domain.drop.cache.config.DropCacheProperties;
+import org.example.grab.domain.drop.cache.service.PublicDropCache;
+import org.example.grab.domain.drop.cache.store.InMemoryDropCacheStore;
 import org.example.grab.domain.drop.dto.response.PublicDropStockResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

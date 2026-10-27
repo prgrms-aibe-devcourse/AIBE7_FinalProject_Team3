@@ -1,4 +1,4 @@
-package org.example.grab.domain.drop.cache;
+package org.example.grab.domain.drop.cache.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;

@@ -1,4 +1,4 @@
-package org.example.grab.domain.drop.cache;
+package org.example.grab.domain.drop.cache.service;
 
 import java.time.Duration;
 import java.util.Map;
@@ -7,6 +7,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
+import org.example.grab.domain.drop.cache.store.DropCacheStore;
 
 /**
  * 공개 DROP 상세·재고 응답 캐시(GR-183). SSE 알림을 받은 화면들이 같은 상품을 한꺼번에 다시 조회해도 DB 조회는 한 번만 일어나게 한다.

@@ -1,4 +1,4 @@
-package org.example.grab.domain.drop.cache;
+package org.example.grab.domain.drop.cache.store;
 
 import org.example.grab.domain.drop.dto.response.PublicDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.PublicDropDetailResponse.Actions;
