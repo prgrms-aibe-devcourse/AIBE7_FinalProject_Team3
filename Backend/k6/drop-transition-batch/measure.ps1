@@ -1,6 +1,7 @@
 # PERF(GR-171): DROP 상태 전이 배치 부하 측정. k6를 쓰지 않는다 — 측정 대상이
-# HTTP 트래픽이 아니라 DropTransitionScheduler(10초 주기) 한 번이 DropTransitionBatchService
-# (BATCH_SIZE=500, FOR UPDATE SKIP LOCKED)로 수백 건을 한 번에 전이시키는 DB 배치
+# HTTP 트래픽이 아니라 DropTransitionScheduler(10초 주기) 한 번이 DropTransitionService
+# (BATCH_SIZE=500)·DropTransitionBatchService(FOR UPDATE SKIP LOCKED)로 수백 건을
+# 한 번에 전이시키는 DB 배치
 # 처리 시간이라, seed 실행 -> DB 상태(WISH->GRAB) 폴링만 하면 충분하다.
 #
 # 사전 준비: docker compose up -d --build backend, common/accounts-seed.sql 1회 실행.
@@ -15,9 +16,13 @@
 param(
     [switch]$WithWish,
     [int]$ExpectedCount = 600,
-    [int]$SaleStartDelaySeconds = 20,
     [int]$TimeoutSeconds = 60
 )
+
+# seed.sql/seed-with-wish.sql이 sale_starts_at을 "now() + interval '20 seconds'"로
+# 고정해 두므로, 이 값은 파라미터로 받지 않고 그 상수를 그대로 따라간다(두 파일을
+# 함께 바꾸지 않으면 이 숫자만 바꿔도 아무 효과가 없다).
+$SaleStartDelaySeconds = 20
 
 $ErrorActionPreference = 'Stop'
 # BOM 있는 UTF8Encoding(.UTF8 정적 인스턴스)을 쓰면 파이프 시작에 BOM 바이트가 섞여 들어가

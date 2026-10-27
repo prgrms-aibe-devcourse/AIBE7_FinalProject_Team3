@@ -1,8 +1,9 @@
 # 드롭 상태 전이 배치 부하 (drop-transition-batch, GR-171)
 
 > 공통 실행 환경·전제는 `../README.md` 참고. 이 시나리오는 HTTP 부하가 아니라
-> `DropTransitionScheduler`(10초 `fixedDelay`) 한 번이 `DropTransitionBatchService`
-> (`BATCH_SIZE=500`, `FOR UPDATE SKIP LOCKED`)로 대량 DROP을 전이시키는 DB 배치
+> `DropTransitionScheduler`(10초 `fixedDelay`) 한 번이 `DropTransitionService`
+> (`BATCH_SIZE=500`)·`DropTransitionBatchService`(`FOR UPDATE SKIP LOCKED`)로
+> 대량 DROP을 전이시키는 DB 배치
 > 처리 시간을 보는 것이라 k6를 쓰지 않고 seed.sql 실행 + DB 상태(WISH→GRAB) 폴링으로
 > 측정했다. 메일 발송 자체의 부하(수신자 규모, SMTP 처리량)는 GR-170 범위이고, 여기서는
 > "전이 이벤트 발행이 배치 루프 자체를 지연시키는지"만 비교군으로 본다.
