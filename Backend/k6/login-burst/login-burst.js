@@ -1,6 +1,8 @@
 // PERF(GR-161): 로그인 동시 폭주. 로그인 비밀번호 검증(Argon2id, 해시 1회에 약 19MiB)이
 // 동시에 몰릴 때 제한 환경이 어느 VU 단계부터 무너지는지 본다. 결과: login-burst/result.md
 // 다른 시나리오는 setup()에서 한 번만 로그인하므로, 로그인 자체의 부하는 이 시나리오에서만 측정한다.
+// GR-178부터 서버는 해시를 동시에 정해진 수(기본 4)까지만 실행하고, 대기 시간(기본 3초) 안에 차례가 오지 않은 요청은
+// 503 AUTH_TEMPORARILY_UNAVAILABLE + Retry-After로 거부한다. 이 거부는 의도한 동작이라 서버 오류와 따로 센다.
 //
 // 반복 1회 = 새 사용자 1명이 앱을 열고(CSRF 발급) 로그인하는 흐름이다. think time은 없다.
 // 합격 기준(thresholds)은 두지 않는다. 목표 수치(NFR-006)가 아직 없고, 무너지는 지점을
@@ -34,8 +36,9 @@
 //   docker compose exec -T redis redis-cli DBSIZE
 //   docker compose exec -T redis redis-cli INFO memory | grep '^used_memory_human'
 //
-// [실행] VU 단계(5 → 10 → 20 → 40, 40에서도 버티면 80)마다 따로 실행한다. 5xx·타임아웃·
-// 힙 OutOfMemoryError·컨테이너 종료·응답 불가가 처음 나온 단계를 한계 단계로 기록한다.
+// [실행] VU 단계(5 → 10 → 20 → 40, 40에서도 버티면 80)마다 따로 실행한다. 서버 오류(의도한 거절이 아닌 5xx)·
+// 타임아웃·힙 OutOfMemoryError·컨테이너 종료·응답 불가가 처음 나온 단계를 한계 단계로 기록한다.
+// 의도한 거절(login_hash_rejected_total)은 한계로 보지 않고, 로그인 시도 대비 비율로 따로 기록한다(GR-178 M00-07).
 //   k6 run -e VUS=5 k6/login-burst/login-burst.js                 # steady: 30초 동안 계속 로그인
 //   k6 run -e VUS=5 -e SHAPE=burst k6/login-burst/login-burst.js  # burst: VU마다 1번씩 동시에
 //   k6 run -e VUS=20 -e MODE=fail k6/login-burst/login-burst.js   # 실패 로그인(비교용)
@@ -52,6 +55,9 @@
 //   실행 후 힙 부족(컨테이너 OOM-kill과 구분해 기록한다). ERROR 줄 아래 예외가 OutOfMemoryError면 힙 OOM,
 //   QueryTimeoutException이면 Redis 타임아웃이다:
 //   docker compose logs --since 5m backend | grep -E 'OutOfMemoryError|ERROR|Exception in thread'
+//   해시 거부·대기(GR-178): 실행 전후 서버 지표를 저장해, 거부 수 증가량이 k6의 login_hash_rejected_total과 맞는지 본다.
+//   grab_password_hash_waiting은 조회 순간의 대기 수(추정값)라 실행 중에 여러 번 읽어 최댓값을 본다:
+//   curl -s localhost:8080/actuator/prometheus | grep -E '^grab_password_hash_(rejected_total|waiting)'
 //   GC: micro 설정에는 -Xlog:gc가 없으므로 실행 직전과 직후에 actuator 지표를 저장해 차이를 본다:
 //   curl -s localhost:8080/actuator/prometheus | grep -E '^jvm_gc_(pause_seconds_(count|sum)|memory_allocated_bytes_total)' > gc-before.txt
 //   (실행 후 같은 명령으로 gc-after.txt). jvm_gc_pause_seconds_count{gc="G1 Old Generation"}가 Full GC 횟수,
@@ -103,6 +109,9 @@ const loginSuccess = new Counter('login_success_total');
 const loginExpectedReject = new Counter('login_expected_reject_total');
 // 모드와 맞지 않는 4xx·2xx 등(예: success인데 401, fail인데 200)
 const loginUnexpected = new Counter('login_unexpected_total');
+// 해시 동시 실행 상한에 걸린 의도한 거절(503 AUTH_TEMPORARILY_UNAVAILABLE, GR-178). 서버 오류로 세지 않는다
+const loginHashRejected = new Counter('login_hash_rejected_total');
+// 의도한 거절을 뺀 5xx. 한계 판정에 쓴다
 const loginServerError = new Counter('login_server_error_total');
 // status 0: 요청 타임아웃(기본 60초)이나 연결 실패
 const loginNoResponse = new Counter('login_no_response_total');
@@ -159,6 +168,8 @@ export default function () {
         loginSuccess.add(1);
     } else if (MODE === 'fail' && loginRes.status === 401 && errorCode(loginRes) === 'INVALID_CREDENTIALS') {
         loginExpectedReject.add(1);
+    } else if (isHashRejected(loginRes)) {
+        loginHashRejected.add(1);
     } else if (loginRes.status >= 500) {
         loginServerError.add(1);
     } else {
@@ -167,8 +178,12 @@ export default function () {
 
     check(loginRes, {
         [`로그인 ${EXPECTED_STATUS}`]: (r) => r.status === EXPECTED_STATUS,
-        '5xx 아님': (r) => r.status < 500,
+        '서버 오류 아님(의도한 거절 제외 5xx)': (r) => r.status < 500 || isHashRejected(r),
     });
+}
+
+function isHashRejected(res) {
+    return res.status === 503 && errorCode(res) === 'AUTH_TEMPORARILY_UNAVAILABLE';
 }
 
 function errorCode(res) {
