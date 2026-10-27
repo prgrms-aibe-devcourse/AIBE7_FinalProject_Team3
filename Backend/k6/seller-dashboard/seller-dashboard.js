@@ -1,7 +1,8 @@
 // PERF(GR-173): 판매자 대시보드 요약·DROP별 통계 조회 부하. steady-read(GR-153)와 같은
 // 성격 — 정확한 캐파시티가 아니라, 캐시 없이 집계 쿼리가 평상시 수준 동시 조회를 버티는
-// 하한선을 본다. seed.sql이 판매자 1명(k6-seller)에 DROP 200개·DROP당 주문 5건(결제
-// 완료)·위시 20명을 깔아둔 상태를 전제로 한다.
+// 하한선을 본다. seed.sql이 이 시나리오 전용 판매자(k6-dashboard-seller)에 DROP 200개·
+// DROP당 주문 5건(결제 완료)·위시 20명을 깔아둔 상태를 전제로 한다(대시보드 API는
+// 판매자 전체를 집계하므로, 다른 soak 시나리오와 데이터가 섞이지 않게 전용 계정을 쓴다).
 //
 // 사전 준비: common/accounts-seed.sql, seller-dashboard/seed.sql 실행.
 //   k6 run k6/seller-dashboard/seller-dashboard.js
@@ -36,10 +37,17 @@ export const options = {
             duration: DURATION,
         },
     },
+    // 빈 배열(no-op) thresholds지만, k6가 시나리오 태그별로 요약을 따로 찍게 만드는 용도다.
+    // summary_read(가벼운 집계 5종)와 drop_stats_read(findDropStats, LATERAL 조인 2개)의
+    // 지연시간 특성이 달라서, 합산 p95로는 findDropStats 단독 성능을 판단할 수 없다.
+    thresholds: {
+        'http_req_duration{scenario:summary_read}': [],
+        'http_req_duration{scenario:drop_stats_read}': [],
+    },
 };
 
 export function setup() {
-    const session = login('k6-seller@loadtest.local', 'LoadTest1234!');
+    const session = login('k6-dashboard-seller@loadtest.local', 'LoadTest1234!');
     return { session };
 }
 
