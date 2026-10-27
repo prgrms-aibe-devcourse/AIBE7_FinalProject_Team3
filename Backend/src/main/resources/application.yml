@@ -84,10 +84,11 @@ grab:
     send-timeout: 5s
     max-pending-drops: 100
     max-drop-ids: 100
-    max-connections: 200
-    max-connections-per-ip: 20
+    # 상한·제한값 근거는 REALTIME_STOCK.md 12절(GR-185). 연결 1000개는 GR-180에서 검증한다.
+    max-connections: 1000
+    max-connections-per-ip: 50
     connect-rate-window: 60s
-    connect-rate-max: 30
+    connect-rate-max: 75
     retry-after: 60s
     # 활성 연결이 없고 요청 창이 만료되면 제거한다. 임의 IP로 추적 메모리가 무한 증가하지 않게 한다.
     max-tracked-ips: 10000

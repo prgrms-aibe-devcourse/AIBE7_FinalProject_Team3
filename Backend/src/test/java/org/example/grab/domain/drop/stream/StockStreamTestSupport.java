@@ -21,7 +21,8 @@ public final class StockStreamTestSupport {
     }
 
     public static StockStreamProperties defaults() {
-        return properties(200, 20, 30, 10000);
+        // application.yml·StockStreamProperties 기본값과 같다(StockStreamPropertiesTest가 바인딩을 확인한다).
+        return properties(1000, 50, 75, 10000);
     }
 
     public static final class MutableClock extends Clock {
