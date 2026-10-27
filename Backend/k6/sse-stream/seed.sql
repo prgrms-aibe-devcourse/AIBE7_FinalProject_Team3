@@ -1,7 +1,7 @@
 -- SSE(stock-stream) 동시 연결 부하테스트 전용 GRAB DROP 24개(GR-157).
 -- "상품 01"은 인기 상품(상세 구독·주문 집중), 24개 전체는 목록 구독 대상이다(REALTIME_STOCK.md 13.2).
 -- 재고는 측정 시간 동안 소진되지 않게 넉넉히 둔다. 재고 고갈이 아니라 변경 알림 전달을 보는 것이 목적이다.
--- compose.loadtest.yaml로 띄운 postgres(pg_stat_statements 적재)에서만 동작한다.
+-- compose.loadtest-sse.yaml을 합쳐 띄운 postgres(pg_stat_statements 적재)에서만 동작한다.
 --   docker compose exec -T postgres psql -U grab -d grab -f - < Backend/k6/sse-stream/seed.sql
 BEGIN;
 

@@ -33,7 +33,8 @@ k6/
 1. k6 설치: https://k6.io/docs/get-started/installation/
 2. 백엔드 기동: `docker compose up --build` (nano 제한 환경으로 돌리려면 GR-149의
    `docker compose -f compose.yaml -f compose.loadtest-nano.yaml up --build`,
-   t3.micro 수준은 `compose.loadtest-micro.yaml`로 바꿔 쓴다)
+   t3.micro 수준은 `compose.loadtest-micro.yaml`로 바꿔 쓴다. SSE 시나리오는 그 뒤에
+   `-f compose.loadtest-sse.yaml`을 덧붙인다)
 3. 테스트 계정 시드 (최초 1회, 재실행해도 안전):
    ```
    docker compose exec -T postgres psql -U grab -d grab -f - < k6/common/accounts-seed.sql

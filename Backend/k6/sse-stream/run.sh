@@ -1,7 +1,7 @@
 #!/bin/bash
 # GR-157 SSE 부하테스트 한 회차를 처음부터 끝까지 실행한다.
 # seed → docker stats 수집 → SSE 연결 유지(Node) → 주문 투입(k6) → Prometheus 지표 → verify.sql → 전달 지연 계산.
-# compose.loadtest.yaml을 합쳐 띄운 상태여야 한다(k6/README.md). 로컬 node·k6·docker가 필요하다.
+# 스펙 파일(compose.loadtest-nano/micro.yaml)과 compose.loadtest-sse.yaml을 합쳐 띄운 상태여야 한다(k6/README.md). 로컬 node·k6·docker가 필요하다.
 #
 #   Backend/k6/sse-stream/run.sh <이름> <SSE 연결 수> <주문/초> <주문 시간(초)>
 #   Backend/k6/sse-stream/run.sh r0 0 50 300     # SSE 비활성 기준선
