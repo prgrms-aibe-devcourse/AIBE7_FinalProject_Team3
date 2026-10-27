@@ -13,7 +13,12 @@
 // GR-180: REFETCH=1이면 프론트처럼 알림마다 기존 조회 API를 다시 부른다(REALTIME_STOCK.md 4·12절).
 // 상세 연결은 상세·재고 두 API, 목록 연결은 목록 API(구독 24개를 담은 한 페이지)를 조회 키 하나로 묶고,
 // 키별 시작 간격 최소 2초·실행 중 신호는 dirty로 병합·30초(+0~5초) 주기 재동기화를 따른다.
-// 재조회 결과는 연결별 refetches([시작 ms, 끝 ms, 상태, 사유])로 남겨 analyze.mjs가 화면 반영 지연을 계산한다.
+// 재조회 결과는 연결별 refetches([시작 ms, 끝 ms, 상태, 사유, 관측 재고])로 남겨 analyze.mjs가 화면 반영 지연과
+// 재고값 최신성(GR-200)을 계산한다. 관측 재고는 상세 연결이면 재고 API의 가용 재고 합, 목록 연결이면 {dropId: availableStock}이다.
+//
+// GR-200: LIST_MIX=mixed이면 목록 연결을 여러 정렬·필터 조회(LIST_QUERIES)에 나눠 배정한다. 각 연결은 시작할 때 자기 조회의
+// 첫 페이지를 받아 그 상품들을 구독하고, 알림을 받으면 같은 조회를 다시 부른다(현재 페이지 구독, REALTIME_STOCK.md 4절).
+// 기본(sse)은 GR-180과 같이 전원 keyword 검색 한 페이지(24개)다.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
@@ -32,6 +37,21 @@ const REFRESH_MIN_INTERVAL_MS = 2000;
 const RESYNC_INTERVAL_MS = 30_000;
 const RESYNC_JITTER_MS = 5000;
 const LIST_PATH = `/api/v1/drops?keyword=${encodeURIComponent(KEYWORD)}&size=24`;
+// mixed 배정 순서. 날짜순·GRAB 탭·카테고리 조회는 가장 최근에 공개된 SSE 시드 상품이 첫 페이지에 오고,
+// 인기순은 대용량 seed 상품이 와서 주문 알림 없이 주기 재동기화만 일어난다.
+const LIST_QUERIES = {
+    sse: [LIST_PATH],
+    mixed: [
+        LIST_PATH,
+        '/api/v1/drops?size=20',
+        '/api/v1/drops?status=GRAB&size=20',
+        '/api/v1/drops?status=GRAB&soldOut=false&size=20',
+        '/api/v1/drops?categoryId=1&size=20',
+        '/api/v1/drops?status=GRAB&sort=soldQuantity,desc&size=20',
+        '/api/v1/drops?status=WISH&sort=wishCount,desc&size=20',
+    ],
+}[process.env.LIST_MIX || 'sse'];
+if (!LIST_QUERIES) throw new Error(`LIST_MIX는 sse 또는 mixed다: ${process.env.LIST_MIX}`);
 
 async function loadDropIds() {
     const res = await fetch(`${BASE_URL}/api/v1/drops?keyword=${encodeURIComponent(KEYWORD)}&size=100`);
@@ -44,6 +64,13 @@ async function loadDropIds() {
     }
     const sorted = content.slice().sort((a, b) => a.name.localeCompare(b.name));
     return { hot: sorted[0].dropId, all: sorted.map((d) => d.dropId) };
+}
+
+// 목록 조회 첫 페이지의 상품 ID와 가용 재고. 연결을 열기 전(주문 시작 전)에 불러 구독 대상과 시작 재고로 쓴다.
+async function loadPage(path) {
+    const res = await fetch(`${BASE_URL}${path}`);
+    if (res.status !== 200) throw new Error(`목록 조회 실패: ${path} status=${res.status}`);
+    return (await res.json()).data.content.map((d) => [d.dropId, d.availableStock]);
 }
 
 // 연결 하나를 열고 이벤트 수신 시각을 기록한다. 끝날 때까지 resolve하지 않는다.
@@ -127,11 +154,11 @@ async function runRefetch(conn) {
     key.lastStart = Date.now();
     const paths = conn.detail
         ? [`/api/v1/drops/${conn.dropIds[0]}`, `/api/v1/drops/${conn.dropIds[0]}/stocks`]
-        : [LIST_PATH];
+        : [conn.listPath];
     // 상세는 두 API를 함께 부르고 둘 다 성공해야 화면 반영으로 본다. 개별 응답시간은 requests에 따로 남긴다.
     const results = await Promise.all(paths.map((path) => timedGet(path)));
     const status = results.find((r) => r.status !== 200)?.status ?? 200;
-    conn.refetches.push([key.lastStart, Date.now(), status, reason === 'signal' ? 0 : 1]);
+    conn.refetches.push([key.lastStart, Date.now(), status, reason === 'signal' ? 0 : 1, observed(conn, results)]);
     for (const [i, r] of results.entries()) {
         requests[conn.detail ? (i === 0 ? 'detail' : 'stock') : 'list'].push([r.startedAt, r.ms, r.status]);
     }
@@ -139,13 +166,24 @@ async function runRefetch(conn) {
     if (key.dirty) markDirty(conn, key.dirty);
 }
 
+// 응답에서 가용 재고를 꺼낸다(GR-200 최신성 검증). 실패 응답이면 null.
+function observed(conn, results) {
+    const body = results.at(-1).body;
+    if (!body?.success) return null;
+    if (conn.detail) return body.data.options.reduce((sum, o) => sum + o.availableStock, 0);
+    return Object.fromEntries(body.data.content.map((d) => [d.dropId, d.availableStock]));
+}
+
 async function timedGet(path) {
     const startedAt = Date.now();
     const t0 = performance.now();
     try {
         const res = await fetch(`${BASE_URL}${path}`);
-        await res.arrayBuffer();
-        return { startedAt, ms: performance.now() - t0, status: res.status };
+        const text = await res.text();
+        const ms = performance.now() - t0;
+        let body = null;
+        try { body = JSON.parse(text); } catch { /* 본문이 JSON이 아니면 재고 검증에서 뺀다 */ }
+        return { startedAt, ms, status: res.status, body };
     } catch (error) {
         return { startedAt, ms: performance.now() - t0, status: error.cause?.code || error.name };
     }
@@ -172,12 +210,23 @@ function countBy(values) {
 }
 
 const ids = await loadDropIds();
+// 목록 조회별 첫 페이지(구독 대상)와, 관측한 모든 상품의 시작 재고. 주문이 시작되기 전에 읽는다.
+const pages = new Map();
+const initialStock = {};
+for (const path of LIST_QUERIES) {
+    const page = await loadPage(path);
+    pages.set(path, page.map(([id]) => id));
+    for (const [id, stock] of page) initialStock[id] = stock;
+}
+for (const [id, stock] of await loadPage(LIST_PATH)) initialStock[id] = stock;
 const controller = new AbortController();
 const detailCount = Math.round(CONNECTIONS * DETAIL_RATIO);
 const conns = Array.from({ length: CONNECTIONS }, (_, i) => ({
     id: i,
     detail: i < detailCount,
-    dropIds: i < detailCount ? [ids.hot] : ids.all,
+    // 목록 연결은 배정된 조회의 첫 페이지 상품을 구독한다(sse면 24개 전체로 GR-180과 같다).
+    listPath: i < detailCount ? null : LIST_QUERIES[(i - detailCount) % LIST_QUERIES.length],
+    dropIds: i < detailCount ? [ids.hot] : pages.get(LIST_QUERIES[(i - detailCount) % LIST_QUERIES.length]),
     startedAt: null, status: null, readyAt: null, closedAt: null, closeReason: null, error: null,
     heartbeats: 0, changes: [], aborted: false,
     refetch: { dirty: null, running: false, timer: null, resync: null, lastStart: -Infinity },
@@ -244,6 +293,9 @@ const summary = {
         }];
     })) : null,
     refetchList: REFETCH_LIST,
+    listMix: process.env.LIST_MIX || 'sse',
+    listQueries: LIST_QUERIES,
+    initialStock,
     eventLoopDelayMs: { p99: loopDelay.percentile(99) / 1e6, max: loopDelay.max / 1e6 },
 };
 console.log(JSON.stringify(summary, null, 2));

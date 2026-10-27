@@ -11,6 +11,13 @@
 // GR-180: sse-clients.mjs를 REFETCH=1로 돌린 결과면 두 값을 더 낸다.
 // - 화면 반영 지연(13.1 "커밋 완료 → 변경 이후 성공 조회·화면 반영"): 위 알림 수신 이후 처음 시작해 성공한 재조회의 완료 시각까지.
 // - 재조회 응답시간: 첫 주문부터 마지막 주문까지(변경이 실제로 일어난 구간)에 시작한 요청만 API별로 집계한다.
+//
+// GR-200:
+// - 응답보다 먼저 온 알림: 주문 응답 이후 알림이 없지만 요청 시작~응답 사이에 같은 상품 알림이 있으면 유실이 아니라
+//   earlyArrival로 따로 센다(커밋은 그 구간 안에 있다). 주문 로그에 요청 시작 시각이 있을 때만 구분한다.
+// - 재고값 최신성: 재조회 시작 시각보다 STALE_MARGIN_MS 먼저 응답을 받은 주문은 이미 커밋됐다. 응답의 가용 재고가
+//   "시작 재고 − 그 주문 수"보다 크면 그 주문을 반영하지 못한 옛 값이다. 커밋됐지만 응답이 아직 안 온 주문은 세지 않으므로
+//   옛 값을 놓칠 수는 있어도 잘못 옛 값으로 세지는 않는다(주문 1건 = 수량 1, 측정 중 만료·취소 없음 전제: 결제 대기 10분).
 import { readFileSync } from 'node:fs';
 
 const [ssePath, ordersPath] = process.argv.slice(2);
@@ -21,13 +28,15 @@ if (!ssePath || !ordersPath) {
 
 // 측정 종료 직전 주문은 다음 알림을 받기 전에 연결이 끊길 수 있어 표본에서 뺀다(병합 창 1초 + 여유).
 const TAIL_MS = 3000;
+// 호스트(Node)와 도커 VM(k6) 시계 차는 약 1ms로 쟀다. 여유를 두고 이만큼 먼저 끝난 주문만 커밋된 것으로 본다.
+const STALE_MARGIN_MS = 5;
 // 화면 반영은 알림 뒤 최대 2초(키별 간격)를 더 기다리고 응답까지 받아야 해서 더 넉넉히 뺀다.
 const REFLECT_TAIL_MS = 8000;
 
 const { summary, endedAt, conns, requests } = JSON.parse(readFileSync(ssePath, 'utf8'));
 const refetchOn = Boolean(summary.refetch);
-const orders = [...readFileSync(ordersPath, 'utf8').matchAll(/ORDER (\d+) (\d+)/g)]
-    .map((m) => [Number(m[1]), Number(m[2])]);
+const orders = [...readFileSync(ordersPath, 'utf8').matchAll(/ORDER (\d+) (\d+)(?: (\d+))?/g)]
+    .map((m) => [Number(m[1]), Number(m[2]), m[3] ? Number(m[3]) : null]);
 
 // 연결별·상품별 수신 시각(정렬됨)
 const received = conns.filter((c) => c.readyAt).map((c) => {
@@ -60,16 +69,20 @@ function firstAtOrAfter(times, t) {
 const latencies = [];
 const reflects = [];
 let missing = 0;
+let earlyArrival = 0;
 let reflectMissing = 0;
 let sampledOrders = 0;
-for (const [t, dropId] of orders) {
+for (const [t, dropId, sentAt] of orders) {
     let sampled = false;
     for (const { conn, end, byDrop, refetchStarts, refetches } of received) {
         if (!conn.dropIds.includes(dropId) || conn.readyAt > t || end - TAIL_MS < t) continue;
         sampled = true;
-        const at = firstAtOrAfter(byDrop.get(dropId) ?? [], t);
+        const times = byDrop.get(dropId) ?? [];
+        const at = firstAtOrAfter(times, t);
         if (at === null || at > end) {
-            missing++;
+            const early = sentAt !== null ? firstAtOrAfter(times, sentAt) : null;
+            if (early !== null && early < t) earlyArrival++;
+            else missing++;
             continue;
         }
         latencies.push(at - t);
@@ -91,8 +104,9 @@ const dist = (values) => {
 const result = {
     orders: orders.length,
     sampledOrders,
-    pairs: latencies.length + missing,
+    pairs: latencies.length + missing + earlyArrival,
     missing,
+    earlyArrival,
     deliveryLatencyMs: dist(latencies),
 };
 if (refetchOn) {
@@ -121,5 +135,42 @@ if (refetchOn) {
     }
     result.refetchTotal = { count: total, perSec: Number((total / sec).toFixed(1)), errorRate: total ? errors / total : 0 };
     result.eventLoopDelayMs = summary.eventLoopDelayMs;
+    if (summary.initialStock) result.staleness = staleness();
+}
+
+// 재고값 최신성: 상품별 주문 응답 시각(정렬)으로 "재조회 시작 전에 확실히 커밋된 주문 수"를 세어 관측 재고와 비교한다.
+function staleness() {
+    const ends = new Map();
+    for (const [t, dropId] of orders) {
+        if (!ends.has(dropId)) ends.set(dropId, []);
+        ends.get(dropId).push(t);
+    }
+    for (const list of ends.values()) list.sort((a, b) => a - b);
+    const committedBefore = (dropId, time) => {
+        const list = ends.get(dropId);
+        if (!list) return 0;
+        const i = indexAtOrAfter(list, time);
+        return i === null ? list.length : i;
+    };
+    const out = { stock: { checked: 0, stale: 0, maxBehind: 0 }, list: { checked: 0, stale: 0, maxBehind: 0 } };
+    for (const c of conns) {
+        for (const r of c.refetches ?? []) {
+            if (r[2] !== 200 || r[4] == null) continue;
+            const observedByDrop = c.detail ? { [c.dropIds[0]]: r[4] } : r[4];
+            const bucket = c.detail ? out.stock : out.list;
+            for (const [id, value] of Object.entries(observedByDrop)) {
+                const initial = summary.initialStock[id];
+                if (initial == null) continue;
+                bucket.checked++;
+                const behind = value - (initial - committedBefore(Number(id), r[0] - STALE_MARGIN_MS));
+                if (behind > 0) {
+                    bucket.stale++;
+                    bucket.maxBehind = Math.max(bucket.maxBehind, behind);
+                }
+            }
+        }
+    }
+    for (const b of Object.values(out)) b.staleRate = b.checked ? b.stale / b.checked : 0;
+    return out;
 }
 console.log(JSON.stringify(result, null, 2));

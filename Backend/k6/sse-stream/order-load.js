@@ -3,7 +3,8 @@
 // 결제는 하지 않는다. PG 호출이 섞이면 주문 지연이 오염된다.
 //
 // SSE 없이 이 스크립트만 돌린 결과가 "SSE 비활성 기준선"이다(주문 p95 비교용).
-// 주문 성공마다 ORDER <응답 수신 epoch ms> <dropId> 한 줄을 남기며, analyze.mjs가 이 로그로 전달 지연을 계산한다.
+// 주문 성공마다 ORDER <응답 수신 epoch ms> <dropId> <요청 시작 epoch ms> 한 줄을 남기며, analyze.mjs가 이 로그로 전달 지연을 계산한다.
+// 커밋은 요청 시작과 응답 수신 사이에 있다(GR-200: 응답보다 먼저 도착한 알림을 유실과 구분하는 데 쓴다).
 //
 //   k6 run --console-output=Backend/k6/sse-stream/out/orders.log Backend/k6/sse-stream/order-load.js
 //   (평시) RATE=5 / (피크) RATE=50 HOT_RATIO=0.8 — 피크 50회/초 중 인기 상품 40회/초
@@ -73,6 +74,7 @@ export default function (data) {
         },
     });
 
+    const startedAt = Date.now();
     const res = http.post(`${BASE_URL}/api/v1/orders`, payload, {
         headers: authHeaders(data.session, { 'Idempotency-Key': uuidv4() }),
         tags: { name: 'order' },
@@ -81,7 +83,7 @@ export default function (data) {
     check(res, { '주문 201': (r) => r.status === 201 });
     if (res.status === 201) {
         // 커밋은 응답 전에 끝나므로 응답 수신 시각을 커밋 시각의 근사로 쓴다.
-        console.log(`ORDER ${Date.now()} ${target.dropId}`);
+        console.log(`ORDER ${Date.now()} ${target.dropId} ${startedAt}`);
     } else if (res.status >= 500) {
         orderServerError.add(1);
     } else {

@@ -61,7 +61,7 @@ fi
   echo "commit=$(git rev-parse --short HEAD) refetch=${REFETCH:-0}"
   docker compose exec -T backend printenv GRAB_DROP_CACHE_STORE JDK_JAVA_OPTIONS 2>/dev/null | sed 's/^/backend /'
   docker inspect -f 'postgres nanocpus={{.HostConfig.NanoCpus}} memory={{.HostConfig.Memory}}' $(docker compose ps -q postgres)
-  echo "sse detailRatio=${DETAIL_RATIO:-0.7} refetchList=${REFETCH_LIST:-1}"
+  echo "sse detailRatio=${DETAIL_RATIO:-0.7} refetchList=${REFETCH_LIST:-1} listMix=${LIST_MIX:-sse}"
   k6/drop-detail-scale/netem.sh show 2>/dev/null | grep qdisc
 } > $O/$NAME-meta.txt
 echo "[$NAME] 주문 ${RATE}/초 × ${DUR}초 시작 (SSE 연결 $CONNS)"
