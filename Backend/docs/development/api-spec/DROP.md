@@ -191,6 +191,7 @@ GET /api/v1/drops/{dropId}
 > `options`에는 활성 SKU(`is_active = true`)만 포함하고, 각 SKU의 `soldOut`은 `availableStock == 0`입니다. `optionGroups`·`values`는 활성 개념 없이 전부 반환합니다.
 > 없는 DROP과 `DRAFT`는 `DROP_NOT_FOUND`로 숨깁니다. `CANCELED`는 200으로 보여 주고 `actions`가 모두 `false`입니다.
 > `wishNotice`는 WISH 안내 문구이고, `serverTime`은 `actions`를 판정한 서버 시각입니다.
+> 서버는 이 응답을 짧은 TTL(5초)로 캐시합니다(GR-183). 재고·판매·상태 변경은 커밋 후 바로 반영되고, `actions`·`serverTime`은 요청마다 다시 계산합니다. `wishCount`·`brandName`은 최대 5초 늦게 반영될 수 있습니다. 자세한 수렴 규칙은 [실시간 변경 전달 계약](../REALTIME_STOCK.md) 9절을 따릅니다.
 > `galleryImages`와 `detailImages`는 용도별 `sort_order` 순으로 반환하고 이미지가 없으면 빈 배열입니다. 기존 `imageUrls`는 GALLERY URL만 같은 순서로 반환해 구버전 소비자 화면과 호환합니다. 상세 설명 텍스트는 `description`이고 DETAIL 이미지는 그 아래에 표시합니다.
 >
 > `actions`는 비로그인 API이므로 사용자와 무관하게 DROP 상태·시각으로만 정합니다.

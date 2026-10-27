@@ -22,6 +22,7 @@ GET /api/v1/drops/{dropId}/stocks
 - `soldOut = availableStock == 0`이며, 재고 여부만 나타낸다. 판매 기간 종료나 CANCELED를 이유로 품절 처리하지 않는다.
 - `options`의 각 항목은 `optionId`·`availableStock`·`soldOut`을 항상 포함하며 null이 아니다. OpenAPI 스키마(`PublicDropStockOption`)에서도 세 필드를 필수(`required`)로 표시한다.
 - 응답 이후 주문으로 재고가 바뀔 수 있으며, 실제 주문 가능 여부는 주문 API가 서버의 최신 재고로 다시 판단한다.
+- 서버는 응답을 짧은 TTL(5초)로 캐시하고, 재고·판매·상태 변경이 커밋되면 SSE 알림 전에 지운다(GR-183). `serverTime`은 요청마다 다시 계산한다.
 
 **응답:**
 

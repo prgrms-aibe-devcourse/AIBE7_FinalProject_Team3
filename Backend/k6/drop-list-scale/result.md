@@ -175,7 +175,7 @@ docker run --rm -i --network backend_default -v "$PWD/k6:/k6" -w /k6 -e BASE_URL
 | 가용 재고 합계 중복 계산 | **부분 개선(완료)** | 실제 중복은 인기 GRAB + soldOut뿐이라 그 필터만 생략. `LATERAL` 일괄 적용은 역효과. 날짜·인기 WISH의 soldOut 비용은 필터 자체의 비용이라 남음 | GR-177 |
 | `pg_trgm` keyword 인덱스 | 보류 | keyword 조합 p95 12.2ms 이하 | 데이터가 커져 병목이 되면 재검토 |
 | 활성 WISH 부분 인덱스 | 보류 | 기존 인덱스로 Index Only Scan | — |
-| Redis 조회 캐시 | 보류 | 쿼리 개선 후에도 병목이 남을 때 판단(TECHSTACK.md) | — |
+| 목록 응답 캐시 | 보류 | 필터 조합이 많다. 쿼리 개선 후에도 병목이 남을 때 판단(TECHSTACK.md). 상세·재고 응답 캐시는 GR-183에서 적용 | — |
 
 ## 개선 결과 — 인기 GRAB 판매 수량 집계 (GR-176, 2026-10-27)
 
