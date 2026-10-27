@@ -10,5 +10,10 @@ services:
     memswap_limit: 1g
     cpus: 2
     environment:
-      # 컨테이너 메모리의 75%를 힙으로 둔다(nano의 384m/512m 비율과 동일하게 맞춤).
-      JDK_JAVA_OPTIONS: -Xmx768m
+      # 힙 밖(메타스페이스·스레드 스택·GC 네이티브 구조 등) 실측 사용량이 ~410MB로
+      # 컨테이너 크기와 무관하게 거의 고정이라, 768m(1024-768=256MB 여유)로는
+      # 힙+힙 밖 합계(768+410=1178MB)가 1GiB 한도를 이미 초과한다(payment-batch-soak
+      # result.md 참고). 1024-410=614MB가 마진 0인 이론적 한계라 550m로 낮춰 여유를 둔다.
+      # JVM은 메모리·CPU가 작은 컨테이너에선 기본 컬렉터를 G1 대신 Serial 등으로 바꿀 수 있다(에르고노믹스).
+      # nano/micro 두 환경을 같은 조건으로 비교하려고 컨테이너 크기와 무관하게 G1GC로 고정한다.
+      JDK_JAVA_OPTIONS: -Xmx550m -XX:+UseG1GC

@@ -53,3 +53,4 @@ verify.sql 실행 명령은 각 SQL 파일 상단 주석을 본다.
 | 평상시 조회 | [`steady-read/`](steady-read/steady-read.js) | 캐시 없는 상태의 목록/상세 조회 하한선 | [result.md](steady-read/result.md) |
 | DB 커넥션 풀 고갈 | [`connection-pool-exhaustion/`](connection-pool-exhaustion/pool-exhaustion.js) | 풀 크기(기본 10)보다 뚜렷이 많은 동시 요청에 타임아웃/5xx가 나는지 | [result.md](connection-pool-exhaustion/result.md) |
 | 결제 배치 롱런(soak) | [`payment-batch-soak/`](payment-batch-soak/payment-batch-soak.js) | 평상시 수준 주문·결제·취소 트래픽을 장시간 유지해 결제 배치의 메모리·커넥션 누수 여부를 확인 (`GRAB_PAYMENT_MOCK_GATEWAY_ENABLED=true`로 실행해 실제 토스를 안 때림) | [result.md](payment-batch-soak/result.md) |
+| PG 장애 주입 | [`payment-fault-injection/`](payment-fault-injection/payment-fault-injection.js) | MockPaymentGateway로 결제 승인 거절·결과불명·취소 결과불명을 섞어, 결제 배치(진행 중 결제 정리·취소 재요청)가 해소하는지와 보정 환불 중복 생성 여부를 확인 (`GRAB_PAYMENT_MOCK_GATEWAY_ENABLED=true`와 `GRAB_MOCK_*_RATE`로 실행) | [result.md](payment-fault-injection/result.md) |
