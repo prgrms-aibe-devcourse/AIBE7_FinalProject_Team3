@@ -19,7 +19,6 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.annotation.web.configurers.oauth2.client.OAuth2LoginConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.session.NullAuthenticatedSessionStrategy;
@@ -175,9 +174,10 @@ public class SecurityConfig {
         Spring 기본값(defaultsForSpringSecurity_v5_8)은 메모리가 16 MiB라 쓰지 않는다.
         검증은 저장된 해시에 적힌 파라미터로 하므로, 값을 올려도 기존 해시는 그대로 검증된다.
         해시 1건이 힙 약 19 MiB를 잡으므로 동시 실행 수를 묶는 인코더로 감싼다(GR-178, NFR-014).
+        반환 타입을 구체 클래스로 두어 지표 등록(PasswordHashMetricsConfig)이 거부·대기 수를 읽게 한다. 사용하는 쪽은 PasswordEncoder로 받는다.
      */
     @Bean
-    PasswordEncoder passwordEncoder(PasswordHashProperties passwordHashProperties) {
+    ConcurrencyLimitedPasswordEncoder passwordEncoder(PasswordHashProperties passwordHashProperties) {
         return new ConcurrencyLimitedPasswordEncoder(
                 new Argon2PasswordEncoder(16, 32, 1, 19 * 1024, 2), passwordHashProperties);
     }

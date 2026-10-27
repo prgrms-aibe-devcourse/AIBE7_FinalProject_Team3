@@ -6,6 +6,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
 /*
@@ -24,6 +25,8 @@ public class ConcurrencyLimitedPasswordEncoder implements PasswordEncoder {
     private final Semaphore permits;
     private final long acquireTimeoutNanos;
     private final long retryAfterSeconds;
+    // 거부 수는 지표(PasswordHashMetricsConfig)로 노출한다. 여러 요청 스레드가 함께 올리므로 원자적으로 센다
+    private final AtomicLong rejected = new AtomicLong();
 
     public ConcurrencyLimitedPasswordEncoder(PasswordEncoder delegate, PasswordHashProperties properties) {
         this.delegate = delegate;
@@ -46,6 +49,17 @@ public class ConcurrencyLimitedPasswordEncoder implements PasswordEncoder {
     @Override
     public boolean upgradeEncoding(String encodedPassword) {
         return delegate.upgradeEncoding(encodedPassword);
+    }
+
+    // 입장하지 못한 요청이 몇 건인가
+    public long rejectedCount() {
+        return rejected.get();
+    }
+
+    // 지금 기다리는 요청이 몇 개인가
+    // Semaphore.getQueueLength()는 Javadoc상 추정값이다. 정확한 개수가 아니라 대기 추이를 보는 용도로만 쓴다
+    public int waitingCount() {
+        return permits.getQueueLength();
     }
 
     private <T> T withPermit(Supplier<T> hash) {
@@ -72,6 +86,7 @@ public class ConcurrencyLimitedPasswordEncoder implements PasswordEncoder {
     }
 
     private BusinessException rejected() {
+        rejected.incrementAndGet();
         return new BusinessException(CommonErrorCode.AUTH_TEMPORARILY_UNAVAILABLE, retryAfterSeconds);
     }
 }
