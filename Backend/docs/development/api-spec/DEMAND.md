@@ -354,6 +354,17 @@ DROP을 만들거나 DRAFT를 편집할 때 같은 카테고리·비슷한 가�
 - 시장 평균(`MARKET`): 다른 판매자 후보 DROP 중 `closed_at`이 오늘 0시(KST) 이전인 DROP을 최신순으로 최대 20개. 1.3의 보호 규칙(판매자 5명·DROP 10개 이상, 기준 시점 고정, 본인 DROP 제외, 개별 상품·수치 비노출)을 그대로 적용한다.
 - 편집 중인 DRAFT는 종료 DROP이 아니므로 표본에 들어가지 않는다.
 
+**표본 선택 방법(GR-147)**: 기준(`OWN`, `MARKET`)마다 아래 순서로 고르고 어느 방법을 썼는지 응답(`sampleSelection`)에 표시한다.
+
+| 방법 | 선택 | 사용 조건 |
+| --- | --- | --- |
+| `SIMILAR` | 위 후보 중 임베딩(6절)이 있고 요청과의 코사인 유사도가 0.75 이상인 DROP을 유사도 순으로 최대 20개 | 요청에 상품명·설명이 있고 요청 임베딩을 만들었으며, 그 표본의 결과 신뢰도가 `NONE`이 아닐 때 |
+| `CATEGORY` | 위 후보를 `closed_at` 최신순으로 최대 20개 | 그 외 모든 경우 |
+
+- 요청 임베딩은 요청의 카테고리명·상품명·설명·옵션 구성으로 6.1과 같은 형식의 텍스트를 만들어 같은 모델로 만든다. 같은 텍스트면 캐시(Redis, 하루)를 다시 쓴다. 캐시를 비워도 다시 만들면 되므로 결과에는 영향이 없다.
+- 임베딩이 꺼져 있거나, 요청 임베딩을 만들지 못했거나(실패·시간 초과), 비슷한 상품 표본의 신뢰도가 `NONE`(시장 평균은 보호 단위 미달 포함)이면 그 기준은 `CATEGORY`로 계산한다. 추천은 막지 않는다.
+- 임베딩은 표본 검색에만 쓰고, 고른 표본의 집계·계산은 5.2 그대로다.
+
 ### 5.2 계산
 
 기준(`OWN`, `MARKET`)마다 따로 계산하고 섞지 않는다.
@@ -383,8 +394,9 @@ DROP을 만들거나 DRAFT를 편집할 때 같은 카테고리·비슷한 가�
 | 시장 분위수 단위 | 5개 | 개별 DROP 판매량이 그대로 드러나지 않게 하는 최소 반올림 | 보호 |
 | 참고 가격 단위 | 1,000원 | 개별 DROP 가격이 그대로 드러나지 않게 하는 최소 반올림 | 보호 |
 | 가격대 참고 표본 | 최대 60개 | 가격대 세 구간 각각에 보호 단위(10개)를 채울 수 있는 크기 | 가정 |
+| 비슷한 상품 유사도 기준 | 0.75 | WISH 단계 표본(1.2)과 같은 값. 로컬 데이터에서 같은 상품군(티셔츠·셔츠·니트)이 0.75~0.88로 모였다(GR-147) | 가정 |
 
-값은 설정(`grab.demand.stock.*`)으로 바꾼다. 공개 시점 기록(5.6)이 쌓이면 실제 판매량이 추천 범위 안에 든 비율로 보정하고, 계산을 바꾸면 `calculationVersion`(초기 `s1`)을 올린다.
+값은 설정(`grab.demand.stock.*`, 유사도 기준은 1.2와 같은 `grab.demand.similarity.min-score`)으로 바꾼다. 공개 시점 기록(5.6)이 쌓이면 실제 판매량이 추천 범위 안에 든 비율로 보정하고, 계산을 바꾸면 `calculationVersion`(초기 `s1`)을 올린다.
 
 ### 5.4 가격대 참고
 
@@ -413,13 +425,19 @@ POST /api/v1/seller/stock-recommendations
     { "unitPrice": 59000, "quantity": 40 },
     { "unitPrice": 59000, "quantity": 20 }
   ],
-  "safetyStockRate": 0.1
+  "safetyStockRate": 0.1,
+  "name": "오버핏 코튼 티셔츠",
+  "description": "부드러운 코튼 소재의 오버핏 티셔츠입니다.",
+  "optionGroups": [
+    { "name": "색상", "values": ["블랙", "화이트"] }
+  ]
 }
 ```
 
 - `categoryId`: 필수, 활성 카테고리. 없거나 비활성이면 `VALIDATION_FAILED`(`field`: `categoryId`).
 - `options`: 필수 1~100개. `unitPrice` 필수 0 이상, `quantity` 선택 0 이상.
 - `safetyStockRate`: 선택, 0~1, 소수 둘째 자리까지. 생략하면 0.1.
+- `name`(200자 이하)·`description`(5,000자 이하)·`optionGroups`(최대 10개, 그룹명 100자·값 최대 50개 각 100자 이하): 선택. 비슷한 상품 표본(5.1)을 고르는 데만 쓴다. 상품명과 설명이 모두 있어야 비슷한 상품으로 고르고, 없으면 카테고리 기준이다.
 
 **응답:**
 
@@ -442,6 +460,7 @@ POST /api/v1/seller/stock-recommendations
       "asOf": "2026-10-26T00:00:00+09:00"
     },
     "basis": "MARKET",
+    "sampleSelection": { "own": "SIMILAR", "market": "CATEGORY" },
     "recommendation": {
       "low": 25, "expected": 40, "high": 60,
       "recommended": 44, "safetyStockRate": 0.1,
@@ -465,6 +484,7 @@ POST /api/v1/seller/stock-recommendations
 }
 ```
 
+- `sampleSelection`: 기준마다 표본을 고른 방법(`SIMILAR`, `CATEGORY`, 5.1).
 - `own`·`market`은 항상 함께 반환한다. 신뢰도 `NONE`이면 수치 필드는 `null`이고, 시장 평균은 `asOf`만 남긴다.
 - `recommendation.expected`는 기준 수량(5.2), `options[].index`는 요청 옵션 순서다. 기준이 없으면 `basis`와 `recommendation`의 수량 필드가 `null`이다.
 - `priceReference`: 요청 대표 가격이 0이면 `position`은 `UNKNOWN`, 참고 가격 범위는 `null`, `bands`는 빈 배열이다.
@@ -472,6 +492,7 @@ POST /api/v1/seller/stock-recommendations
 ### 5.6 공개 시점 기록
 
 - DROP 공개(`POST /api/v1/seller/drops/{dropId}/publish`, DROP.md 2.5)가 커밋된 뒤 별도 트랜잭션에서 DROP의 카테고리·옵션 가격·준비 수량으로 5.2를 다시 계산해 `drop_stock_recommendations`(ERD.md 1.7)에 DROP당 한 건 저장한다(DEMAND-012).
+- 표본 선택(5.1)도 공개 시점 DROP의 카테고리명·상품명·설명·옵션 구성으로 같은 방식을 쓴다. 판매자가 같은 내용으로 추천을 받았다면 요청 임베딩 캐시를 다시 쓴다.
 - 판매자가 편집 중에 본 값이 아니라 공개 시점 값이다. 화면에서 "추천 수량 채우기"를 눌렀는지는 받지 않고, 옵션별 실제 준비 수량이 추천 배분과 모두 같으면 추천을 적용한 것으로 기록한다.
 - 공개 트랜잭션과 분리하므로 계산·저장에 실패해도 공개는 그대로이고 기록만 빠진다(WARN 로그). 서버가 커밋 직후 종료되면 기록이 빠질 수 있다. 평가용 기록이라 재시도하지 않는다.
 - 실제 판매량과의 비교(추천 범위 적중률 등)는 종료 후 SQL로 집계하며 API로 제공하지 않는다.
