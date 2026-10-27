@@ -216,6 +216,14 @@ Set-Cookie: email_signup_token=; HttpOnly; Secure; SameSite=Lax; Path=/api/v1/au
 **요청 본문 오류:**
 - 요청 본문이 없거나 JSON 형식이 잘못되면 `INVALID_REQUEST`로 거부하고 `fieldErrors`는 빈 배열로 반환한다. 1.2.1·1.2.2에도 같게 적용한다.
 
+**비밀번호 해시 동시 처리 상한:**
+- 서버는 비밀번호 해시(Argon2id) 계산을 인스턴스마다 동시에 정해진 수까지만 실행한다. 자리가 없으면 대기 시간 동안 차례를 기다리고, 그 안에 차례가 오지 않으면 `AUTH_TEMPORARILY_UNAVAILABLE`(503)로 거부한다.
+- 거부 응답에는 `Retry-After` 헤더(초 단위)를 담는다. 동시 처리 수·대기 시간·`Retry-After`는 서버 설정값이다(기본 4건, 3초, 3초).
+- 이 거부는 요청 값이나 인증 상태와 관계없는 일시적 거부다. 같은 요청을 `Retry-After` 뒤에 다시 보낼 수 있다.
+- 1.3 로그인과 1.11 비밀번호 변경에도 같게 적용한다.
+- 회원가입에서는 이메일·닉네임 중복 확인을 마친 뒤 비밀번호를 해시하므로, 그보다 앞선 오류(`EMAIL_SIGNUP_CONTEXT_INVALID`, 요청 값 오류, `DUPLICATE_EMAIL`, `DUPLICATE_NICKNAME`)가 먼저 응답된다.
+- 거부되면 회원을 저장하지 않고 가입 컨텍스트도 소비하지 않는다. 사용자는 컨텍스트가 만료되기 전까지 다시 요청할 수 있다.
+
 **오류 코드:**
 - `EMAIL_SIGNUP_CONTEXT_INVALID`
 - `INVALID_REQUEST`
@@ -224,6 +232,7 @@ Set-Cookie: email_signup_token=; HttpOnly; Secure; SameSite=Lax; Path=/api/v1/au
 - `INVALID_PASSWORD`
 - `INVALID_NICKNAME`
 - `DUPLICATE_NICKNAME`
+- `AUTH_TEMPORARILY_UNAVAILABLE`
 
 ### 1.3 LOCAL 로그인
 
@@ -288,11 +297,17 @@ Access Token과 Refresh Token은 응답 본문에 포함하지 않는다. Access
 - 계정 상태는 비밀번호를 아는 사용자에게만 드러난다.
 - 실패 응답에는 인증 쿠키를 발급하지 않고 Refresh Token을 저장하지 않는다.
 
+**비밀번호 해시 동시 처리 상한:**
+- 1.2.3의 동시 처리 상한을 적용한다. 2·3의 비밀번호 해시 검증 차례를 대기 시간 안에 얻지 못하면 `AUTH_TEMPORARILY_UNAVAILABLE`(503)로 거부한다.
+- 회원이 있을 때와 없을 때 모두 같은 방식으로 해시 차례를 기다리고, 계정 상태는 해시 검증 뒤에 확인한다. 따라서 이 거부로 계정 존재 여부나 계정 상태가 드러나지 않는다.
+- 거부 응답에도 인증 쿠키를 발급하지 않고 Refresh Token을 저장하지 않는다.
+
 **오류 코드:**
 - `INVALID_REQUEST`
 - `VALIDATION_FAILED`
 - `INVALID_CREDENTIALS`
 - `ACCOUNT_DISABLED`
+- `AUTH_TEMPORARILY_UNAVAILABLE`
 
 ### 1.4 KAKAO·GOOGLE 소셜 로그인 시작
 
@@ -638,6 +653,10 @@ PATCH /api/v1/users/me/password
 
 현재 비밀번호 검증 후 저장 전에 다른 요청이 먼저 비밀번호를 바꿨다면 변경하지 않고 `PASSWORD_MISMATCH`(400)로 응답한다. 이 API에는 현재 비밀번호 확인 실패에 대한 별도의 횟수 제한을 두지 않는다.
 
+**비밀번호 해시 동시 처리 상한:**
+
+1.2.3의 동시 처리 상한을 적용한다. 이 API는 요청 1건에 비밀번호 해시를 두 번 계산한다(4의 현재 비밀번호 검증, 6의 새 비밀번호 해시 생성). 두 번 모두 따로 차례를 기다리며, 어느 쪽이든 대기 시간 안에 차례를 얻지 못하면 비밀번호를 변경하지 않고 `AUTH_TEMPORARILY_UNAVAILABLE`(503)로 응답한다. 인증 실패가 아니므로 로그인 세션은 그대로 유지되며, 클라이언트는 로그아웃하지 않는다.
+
 **오류 코드:**
 
 - `INVALID_REQUEST`(400): 요청 본문 형식 오류
@@ -650,6 +669,7 @@ PATCH /api/v1/users/me/password
 - `INVALID_TOKEN`(401): 만료·변조된 Access Token
 - `ACCESS_DENIED`(403): `USER` 권한 없음 또는 CSRF 토큰 누락·불일치
 - `INTERNAL_SERVER_ERROR`(500): DB 장애·비밀번호 해시 생성 실패 등 서버 오류
+- `AUTH_TEMPORARILY_UNAVAILABLE`(503): 비밀번호 해시 동시 처리 상한을 넘어 대기 시간 안에 처리하지 못함. `Retry-After` 헤더 포함
 
 ### 1.12 내 프로필 이미지 등록/수정
 
