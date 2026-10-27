@@ -19,6 +19,7 @@ TARGETS=${*:-pair_hot pair_random stock_hot}
 cd "$(dirname "$0")/../.."  # Backend
 DIR=k6/drop-detail-scale
 OUT=$DIR/out/$NAME; mkdir -p "$OUT"
+trap 'pkill -f "drop-list-scale/stats.sh" 2>/dev/null || true' EXIT  # 중간에 실패해도 통계 수집기를 남기지 않는다
 k6() {
   docker run --rm -i --network backend_default -v "$PWD/k6:/k6" -w /k6 -e BASE_URL=http://backend:8080 grafana/k6 "$@"
 }
@@ -32,7 +33,7 @@ k6-drop-list-stats() { k6/drop-list-scale/stats.sh "$PWD/$OUT/stats.txt"; }
 k6-drop-list-stats & STATS=$!
 k6 run --quiet --summary-export "drop-detail-scale/out/$NAME/k6-summary.json" drop-detail-scale/detail.js \
   > "$OUT/k6-stdout.txt" 2>&1
-kill $STATS 2>/dev/null; pkill -f "drop-list-scale/stats.sh" 2>/dev/null || true
+kill "$STATS" 2>/dev/null || true
 
 echo "== 워밍업 + 동시 접속 ($TARGETS)"
 k6 run --quiet drop-detail-scale/warmup.js > /dev/null 2>&1

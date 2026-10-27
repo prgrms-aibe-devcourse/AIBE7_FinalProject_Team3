@@ -20,5 +20,8 @@ case "$1" in
   show) CMD='true' ;;
   *) CMD="tc qdisc replace dev eth0 root netem delay ${1}ms" ;;
 esac
-docker run --rm --net "container:$PG" --cap-add NET_ADMIN alpine:3.20 \
-  sh -c "apk add -q iproute2-tc > /dev/null 2>&1 && $CMD && tc qdisc show dev eth0"
+# sh -e로 단계마다 실패를 그대로 드러낸다. tc 설치가 실패하면 해제도 못 한 채 성공으로 끝나지 않게 한다.
+docker run --rm --net "container:$PG" --cap-add NET_ADMIN alpine:3.20 sh -ec "
+  apk add -q iproute2-tc > /dev/null 2>&1 || { echo 'iproute2-tc 설치 실패: 지연을 바꾸지 못했다' >&2; exit 1; }
+  $CMD
+  tc qdisc show dev eth0"

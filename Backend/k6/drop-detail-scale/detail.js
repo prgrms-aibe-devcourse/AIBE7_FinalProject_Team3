@@ -12,7 +12,8 @@ const DURATION_S = Number(__ENV.DURATION_S || 20);
 const GAP_S = 2;
 
 const scenarios = {};
-const thresholds = {};
+// 부하 없는 측정이라 실패 응답이 있으면 결과를 쓰지 않는다. 실패 시 k6가 0이 아닌 코드로 끝나 measure.sh·latency.sh도 멈춘다.
+const thresholds = { http_req_failed: ['rate==0'], checks: ['rate==1'] };
 Object.keys(COMBOS).forEach((name, i) => {
     scenarios[name] = {
         executor: 'constant-vus',

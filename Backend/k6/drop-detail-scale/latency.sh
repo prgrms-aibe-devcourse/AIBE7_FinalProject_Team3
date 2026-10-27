@@ -22,7 +22,14 @@ k6() {
   docker run --rm -i --network backend_default -v "$PWD/k6:/k6" -w /k6 -e BASE_URL=http://backend:8080 grafana/k6 "$@"
 }
 
-trap '"$DIR/netem.sh" off > /dev/null' EXIT
+# 끝나거나 실패해도 통계 수집기를 멈추고 지연을 해제한다. 해제를 확인하지 못하면 다음 측정이 오염되므로 경고를 남긴다.
+cleanup() {
+  pkill -f "drop-list-scale/stats.sh" 2>/dev/null || true
+  if ! "$DIR/netem.sh" off | grep -q noqueue; then
+    echo "경고: postgres 지연 해제를 확인하지 못했다. 'netem.sh show'로 확인한다" >&2
+  fi
+}
+trap cleanup EXIT
 "$DIR/netem.sh" "$DELAY" > "$OUT/netem.txt"
 
 echo "== ${DELAY}ms: 워밍업 + 조합별 응답시간"
@@ -30,7 +37,7 @@ k6 run --quiet drop-detail-scale/warmup.js > /dev/null 2>&1
 k6/drop-list-scale/stats.sh "$PWD/$OUT/stats.txt" & STATS=$!
 k6 run --quiet --summary-export "drop-detail-scale/out/$NAME/k6-summary.json" drop-detail-scale/detail.js \
   > "$OUT/k6-stdout.txt" 2>&1
-kill $STATS 2>/dev/null; pkill -f "drop-list-scale/stats.sh" 2>/dev/null || true
+kill "$STATS" 2>/dev/null || true
 
 echo "== ${DELAY}ms: 워밍업 + 동시 접속 ($TARGETS)"
 k6 run --quiet drop-detail-scale/warmup.js > /dev/null 2>&1
