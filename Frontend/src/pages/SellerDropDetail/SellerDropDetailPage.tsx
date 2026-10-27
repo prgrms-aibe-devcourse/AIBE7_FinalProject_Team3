@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import {
   Link,
   Navigate,
@@ -9,6 +10,7 @@ import {
 import { getCategories } from '../../api/category/categories'
 import EmptyState from '../../components/EmptyState/EmptyState'
 import AuthLoading from '../../features/auth/components/AuthLoading'
+import DemandReferenceCard from '../../features/demand/components/DemandReferenceCard'
 import {
   apiErrorCode,
   isAdmin,
@@ -52,6 +54,8 @@ export default function SellerDropDetailPage({
     queryFn: getCategories,
     enabled,
   })
+  // 수요 분석 카드는 판매 시작 전에만 보인다. 렌더마다 시각이 바뀌지 않게 진입 시각을 쓴다(SellerDropActions와 같음)
+  const [now] = useState(() => Date.now())
   const { status, page } = readSellerDropQuery(params)
   const backTo = `/seller/drops?status=${status}&page=${page}`
   if (authStatus === 'loading') return <AuthLoading />
@@ -330,6 +334,11 @@ export default function SellerDropDetailPage({
           )}
         </section>
       </div>
+      {drop.status === 'WISH' &&
+        !!drop.saleStartsAt &&
+        Date.parse(drop.saleStartsAt) > now && (
+          <DemandReferenceCard dropId={id} />
+        )}
       <section className="panel seller-drop-related">
         <h2>관련 작업</h2>
         <div>
