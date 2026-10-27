@@ -28,6 +28,7 @@ import org.example.grab.domain.drop.entity.option.DropOptionValue;
 import org.example.grab.domain.drop.entity.option.DropOptionValueMap;
 import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.domain.drop.event.DropCanceledEvent;
+import org.example.grab.domain.drop.event.DropPublishedEvent;
 import org.example.grab.domain.seller.service.SellerProfileService;
 import org.example.grab.domain.drop.repository.DropImageRepository;
 import org.example.grab.domain.drop.repository.DropRepository;
@@ -439,6 +440,27 @@ class DropServiceTest {
                     assertThat(e.getFieldErrors()).extracting(ErrorResponse.FieldError::field)
                             .containsExactly("categoryId");
                 });
+        verifyNoInteractions(eventPublisher);
+    }
+
+    @Test
+    @DisplayName("공개에 성공하면 공개 시점 재고 추천 기록을 위해 DropPublishedEvent가 발행된다")
+    void publish_publishesEvent() {
+        // given
+        Drop drop = Drop.createDraft(1L);
+        drop.updateDraft("상품", "설명", 1L, 3000L, "안내",
+                OffsetDateTime.now().plusDays(1), OffsetDateTime.now().plusDays(2));
+        drop.addImage(DropImage.create(drop, UUID.randomUUID(), "https://example.com/a.jpg", DropImageType.GALLERY, 0, "상품"));
+        drop.addOption(DropOption.create(drop, 1000L, 5, 0));
+        given(dropRepository.findByIdForUpdate(10L)).willReturn(Optional.of(drop));
+        given(categoryService.isActive(1L)).willReturn(true);
+
+        // when
+        dropService.publish(1L, 10L);
+
+        // then
+        assertThat(drop.getStatus()).isEqualTo(DropStatus.WISH);
+        verify(eventPublisher).publishEvent(new DropPublishedEvent(10L));
     }
 
     @Test

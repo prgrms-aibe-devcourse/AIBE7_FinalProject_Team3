@@ -491,6 +491,8 @@ POST /api/v1/seller/drops/{dropId}/publish
 
 > 옵션이 없는 상품은 `optionGroups`를 빈 배열로 보내고 값 선택이 없는 `기본` SKU 한 개를 등록합니다.
 
+> 공개가 커밋된 뒤 그 시점의 재고 추천과 실제 준비 수량을 기록합니다(GR-167, [수요 분석 API](DEMAND.md) 5.6). 기록 실패는 공개 결과에 영향을 주지 않습니다.
+
 **응답:**
 
 ```json

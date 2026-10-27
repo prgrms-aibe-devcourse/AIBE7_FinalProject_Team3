@@ -1,6 +1,8 @@
 package org.example.grab.domain.demand.repository;
 
+import org.example.grab.domain.demand.dto.ConversionBasis;
 import org.example.grab.domain.demand.dto.ConversionSample;
+import org.example.grab.domain.demand.dto.DemandAnalysisResponse.InitialRecommendation;
 import org.example.grab.domain.demand.dto.DemandOption;
 import org.example.grab.domain.demand.dto.MarketSample;
 import org.example.grab.domain.demand.repository.DemandAnalysisRepository.TargetDrop;
@@ -13,6 +15,7 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -27,6 +30,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.entry;
 
 @DataJpaTest
@@ -268,6 +272,54 @@ class DemandAnalysisRepositoryTest {
 
         // then
         assertThat(sample).isEqualTo(new MarketSample(2, 2, 2, 0, 0));
+    }
+
+    @Test
+    @DisplayName("공개 시점 재고 추천 기록에서 기준·추천 수량·준비 수량과 저장된 응답의 범위를 읽고, 기록이 없으면 비어 있다")
+    void findInitialRecommendation_readsSnapshot() {
+        // given
+        Long dropId = insertDrop(sellerId, categoryId, "WISH", null, null);
+        Long withoutRecord = insertDrop(sellerId, categoryId, "WISH", null, null);
+        jdbcTemplate.update(
+                """
+                INSERT INTO drop_stock_recommendations (drop_id, calculation_version, basis, result, recommended_total,
+                                                        prepared_total, prepared_quantities, applied, created_at)
+                VALUES (?, 's1', 'MARKET', CAST(? AS JSONB), 44, 120, '[]', FALSE, ?)
+                """,
+                dropId, "{\"recommendation\": {\"low\": 25, \"expected\": 40, \"high\": 60, \"recommended\": 44}}",
+                now.minusDays(3));
+
+        // when
+        InitialRecommendation initial = demandAnalysisRepository.findInitialRecommendation(dropId).orElseThrow();
+
+        // then
+        assertThat(initial).usingRecursiveComparison().ignoringFields("recordedAt")
+                .isEqualTo(new InitialRecommendation(null, ConversionBasis.MARKET, 25, 40, 60, 44, 120));
+        assertThat(initial.recordedAt()).isEqualTo(now.minusDays(3));
+        assertThat(demandAnalysisRepository.findInitialRecommendation(withoutRecord)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("판매 시작 시점 기록은 DROP당 한 건만 남고, 기준이 없는데 수량이 있으면 제약으로 거부된다")
+    void saveSnapshot_keepsFirstRecordPerDrop() {
+        // given
+        Long dropId = insertDrop(sellerId, categoryId, "GRAB", null, null);
+
+        // when
+        demandAnalysisRepository.saveSnapshot(dropId, "v1", "OWN", "{}", 100, 40, 44, 60, now);
+        demandAnalysisRepository.saveSnapshot(dropId, "v1", "MARKET", "{}", 999, 1, 1, 1, now.plusHours(1));
+
+        // then
+        assertThat(jdbcTemplate.queryForMap(
+                """
+                SELECT conversion_basis, active_wish_count, expected_total, recommended_total, prepared_total
+                FROM demand_analysis_snapshots WHERE drop_id = ?
+                """, dropId))
+                .containsExactly(entry("conversion_basis", "OWN"), entry("active_wish_count", 100),
+                        entry("expected_total", 40), entry("recommended_total", 44), entry("prepared_total", 60));
+        Long noBasis = insertDrop(sellerId, categoryId, "GRAB", null, null);
+        assertThatThrownBy(() -> demandAnalysisRepository.saveSnapshot(noBasis, "v1", null, "{}", 0, 10, 11, 60, now))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     private Long insertUser() {

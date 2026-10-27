@@ -172,6 +172,20 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
     await shot(page, 'seller-drop-detail')
   })
 
+  // 판매 시작 전 WISH DROP의 수요 분석 참고 카드(GR-144). 근거와 가정을 펼친 상태로 찍는다
+  test('seller-drop-detail-demand', async ({ page }) => {
+    await loginSeller(page)
+    await page.evaluate(() => {
+      window.location.hash = '#/seller/drops/101'
+    })
+    const card = page.getByRole('region', { name: '수요 분석' })
+    await expect(card.locator('.demand-metrics')).toBeVisible()
+    await card.getByText('근거와 가정 보기').click()
+    await expect(card.getByRole('table', { name: '옵션별 배분' })).toBeVisible()
+    await settleToast(page)
+    await shot(page, 'seller-drop-detail-demand')
+  })
+
   test('seller-inventory', async ({ page }) => {
     await loginSeller(page)
     await page.evaluate(() => {

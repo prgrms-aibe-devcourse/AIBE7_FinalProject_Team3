@@ -105,6 +105,6 @@ class SellerDemandControllerTest {
     }
 
     private static DemandAnalysisResponse response() {
-        return new DemandAnalysisResponse(100L, null, "v1", null, null, null, null, null, List.of(), List.of());
+        return new DemandAnalysisResponse(100L, null, "v1", null, null, null, null, null, null, List.of(), List.of());
     }
 }
