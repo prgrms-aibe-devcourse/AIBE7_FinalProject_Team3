@@ -1,0 +1,295 @@
+/* 수요 분석 참고 카드(GR-144). 판매자 화면의 panel·option-stock을 재사용한다. */
+.demand-card {
+  display: grid;
+  gap: 16px;
+  margin-top: 20px;
+  padding: 22px 24px;
+}
+.demand-card > h2,
+.demand-card-heading h2 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 17px;
+}
+.demand-card-heading p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.demand-ready {
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--lime);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.demand-plan,
+.demand-evidence,
+.demand-assumption-form {
+  display: grid;
+  gap: 16px;
+}
+.demand-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+.demand-metrics > div {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.demand-metrics > div.is-primary {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink);
+}
+.demand-metrics dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.demand-metrics dd {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+}
+.demand-metrics small,
+.demand-hint,
+.demand-basis small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.demand-uncalculated {
+  margin: 0;
+  font-weight: 700;
+}
+.demand-gaps {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.demand-gaps li {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border-left: 3px solid var(--lime);
+  background: var(--soft);
+  font-size: 12px;
+}
+.demand-initial {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px dashed var(--line);
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.demand-initial small {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.demand-details {
+  display: grid;
+  gap: 16px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+.demand-details[open] {
+  gap: 18px;
+}
+.demand-details summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+}
+.demand-details > * + * {
+  margin-top: 16px;
+}
+.demand-options {
+  padding: 0;
+}
+.demand-options caption {
+  padding-bottom: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+}
+/* 네 열이라 모바일 폭(390px)에서도 가로 스크롤 없이 들어가게 한다 */
+.demand-options table {
+  min-width: 300px;
+}
+.demand-options td {
+  font-variant-numeric: tabular-nums;
+}
+
+.demand-recent {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+}
+.demand-recent small {
+  color: var(--muted);
+  font-weight: 500;
+}
+.demand-bases {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.demand-basis {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.demand-basis.is-used {
+  border-color: var(--ink);
+}
+.demand-basis h3 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+}
+.demand-basis h3 span {
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: var(--lime);
+  font-size: 10px;
+}
+.demand-basis strong {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.demand-basis strong small {
+  font-size: 12px;
+}
+.demand-basis p {
+  margin: 0;
+  font-size: 12px;
+}
+.demand-assumptions {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+.demand-assumptions div {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 8px;
+  font-size: 12px;
+}
+.demand-assumptions dt {
+  color: var(--muted);
+  font-size: 11px;
+}
+.demand-assumptions dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.demand-assumptions small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.demand-assumption-form fieldset {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.demand-assumption-form legend {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.demand-assumption-form fieldset label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.demand-assumption-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.demand-assumption-fields label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.demand-assumption-fields input {
+  min-height: 42px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+  font-weight: 500;
+}
+.demand-assumption-fields input:disabled {
+  background: var(--soft);
+}
+.demand-assumption-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.demand-change {
+  margin: 0;
+  padding: 12px 14px;
+  background: #efffc9;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.demand-notes {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 1000px) {
+  .demand-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 720px) {
+  .demand-card {
+    padding: 16px;
+  }
+  .demand-metrics dd {
+    font-size: 22px;
+  }
+  .demand-bases,
+  .demand-assumption-fields {
+    grid-template-columns: 1fr;
+  }
+}
