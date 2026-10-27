@@ -26,6 +26,11 @@ public record PublicDropStockResponse(Long dropId, List<Option> options, OffsetD
         }
     }
 
+    // 캐시한 응답을 꺼낼 때 serverTime만 조회 시각으로 바꾼다(GR-183).
+    public PublicDropStockResponse at(OffsetDateTime now) {
+        return new PublicDropStockResponse(dropId, options, now);
+    }
+
     // open-in-view=false이므로 컬렉션 접근과 DTO 변환은 서비스 트랜잭션 안에서 끝나야 한다.
     // 공개 상세와 동일하게 활성 SKU만 반환하고, DROP.options의 @OrderBy(sortOrder ASC) 순서를 따른다.
     public static PublicDropStockResponse of(Drop drop, OffsetDateTime now) {

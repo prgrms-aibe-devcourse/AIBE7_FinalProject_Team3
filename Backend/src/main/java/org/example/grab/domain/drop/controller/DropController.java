@@ -9,6 +9,7 @@ import org.example.grab.domain.drop.dto.response.PublicDropListResponse;
 import org.example.grab.domain.drop.dto.response.PublicDropStockResponse;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.service.DropService;
+import org.example.grab.domain.drop.service.PublicDropReadService;
 import org.example.grab.global.common.ApiResponse;
 import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class DropController {
 
     private final DropService dropService;
+    private final PublicDropReadService publicDropReadService;
 
     /*
      * 공개 DROP 목록. page/size와 sort는 서비스 호출 전에 검증해 잘못된 요청이면 서비스를 부르지 않는다.
@@ -67,7 +69,7 @@ public class DropController {
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "DROP_NOT_FOUND")
     @GetMapping("/{dropId}")
     public ApiResponse<PublicDropDetailResponse> getDrop(@PathVariable Long dropId) {
-        return ApiResponse.success(dropService.findPublicDrop(dropId));
+        return ApiResponse.success(publicDropReadService.findPublicDrop(dropId));
     }
 
     // 공개 재고 재조회. 비로그인 조회이며 DRAFT는 서비스가 DROP_NOT_FOUND로 숨긴다.
@@ -78,6 +80,6 @@ public class DropController {
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "DROP_NOT_FOUND")
     @GetMapping("/{dropId}/stocks")
     public ApiResponse<PublicDropStockResponse> getStocks(@PathVariable Long dropId) {
-        return ApiResponse.success(dropService.findPublicStocks(dropId));
+        return ApiResponse.success(publicDropReadService.findPublicStocks(dropId));
     }
 }

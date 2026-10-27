@@ -91,6 +91,13 @@ grab:
     retry-after: 60s
     # 활성 연결이 없고 요청 창이 만료되면 제거한다. 임의 IP로 추적 메모리가 무한 증가하지 않게 한다.
     max-tracked-ips: 10000
+  # GR-183 공개 DROP 상세·재고 응답 캐시. 재고·판매·상태 변경은 커밋 후 이벤트로 바로 지우고, TTL은 이벤트가 없는 값
+  # (상세의 활성 WISH 수·브랜드명)과 놓친 이벤트(blue/green 전환 중 다른 인스턴스의 커밋)의 지연 상한이다.
+  # store: memory(인스턴스 메모리, 기본) | redis(운영 Redis 왕복 105ms라 쓰지 않음) | none(캐시 안 씀)
+  drop-cache:
+    store: ${GRAB_DROP_CACHE_STORE:memory}
+    detail-ttl: 5s
+    stock-ttl: 5s
   # 메일 본문 등 서버가 만드는 링크가 가리키는 프런트엔드 주소. 기본값은 로컬 Vite 개발 서버다
   web:
     base-url: ${WEB_BASE_URL:http://localhost:5173}

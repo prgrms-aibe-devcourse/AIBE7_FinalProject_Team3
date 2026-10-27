@@ -11,6 +11,7 @@ import org.example.grab.domain.drop.dto.response.common.DropShippingResponse;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.domain.drop.service.DropService;
+import org.example.grab.domain.drop.service.PublicDropReadService;
 import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.GlobalExceptionHandler;
@@ -37,12 +38,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class DropControllerTest {
 
     private DropService dropService;
+    private PublicDropReadService publicDropReadService;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         dropService = mock(DropService.class);
-        DropController controller = new DropController(dropService);
+        publicDropReadService = mock(PublicDropReadService.class);
+        DropController controller = new DropController(dropService, publicDropReadService);
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler(new ValidationErrorCodeResolver(List.of())))
                 .build();
@@ -200,7 +203,7 @@ class DropControllerTest {
                         List.of(new DropOptionSelectionResponse(11L, 111L)), 129000L, 10, false)),
                 new PublicDropDetailResponse.Actions(false, false, true),
                 OffsetDateTime.parse("2026-09-20T01:10:00Z"));
-        given(dropService.findPublicDrop(100L)).willReturn(response);
+        given(publicDropReadService.findPublicDrop(100L)).willReturn(response);
 
         // when & then
         mockMvc.perform(get("/api/v1/drops/100"))
@@ -250,7 +253,7 @@ class DropControllerTest {
                 List.of(new PublicDropStockResponse.Option(1001L, 8, false),
                         new PublicDropStockResponse.Option(1002L, 0, true)),
                 OffsetDateTime.parse("2026-10-03T05:00:00Z"));
-        given(dropService.findPublicStocks(100L)).willReturn(response);
+        given(publicDropReadService.findPublicStocks(100L)).willReturn(response);
 
         // when & then
         mockMvc.perform(get("/api/v1/drops/100/stocks"))
@@ -273,7 +276,7 @@ class DropControllerTest {
     @Test
     @DisplayName("공개 재고 재조회: DRAFT면 404 DROP_NOT_FOUND")
     void getStocks_hidesDraft() throws Exception {
-        given(dropService.findPublicStocks(99L))
+        given(publicDropReadService.findPublicStocks(99L))
                 .willThrow(new BusinessException(DropErrorCode.DROP_NOT_FOUND));
 
         mockMvc.perform(get("/api/v1/drops/99/stocks"))
@@ -293,7 +296,7 @@ class DropControllerTest {
     @Test
     @DisplayName("서비스가 DROP_NOT_FOUND를 던지면 404")
     void returnsNotFoundForMissingDrop() throws Exception {
-        given(dropService.findPublicDrop(99L))
+        given(publicDropReadService.findPublicDrop(99L))
                 .willThrow(new BusinessException(DropErrorCode.DROP_NOT_FOUND));
 
         mockMvc.perform(get("/api/v1/drops/99"))

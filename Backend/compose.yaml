@@ -13,6 +13,8 @@ services:
       TOSS_SECRET_KEY: ${TOSS_SECRET_KEY:-}
       # GR-154/155 부하테스트에서 토스 샌드박스 대신 MockPaymentGateway를 쓸지. 기본은 꺼짐(운영과 동일)
       GRAB_PAYMENT_MOCK_GATEWAY_ENABLED: ${GRAB_PAYMENT_MOCK_GATEWAY_ENABLED:-false}
+      # GR-183 공개 DROP 응답 캐시 저장소(memory | redis | none). 부하 측정에서 저장소별로 비교할 때 바꾼다
+      GRAB_DROP_CACHE_STORE: ${GRAB_DROP_CACHE_STORE:-memory}
       # GR-155 장애 주입 비율(0~1). 기본 0(장애 없음)
       GRAB_MOCK_CONFIRM_FAILURE_RATE: ${GRAB_MOCK_CONFIRM_FAILURE_RATE:-0}
       GRAB_MOCK_CONFIRM_UNKNOWN_RATE: ${GRAB_MOCK_CONFIRM_UNKNOWN_RATE:-0}
