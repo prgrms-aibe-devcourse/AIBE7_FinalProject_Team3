@@ -25,6 +25,7 @@ k6/
 ├── expiry/
 ├── drop-open-spike/
 ├── steady-read/
+├── login-burst/
 └── sse-stream/              # 연결 유지는 Node(sse-clients.mjs), 주문은 k6(order-load.js)
 ```
 
@@ -54,6 +55,7 @@ verify.sql 실행 명령은 각 SQL 파일 상단 주석을 본다.
 | 드롭 오픈 순간 스파이크 | [`drop-open-spike/`](drop-open-spike/spike.js) | 오픈 순간 조회 램프업 + 주문 스파이크에 서버가 버티는지 (seed.sql 실행 직후 바로 돌려야 함) | [result.md](drop-open-spike/result.md) |
 | 평상시 조회 | [`steady-read/`](steady-read/steady-read.js) | 캐시 없는 상태의 목록/상세 조회 하한선 | [result.md](steady-read/result.md) |
 | DB 커넥션 풀 고갈 | [`connection-pool-exhaustion/`](connection-pool-exhaustion/pool-exhaustion.js) | 풀 크기(기본 10)보다 뚜렷이 많은 동시 요청에 타임아웃/5xx가 나는지 | [result.md](connection-pool-exhaustion/result.md) |
-| SSE 동시 연결 | [`sse-stream/`](sse-stream/order-load.js) | SSE 200 연결 유지 + 주문 50/초에서 연결 실패·알림 유실·재고 정합성·주문 p95 악화 여부 (한 회차는 [`run.sh`](sse-stream/run.sh)로 실행) | [result.md](sse-stream/result.md) |
+| 로그인 동시 폭주 | [`login-burst/`](login-burst/login-burst.js) | 로그인(Argon2) 요청이 동시에 몰릴 때 어느 VU부터 5xx·힙 OOM이 나는지, 실패 로그인도 같은 비용인지 (`compose.loadtest-micro.yaml`로 측정. 초기 측정은 임시 설정, 스크립트 상단 주석 참고) | [result.md](login-burst/result.md) |
+| SSE 동시 연결 | [`sse-stream/`](sse-stream/order-load.js) | SSE 200 연결 유지 + 주문 50/초에서 연결 실패·알림 유실·재고 정합성·주문 p95 악화 여부 (`compose.loadtest-micro.yaml` + `compose.loadtest-sse.yaml`로 측정, 한 회차는 [`run.sh`](sse-stream/run.sh)로 실행) | [result.md](sse-stream/result.md) |
 | 결제 배치 롱런(soak) | [`payment-batch-soak/`](payment-batch-soak/payment-batch-soak.js) | 평상시 수준 주문·결제·취소 트래픽을 장시간 유지해 결제 배치의 메모리·커넥션 누수 여부를 확인 (`GRAB_PAYMENT_MOCK_GATEWAY_ENABLED=true`로 실행해 실제 토스를 안 때림) | [result.md](payment-batch-soak/result.md) |
 | PG 장애 주입 | [`payment-fault-injection/`](payment-fault-injection/payment-fault-injection.js) | MockPaymentGateway로 결제 승인 거절·결과불명·취소 결과불명을 섞어, 결제 배치(진행 중 결제 정리·취소 재요청)가 해소하는지와 보정 환불 중복 생성 여부를 확인 (`GRAB_PAYMENT_MOCK_GATEWAY_ENABLED=true`와 `GRAB_MOCK_*_RATE`로 실행) | [result.md](payment-fault-injection/result.md) |

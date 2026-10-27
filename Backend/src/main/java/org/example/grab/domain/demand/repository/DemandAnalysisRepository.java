@@ -1,6 +1,8 @@
 package org.example.grab.domain.demand.repository;
 
+import org.example.grab.domain.demand.dto.ConversionBasis;
 import org.example.grab.domain.demand.dto.ConversionSample;
+import org.example.grab.domain.demand.dto.DemandAnalysisResponse.InitialRecommendation;
 import org.example.grab.domain.demand.dto.DemandOption;
 import org.example.grab.domain.demand.dto.MarketSample;
 import lombok.RequiredArgsConstructor;
@@ -124,6 +126,54 @@ public class DemandAnalysisRepository {
                 resultSet.getLong("wishers"),
                 resultSet.getLong("converted"),
                 resultSet.getLong("quantity")));
+    }
+
+    // 공개 시점 재고 추천 기록(drop_stock_recommendations)의 요약. 수량 범위는 저장한 응답 스냅샷에서 읽는다
+    public Optional<InitialRecommendation> findInitialRecommendation(long dropId) {
+        String sql = """
+                SELECT r.created_at, r.basis, r.recommended_total, r.prepared_total,
+                       CAST(r.result -> 'recommendation' ->> 'low' AS INT) AS low,
+                       CAST(r.result -> 'recommendation' ->> 'expected' AS INT) AS expected,
+                       CAST(r.result -> 'recommendation' ->> 'high' AS INT) AS high
+                FROM drop_stock_recommendations r
+                WHERE r.drop_id = :dropId
+                """;
+        return jdbcTemplate.query(sql, new MapSqlParameterSource("dropId", dropId),
+                (resultSet, rowNumber) -> {
+                    String basis = resultSet.getString("basis");
+                    return new InitialRecommendation(
+                            resultSet.getObject("created_at", OffsetDateTime.class),
+                            basis == null ? null : ConversionBasis.valueOf(basis),
+                            resultSet.getObject("low", Integer.class),
+                            resultSet.getObject("expected", Integer.class),
+                            resultSet.getObject("high", Integer.class),
+                            resultSet.getObject("recommended_total", Integer.class),
+                            resultSet.getInt("prepared_total"));
+                })
+                .stream().findFirst();
+    }
+
+    // 판매 시작 시점 기록(DEMAND.md 2.3). DROP당 한 건이며 이미 있으면 남기지 않는다
+    public void saveSnapshot(long dropId, String calculationVersion, String conversionBasis, String resultJson,
+                             long activeWishCount, Integer expectedTotal, Integer recommendedTotal,
+                             int preparedTotal, OffsetDateTime createdAt) {
+        jdbcTemplate.update("""
+                INSERT INTO demand_analysis_snapshots (drop_id, calculation_version, conversion_basis, result,
+                                                       active_wish_count, expected_total, recommended_total,
+                                                       prepared_total, created_at)
+                VALUES (:dropId, :calculationVersion, :conversionBasis, CAST(:result AS JSONB), :activeWishCount,
+                        :expectedTotal, :recommendedTotal, :preparedTotal, :createdAt)
+                ON CONFLICT (drop_id) DO NOTHING
+                """, new MapSqlParameterSource()
+                .addValue("dropId", dropId)
+                .addValue("calculationVersion", calculationVersion)
+                .addValue("conversionBasis", conversionBasis)
+                .addValue("result", resultJson)
+                .addValue("activeWishCount", activeWishCount)
+                .addValue("expectedTotal", expectedTotal)
+                .addValue("recommendedTotal", recommendedTotal)
+                .addValue("preparedTotal", preparedTotal)
+                .addValue("createdAt", createdAt));
     }
 
     // %s에는 표본 DROP을 고르는 판매자·기간 조건이 들어간다. 나머지 표본 조건과 전환 집계는 두 기준이 같다.
