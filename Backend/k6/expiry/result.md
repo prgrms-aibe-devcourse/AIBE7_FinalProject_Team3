@@ -2,7 +2,14 @@
 
 > 공통 실행 환경·전제는 `../README.md` 참고.
 
-## 2026-10-26 재검증: `memswap_limit` 추가(스왑 차단) 후에도 통과
+## 2026-10-26 재검증: `cpus: 2`(올바른 t3.nano 스펙) 적용 후에도 통과
+
+`compose.loadtest-nano.yaml`의 `cpus`를 2로 고친 뒤(이전엔 1로 잘못 제한) 다시
+실행. 이번엔 만료 배치가 취소 요청보다 먼저 처리돼(`status=EXPIRED`,
+`release_reason=EXPIRED`) 재고가 정확히 한 번만 반환됨(`verify.sql` 0행) —
+**통과**. 메모리 430.4MiB/512MiB(84.06%, 이전 시나리오 누적 효과 포함), OOM-kill 없음.
+
+## 2026-10-26 재검증(이전): `memswap_limit` 추가(스왑 차단) 후에도 통과 — 이때는 아직 `cpus: 1`
 
 `memswap_limit: 512m`으로 스왑을 막은 뒤 재실행. 이번엔 취소 요청이 만료
 배치보다 먼저 처리돼(`status=CANCELED`, `release_reason=ORDER_CANCELED`) 이전
