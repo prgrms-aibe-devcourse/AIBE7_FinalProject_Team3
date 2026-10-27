@@ -1,11 +1,20 @@
-import type { StockRecommendation } from '../../../api/demand/stockRecommendation'
+import { useMutation } from '@tanstack/react-query'
+import {
+  getOptionAllocation,
+  type OptionAllocation,
+  type OptionAllocationRequest,
+  type StockRecommendation,
+} from '../../../api/demand/stockRecommendation'
+import { apiErrorCode } from '../../auth/logic/authUser'
 import type { OptionGroup } from '../../../types/drop'
 import { won } from '../../../utils/price'
 import { CONFIDENCE_LABEL, count, percent } from '../logic/demandFormat'
 import {
+  MATCH_FALLBACK_TEXT,
   PRICE_BAND_LABEL,
   PRICE_POSITION_LABEL,
   STOCK_GAP_TEXT,
+  toOptionAllocationInput,
   toRecommendationInput,
 } from '../logic/stockRecommendation'
 import { useStockRecommendation } from '../logic/useStockRecommendation'
@@ -43,6 +52,86 @@ function BasisLine({
 }
 
 /*
+    옵션별 추천(DEMAND.md 7절, GR-189). 판매자가 누를 때만 요청하고, 입력이 바뀌면 부모가 key로 다시 만들어
+    이전 결과를 지운다. "옵션별 수량 채우기"를 눌러야 재고 칸이 바뀐다.
+ */
+function OptionAllocationSection({
+  request,
+  onApply,
+}: {
+  request: OptionAllocationRequest
+  onApply: (allocation: OptionAllocation) => void
+}) {
+  const mutation = useMutation({ mutationFn: getOptionAllocation })
+  const result = mutation.data
+  const fallback = result?.matchStatus
+    ? MATCH_FALLBACK_TEXT[result.matchStatus]
+    : undefined
+  return (
+    <div className="stock-recommendation-options" aria-label="옵션별 추천">
+      <div className="stock-recommendation-options-heading">
+        <p>비슷한 상품에서 옵션별로 얼마나 팔렸는지로 수량을 나눠요.</p>
+        <button
+          type="button"
+          className="secondary-button"
+          disabled={mutation.isPending}
+          onClick={() => mutation.mutate(request)}
+        >
+          {result ? '다시 계산' : '옵션별 추천'}
+        </button>
+      </div>
+      {mutation.isPending && (
+        <p className="stock-recommendation-hint" role="status">
+          비슷한 상품의 옵션을 맞춰 보는 중이에요.
+        </p>
+      )}
+      {mutation.isError && (
+        <p className="stock-recommendation-hint" role="alert">
+          {apiErrorCode(mutation.error) === 'STOCK_OPTION_MATCH_LIMIT_EXCEEDED'
+            ? '오늘 옵션별 추천 횟수를 다 썼어요. 내일 다시 시도해주세요.'
+            : '옵션별 추천을 불러오지 못했어요. 재고는 직접 입력해도 돼요.'}
+        </p>
+      )}
+      {result && (
+        <>
+          <ul className="stock-recommendation-option-groups">
+            {result.groups!.map((group) => (
+              <li key={group.name}>
+                <strong>{group.name}</strong>
+                <span>
+                  {group.allocation === 'SALES'
+                    ? group
+                        .values!.map(
+                          (value) => `${value.value} ${value.sharePercent}%`,
+                        )
+                        .join(' · ')
+                    : '비교할 판매 데이터가 부족해 똑같이 나눠요'}
+                </span>
+                <small>
+                  {group.allocation === 'SALES'
+                    ? '비슷한 상품 판매 비율'
+                    : '균등 배분'}
+                </small>
+              </li>
+            ))}
+          </ul>
+          {fallback && <p className="stock-recommendation-hint">{fallback}</p>}
+          {result.recommended != null && (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => onApply(result)}
+            >
+              옵션별 수량 채우기
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+/*
     DROP 생성·DRAFT 편집 폼의 재고 추천·가격대 참고(DEMAND.md 5절, GR-168).
     입력·저장·공개를 막지 않고, "추천 수량 채우기"를 눌러야만 재고 칸이 바뀐다.
  */
@@ -50,12 +139,15 @@ export default function StockRecommendationPanel({
   values,
   groups,
   onApply,
+  onApplyAllocation,
 }: {
   values: Record<string, string>
   groups: OptionGroup[]
   onApply: (recommendation: StockRecommendation, rowKeys: string[]) => void
+  onApplyAllocation: (allocation: OptionAllocation, rowKeys: string[]) => void
 }) {
   const input = toRecommendationInput(values, groups)
+  const optionInput = toOptionAllocationInput(values, groups)
   const query = useStockRecommendation(input?.request ?? null)
   const data = input ? query.data : undefined
   const recommendation = data?.recommendation
@@ -122,6 +214,15 @@ export default function StockRecommendationPanel({
               >
                 추천 수량 채우기
               </button>
+              {optionInput && (
+                <OptionAllocationSection
+                  key={JSON.stringify(optionInput.request)}
+                  request={optionInput.request}
+                  onApply={(allocation) =>
+                    onApplyAllocation(allocation, optionInput.rowKeys)
+                  }
+                />
+              )}
             </>
           )}
           {(data.sampleSelection?.own === 'SIMILAR' ||

@@ -103,6 +103,41 @@
 .stock-recommendation-price small {
   margin: 0;
 }
+/* 옵션별 추천(GR-189) */
+.stock-recommendation-options {
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+}
+.stock-recommendation-options-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.stock-recommendation-options-heading p {
+  margin: 0;
+}
+.stock-recommendation-options > .secondary-button {
+  justify-self: start;
+}
+.stock-recommendation-option-groups {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.stock-recommendation-option-groups li {
+  display: grid;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.stock-recommendation-option-groups li small {
+  margin: 0;
+}
 
 @media (max-width: 720px) {
   .stock-recommendation {
@@ -110,5 +145,9 @@
   }
   .stock-recommendation-metrics {
     grid-template-columns: 1fr;
+  }
+  .stock-recommendation-options-heading {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

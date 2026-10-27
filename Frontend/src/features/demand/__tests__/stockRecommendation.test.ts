@@ -1,7 +1,10 @@
 import { expect, test } from 'vitest'
 import type { StockRecommendation } from '../../../api/demand/stockRecommendation'
+import type { OptionAllocation } from '../../../api/demand/stockRecommendation'
 import {
+  applyAllocatedStock,
   applyRecommendedStock,
+  toOptionAllocationInput,
   toRecommendationInput,
 } from '../logic/stockRecommendation'
 
@@ -99,4 +102,77 @@ test('추천 배분을 요청 순서대로 각 SKU 재고 칸에 채우고 다�
       recommendation: { options: [{ index: 0, recommendedQuantity: null }] },
     } as unknown as StockRecommendation),
   ).toEqual(values)
+})
+
+const COLOR = {
+  id: 'g1',
+  name: '색상',
+  values: [
+    { id: 'black', label: '블랙' },
+    { id: 'white', label: ' 화이트 ' },
+  ],
+}
+
+test('옵션별 배분 요청은 SKU 키의 선택을 옵션 구성 순서대로 값으로 바꿔 붙인다', () => {
+  const input = toOptionAllocationInput(
+    {
+      categoryId: '3',
+      name: '티셔츠',
+      description: '코튼',
+      [`${BLACK}:price`]: '39000',
+      [`${WHITE}:price`]: '39000',
+      [`${WHITE}:stock`]: '5',
+    },
+    [COLOR],
+  )
+
+  expect(input).toEqual({
+    request: {
+      categoryId: 3,
+      name: '티셔츠',
+      description: '코튼',
+      optionGroups: [{ name: '색상', values: ['블랙', '화이트'] }],
+      options: [
+        { unitPrice: 39000, values: ['블랙'] },
+        { unitPrice: 39000, quantity: 5, values: ['화이트'] },
+      ],
+    },
+    rowKeys: [BLACK, WHITE],
+  })
+})
+
+test('상품명·설명·옵션 구성이 없거나 빈 그룹이 있으면 옵션별 배분을 요청하지 않는다', () => {
+  const values = {
+    categoryId: '3',
+    name: '티셔츠',
+    description: '코튼',
+    [`${BLACK}:price`]: '39000',
+  }
+  expect(
+    toOptionAllocationInput({ ...values, description: '' }, [COLOR]),
+  ).toBeNull()
+  expect(toOptionAllocationInput(values, [])).toBeNull()
+  expect(
+    toOptionAllocationInput(values, [
+      COLOR,
+      { id: 'g2', name: ' ', values: [] },
+    ]),
+  ).toBeNull()
+})
+
+test('옵션별 배분 수량을 각 SKU 재고 칸에 채우고 수량이 없으면 그대로 둔다', () => {
+  const allocation = {
+    options: [
+      { index: 0, recommendedQuantity: 33 },
+      { index: 1, recommendedQuantity: null },
+    ],
+  } as unknown as OptionAllocation
+
+  expect(
+    applyAllocatedStock(
+      { [`${WHITE}:stock`]: '7' },
+      [BLACK, WHITE],
+      allocation,
+    ),
+  ).toEqual({ [`${BLACK}:stock`]: '33', [`${WHITE}:stock`]: '7' })
 })

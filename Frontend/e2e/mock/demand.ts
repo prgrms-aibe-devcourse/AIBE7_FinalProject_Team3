@@ -4,6 +4,7 @@ import { baseDrops, FIXED_NOW } from './api/drop/fixtures'
 import { json } from './api/shared'
 
 type StockRequest = components['schemas']['StockRecommendationRequest']
+type AllocationRequest = components['schemas']['OptionAllocationRequest']
 type Analysis = components['schemas']['DemandAnalysisResponse']
 type CalculateRequest = components['schemas']['DemandCalculateRequest']
 
@@ -239,8 +240,67 @@ function recommendStock(request: StockRequest) {
   }
 }
 
+// 옵션별 배분(DEMAND.md 7.2). 첫 그룹만 비슷한 상품 판매 비율(첫 값 75%)로, 나머지 그룹은 균등으로 나눈다.
+// 판매자 옵션 이름이 "한도"면 하루 한도 초과를 준다
+function allocateOptions(request: AllocationRequest) {
+  const recommended = 44
+  const groups = request.optionGroups.map((group, index) => {
+    const sales = index === 0 && group.values.length === 2
+    return {
+      name: group.name,
+      allocation: sales ? 'SALES' : 'EVEN',
+      values: group.values.map((value, valueIndex) => ({
+        value,
+        sharePercent: sales ? (valueIndex === 0 ? 75 : 25) : null,
+      })),
+    }
+  })
+  const weights = request.options.map((option) =>
+    request.optionGroups.reduce((weight, group, index) => {
+      const valueIndex = group.values.indexOf(option.values[index])
+      const sales = groups[index].allocation === 'SALES'
+      return (
+        weight *
+        (sales ? (valueIndex === 0 ? 0.75 : 0.25) : 1 / group.values.length)
+      )
+    }, 1),
+  )
+  const total = weights.reduce((sum, weight) => sum + weight, 0)
+  const shares = weights.map((weight) => (recommended * weight) / total)
+  const allocated = shares.map(Math.floor)
+  let left = recommended - allocated.reduce((sum, value) => sum + value, 0)
+  shares
+    .map((share, index) => ({ index, remainder: share - Math.floor(share) }))
+    .sort((a, b) => b.remainder - a.remainder || a.index - b.index)
+    .forEach(({ index }) => {
+      if (left-- > 0) allocated[index] += 1
+    })
+  return {
+    basis: 'MARKET',
+    sampleSelection: { own: 'CATEGORY', market: 'SIMILAR' },
+    recommended,
+    matchStatus: 'GENERATED',
+    groups,
+    options: allocated.map((quantity, index) => ({
+      index,
+      recommendedQuantity: quantity,
+    })),
+  }
+}
+
 // 수요 분석 경로만 처리한다. 다른 판매자 경로는 기존 핸들러가 맡는다
 export async function installDemandApi(page: Page) {
+  await page.route(
+    '**/api/v1/seller/stock-recommendations/option-allocation',
+    async (route) => {
+      const request = route.request()
+      if (request.method() !== 'POST') return route.fallback()
+      const body: AllocationRequest = request.postDataJSON()
+      if (body.optionGroups[0]?.name === '한도')
+        return json(route, error('STOCK_OPTION_MATCH_LIMIT_EXCEEDED'), 429)
+      return json(route, { success: true, data: allocateOptions(body) })
+    },
+  )
   await page.route('**/api/v1/seller/stock-recommendations', async (route) => {
     const request = route.request()
     if (request.method() !== 'POST') return route.fallback()

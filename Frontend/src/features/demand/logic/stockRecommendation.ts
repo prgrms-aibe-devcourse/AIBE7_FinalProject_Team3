@@ -1,4 +1,6 @@
 import type {
+  OptionAllocation,
+  OptionAllocationRequest,
   StockRecommendation,
   StockRecommendationRequest,
 } from '../../../api/demand/stockRecommendation'
@@ -79,6 +81,87 @@ export function toRecommendationInput(
     request: { categoryId, options, ...catalogText(values, groups) },
     rowKeys,
   }
+}
+
+export type OptionAllocationInput = {
+  request: OptionAllocationRequest
+  rowKeys: string[]
+}
+
+const label = (value: string) => value.trim().slice(0, MAX_LABEL)
+
+/*
+    옵션별 배분 요청(DEMAND.md 7.2). 재고 추천 요청에 SKU마다 옵션 구성 순서대로 값을 붙인다.
+    상품명·설명·옵션 구성이 모두 있고 모든 SKU 값이 보낸 옵션 구성 안에 있어야 요청한다. 아니면 null이다.
+    SKU 키는 `sku:<그룹 ID → 값 ID JSON>`이다(sellerDropForm).
+ */
+export function toOptionAllocationInput(
+  values: Record<string, string>,
+  groups: OptionGroup[],
+): OptionAllocationInput | null {
+  const base = toRecommendationInput(values, groups)
+  const optionGroups = base?.request.optionGroups
+  if (
+    !base ||
+    !base.request.name ||
+    !base.request.description ||
+    !optionGroups?.length ||
+    optionGroups.length !== groups.length
+  )
+    return null
+  const options: OptionAllocationRequest['options'] = []
+  for (const [index, option] of base.request.options.entries()) {
+    let selection: Record<string, string>
+    try {
+      selection = JSON.parse(base.rowKeys[index].slice('sku:'.length))
+    } catch {
+      return null
+    }
+    const skuValues = groups.map((group) => {
+      const value = group.values.find((item) => item.id === selection[group.id])
+      return value ? label(value.label) : ''
+    })
+    if (
+      skuValues.some(
+        (value, groupIndex) => !optionGroups[groupIndex].values.includes(value),
+      )
+    )
+      return null
+    options.push({ ...option, values: skuValues })
+  }
+  return {
+    request: {
+      ...base.request,
+      name: base.request.name,
+      description: base.request.description,
+      optionGroups,
+      options,
+    },
+    rowKeys: base.rowKeys,
+  }
+}
+
+// 옵션별 배분을 각 SKU의 재고 칸에 채운다. 수량이 없으면 그대로 둔다
+export function applyAllocatedStock(
+  values: Record<string, string>,
+  rowKeys: string[],
+  allocation: OptionAllocation,
+): Record<string, string> {
+  const next = { ...values }
+  for (const option of allocation.options ?? []) {
+    const rowKey = rowKeys[option.index ?? -1]
+    if (rowKey && option.recommendedQuantity != null)
+      next[`${rowKey}:stock`] = String(option.recommendedQuantity)
+  }
+  return next
+}
+
+export const MATCH_FALLBACK_TEXT: Record<string, string> = {
+  FAILED:
+    'AI로 옵션 이름을 맞추지 못해 글자가 같은 값만 비교했어요. 잠시 후 다시 시도할 수 있어요.',
+  DISCARDED:
+    'AI 응답을 확인하지 못해 글자가 같은 값만 비교했어요. 잠시 후 다시 시도할 수 있어요.',
+  DISABLED: 'AI 옵션 맞추기가 꺼져 있어 글자가 같은 값만 비교했어요.',
 }
 
 // 추천 배분을 각 SKU의 재고 칸에 채운다. 추천이 없으면 그대로 둔다

@@ -18,7 +18,10 @@ import {
 import useAuth from '../../features/auth/logic/useAuth'
 import { categoryKeys } from '../../features/drop/logic/queryKeys'
 import StockRecommendationPanel from '../../features/demand/components/StockRecommendationPanel'
-import { applyRecommendedStock } from '../../features/demand/logic/stockRecommendation'
+import {
+  applyAllocatedStock,
+  applyRecommendedStock,
+} from '../../features/demand/logic/stockRecommendation'
 import DropAiDraftPanel from '../../features/seller/components/DropAiDraftPanel'
 import DropImageField from '../../features/seller/components/DropImageField'
 import DropFieldErrors from '../../features/seller/components/DropFieldErrors'
@@ -380,6 +383,14 @@ function SellerDropForm({
                     applyRecommendedStock(current, rowKeys, recommendation),
                   )
                   notify('추천 수량을 재고 칸에 채웠어요. 필요하면 고쳐주세요.')
+                }}
+                onApplyAllocation={(allocation, rowKeys) => {
+                  setValues((current) =>
+                    applyAllocatedStock(current, rowKeys, allocation),
+                  )
+                  notify(
+                    '옵션별 추천 수량을 재고 칸에 채웠어요. 필요하면 고쳐주세요.',
+                  )
                 }}
               />
             </div>

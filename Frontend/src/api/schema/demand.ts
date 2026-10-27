@@ -24,6 +24,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/seller/stock-recommendations/option-allocation': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * 옵션별 재고 배분
+     * @description 판매자가 설정한 옵션 안에서 준비 권장 수량을 비슷한 상품의 옵션별 판매 비율로 나눈다. 같은 값은 글자 비교로 먼저 찾고 나머지만 LLM이 후보 번호로 고르며, 비율과 수량은 서버가 계산한다
+     */
+    post: operations['allocate']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/seller/drops/{dropId}/demand-analysis/explanation': {
     parameters: {
       query?: never
@@ -196,6 +216,61 @@ export interface components {
       dataGaps?: (
         'NO_SALES_SAMPLE' | 'SMALL_SALES_SAMPLE' | 'FREQUENT_SOLD_OUT'
       )[]
+    }
+    OptionAllocationRequest: {
+      /** Format: int64 */
+      categoryId: number
+      options: components['schemas']['SkuInput'][]
+      safetyStockRate?: number
+      name: string
+      description: string
+      optionGroups: components['schemas']['OptionGroupInput'][]
+    }
+    SkuInput: {
+      /** Format: int64 */
+      unitPrice: number
+      /** Format: int32 */
+      quantity?: number
+      values: string[]
+    }
+    ApiResponseOptionAllocationResponse: {
+      success?: boolean
+      data?: components['schemas']['OptionAllocationResponse']
+      message?: string
+    }
+    GroupAllocation: {
+      name?: string
+      /** @enum {string} */
+      allocation?: 'SALES' | 'EVEN'
+      values?: components['schemas']['ValueShare'][]
+    }
+    OptionAllocation: {
+      /** Format: int32 */
+      index?: number
+      /** Format: int32 */
+      recommendedQuantity?: number
+    }
+    OptionAllocationResponse: {
+      /** @enum {string} */
+      basis?: 'OWN' | 'MARKET'
+      sampleSelection?: components['schemas']['SampleSelections']
+      /** Format: int32 */
+      recommended?: number
+      /** @enum {string} */
+      matchStatus?:
+        | 'TEXT_ONLY'
+        | 'GENERATED'
+        | 'REUSED'
+        | 'DISCARDED'
+        | 'FAILED'
+        | 'DISABLED'
+      groups?: components['schemas']['GroupAllocation'][]
+      options?: components['schemas']['OptionAllocation'][]
+    }
+    ValueShare: {
+      value?: string
+      /** Format: int32 */
+      sharePercent?: number
     }
     DemandCalculateRequest: {
       /** @enum {string} */
@@ -398,6 +473,66 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['ApiResponseStockRecommendationResponse']
+        }
+      }
+    }
+  }
+  allocate: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['OptionAllocationRequest']
+      }
+    }
+    responses: {
+      /** @description 계산 성공 */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOptionAllocationResponse']
+        }
+      }
+      /** @description INVALID_REQUEST, VALIDATION_FAILED */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOptionAllocationResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOptionAllocationResponse']
+        }
+      }
+      /** @description ACCESS_DENIED */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOptionAllocationResponse']
+        }
+      }
+      /** @description STOCK_OPTION_MATCH_LIMIT_EXCEEDED */
+      429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseOptionAllocationResponse']
         }
       }
     }

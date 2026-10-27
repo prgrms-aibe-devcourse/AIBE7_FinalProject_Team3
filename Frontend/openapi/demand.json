@@ -81,6 +81,76 @@
         }
       }
     },
+    "/api/v1/seller/stock-recommendations/option-allocation": {
+      "post": {
+        "tags": ["판매자 재고 추천"],
+        "summary": "옵션별 재고 배분",
+        "description": "판매자가 설정한 옵션 안에서 준비 권장 수량을 비슷한 상품의 옵션별 판매 비율로 나눈다. 같은 값은 글자 비교로 먼저 찾고 나머지만 LLM이 후보 번호로 고르며, 비율과 수량은 서버가 계산한다",
+        "operationId": "allocate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OptionAllocationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "계산 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOptionAllocationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST, VALIDATION_FAILED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOptionAllocationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED, INVALID_TOKEN",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOptionAllocationResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOptionAllocationResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "STOCK_OPTION_MATCH_LIMIT_EXCEEDED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOptionAllocationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/seller/drops/{dropId}/demand-analysis/explanation": {
       "post": {
         "tags": ["판매자 수요 분석"],
@@ -640,6 +710,175 @@
                 "FREQUENT_SOLD_OUT"
               ]
             }
+          }
+        }
+      },
+      "OptionAllocationRequest": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkuInput"
+            },
+            "maxItems": 100,
+            "minItems": 1
+          },
+          "safetyStockRate": {
+            "type": "number",
+            "maximum": 1,
+            "minimum": 0
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 0
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 5000,
+            "minLength": 0
+          },
+          "optionGroups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OptionGroupInput"
+            },
+            "maxItems": 10,
+            "minItems": 1
+          }
+        },
+        "required": [
+          "categoryId",
+          "description",
+          "name",
+          "optionGroups",
+          "options"
+        ]
+      },
+      "SkuInput": {
+        "type": "object",
+        "properties": {
+          "unitPrice": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "minLength": 0
+            },
+            "maxItems": 10,
+            "minItems": 1
+          }
+        },
+        "required": ["unitPrice", "values"]
+      },
+      "ApiResponseOptionAllocationResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/OptionAllocationResponse"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "GroupAllocation": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "allocation": {
+            "type": "string",
+            "enum": ["SALES", "EVEN"]
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValueShare"
+            }
+          }
+        }
+      },
+      "OptionAllocation": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "recommendedQuantity": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "OptionAllocationResponse": {
+        "type": "object",
+        "properties": {
+          "basis": {
+            "type": "string",
+            "enum": ["OWN", "MARKET"]
+          },
+          "sampleSelection": {
+            "$ref": "#/components/schemas/SampleSelections"
+          },
+          "recommended": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "matchStatus": {
+            "type": "string",
+            "enum": [
+              "TEXT_ONLY",
+              "GENERATED",
+              "REUSED",
+              "DISCARDED",
+              "FAILED",
+              "DISABLED"
+            ]
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupAllocation"
+            }
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OptionAllocation"
+            }
+          }
+        }
+      },
+      "ValueShare": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "sharePercent": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
