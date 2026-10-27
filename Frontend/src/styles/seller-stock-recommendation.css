@@ -1,0 +1,114 @@
+/* DROP 생성 폼 재고 추천·가격대 참고 패널(GR-168). 폼 카드 안에서 SKU 표 아래에 둔다. */
+.stock-recommendation {
+  display: grid;
+  gap: 14px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--lime);
+  border-radius: 4px;
+  background: var(--soft);
+}
+.stock-recommendation-heading h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.stock-recommendation-heading p,
+.stock-recommendation-hint,
+.stock-recommendation small {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.stock-recommendation-hint {
+  margin: 0;
+}
+.stock-recommendation-hint .text-link {
+  border: 0;
+  background: none;
+  font-size: 12px;
+}
+.stock-recommendation-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+.stock-recommendation-metrics > div {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+}
+.stock-recommendation-metrics > div.is-primary {
+  border-color: var(--ink);
+}
+.stock-recommendation-metrics dt {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+.stock-recommendation-metrics dd {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.stock-recommendation > .secondary-button {
+  justify-self: start;
+}
+.stock-recommendation-gaps,
+.stock-recommendation-bases,
+.stock-recommendation-price ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+.stock-recommendation-gaps li {
+  padding-left: 10px;
+  border-left: 3px solid var(--lime);
+}
+.stock-recommendation-bases li {
+  display: grid;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.stock-recommendation-bases li strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.stock-recommendation-bases li strong span {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--lime);
+  font-size: 10px;
+}
+.stock-recommendation-bases li small {
+  margin: 0;
+}
+.stock-recommendation-price {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+}
+.stock-recommendation-price strong span {
+  font-weight: 500;
+}
+.stock-recommendation-price small {
+  margin: 0;
+}
+
+@media (max-width: 720px) {
+  .stock-recommendation {
+    padding: 14px;
+  }
+  .stock-recommendation-metrics {
+    grid-template-columns: 1fr;
+  }
+}

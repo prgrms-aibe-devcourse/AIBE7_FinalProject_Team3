@@ -1,0 +1,1372 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "OpenAPI definition",
+    "version": "v0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Generated server url"
+    }
+  ],
+  "tags": [
+    {
+      "name": "판매자 재고 추천",
+      "description": "DROP 생성 단계의 재고 추천·가격대 참고. 저장하지 않는다. 403 ACCESS_DENIED는 SELLER 권한 없음"
+    },
+    {
+      "name": "판매자 판매 계획",
+      "description": "수요 분석 판매 계획 저장·이력·결정 기록. 결정은 재고·DROP을 바꾸지 않는다. 403 ACCESS_DENIED는 SELLER 권한 없음"
+    },
+    {
+      "name": "판매자 수요 분석",
+      "description": "본인 WISH DROP의 수요 데이터와 판매 계획 계산. 403 ACCESS_DENIED는 SELLER 권한 없음, DROP_ACCESS_DENIED는 다른 판매자의 DROP"
+    }
+  ],
+  "paths": {
+    "/api/v1/seller/stock-recommendations": {
+      "post": {
+        "tags": ["판매자 재고 추천"],
+        "summary": "재고 추천",
+        "description": "같은 카테고리·비슷한 가격대 종료 DROP의 판매 실적으로 준비 권장 수량과 옵션별 배분을 계산하고 가격대별 판매율을 함께 반환한다",
+        "operationId": "recommend",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockRecommendationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "계산 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseStockRecommendationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST, VALIDATION_FAILED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseStockRecommendationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED, INVALID_TOKEN",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseStockRecommendationResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseStockRecommendationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/seller/drops/{dropId}/demand-plans": {
+      "get": {
+        "tags": ["판매자 판매 계획"],
+        "summary": "판매 계획 목록",
+        "description": "DROP의 판매 계획을 최근 저장순으로 반환한다. DROP 상태와 관계없이 조회한다",
+        "operationId": "findPlans",
+        "parameters": [
+          {
+            "name": "dropId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "조회 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseDemandPlanSummaryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseDemandPlanSummaryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED, INVALID_TOKEN",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseDemandPlanSummaryResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED, DROP_ACCESS_DENIED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseDemandPlanSummaryResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "DROP_NOT_FOUND",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseDemandPlanSummaryResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["판매자 판매 계획"],
+        "summary": "판매 계획 저장",
+        "description": "저장 시점 데이터로 다시 계산해 DRAFT로 저장한다. 요청은 가정 변경 재계산과 같다",
+        "operationId": "save",
+        "parameters": [
+          {
+            "name": "dropId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DemandCalculateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "저장 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDemandPlanResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST, VALIDATION_FAILED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDemandPlanResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED, INVALID_TOKEN",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDemandPlanResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED, DROP_ACCESS_DENIED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDemandPlanResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "DROP_NOT_FOUND",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDemandPlanResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "DEMAND_ANALYSIS_UNAVAILABLE",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDemandPlanResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/seller/drops/{dropId}/demand-analysis/calculate": {
+      "post": {
+        "tags": ["판매자 수요 분석"],
+        "summary": "가정 변경 재계산",
+        "description": "전환율 기준(OWN·MARKET) 또는 직접 입력한 전환율과 안전 재고율로 다시 계산한다. 저장하지 않는다",
+        "operationId": "calculate",
+        "parameters": [
+          {
+            "name": "dropId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DemandCalculateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "계산 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDemandAnalysisResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST, VALIDATION_FAILED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDemandAnalysisResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED, INVALID_TOKEN",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDemandAnalysisResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED, DROP_ACCESS_DENIED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDemandAnalysisResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "DROP_NOT_FOUND",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDemandAnalysisResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "DEMAND_ANALYSIS_UNAVAILABLE",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDemandAnalysisResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/seller/demand-plans/{planId}/decision": {
+      "post": {
+        "tags": ["판매자 판매 계획"],
+        "summary": "판매 계획 결정 기록",
+        "description": "ACCEPTED·MODIFIED·REJECTED 중 하나를 계획당 한 번 기록한다. MODIFIED는 계획의 모든 옵션 수량을 보낸다. DROP 판매 수량은 바꾸지 않는다",
+        "operationId": "decide",
+        "parameters": [
+          {
+            "name": "planId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DemandPlanDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "기록 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDemandPlanResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST, VALIDATION_FAILED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDemandPlanResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED, INVALID_TOKEN",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDemandPlanResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDemandPlanResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "DEMAND_PLAN_NOT_FOUND, RESOURCE_NOT_FOUND",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDemandPlanResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "DEMAND_PLAN_ALREADY_DECIDED, DEMAND_ANALYSIS_UNAVAILABLE",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDemandPlanResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/seller/drops/{dropId}/demand-analysis": {
+      "get": {
+        "tags": ["판매자 수요 분석"],
+        "summary": "수요 분석 조회",
+        "description": "활성 WISH·일별 추이와 내 실적·시장 평균 전환율로 기본 가정의 판매 계획을 계산한다. 계산 규칙은 DEMAND.md 1절 참고",
+        "operationId": "analyze",
+        "parameters": [
+          {
+            "name": "dropId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "조회 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDemandAnalysisResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED, INVALID_TOKEN",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDemandAnalysisResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED, DROP_ACCESS_DENIED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDemandAnalysisResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "DROP_NOT_FOUND",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDemandAnalysisResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "DEMAND_ANALYSIS_UNAVAILABLE",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDemandAnalysisResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/seller/demand-plans/{planId}": {
+      "get": {
+        "tags": ["판매자 판매 계획"],
+        "summary": "판매 계획 상세",
+        "description": "저장 시점 수요 분석 스냅샷과 결정·설명 상태를 반환한다",
+        "operationId": "findPlan",
+        "parameters": [
+          {
+            "name": "planId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "조회 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDemandPlanResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED, INVALID_TOKEN",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDemandPlanResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDemandPlanResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "DEMAND_PLAN_NOT_FOUND, RESOURCE_NOT_FOUND",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDemandPlanResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "OptionInput": {
+        "type": "object",
+        "properties": {
+          "unitPrice": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "required": ["unitPrice"]
+      },
+      "StockRecommendationRequest": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OptionInput"
+            },
+            "maxItems": 100,
+            "minItems": 1
+          },
+          "safetyStockRate": {
+            "type": "number",
+            "maximum": 1,
+            "minimum": 0
+          }
+        },
+        "required": ["categoryId", "options"]
+      },
+      "ApiResponseStockRecommendationResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/StockRecommendationResponse"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "MarketSales": {
+        "type": "object",
+        "properties": {
+          "soldLow": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "soldMedian": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "soldHigh": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sellThroughRate": {
+            "type": "number"
+          },
+          "soldOutRate": {
+            "type": "number"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": ["HIGH", "LOW", "NONE"]
+          },
+          "dropCountBand": {
+            "type": "string"
+          },
+          "asOf": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "OptionRecommendation": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "recommendedQuantity": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "OwnSales": {
+        "type": "object",
+        "properties": {
+          "soldLow": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "soldMedian": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "soldHigh": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sellThroughRate": {
+            "type": "number"
+          },
+          "soldOutRate": {
+            "type": "number"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": ["HIGH", "LOW", "NONE"]
+          },
+          "dropCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PriceBand": {
+        "type": "object",
+        "properties": {
+          "band": {
+            "type": "string",
+            "enum": ["LOWER", "SIMILAR", "HIGHER"]
+          },
+          "sellThroughRate": {
+            "type": "number"
+          },
+          "dropCountBand": {
+            "type": "string"
+          }
+        }
+      },
+      "PriceReference": {
+        "type": "object",
+        "properties": {
+          "position": {
+            "type": "string",
+            "enum": ["LOW", "MID", "HIGH", "UNKNOWN"]
+          },
+          "typicalPriceLow": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "typicalPriceHigh": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "bands": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PriceBand"
+            }
+          }
+        }
+      },
+      "Recommendation": {
+        "type": "object",
+        "properties": {
+          "low": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "expected": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "high": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "recommended": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "safetyStockRate": {
+            "type": "number"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OptionRecommendation"
+            }
+          }
+        }
+      },
+      "StockRecommendationResponse": {
+        "type": "object",
+        "properties": {
+          "calculatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "calculationVersion": {
+            "type": "string"
+          },
+          "referencePrice": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "own": {
+            "$ref": "#/components/schemas/OwnSales"
+          },
+          "market": {
+            "$ref": "#/components/schemas/MarketSales"
+          },
+          "basis": {
+            "type": "string",
+            "enum": ["OWN", "MARKET"]
+          },
+          "recommendation": {
+            "$ref": "#/components/schemas/Recommendation"
+          },
+          "priceReference": {
+            "$ref": "#/components/schemas/PriceReference"
+          },
+          "dataGaps": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "NO_SALES_SAMPLE",
+                "SMALL_SALES_SAMPLE",
+                "FREQUENT_SOLD_OUT"
+              ]
+            }
+          }
+        }
+      },
+      "DemandCalculateRequest": {
+        "type": "object",
+        "properties": {
+          "conversionBasis": {
+            "type": "string",
+            "enum": ["OWN", "MARKET"]
+          },
+          "conversionRate": {
+            "type": "number",
+            "maximum": 1,
+            "minimum": 0
+          },
+          "safetyStockRate": {
+            "type": "number",
+            "maximum": 1,
+            "minimum": 0
+          }
+        }
+      },
+      "ApiResponseDemandPlanResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DemandPlanResponse"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "Assumption": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "number"
+          },
+          "source": {
+            "type": "string",
+            "enum": ["OWN", "MARKET", "DEFAULT", "SELLER_INPUT"]
+          }
+        }
+      },
+      "Assumptions": {
+        "type": "object",
+        "properties": {
+          "conversionRate": {
+            "$ref": "#/components/schemas/Assumption"
+          },
+          "avgQuantityPerBuyer": {
+            "$ref": "#/components/schemas/Assumption"
+          },
+          "safetyStockRate": {
+            "$ref": "#/components/schemas/Assumption"
+          }
+        }
+      },
+      "Conversion": {
+        "type": "object",
+        "properties": {
+          "selection": {
+            "type": "string",
+            "enum": ["CATEGORY"]
+          },
+          "own": {
+            "$ref": "#/components/schemas/OwnConversion"
+          },
+          "market": {
+            "$ref": "#/components/schemas/MarketConversion"
+          }
+        }
+      },
+      "DailyWish": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "DecidedQuantity": {
+        "type": "object",
+        "properties": {
+          "optionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "required": ["optionId", "quantity"]
+      },
+      "Decision": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["DRAFT", "ACCEPTED", "MODIFIED", "REJECTED"]
+          },
+          "quantities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DecidedQuantity"
+            }
+          },
+          "reason": {
+            "type": "string"
+          },
+          "decidedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Demand": {
+        "type": "object",
+        "properties": {
+          "activeWishCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "hoursUntilSaleStart": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "dailyWishes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DailyWish"
+            }
+          },
+          "trendApproximate": {
+            "type": "boolean"
+          }
+        }
+      },
+      "DemandAnalysisResponse": {
+        "type": "object",
+        "properties": {
+          "dropId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "calculatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "calculationVersion": {
+            "type": "string"
+          },
+          "suggestion": {
+            "$ref": "#/components/schemas/Suggestion"
+          },
+          "demand": {
+            "$ref": "#/components/schemas/Demand"
+          },
+          "conversion": {
+            "$ref": "#/components/schemas/Conversion"
+          },
+          "assumptions": {
+            "$ref": "#/components/schemas/Assumptions"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/Plan"
+          },
+          "dataGaps": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "NO_ACTIVE_WISH",
+                "NO_CONVERSION_SAMPLE",
+                "SMALL_CONVERSION_SAMPLE"
+              ]
+            }
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "DemandPlanResponse": {
+        "type": "object",
+        "properties": {
+          "planId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "dropId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["DRAFT", "ACCEPTED", "MODIFIED", "REJECTED"]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "analysis": {
+            "$ref": "#/components/schemas/DemandAnalysisResponse"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/Decision"
+          },
+          "explanationStatus": {
+            "type": "string",
+            "enum": ["PENDING", "GENERATED", "DISCARDED", "FAILED", "DISABLED"]
+          },
+          "explanation": {
+            "$ref": "#/components/schemas/JsonNode"
+          }
+        }
+      },
+      "JsonNode": {
+        "type": "object",
+        "properties": {
+          "array": {
+            "type": "boolean"
+          },
+          "empty": {
+            "type": "boolean"
+          },
+          "null": {
+            "type": "boolean"
+          },
+          "float": {
+            "type": "boolean"
+          },
+          "string": {
+            "type": "boolean"
+          },
+          "container": {
+            "type": "boolean"
+          },
+          "number": {
+            "type": "boolean"
+          },
+          "integralNumber": {
+            "type": "boolean"
+          },
+          "object": {
+            "type": "boolean"
+          },
+          "nodeType": {
+            "type": "string",
+            "enum": [
+              "ARRAY",
+              "BINARY",
+              "BOOLEAN",
+              "MISSING",
+              "NULL",
+              "NUMBER",
+              "OBJECT",
+              "POJO",
+              "STRING"
+            ]
+          },
+          "missingNode": {
+            "type": "boolean"
+          },
+          "valueNode": {
+            "type": "boolean"
+          },
+          "int": {
+            "type": "boolean"
+          },
+          "double": {
+            "type": "boolean"
+          },
+          "pojo": {
+            "type": "boolean"
+          },
+          "long": {
+            "type": "boolean"
+          },
+          "bigDecimal": {
+            "type": "boolean"
+          },
+          "short": {
+            "type": "boolean"
+          },
+          "bigInteger": {
+            "type": "boolean"
+          },
+          "textual": {
+            "type": "boolean",
+            "deprecated": true
+          },
+          "boolean": {
+            "type": "boolean"
+          },
+          "binary": {
+            "type": "boolean"
+          },
+          "floatingPointNumber": {
+            "type": "boolean"
+          },
+          "embeddedValue": {
+            "type": "boolean"
+          }
+        }
+      },
+      "MarketConversion": {
+        "type": "object",
+        "properties": {
+          "rate": {
+            "type": "number"
+          },
+          "rateLow": {
+            "type": "number"
+          },
+          "rateHigh": {
+            "type": "number"
+          },
+          "avgQuantityPerBuyer": {
+            "type": "number"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": ["HIGH", "LOW", "NONE"]
+          },
+          "dropCountBand": {
+            "type": "string"
+          },
+          "wishCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "asOf": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "OptionPlan": {
+        "type": "object",
+        "properties": {
+          "optionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "currentQuantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "recommendedQuantity": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "OwnConversion": {
+        "type": "object",
+        "properties": {
+          "rate": {
+            "type": "number"
+          },
+          "rateLow": {
+            "type": "number"
+          },
+          "rateHigh": {
+            "type": "number"
+          },
+          "avgQuantityPerBuyer": {
+            "type": "number"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": ["HIGH", "LOW", "NONE"]
+          },
+          "dropCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "wishCount": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "Plan": {
+        "type": "object",
+        "properties": {
+          "low": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "expected": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "high": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "recommended": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "currentTotalQuantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "differenceFromCurrent": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OptionPlan"
+            }
+          }
+        }
+      },
+      "Suggestion": {
+        "type": "object",
+        "properties": {
+          "ready": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseDemandAnalysisResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DemandAnalysisResponse"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "DemandPlanDecisionRequest": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["DRAFT", "ACCEPTED", "MODIFIED", "REJECTED"]
+          },
+          "quantities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DecidedQuantity"
+            }
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0
+          }
+        },
+        "required": ["status"]
+      },
+      "ApiResponsePageResponseDemandPlanSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PageResponseDemandPlanSummaryResponse"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "DemandPlanSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "planId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["DRAFT", "ACCEPTED", "MODIFIED", "REJECTED"]
+          },
+          "recommended": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "decidedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PageResponseDemandPlanSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DemandPlanSummaryResponse"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hasNext": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}
