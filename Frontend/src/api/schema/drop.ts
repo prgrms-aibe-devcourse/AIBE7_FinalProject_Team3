@@ -88,6 +88,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/seller/drop-drafts': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * 사진 기반 DROP 초안(AI)
+     * @description 업로드한 이미지(최대 3장)로 상품명·설명·카테고리·이미지 대체 설명 초안을 만든다. 저장하지 않으며 항목별로 검증에 실패하면 null이다
+     */
+    post: operations['draft']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/seller/drops/{dropId}': {
     parameters: {
       query?: never
@@ -349,6 +369,31 @@ export interface components {
       status?: 'DRAFT' | 'WISH' | 'GRAB' | 'ENDED' | 'CANCELED'
       /** Format: date-time */
       canceledAt?: string
+    }
+    DropAiDraftImage: {
+      /** Format: uuid */
+      imageId: string
+      imageUrl: string
+    }
+    DropAiDraftRequest: {
+      images: components['schemas']['DropAiDraftImage'][]
+    }
+    ApiResponseDropAiDraftResponse: {
+      success?: boolean
+      data?: components['schemas']['DropAiDraftResponse']
+      message?: string
+    }
+    DropAiDraftImageAltText: {
+      /** Format: uuid */
+      imageId?: string
+      altText?: string
+    }
+    DropAiDraftResponse: {
+      name?: string
+      description?: string
+      /** Format: int64 */
+      categoryId?: number
+      images?: components['schemas']['DropAiDraftImageAltText'][]
     }
     ApiResponsePageResponseSellerDropListResponse: {
       success?: boolean
@@ -936,6 +981,84 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['ApiResponseDropCancelResponse']
+        }
+      }
+    }
+  }
+  draft: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DropAiDraftRequest']
+      }
+    }
+    responses: {
+      /** @description 초안 생성 성공 */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropAiDraftResponse']
+        }
+      }
+      /** @description INVALID_REQUEST, VALIDATION_FAILED */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropAiDraftResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropAiDraftResponse']
+        }
+      }
+      /** @description ACCESS_DENIED */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropAiDraftResponse']
+        }
+      }
+      /** @description AI_DRAFT_LIMIT_EXCEEDED */
+      429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropAiDraftResponse']
+        }
+      }
+      /** @description AI_DRAFT_FAILED */
+      502: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropAiDraftResponse']
+        }
+      }
+      /** @description AI_DRAFT_UNAVAILABLE */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropAiDraftResponse']
         }
       }
     }

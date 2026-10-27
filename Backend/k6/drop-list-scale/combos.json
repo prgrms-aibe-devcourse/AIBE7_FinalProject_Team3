@@ -10,5 +10,7 @@
   { "name": "grab_none", "params": { "status": "GRAB", "sort": "soldQuantity,desc" } },
   { "name": "grab_category", "params": { "status": "GRAB", "sort": "soldQuantity,desc", "categoryId": "1" } },
   { "name": "grab_keyword", "params": { "status": "GRAB", "sort": "soldQuantity,desc", "keyword": "스니커즈" } },
-  { "name": "grab_soldout", "params": { "status": "GRAB", "sort": "soldQuantity,desc", "soldOut": "false" } }
+  { "name": "grab_soldout", "params": { "status": "GRAB", "sort": "soldQuantity,desc", "soldOut": "false" } },
+  { "name": "grabtab_date_none", "params": { "status": "GRAB" } },
+  { "name": "grabtab_date_soldout", "params": { "status": "GRAB", "soldOut": "false" } }
 ]

@@ -226,6 +226,10 @@
   .drop-image-layout {
     grid-template-columns: 1fr;
   }
+  .drop-ai-draft-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
   .drop-image-item {
     grid-template-columns: 86px minmax(0, 1fr);
   }

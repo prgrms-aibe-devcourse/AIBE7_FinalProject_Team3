@@ -172,7 +172,7 @@ docker run --rm -i --network backend_default -v "$PWD/k6:/k6" -w /k6 -e BASE_URL
 | 후보 | 판단 | 근거 | 후속 |
 | --- | --- | --- | --- |
 | 결제 확정 주문 집계(인기 GRAB) | **개선(완료)** | p95 64.3 / 74.0ms, 버퍼 80%가 정렬 키, 동시 접속 천장 초당 약 200건 → `sold_quantity` 합으로 천장 약 495건 | GR-176 |
-| 가용 재고 합계 중복 계산 | **개선** | soldOut 조합 버퍼 28~66배, p95 30.8~49.2ms, 동시 접속 천장 초당 약 257건 | GR-177 |
+| 가용 재고 합계 중복 계산 | **부분 개선(완료)** | 실제 중복은 인기 GRAB + soldOut뿐이라 그 필터만 생략. `LATERAL` 일괄 적용은 역효과. 날짜·인기 WISH의 soldOut 비용은 필터 자체의 비용이라 남음 | GR-177 |
 | `pg_trgm` keyword 인덱스 | 보류 | keyword 조합 p95 12.2ms 이하 | 데이터가 커져 병목이 되면 재검토 |
 | 활성 WISH 부분 인덱스 | 보류 | 기존 인덱스로 Index Only Scan | — |
 | Redis 조회 캐시 | 보류 | 쿼리 개선 후에도 병목이 남을 때 판단(TECHSTACK.md) | — |
@@ -220,12 +220,82 @@ docker run --rm -i --network backend_default -v "$PWD/k6:/k6" -w /k6 -e BASE_URL
 - 예측과의 차이: A 결과만 보고 "요청 중앙값과 쿼리 시간의 차이(약 30ms)는 쿼리 밖 고정 시간"이라 보고 B의 천장을 +30~40%로 예상했지만, 실제로는 요청 중앙값이 쿼리 감소폭(12ms)보다 크게(27ms) 줄어 2.5배가 됐다. 이 차이의 원인은 따로 확인하지 않았다.
 - 검증: `DropRepositoryTest`의 주문 픽스처가 실제 원장처럼 결제 확정·미취소 주문 수량만큼 `sold_quantity`를 올리도록 고쳤고, 비활성 SKU 판매분 포함 테스트를 추가했다. 결제 확정·결제 후 취소의 `sold_quantity` 이동은 기존 결제 통합 테스트(`PaymentServiceIntegrationTest`, `OrderPaidCancelIntegrationTest`)가 검증한다. 전체 테스트 2,051건 통과.
 
+## 개선 결과 — 가용 재고 합계 중복 계산 (GR-177, 2026-10-27)
+
+기준선과 같은 조건(`compose.swapoff.yaml`, seed 후 `VACUUM (ANALYZE)`, `explain.sh <이름> 5`, `drop-list.js`)에서
+변경 전(`main`)과 변경 후를 같은 날 연달아 측정했다. 원자료는 `out/gr177-before/`, `out/gr177-after/`.
+두 회차 모두 seed 밖 공개 DROP 119건이 섞였고(seed 경고), 실패 0, 스왑 0이었다.
+
+### 먼저 확인한 것 — `LATERAL`로 한 번만 계산하면 오히려 느려진다
+
+이슈의 1안(`CROSS JOIN LATERAL`로 행마다 재고 합계를 한 번만 계산)을 psql에서 같은 seed로 비교했다. 앱은 prepared
+statement라 파라미터를 상수로 접는 custom plan과 접지 않는 generic plan이 모두 쓰인다(위 기준선 버퍼가 조합에 따라
+어느 한쪽과 정확히 같다). 아래는 본 쿼리 shared hit 버퍼다(custom / generic).
+
+| 조합 | 현재 식 | `LATERAL` |
+| --- | ---: | ---: |
+| 날짜, 필터 없음 | 501 / 980 | **14,356 / 14,314** |
+| 인기 WISH, 필터 없음 | 5,744 / 9,244 | **10,935 / 17,913** |
+| 날짜, soldOut | 14,929 / 14,913 | 14,356 / 14,314 |
+| 인기 WISH, soldOut | 11,049 / 14,531 | 10,935 / 17,913 |
+| 인기 GRAB, 필터 없음 | 17,420 / 14,190 | 10,872 / 18,202 |
+| 인기 GRAB, soldOut | 22,296 / 19,066 | 10,872 / 18,202 |
+
+- 지금 식은 `CAST(:soldOut AS BOOLEAN) IS NULL OR …`이라 필터가 없으면 재고 서브쿼리를 실행하지 않고(loops=0),
+  SELECT의 `soldOut`·`availableStock`은 정렬·LIMIT 뒤 20행에서만 계산된다(loops=20).
+- `LATERAL`은 조인이라 이렇게 건너뛰지 못해 필터와 상관없이 후보 전체(날짜 정렬 4,617건)에 계산이 강제된다.
+  가장 흔한 필터 없는 조합이 버퍼 약 28배(날짜) · 2배(인기 WISH)로 나빠진다.
+- soldOut 조합에서 비용이 큰 이유는 중복이 아니라 **후보마다 한 번은 재고를 계산해야 거를 수 있다**는 데 있다.
+  SELECT 쪽 중복은 20행 × 2회라 무시할 수준이다. 그래서 날짜·인기 WISH의 soldOut은 `LATERAL`로도 줄지 않는다.
+- 후보마다 두 번 계산하는 실제 중복은 **인기 GRAB + soldOut** 하나다. 후보 조건(가용 재고 > 0)과 soldOut 필터가
+  같은 합계를 각각 계산한다.
+
+### 적용 — 인기 GRAB에서 soldOut 필터 생략
+
+인기 GRAB 후보는 정의상 가용 재고가 1개 이상인 상품뿐이라(`api-spec/DROP.md` 1.2) `soldOut=true`는 항상 빈 목록,
+`soldOut=false`는 결과에 영향이 없다. 명세에 이미 이 동작이 적혀 있어 계약은 바뀌지 않는다.
+
+- `findPopularGrabDrops`에서 soldOut 파라미터와 필터를 뺐다(`CATEGORY_KEYWORD_FILTERS`만 붙인다).
+- 서비스가 `soldOut=true`이면 조회 없이 빈 페이지를, 아니면 필터 없이 조회한다.
+- 프론트의 "품절 제외"는 GRAB 탭에서만 `soldOut=false`를 보내므로 **인기 GRAB순 + 품절 제외**가 실제 화면 경로다.
+
+| `grab_soldout` | 변경 전 | 변경 후 | 변화 |
+| --- | ---: | ---: | ---: |
+| 본 쿼리 버퍼 | 19,066 | **14,178** | -26% |
+| count 쿼리 버퍼 | 13,887 | **9,004** | -35% |
+| 본 쿼리 시간 (explain 중앙값) | 11.2ms | 8.9ms | |
+| count 쿼리 시간 | 7.2ms | 4.3ms | |
+| API p50 / p95 (VU 10) | 36.2 / 49.4ms | **25.8 / 37.1ms** | p95 -25% |
+
+- 실행 계획에서 soldOut 필터 서브쿼리(`loops=1616`)가 사라지고 후보 조건의 재고 계산(`loops=1841`)만 남았다.
+- 변경 후 `grab_soldout`은 `grab_none`과 같은 SQL·파라미터다. 두 조합의 버퍼(14,178 / 17,409)가 다른 것은
+  `explain.sh`가 `grab_none`을 먼저 실행해 같은 문장의 plan 캐시가 `grab_soldout` 차례에 generic plan으로 바뀐 것으로
+  본다(psql 비교의 generic 14,190과 거의 같다. 커넥션별 캐시 상태는 확인하지 않음). 변경 전 `grab_soldout` 19,066도 generic plan이라 전후 비교는 같은 조건이다.
+- 쿼리가 바뀌지 않은 다른 조합은 버퍼가 수백 블록 안에서 흔들렸고(예: `date_category` 348 → 713, `date_soldout`
+  14,913 → 14,428) p95도 회차 편차가 있었다. seed가 행을 지우고 다시 넣어 물리 배치가 달라진 영향으로 보며 확인하지 않았다.
+
+### 참고 — GRAB 탭 날짜순 + 품절 제외 (`grabtab_date_*`, 변경 후 1회)
+
+GRAB 탭의 기본 날짜 정렬에 "품절 제외"를 건 실제 화면 경로도 `combos.json`에 추가해 한 번 측정했다(`status=GRAB`,
+`soldOut=false`). 이 경로는 `findPublicDrops`라 이번 변경과 무관하다.
+
+| 조합 | 본 쿼리 버퍼 | count 버퍼 | API p50 / p95 |
+| --- | ---: | ---: | ---: |
+| `grabtab_date_none` | 507 | 49 | 4.1 / 7.2ms |
+| `grabtab_date_soldout` | 9,281 | 9,001 | 16.4 / 24.2ms |
+
+- 품절 제외를 걸면 GRAB 저장 상태 후보 전체의 재고를 계산해야 해서 버퍼가 약 18배, p95가 약 3배가 된다. 인기 GRAB과
+  달리 이 후보에는 품절 상품이 있어 필터를 생략할 수 없다.
+- p95 24.2ms로 다른 조합 범위 안이라 지금은 그대로 둔다. 줄여야 하면 가용 재고 합계를 DROP 행에 유지하는
+  비정규화나 부분 인덱스처럼 쓰기 경로를 바꾸는 방법이 필요하다(별도 판단).
+
 ## 측정 중 바로잡은 것
 
 1. **k6 접속 경로**: 처음엔 `host.docker.internal`(Docker Desktop 포트 포워딩)로 보냈는데 `dial: i/o timeout` 42건이 나왔다. 백엔드 로그는 정상이어서 측정 경로 문제로 보고 compose 네트워크 직접 호출로 바꿨다(이후 실패 0).
 2. **스왑**: 처음엔 기본 `compose.yaml`로 돌려 스왑이 허용된 상태였다(측정 후 스왑 사용량은 0). 조건을 명확히 하려고 `compose.swapoff.yaml`로 스왑을 막고 자원 사용량을 기록하며 다시 측정했다. 위 결과가 이 측정이다.
 3. **visibility map**: seed 직후 `ANALYZE`만 하면 autovacuum 시점에 따라 `wish_none`이 Index Only Scan ↔ Bitmap Heap Scan으로 바뀌었다. seed 마지막을 `VACUUM (ANALYZE)`로 바꿔 매번 같은 상태에서 측정한다.
 4. **seed 분포**: 키워드 단어와 상태를 같은 주기(n % 20)로 정해 단어 하나가 한 상태에만 걸렸다. 단어 n % 19, 카테고리 (n / 20) % 8로 바꿨다.
+5. **seed 정리 대상**: V26에서 `demand_plans`가 `demand_analysis_snapshots`로 바뀌어 `seed.sql`이 실패했다. GR-177 측정 전에 `drops`를 참조하는 `demand_analysis_snapshots`·`demand_explanations`·`drop_stock_recommendations`를 지우도록 고쳤다.
 
 ## 한계
 

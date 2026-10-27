@@ -37,10 +37,9 @@ SELECT setseed(0.164);
 
 DELETE FROM drop_notifications
     WHERE drop_id IN (SELECT id FROM drops WHERE name LIKE 'k6 대용량 %');
--- DROP을 참조하는 수요 분석 기록(V25~V27). 앱이 공개·판매 시작 이벤트로 남길 수 있어 seed 재실행 전에 지운다.
-DELETE FROM demand_explanations
-    WHERE drop_id IN (SELECT id FROM drops WHERE name LIKE 'k6 대용량 %');
 DELETE FROM demand_analysis_snapshots
+    WHERE drop_id IN (SELECT id FROM drops WHERE name LIKE 'k6 대용량 %');
+DELETE FROM demand_explanations
     WHERE drop_id IN (SELECT id FROM drops WHERE name LIKE 'k6 대용량 %');
 DELETE FROM drop_stock_recommendations
     WHERE drop_id IN (SELECT id FROM drops WHERE name LIKE 'k6 대용량 %');

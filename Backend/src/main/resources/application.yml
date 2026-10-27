@@ -104,6 +104,11 @@ grab:
     suggestion:
       min-active-wishes: 30
       hours-before-start: 48
+  # 사진 기반 DROP 초안(DROP.md 2.8). 모델·키는 spring.ai.* 설정을 함께 쓰고, 꺼져 있으면 AI_DRAFT_UNAVAILABLE이다
+  drop:
+    ai-draft:
+      timeout: 20s
+      daily-limit: 20
   drop-transition:
     enabled: ${GRAB_DROP_TRANSITION_ENABLED:true}
     fixed-delay: 10s
