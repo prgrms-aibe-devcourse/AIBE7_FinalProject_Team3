@@ -7,6 +7,7 @@ import org.example.grab.global.security.handler.RestAuthenticationEntryPoint;
 import org.example.grab.global.security.jwt.AccessTokenProperties;
 import org.example.grab.global.security.jwt.JwtAuthenticationFilter;
 import org.example.grab.global.security.jwt.JwtProvider;
+import org.example.grab.global.security.password.ConcurrencyLimitedPasswordEncoder;
 import org.example.grab.global.security.password.PasswordHashProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -173,9 +174,11 @@ public class SecurityConfig {
         값은 OWASP Password Storage Cheat Sheet의 최소 권장값(메모리 19 MiB, 반복 2, 병렬도 1)이다.
         Spring 기본값(defaultsForSpringSecurity_v5_8)은 메모리가 16 MiB라 쓰지 않는다.
         검증은 저장된 해시에 적힌 파라미터로 하므로, 값을 올려도 기존 해시는 그대로 검증된다.
+        해시 1건이 힙 약 19 MiB를 잡으므로 동시 실행 수를 묶는 인코더로 감싼다(GR-178, NFR-014).
      */
     @Bean
-    PasswordEncoder passwordEncoder() {
-        return new Argon2PasswordEncoder(16, 32, 1, 19 * 1024, 2);
+    PasswordEncoder passwordEncoder(PasswordHashProperties passwordHashProperties) {
+        return new ConcurrencyLimitedPasswordEncoder(
+                new Argon2PasswordEncoder(16, 32, 1, 19 * 1024, 2), passwordHashProperties);
     }
 }
