@@ -90,7 +90,7 @@ if (!Number.isInteger(VUS) || VUS < 1) {
 if (SHAPE !== 'steady' && SHAPE !== 'burst') {
     throw new Error(`SHAPE는 steady 또는 burst여야 합니다: ${SHAPE}`);
 }
-if (!(MODE in DEFAULT_ACCOUNTS)) {
+if (MODE !== 'success' && MODE !== 'fail') {
     throw new Error(`MODE는 success 또는 fail이어야 합니다: ${MODE}`);
 }
 
