@@ -24,30 +24,6 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/api/v1/seller/drops/{dropId}/demand-plans': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * 판매 계획 목록
-     * @description DROP의 판매 계획을 최근 저장순으로 반환한다. DROP 상태와 관계없이 조회한다
-     */
-    get: operations['findPlans']
-    put?: never
-    /**
-     * 판매 계획 저장
-     * @description 저장 시점 데이터로 다시 계산해 DRAFT로 저장한다. 요청은 가정 변경 재계산과 같다
-     */
-    post: operations['save']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
   '/api/v1/seller/drops/{dropId}/demand-analysis/calculate': {
     parameters: {
       query?: never
@@ -68,26 +44,6 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/api/v1/seller/demand-plans/{planId}/decision': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /**
-     * 판매 계획 결정 기록
-     * @description ACCEPTED·MODIFIED·REJECTED 중 하나를 계획당 한 번 기록한다. MODIFIED는 계획의 모든 옵션 수량을 보낸다. DROP 판매 수량은 바꾸지 않는다
-     */
-    post: operations['decide']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
   '/api/v1/seller/drops/{dropId}/demand-analysis': {
     parameters: {
       query?: never
@@ -100,26 +56,6 @@ export interface paths {
      * @description 활성 WISH·일별 추이와 내 실적·시장 평균 전환율로 기본 가정의 판매 계획을 계산한다. 계산 규칙은 DEMAND.md 1절 참고
      */
     get: operations['analyze']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/seller/demand-plans/{planId}': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * 판매 계획 상세
-     * @description 저장 시점 수요 분석 스냅샷과 결정·설명 상태를 반환한다
-     */
-    get: operations['findPlan']
     put?: never
     post?: never
     delete?: never
@@ -233,9 +169,9 @@ export interface components {
       conversionRate?: number
       safetyStockRate?: number
     }
-    ApiResponseDemandPlanResponse: {
+    ApiResponseDemandAnalysisResponse: {
       success?: boolean
-      data?: components['schemas']['DemandPlanResponse']
+      data?: components['schemas']['DemandAnalysisResponse']
       message?: string
     }
     Assumption: {
@@ -260,20 +196,6 @@ export interface components {
       /** Format: int64 */
       count?: number
     }
-    DecidedQuantity: {
-      /** Format: int64 */
-      optionId: number
-      /** Format: int32 */
-      quantity: number
-    }
-    Decision: {
-      /** @enum {string} */
-      status?: 'DRAFT' | 'ACCEPTED' | 'MODIFIED' | 'REJECTED'
-      quantities?: components['schemas']['DecidedQuantity'][]
-      reason?: string
-      /** Format: date-time */
-      decidedAt?: string
-    }
     Demand: {
       /** Format: int64 */
       activeWishCount?: number
@@ -293,63 +215,27 @@ export interface components {
       conversion?: components['schemas']['Conversion']
       assumptions?: components['schemas']['Assumptions']
       plan?: components['schemas']['Plan']
+      initialRecommendation?: components['schemas']['InitialRecommendation']
       dataGaps?: (
         'NO_ACTIVE_WISH' | 'NO_CONVERSION_SAMPLE' | 'SMALL_CONVERSION_SAMPLE'
       )[]
       notes?: string[]
     }
-    DemandPlanResponse: {
-      /** Format: uuid */
-      planId?: string
-      /** Format: int64 */
-      dropId?: number
-      /** @enum {string} */
-      status?: 'DRAFT' | 'ACCEPTED' | 'MODIFIED' | 'REJECTED'
+    InitialRecommendation: {
       /** Format: date-time */
-      createdAt?: string
-      analysis?: components['schemas']['DemandAnalysisResponse']
-      decision?: components['schemas']['Decision']
+      recordedAt?: string
       /** @enum {string} */
-      explanationStatus?:
-        'PENDING' | 'GENERATED' | 'DISCARDED' | 'FAILED' | 'DISABLED'
-      explanation?: components['schemas']['JsonNode']
-    }
-    JsonNode: {
-      array?: boolean
-      empty?: boolean
-      null?: boolean
-      float?: boolean
-      string?: boolean
-      container?: boolean
-      number?: boolean
-      integralNumber?: boolean
-      object?: boolean
-      /** @enum {string} */
-      nodeType?:
-        | 'ARRAY'
-        | 'BINARY'
-        | 'BOOLEAN'
-        | 'MISSING'
-        | 'NULL'
-        | 'NUMBER'
-        | 'OBJECT'
-        | 'POJO'
-        | 'STRING'
-      missingNode?: boolean
-      valueNode?: boolean
-      int?: boolean
-      double?: boolean
-      pojo?: boolean
-      long?: boolean
-      bigDecimal?: boolean
-      short?: boolean
-      bigInteger?: boolean
-      /** @deprecated */
-      textual?: boolean
-      boolean?: boolean
-      binary?: boolean
-      floatingPointNumber?: boolean
-      embeddedValue?: boolean
+      basis?: 'OWN' | 'MARKET'
+      /** Format: int32 */
+      low?: number
+      /** Format: int32 */
+      expected?: number
+      /** Format: int32 */
+      high?: number
+      /** Format: int32 */
+      recommended?: number
+      /** Format: int32 */
+      preparedTotal?: number
     }
     MarketConversion: {
       rate?: number
@@ -402,46 +288,6 @@ export interface components {
     }
     Suggestion: {
       ready?: boolean
-    }
-    ApiResponseDemandAnalysisResponse: {
-      success?: boolean
-      data?: components['schemas']['DemandAnalysisResponse']
-      message?: string
-    }
-    DemandPlanDecisionRequest: {
-      /** @enum {string} */
-      status: 'DRAFT' | 'ACCEPTED' | 'MODIFIED' | 'REJECTED'
-      quantities?: components['schemas']['DecidedQuantity'][]
-      reason?: string
-    }
-    ApiResponsePageResponseDemandPlanSummaryResponse: {
-      success?: boolean
-      data?: components['schemas']['PageResponseDemandPlanSummaryResponse']
-      message?: string
-    }
-    DemandPlanSummaryResponse: {
-      /** Format: uuid */
-      planId?: string
-      /** @enum {string} */
-      status?: 'DRAFT' | 'ACCEPTED' | 'MODIFIED' | 'REJECTED'
-      /** Format: int32 */
-      recommended?: number
-      /** Format: date-time */
-      createdAt?: string
-      /** Format: date-time */
-      decidedAt?: string
-    }
-    PageResponseDemandPlanSummaryResponse: {
-      content?: components['schemas']['DemandPlanSummaryResponse'][]
-      /** Format: int32 */
-      page?: number
-      /** Format: int32 */
-      size?: number
-      /** Format: int64 */
-      totalElements?: number
-      /** Format: int32 */
-      totalPages?: number
-      hasNext?: boolean
     }
   }
   responses: never
@@ -499,138 +345,6 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['ApiResponseStockRecommendationResponse']
-        }
-      }
-    }
-  }
-  findPlans: {
-    parameters: {
-      query?: {
-        page?: number
-        size?: number
-      }
-      header?: never
-      path: {
-        dropId: number
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description 조회 성공 */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['ApiResponsePageResponseDemandPlanSummaryResponse']
-        }
-      }
-      /** @description INVALID_REQUEST */
-      400: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['ApiResponsePageResponseDemandPlanSummaryResponse']
-        }
-      }
-      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
-      401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['ApiResponsePageResponseDemandPlanSummaryResponse']
-        }
-      }
-      /** @description ACCESS_DENIED, DROP_ACCESS_DENIED */
-      403: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['ApiResponsePageResponseDemandPlanSummaryResponse']
-        }
-      }
-      /** @description DROP_NOT_FOUND */
-      404: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['ApiResponsePageResponseDemandPlanSummaryResponse']
-        }
-      }
-    }
-  }
-  save: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        dropId: number
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['DemandCalculateRequest']
-      }
-    }
-    responses: {
-      /** @description 저장 성공 */
-      201: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['ApiResponseDemandPlanResponse']
-        }
-      }
-      /** @description INVALID_REQUEST, VALIDATION_FAILED */
-      400: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['ApiResponseDemandPlanResponse']
-        }
-      }
-      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
-      401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['ApiResponseDemandPlanResponse']
-        }
-      }
-      /** @description ACCESS_DENIED, DROP_ACCESS_DENIED */
-      403: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['ApiResponseDemandPlanResponse']
-        }
-      }
-      /** @description DROP_NOT_FOUND */
-      404: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['ApiResponseDemandPlanResponse']
-        }
-      }
-      /** @description DEMAND_ANALYSIS_UNAVAILABLE */
-      409: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['ApiResponseDemandPlanResponse']
         }
       }
     }
@@ -706,77 +420,6 @@ export interface operations {
       }
     }
   }
-  decide: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        planId: string
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['DemandPlanDecisionRequest']
-      }
-    }
-    responses: {
-      /** @description 기록 성공 */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['ApiResponseDemandPlanResponse']
-        }
-      }
-      /** @description INVALID_REQUEST, VALIDATION_FAILED */
-      400: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['ApiResponseDemandPlanResponse']
-        }
-      }
-      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
-      401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['ApiResponseDemandPlanResponse']
-        }
-      }
-      /** @description ACCESS_DENIED */
-      403: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['ApiResponseDemandPlanResponse']
-        }
-      }
-      /** @description DEMAND_PLAN_NOT_FOUND, RESOURCE_NOT_FOUND */
-      404: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['ApiResponseDemandPlanResponse']
-        }
-      }
-      /** @description DEMAND_PLAN_ALREADY_DECIDED, DEMAND_ANALYSIS_UNAVAILABLE */
-      409: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['ApiResponseDemandPlanResponse']
-        }
-      }
-    }
-  }
   analyze: {
     parameters: {
       query?: never
@@ -831,55 +474,6 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['ApiResponseDemandAnalysisResponse']
-        }
-      }
-    }
-  }
-  findPlan: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        planId: string
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description 조회 성공 */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['ApiResponseDemandPlanResponse']
-        }
-      }
-      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
-      401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['ApiResponseDemandPlanResponse']
-        }
-      }
-      /** @description ACCESS_DENIED */
-      403: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['ApiResponseDemandPlanResponse']
-        }
-      }
-      /** @description DEMAND_PLAN_NOT_FOUND, RESOURCE_NOT_FOUND */
-      404: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['ApiResponseDemandPlanResponse']
         }
       }
     }
