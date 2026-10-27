@@ -369,3 +369,16 @@
     animation: none;
   }
 }
+
+/* 관련 DROP 추천(GR-195) */
+.related-drops {
+  max-width: 1120px;
+  margin: 48px auto 24px;
+  padding-top: 32px;
+  border-top: 1px solid var(--line);
+}
+.related-drops h2 {
+  margin: 0 0 18px;
+  font-size: clamp(20px, 3vw, 28px);
+  letter-spacing: -1px;
+}

@@ -232,6 +232,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/drops/{dropId}/related': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * 관련 DROP 추천
+     * @description 아직 WISH할 수 있는 DROP을 최대 4개 추천한다. 함께 WISH한 DROP(겹친 사용자 3명 이상)을 먼저 쓰고, 없으면 같은 카테고리에서 내용이 비슷한 DROP(임베딩)을 쓴다. basis로 추천 방식을 알려 준다
+     */
+    get: operations['getRelated']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/drops/stock-stream': {
     parameters: {
       query?: never
@@ -643,6 +663,16 @@ export interface components {
       options?: components['schemas']['PublicDropStockOption'][]
       /** Format: date-time */
       serverTime?: string
+    }
+    ApiResponseRelatedDropsResponse: {
+      success?: boolean
+      data?: components['schemas']['RelatedDropsResponse']
+      message?: string
+    }
+    RelatedDropsResponse: {
+      /** @enum {string|null} */
+      basis?: 'CO_WISH' | 'SIMILAR' | null
+      drops?: components['schemas']['PublicDropListResponse'][]
     }
     ErrorDetail: {
       code?: string
@@ -1430,6 +1460,46 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['ApiResponsePublicDropStockResponse']
+        }
+      }
+    }
+  }
+  getRelated: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        dropId: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description 조회 성공 */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseRelatedDropsResponse']
+        }
+      }
+      /** @description INVALID_REQUEST */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseRelatedDropsResponse']
+        }
+      }
+      /** @description DROP_NOT_FOUND */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseRelatedDropsResponse']
         }
       }
     }

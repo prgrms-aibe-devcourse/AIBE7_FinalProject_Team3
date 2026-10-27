@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import axios from 'axios'
 import EmptyState from '../../components/EmptyState/EmptyState'
 import DropDetailImages from '../../features/drop/components/DropDetailImages'
+import RelatedDrops from '../../features/drop/components/RelatedDrops'
 import DropOpenCountdown from '../../features/drop/components/DropOpenCountdown'
 import DropStockQuantity from '../../features/drop/components/DropStockQuantity'
 import DropGallery from '../../features/drop/components/DropGallery'
@@ -339,6 +340,15 @@ export default function DropDetailPage({
         </div>
       </section>
 
+      {mode === 'closed' && (
+        <RelatedDrops
+          dropId={detail.id}
+          context="closed"
+          wishes={wishes}
+          wishReady={wishesReady}
+          onWish={(id) => void toggleWish(id)}
+        />
+      )}
       <section className="story-section">
         <h2>상품 상세 설명</h2>
         <p>{detail.description}</p>
@@ -349,6 +359,15 @@ export default function DropDetailPage({
         <p>배송비 {won(detail.shippingFee)}</p>
         <p>{detail.shippingNotice}</p>
       </section>
+      {mode === 'wish' && (
+        <RelatedDrops
+          dropId={detail.id}
+          context="wish"
+          wishes={wishes}
+          wishReady={wishesReady}
+          onWish={(id) => void toggleWish(id)}
+        />
+      )}
     </>
   )
 }
