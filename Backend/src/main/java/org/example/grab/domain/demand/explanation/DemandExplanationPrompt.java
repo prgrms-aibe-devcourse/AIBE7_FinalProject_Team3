@@ -18,7 +18,7 @@ import java.util.Map;
     입력에는 저장된 계산 결과의 집계값·코드값만 넣는다. 상품명·카테고리명·옵션 표시명처럼 판매자가 입력한 텍스트,
     회원 정보, 다른 판매자의 개별 데이터는 넣지 않는다. 옵션은 배분 순서 번호로만 전달하고 화면이 표시명과 짝짓는다.
     비율은 화면과 같은 정수 %로 바꿔 넣어 설명의 숫자를 입력값과 그대로 대조할 수 있게 한다.
-    프롬프트나 입력 형식을 바꾸면 VERSION을 올린다(평가 기록·저장 계획의 prompt_version과 짝을 맞춘다).
+    프롬프트나 입력 형식을 바꾸면 VERSION을 올린다(평가 기록·demand_explanations.prompt_version과 짝을 맞추고, 입력 해시가 바뀌어 저장된 설명을 다시 쓰지 않게 한다).
  */
 public final class DemandExplanationPrompt {
 

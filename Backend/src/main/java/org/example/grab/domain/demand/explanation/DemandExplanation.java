@@ -5,7 +5,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.ArrayList;
 import java.util.List;
 
-// 검증을 통과한 설명. demand_plans.explanation에 이 형식 그대로 저장한다(DEMAND.md 2.5)
+// 검증을 통과한 설명. demand_explanations.explanation에 이 형식 그대로 저장하고 응답한다(DEMAND.md 3.1)
 public record DemandExplanation(
         String summary,
         List<String> reasons,

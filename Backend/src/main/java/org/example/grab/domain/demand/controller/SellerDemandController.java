@@ -5,6 +5,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.example.grab.domain.demand.dto.DemandAnalysisResponse;
 import org.example.grab.domain.demand.dto.DemandCalculateRequest;
+import org.example.grab.domain.demand.explanation.DemandExplanationResponse;
+import org.example.grab.domain.demand.explanation.DemandExplanationService;
 import org.example.grab.domain.demand.service.DemandAnalysisService;
 import org.example.grab.global.common.ApiResponse;
 import org.example.grab.global.security.identity.CurrentSellerIdProvider;
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class SellerDemandController {
 
     private final DemandAnalysisService demandAnalysisService;
+    private final DemandExplanationService demandExplanationService;
     private final CurrentSellerIdProvider currentSellerIdProvider;
 
     @Operation(summary = "수요 분석 조회",
@@ -52,5 +55,24 @@ public class SellerDemandController {
             @Valid @RequestBody DemandCalculateRequest request) {
         return ApiResponse.success(demandAnalysisService.analyze(
                 currentSellerIdProvider.currentSellerId(), dropId, request));
+    }
+
+    @Operation(summary = "수요 분석 설명 요청",
+            description = "판매자가 고른 가정(재계산과 같은 본문, 비우면 기본 가정)으로 계산한 결과를 LLM으로 설명한다. "
+                    + "같은 입력이면 저장된 설명을 다시 쓴다. 생성 실패도 200으로 status에 담는다. 규칙은 DEMAND.md 3절 참고")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "GENERATED, DISCARDED, FAILED, DISABLED")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "INVALID_REQUEST, VALIDATION_FAILED")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "AUTHENTICATION_REQUIRED, INVALID_TOKEN")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "ACCESS_DENIED, DROP_ACCESS_DENIED")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "DROP_NOT_FOUND")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "DEMAND_ANALYSIS_UNAVAILABLE")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "429", description = "DEMAND_EXPLANATION_LIMIT_EXCEEDED")
+    @PostMapping("/explanation")
+    public ApiResponse<DemandExplanationResponse> explain(
+            @PathVariable long dropId,
+            @Valid @RequestBody(required = false) DemandCalculateRequest request) {
+        return ApiResponse.success(demandExplanationService.explain(
+                currentSellerIdProvider.currentSellerId(), dropId,
+                request == null ? DemandCalculateRequest.defaults() : request));
     }
 }

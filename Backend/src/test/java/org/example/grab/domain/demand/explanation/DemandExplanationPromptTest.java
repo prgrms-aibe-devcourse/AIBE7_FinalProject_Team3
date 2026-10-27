@@ -61,7 +61,7 @@ class DemandExplanationPromptTest {
                 base.calculationVersion(), base.suggestion(), base.demand(),
                 new Conversion(SampleSelection.CATEGORY, base.conversion().own(),
                         MarketConversion.unavailable(OffsetDateTime.parse("2026-10-22T00:00:00+09:00"))),
-                base.assumptions(), base.plan(), base.dataGaps(), base.notes());
+                base.assumptions(), base.plan(), null, base.dataGaps(), base.notes());
 
         JsonNode market = OBJECT_MAPPER.readTree(DemandExplanationPrompt.input(analysis, OBJECT_MAPPER))
                 .at("/conversion/market");
@@ -71,7 +71,8 @@ class DemandExplanationPromptTest {
         assertThat(market.get("confidence").asString()).isEqualTo("NONE");
     }
 
-    private static DemandAnalysisResponse analysis() {
+    // DemandExplanationServiceTest도 같은 분석 결과로 입력을 만든다
+    static DemandAnalysisResponse analysis() {
         return new DemandAnalysisResponse(
                 100L, OffsetDateTime.parse("2026-10-22T14:00:00+09:00"), "v1", new Suggestion(true),
                 new Demand(420, 40, List.of(), true),
@@ -88,6 +89,7 @@ class DemandExplanationPromptTest {
                 new Plan(113, 126, 139, 139, 120, 19, List.of(
                         new OptionPlan(1001L, "블랙 / M", 60, 70),
                         new OptionPlan(1002L, "화이트 / M", 60, 69))),
+                null,
                 List.of(DemandDataGap.SMALL_CONVERSION_SAMPLE),
                 List.of("WISH 없이 구매한 사용자는 전환율에 포함하지 않았습니다."));
     }

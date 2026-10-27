@@ -42,7 +42,7 @@ spring:
     locations: classpath:db/migration
 
   # 수요 분석 설명 생성 LLM(GR-146, TECHSTACK.md 1.3). 기본값 none이면 모델 빈을 만들지 않아 키 없이도 기동하고,
-  # 계획 설명은 DISABLED로 저장한다. 켜려면 DEMAND_LLM_PROVIDER=google-genai와 GEMINI_API_KEY를 함께 넣는다.
+  # 설명 요청은 DISABLED로 응답한다. 켜려면 DEMAND_LLM_PROVIDER=google-genai와 GEMINI_API_KEY를 함께 넣는다.
   # 임베딩(GR-147)·이미지 생성은 쓰지 않는다
   ai:
     model:
