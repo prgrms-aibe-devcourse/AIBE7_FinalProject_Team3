@@ -30,7 +30,7 @@
 //         JDK_JAVA_OPTIONS: -Xmx512m -Xlog:gc   # environment는 값 전체를 덮어쓰므로 -Xlog:gc도 다시 적는다
 //
 // [준비]
-//   docker compose -f compose.yaml -f compose.loadtest.yaml -f <임시 폴더>/compose.micro.yaml up -d --build
+//   docker compose -f compose.yaml -f compose.loadtest-nano.yaml -f <임시 폴더>/compose.micro.yaml up -d --build
 //   docker inspect backend-backend-1 --format 'Memory={{.HostConfig.Memory}} MemorySwap={{.HostConfig.MemorySwap}}'
 //     → 둘 다 1073741824(스왑 없음)
 //   docker compose logs backend | head -3              → NOTE: Picked up JDK_JAVA_OPTIONS: -Xmx512m -Xlog:gc
