@@ -1,6 +1,7 @@
 #!/bin/bash
-# 목록 조회 동시 접속 단계별 측정(GR-164). 대상마다 concurrency.js를 돌리고, 단계 구간별 HikariCP 지표를 Prometheus에서 읽어
-# k6 지표와 한 표(summary.tsv)로 합친다. 측정 동안 stats.sh로 CPU·메모리·스왑을 함께 기록한다.
+# 목록 조회 동시 접속 단계별 측정(GR-164). 대상마다 concurrency.js를 돌리고, 단계 구간별 HikariCP·JVM 힙·GC 지표를 Prometheus에서
+# 읽어 k6 지표와 한 표(summary.tsv)로 합친다. 측정 동안 stats.sh로 CPU·메모리·스왑을 함께 기록한다.
+# JVM 열: 힙 최대 사용량, GC 멈춤 횟수·합계·최대, 할당 속도, 요청당 할당량(할당 속도 ÷ 처리량).
 # seed.sql을 넣고 compose(+ compose.swapoff.yaml)를 띄운 상태에서 실행한다. explain.sh와 동시에 돌리지 않는다.
 #
 #   Backend/k6/drop-list-scale/concurrency.sh <이름> [대상 ...]
@@ -35,7 +36,7 @@ q() {
       const v=r?Number(r.value[1]):NaN; console.log(Number.isFinite(v)?v.toFixed(2):'none')})"
 }
 
-printf 'target\tvus\treqs\trps\tmed_ms\tp95_ms\tp99_ms\tfail_rate\thikari_active_max\thikari_pending_max\tacquire_avg_ms\tacquire_max_ms\thikari_timeouts\n' \
+printf 'target\tvus\treqs\trps\tmed_ms\tp95_ms\tp99_ms\tfail_rate\thikari_active_max\thikari_pending_max\tacquire_avg_ms\tacquire_max_ms\thikari_timeouts\theap_max_mb\tgc_count\tgc_pause_sum_ms\tgc_pause_max_ms\talloc_mb_s\talloc_kb_per_req\n' \
   > "$OUT/summary.tsv"
 
 for TARGET in $TARGETS; do
@@ -55,12 +56,20 @@ for TARGET in $TARGETS; do
       const m = require('./$OUT/$TARGET-k6.json').metrics, s = 'scenario:vu$VUS';
       const d = m['http_req_duration{' + s + '}'], n = m['http_reqs{' + s + '}'], f = m['http_req_failed{' + s + '}'];
       console.log([n.count, (n.count / $STEP_S).toFixed(1), d.med.toFixed(1), d['p(95)'].toFixed(1), d['p(99)'].toFixed(1), f.value.toFixed(4)].join('\t'));")
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$TARGET" "$VUS" "$K6" \
+    RPS=$(echo "$K6" | cut -f2)
+    ALLOC=$(q "sum(rate(jvm_gc_memory_allocated_bytes_total[$W]))/1048576" $END)
+    PER_REQ=$(node -e "const a = Number('$ALLOC'), r = Number('$RPS'); console.log(a > 0 && r > 0 ? (a * 1024 / r).toFixed(0) : 'none')")
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$TARGET" "$VUS" "$K6" \
       "$(q "max_over_time(hikaricp_connections_active[$W])" $END)" \
       "$(q "max_over_time(hikaricp_connections_pending[$W])" $END)" \
       "$(q "1000*increase(hikaricp_connections_acquire_seconds_sum[$W])/increase(hikaricp_connections_acquire_seconds_count[$W])" $END)" \
       "$(q "1000*max_over_time(hikaricp_connections_acquire_seconds_max[$W])" $END)" \
-      "$(q "increase(hikaricp_connections_timeout_total[$W])" $END)" >> "$OUT/summary.tsv"
+      "$(q "increase(hikaricp_connections_timeout_total[$W])" $END)" \
+      "$(q "max_over_time(sum(jvm_memory_used_bytes{area=\"heap\"})[$W:5s])/1048576" $END)" \
+      "$(q "sum(increase(jvm_gc_pause_seconds_count[$W]))" $END)" \
+      "$(q "1000*sum(increase(jvm_gc_pause_seconds_sum[$W]))" $END)" \
+      "$(q "1000*max(max_over_time(jvm_gc_pause_seconds_max[$W]))" $END)" \
+      "$ALLOC" "$PER_REQ" >> "$OUT/summary.tsv"
     I=$((I + 1))
   done
 done
