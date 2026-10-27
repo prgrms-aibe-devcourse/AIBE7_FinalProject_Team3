@@ -19,8 +19,10 @@ export function login(email, password) {
     const xsrfToken = xsrfCookie[0].value;
 
     // 서버는 XSRF-TOKEN 쿠키에 Secure 속성을 강제로 붙인다(SecurityConfig.csrfTokenRepository).
-    // k6의 쿠키 저장소는 Secure 쿠키를 http:// 요청엔 자동으로 다시 실어 보내지 않으므로,
+    // k6 v1의 쿠키 저장소는 Secure 쿠키를 http:// 요청엔 다시 실어 보내지 않으므로,
     // 로컬 HTTP 부하테스트에서는 값만 가져와 Secure 없이 다시 심어서 쓴다.
+    // k6 v2는 Secure 쿠키도 http로 다시 보낸다. 그래서 login() 전에 다른 요청이 XSRF-TOKEN을 받아 두면
+    // /auth/csrf가 새 쿠키를 내려주지 않아 위 검사에서 실패한다. setup()에서는 login()을 가장 먼저 호출한다.
     http.cookieJar().set(BASE_URL, 'XSRF-TOKEN', xsrfToken, { path: '/' });
 
     const loginRes = http.post(

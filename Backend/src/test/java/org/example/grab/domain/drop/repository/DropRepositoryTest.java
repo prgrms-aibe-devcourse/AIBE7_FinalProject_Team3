@@ -690,7 +690,7 @@ class DropRepositoryTest {
 
         // when
         Page<PublicDropListProjection> page = dropRepository.findPopularGrabDrops(
-                null, null, null, OffsetDateTime.now(ZoneOffset.UTC), PageRequest.of(0, 20));
+                null, null, OffsetDateTime.now(ZoneOffset.UTC), PageRequest.of(0, 20));
 
         // then: 다중 옵션·다중 주문이 행을 늘리거나 다른 집계를 부풀리지 않는다
         assertThat(idsOf(page)).containsExactly(multi, single, none);
@@ -700,6 +700,28 @@ class DropRepositoryTest {
         // 인기 GRAB도 브랜드·가용 재고를 함께 반환한다(multi는 활성 옵션 10+10)
         assertThat(rowOf(page, multi).getBrandName()).isEqualTo("GRAB 판매자");
         assertThat(rowOf(page, multi).getAvailableStock()).isEqualTo(20L);
+    }
+
+    @Test
+    @DisplayName("인기 GRAB 판매 수량에는 판매 후 비활성으로 바뀐 SKU의 판매분도 포함한다")
+    void countsSoldQuantityOfDeactivatedOptionsInPopularGrab() {
+        // given: deactivated는 판매 후 비활성이 된 SKU에서 5개, 활성 SKU에서 1개가 팔렸다
+        Long deactivated = insertSellingDrop(DropStatus.GRAB, "비활성 SKU 판매", 20);
+        Long active = insertSellingDrop(DropStatus.GRAB, "활성 SKU 판매", 10);
+        Long retiredOption = insertOptionReturningId(deactivated, 10, 0);
+        Long remainingOption = insertOptionReturningId(deactivated, 10, 1);
+        Long activeOption = insertOptionReturningId(active, 10, 0);
+        insertOrderItem(insertOrder(deactivated, "PAID"), deactivated, retiredOption, 5);
+        insertOrderItem(insertOrder(deactivated, "PAID"), deactivated, remainingOption, 1);
+        insertOrderItem(insertOrder(active, "PAID"), active, activeOption, 3);
+        jdbcTemplate.update("UPDATE drop_options SET is_active = FALSE WHERE id = ?", retiredOption);
+
+        // when
+        List<Long> ids = idsOf(dropRepository.findPopularGrabDrops(
+                null, null, OffsetDateTime.now(ZoneOffset.UTC), PageRequest.of(0, 20)));
+
+        // then: 6(비활성 5 + 활성 1) > 3. 활성 SKU만 셌다면 1 < 3으로 순서가 뒤집힌다
+        assertThat(ids).containsExactly(deactivated, active);
     }
 
     @Test
@@ -715,7 +737,7 @@ class DropRepositoryTest {
 
         // when
         List<Long> ids = idsOf(dropRepository.findPopularGrabDrops(
-                null, null, null, OffsetDateTime.now(ZoneOffset.UTC), PageRequest.of(0, 20)));
+                null, null, OffsetDateTime.now(ZoneOffset.UTC), PageRequest.of(0, 20)));
 
         // then
         assertThat(ids).containsExactly(sameTimeSecond, sameTimeFirst, oldest);
@@ -746,7 +768,7 @@ class DropRepositoryTest {
 
         // when
         Page<PublicDropListProjection> page = dropRepository.findPopularGrabDrops(
-                null, null, null, OffsetDateTime.now(ZoneOffset.UTC), PageRequest.of(0, 20));
+                null, null, OffsetDateTime.now(ZoneOffset.UTC), PageRequest.of(0, 20));
 
         // then: 응답 status는 저장 상태를 유지한다
         assertThat(idsOf(page)).containsExactlyInAnyOrder(grab, startDelayed);
@@ -768,10 +790,10 @@ class DropRepositoryTest {
 
         // when & then
         assertThat(idsOf(dropRepository.findPopularGrabDrops(
-                null, null, null, startsAt, PageRequest.of(0, 20))))
+                null, null, startsAt, PageRequest.of(0, 20))))
                 .containsExactly(dropId);
         assertThat(dropRepository.findPopularGrabDrops(
-                null, null, null, endsAt, PageRequest.of(0, 20)).getContent())
+                null, null, endsAt, PageRequest.of(0, 20)).getContent())
                 .isEmpty();
     }
 
@@ -791,9 +813,9 @@ class DropRepositoryTest {
 
         // when
         Page<PublicDropListProjection> firstPage = dropRepository.findPopularGrabDrops(
-                null, null, null, now, PageRequest.of(0, 2));
+                null, null, now, PageRequest.of(0, 2));
         Page<PublicDropListProjection> secondPage = dropRepository.findPopularGrabDrops(
-                null, null, null, now, PageRequest.of(1, 2));
+                null, null, now, PageRequest.of(1, 2));
 
         // then
         assertThat(idsOf(firstPage)).containsExactly(first, second);
@@ -804,7 +826,7 @@ class DropRepositoryTest {
     }
 
     @Test
-    @DisplayName("인기 GRAB에 soldOut=true를 주면 빈 목록이고 soldOut=false·keyword·categoryId 필터는 그대로 적용된다")
+    @DisplayName("인기 GRAB에 keyword·categoryId 필터가 그대로 적용된다")
     void appliesFiltersToPopularGrab() {
         // given
         Long sneakers = insertSellingDrop(DropStatus.GRAB, "스니커즈", 20);
@@ -816,19 +838,15 @@ class DropRepositoryTest {
                 Long.class, "TEST-" + UUID.randomUUID());
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
-        // when & then
-        Page<PublicDropListProjection> soldOut = dropRepository.findPopularGrabDrops(
-                null, null, true, now, PageRequest.of(0, 20));
-        assertThat(soldOut.getContent()).isEmpty();
-        assertThat(soldOut.getTotalElements()).isZero();
+        // when & then: soldOut은 서비스가 처리한다(DropServiceTest).
         assertThat(idsOf(dropRepository.findPopularGrabDrops(
-                null, null, false, now, PageRequest.of(0, 20))))
+                null, null, now, PageRequest.of(0, 20))))
                 .containsExactly(hoodie, sneakers);
         assertThat(idsOf(dropRepository.findPopularGrabDrops(
-                null, "%스니커%", null, now, PageRequest.of(0, 20))))
+                null, "%스니커%", now, PageRequest.of(0, 20))))
                 .containsExactly(sneakers);
         assertThat(dropRepository.findPopularGrabDrops(
-                otherCategory, null, null, now, PageRequest.of(0, 20)).getTotalElements())
+                otherCategory, null, now, PageRequest.of(0, 20)).getTotalElements())
                 .isZero();
     }
 
@@ -1175,6 +1193,8 @@ class DropRepositoryTest {
         return orderId;
     }
 
+    // 실제 결제 확정·결제 후 취소는 주문 상태와 같은 트랜잭션에서 sold_quantity를 옮긴다(OrderPaymentService).
+    // 픽스처도 같은 원장을 유지하도록 결제 확정·미취소 주문 수량만큼 판매 수량을 올리고, 가용 재고가 바뀌지 않게 총수량도 같이 늘린다.
     private void insertOrderItem(Long orderId, Long dropId, Long optionId, int quantity) {
         jdbcTemplate.update(
                 """
@@ -1182,6 +1202,14 @@ class DropRepositoryTest {
                 VALUES (?, ?, ?, '기본', 10000, ?)
                 """,
                 orderId, dropId, optionId, quantity);
+        jdbcTemplate.update(
+                """
+                UPDATE drop_options o
+                SET sold_quantity = o.sold_quantity + ?, total_quantity = o.total_quantity + ?
+                FROM orders od
+                WHERE o.id = ? AND od.id = ? AND od.paid_at IS NOT NULL AND od.canceled_at IS NULL
+                """,
+                quantity, quantity, optionId, orderId);
     }
 
     private void insertPaidQuantity(Long dropId, int quantity) {

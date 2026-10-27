@@ -1,0 +1,116 @@
+# 공개 DROP 상세·재고 조회 대용량 기준선 (drop-detail-scale, GR-181)
+
+> 공통 실행 환경·전제는 `../README.md` 참고. 측정 조건·seed는 `../drop-list-scale/result.md`(GR-164)와 같다(nano 제한 아님).
+
+SSE 알림을 받은 상세 화면은 상세(`GET /api/v1/drops/{id}`)와 재고(`GET /api/v1/drops/{id}/stocks`)를 둘 다 다시 부른다(`REALTIME_STOCK.md` 4절).
+동시 사용자 1000명이 한 인기 상품을 보면 재조회 부하의 대부분이 이 두 API로 가는데, 지금까지 대용량 데이터에서 잰 적이 없었다(GR-153은 DROP 15건).
+요청당 쿼리 수·실행 계획·응답시간·동시 접속 천장을 기록하고, 운영(EC2 → Supabase)처럼 DB가 네트워크 너머에 있을 때를 지연 주입으로 확인한다.
+애플리케이션 코드와 Flyway는 바꾸지 않았다.
+
+## 측정 환경
+
+| 항목 | 값 |
+| --- | --- |
+| 머신 | Apple M5(10코어), Docker Desktop VM 8GB / 10 CPU |
+| 컨테이너 | `compose.yaml` + `drop-list-scale/compose.swapoff.yaml` — backend·postgres 메모리 2GiB = 스왑 0, **CPU 제한 없음(backend·DB 모두)** |
+| 코드 | main `7ca3f5a` + GR-164·176(목록 쿼리만 변경). 상세·재고 경로는 main과 같다 |
+| 자원 | 스왑 498샘플(지연 주입 포함) 모두 0. 최대 메모리 backend 863MiB·postgres 211MiB |
+| 부하 경로 | k6 컨테이너 → compose 네트워크 `http://backend:8080` |
+
+운영(무료 티어 가정: EC2 t3.micro 수준 + Supabase Nano)보다 backend·DB 모두 강한 조건이다. 조합 간·전후 비교와 왕복 지연의 영향을 보는 용도이며, 무료 티어 판정은 GR-180·186에서 별도로 한다.
+
+## seed 보강
+
+`drop-list-scale/seed.sql`에 옵션 그룹·값·SKU 매핑을 추가했다(GR-181). 이전에는 0건이라 상세 조회가 실제보다 가볍게 측정될 뻔했다.
+SKU 1개는 그룹 없음, 2~3개는 색상 1그룹, 4개는 색상 2값 × 사이즈 2값이다(그룹 5,000 / 값 11,250 / 매핑 16,250).
+목록 쿼리는 이 테이블을 읽지 않아 GR-164·176 수치에는 영향이 없다.
+
+## 측정 절차
+
+```
+docker compose -f compose.yaml -f k6/drop-list-scale/compose.swapoff.yaml up -d
+docker compose exec -T postgres psql -U grab -d grab -f - < k6/common/accounts-seed.sql
+docker compose exec -T postgres psql -U grab -d grab -v ON_ERROR_STOP=1 -f - < k6/drop-list-scale/seed.sql
+k6/drop-detail-scale/measure.sh baseline pair_hot pair_random stock_hot   # 지연 없음
+k6/drop-detail-scale/latency.sh 1 pair_hot stock_hot                       # DB 왕복 +1ms
+k6/drop-detail-scale/latency.sh 3 pair_hot stock_hot                       # DB 왕복 +3ms
+```
+
+- `targets.sh`: hot = 판매 중·재고 있음·SKU 4개(그룹 2개) 중 활성 WISH 최다, simple = SKU 1개, pool = seed 공개 DROP 4,500건.
+- `combos.js`: `detail_*`, `stock_*`, `pair_*`(상세 + 재고 한 쌍 = SSE 재조회 한 번) × hot / simple / random.
+- `explain.sh`: auto_explain으로 요청 구간의 쿼리를 모아 배치 쿼리를 걸러내고 요청당 쿼리 수·시간·버퍼를 구한다.
+- `measure.sh` / `latency.sh`: 각 측정 전에 `warmup.js`(60초)를 돌린다. GR-176에서 쿼리가 같은 조합도 회차마다 p95가 11~42% 흔들린 원인으로 JVM 워밍업 차이가 추정돼, 측정마다 같은 상태에서 시작하게 했다.
+- `netem.sh`: postgres 컨테이너 송신에 고정 지연을 걸어 DB 왕복 시간이 늘어난 상황을 흉내 낸다(postgres 컨테이너 자체는 바꾸지 않음). 측정이 끝나거나 실패하면 해제한다.
+- 동시 접속은 `drop-list-scale/concurrency.sh`(SCRIPT·OUT_BASE로 일반화)로 VU 25→800, 단계당 60초, 요청 후 1초 대기.
+
+## 결과 (2026-10-27)
+
+### 요청당 쿼리 (auto_explain, 5회 평균)
+
+| 대상 | 쿼리 수 | DB 실행 시간 합 | 버퍼 |
+| --- | ---: | ---: | ---: |
+| 상세 hot (SKU 4, 그룹 2) | 9 | 0.13ms | 27 |
+| 상세 simple (SKU 1) | 8 | 0.10ms | 22 |
+| 재고 hot | 2 | 0.04ms | 6 |
+| 재고 simple | 2 | 0.06ms | 6 |
+
+상세 9개: DROP 본체, 활성 WISH 수, 브랜드, 카테고리, 옵션·이미지·옵션 그룹·그룹 값·SKU 매핑 컬렉션(`@BatchSize`). simple은 그룹 값이 없어 8개다. 재고는 DROP 본체와 옵션 2개다.
+쿼리 비용은 모두 작다. 대신 상세 요청 하나가 트랜잭션 시작·커밋까지 **DB와 약 11번 왕복**하고, 클래스 단위 `@Transactional(readOnly = true)`라 그동안 커넥션을 쥔다.
+
+### 응답시간 (VU 10 × 20초, ms)
+
+| 조합 | 지연 없음 중앙값 / p95 | 1ms 중앙값 / p95 | 3ms 중앙값 / p95 |
+| --- | ---: | ---: | ---: |
+| 상세 hot | 1.2 / 2.6 | 13.2 / 15.7 | 39.1 / 44.2 |
+| 재고 hot | 0.6 / 1.1 | 4.0 / 4.8 | 12.0 / 15.9 |
+| 상세+재고 한 쌍 hot (iteration p95) | 3.6 | 20.9 | 55.5 |
+| 상세+재고 한 쌍 random (iteration p95) | 3.7 | 18.6 | 54.1 |
+
+지연 없음 조합별 전체: 상세 hot·simple·random p95 2.6·2.1·2.4ms, 재고 1.1·1.0·1.1ms. 요청 1,728,618건, 실패 0.
+상세 응답시간은 지연을 주입하면 "지연 × 약 11"만큼 늘었다(1ms +12.0ms, 3ms +37.9ms 중앙값 기준). 재고는 "지연 × 약 4"다.
+
+### 동시 접속 — 인기 상품 상세+재고 (`pair_hot`, HTTP 요청 기준)
+
+| VU | 지연 없음 처리량 / p95 | 1ms 처리량 / p95 | 3ms 처리량 / p95 |
+| ---: | ---: | ---: | ---: |
+| 100 | 200 / 12.9ms | 196 / 29.8ms | 189 / 84.5ms |
+| 200 | 400 / 15.2ms | 390 / 40.0ms | 368 / **182.2ms** |
+| 400 | 796 / 17.8ms | 773 / 67.4ms | **423 / 870.0ms** |
+| 800 | 1,597 / 19.8ms | **1,161 / 424.8ms** | **431 / 1,963.2ms** |
+
+(처리량 단위 HTTP 요청/초. 한 쌍 = 요청 2건)
+
+- **지연 없음:** VU 800까지 천장에 닿지 않았다(커넥션 획득 평균 2.8ms). `pair_random`도 같은 양상이다(VU 800 초당 1,600건, p95 21.9ms).
+- **1ms:** 천장 약 초당 1,160건(약 580쌍). VU 800에서 커넥션 대기 189, 획득 평균 156ms.
+- **3ms:** 천장 약 초당 430건(약 215쌍). VU 400부터 커넥션 대기 189~190, 획득 평균 419~451ms.
+
+### 동시 접속 — 인기 상품 재고만 (`stock_hot`)
+
+| VU | 지연 없음 | 1ms | 3ms |
+| ---: | ---: | ---: | ---: |
+| 800 | 800 / 18.5ms | 800 / 22.5ms | 787 / 26.4ms |
+
+재고만이면 3ms에서도 VU 800까지 천장에 닿지 않았다(요청당 왕복 약 4번).
+
+### JVM 힙·GC (동시 접속 구간)
+
+힙 최대 약 340MB(한도 512MB), 단계별 GC 멈춤은 60초 중 최대 약 1.6초(1ms, `pair_hot` VU 800 = 2.7%)로 병목이 아니다.
+요청당 할당량은 재고 약 260KB, 상세+재고 평균 약 500KB/요청으로 크다. 목록(약 0.8MB/요청, GR-164)과 함께 응답 경로를 볼 때의 단서로 남긴다.
+
+## 해석
+
+- **처리량 천장 = 커넥션 10개 ÷ 요청당 커넥션 점유 시간**(GR-164)이 여기서도 그대로 맞는다. 다만 상세·재고는 쿼리가 아니라 **DB 왕복 횟수**가 점유 시간을 정한다.
+  한 쌍은 왕복 약 15번이라, 3ms 지연이면 점유 약 45ms → 10 ÷ 0.045 ≈ 초당 220쌍(HTTP 약 440건)이다. 실측 431건과 같다. 1ms면 점유 약 17~18ms → 초당 약 560~590쌍(HTTP 약 1,150건), 실측 1,161건과 같다.
+- 로컬처럼 DB가 같은 머신이면 상세·재고는 병목이 아니다. **운영처럼 DB가 네트워크 너머면 왕복 시간 × 왕복 수가 곧 천장**이다.
+  예를 들어 1000명이 SSE 알림마다 상세+재고를 1초 간격으로 다시 부르면 초당 1,000쌍이 필요한데, 왕복 1ms만으로 약 580쌍에서 막힌다.
+- 대응 후보는 두 가지다.
+  - **왕복 수 줄이기(GR-184):** 상세 쿼리 9개를 줄이면 같은 지연에서 천장이 비례해서 오른다. 캐시 정합성 문제가 없어 먼저 볼 후보다.
+  - **응답 캐시(GR-183):** 인기 상품에 몰린 재조회를 DB까지 보내지 않는다. 왕복과 함께 Supabase egress(무료 티어 월 5GB)도 줄인다.
+- 어느 쪽이 필요한지는 실제 EC2↔Supabase 왕복 시간(GR-186)과 성능 목표(GR-182)로 정한다.
+
+## 한계
+
+- backend·DB 모두 CPU 제한이 없다. Supabase Nano(공유 CPU)에서는 쿼리 자체도 느려져 천장이 더 낮을 수 있다.
+- netem은 postgres 송신(응답 방향)에만 고정 지연을 건다. 실제 네트워크의 지연 편차·패킷 손실은 흉내 내지 않는다.
+- 단일 상품 집중(hot)과 고른 분산(random) 두 패턴만 봤다. 실제 트래픽 비중은 GR-182 목표 정의를 따른다.
+- SSE 연결 자체와 재조회를 함께 거는 측정은 GR-180 범위다.

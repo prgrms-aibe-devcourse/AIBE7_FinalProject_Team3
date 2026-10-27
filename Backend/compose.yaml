@@ -18,6 +18,8 @@ services:
       GRAB_MOCK_CONFIRM_UNKNOWN_RATE: ${GRAB_MOCK_CONFIRM_UNKNOWN_RATE:-0}
       GRAB_MOCK_CANCEL_UNKNOWN_RATE: ${GRAB_MOCK_CANCEL_UNKNOWN_RATE:-0}
       GRAB_MOCK_RESOLVE_DELAY_SECONDS: ${GRAB_MOCK_RESOLVE_DELAY_SECONDS:-20}
+      # GR-172 부하테스트에서 배송 단계 Mock 자동 진행을 쓸지. 기본은 꺼짐(운영과 동일)
+      GRAB_MOCK_DELIVERY_ENABLED: ${GRAB_MOCK_DELIVERY_ENABLED:-false}
       DATA_GO_KR_SERVICE_KEY: ${DATA_GO_KR_SERVICE_KEY:-}
       # 기본값을 두지 않는다. .env에 없으면 빈 값이 전달되어 backend가 기동에 실패한다
       JWT_SECRET: ${JWT_SECRET}
@@ -38,6 +40,10 @@ services:
       SUPABASE_DROP_IMAGE_BUCKET: ${SUPABASE_DROP_IMAGE_BUCKET:-drop-images}
       SUPABASE_SELLER_DOCUMENT_BUCKET: ${SUPABASE_SELLER_DOCUMENT_BUCKET:-seller-documents}
       SUPABASE_PROFILE_IMAGE_BUCKET: ${SUPABASE_PROFILE_IMAGE_BUCKET:-profile-images}
+      # 수요 분석 설명 LLM(GR-146). 비워 두면 설명 생성 없이 계산만 동작한다
+      DEMAND_LLM_PROVIDER: ${DEMAND_LLM_PROVIDER:-none}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
       # 쿠키를 포함한 요청을 허용할 프론트엔드 Origin. 기본값은 로컬 Vite 개발 서버다
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
       REDIS_HOST: redis

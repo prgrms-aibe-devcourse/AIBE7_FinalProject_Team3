@@ -1,0 +1,11 @@
+# GR-164 목록 쿼리 측정 전용 오버라이드. 스왑만 차단하고 그 밖의 자원은 제한하지 않는 것이 목적이다.
+# 도커는 memswap_limit을 mem_limit 없이 줄 수 없어 넉넉한 한도(2GiB)를 함께 두고, 같은 값으로 스왑을 0으로 만든다.
+# 측정 중 메모리 사용량을 함께 기록해(stats.sh) 이 한도가 결과에 영향을 주지 않았음을 확인한다. CPU는 제한하지 않는다.
+#   docker compose -f compose.yaml -f k6/drop-list-scale/compose.swapoff.yaml up -d
+services:
+  backend:
+    mem_limit: 2g
+    memswap_limit: 2g
+  postgres:
+    mem_limit: 2g
+    memswap_limit: 2g

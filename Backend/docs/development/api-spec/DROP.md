@@ -95,7 +95,7 @@ GET /api/v1/drops
 >
 > `status`는 저장된 DROP 상태 기준입니다. 판매 시작 시각(`saleStartsAt`)이 지나도 전환 배치(GR-18)가 실행되기 전까지 `WISH`로 보일 수 있으며, 이때 WISH 등록·취소는 `GRAB_ALREADY_STARTED`(409)로 거부됩니다.
 
-인기 정렬은 예외적으로 서버 시각의 실제 탐색 단계로 후보를 정합니다. `status=WISH&sort=wishCount,desc`는 저장 상태 WISH이면서 `now < saleStartsAt`인 상품의 활성 WISH(`wishes.canceled_at IS NULL`) 수를 사용합니다. `status=GRAB&sort=soldQuantity,desc`는 저장 상태 WISH 또는 GRAB이며 `saleStartsAt <= now < saleEndsAt`인 상품 중 활성 SKU의 가용 재고가 1개 이상인 상품만 반환합니다. 취소·종료·비공개 상품은 제외합니다. GRAB 점수는 `paid_at IS NOT NULL AND canceled_at IS NULL`인 주문의 `order_items.quantity` 합계이며 미결제·만료·취소 주문과 결제 시도 횟수는 포함하지 않습니다. 점수가 같으면 두 정렬 모두 `publishedAt DESC, id DESC`를 적용하고 0건 상품도 포함합니다. 해당 인기 정렬은 지정한 상태 조합에서만 허용하며 `status` 생략·다른 상태·오름차순은 거부합니다. 메인은 각각 `page=0&size=8`, 목록은 `size=24`로 조회하며, `categoryId`·`keyword`·`soldOut` 필터는 기존대로 적용합니다. 인기 GRAB 후보는 이미 가용 재고가 있는 상품뿐이므로 `soldOut=true`를 함께 보내면 오류 없이 빈 목록을 반환하고, `soldOut=false`는 결과에 영향을 주지 않습니다. 서버 시각은 조회 시 한 번 고정하고 상태 전환 배치 지연과 무관하게 판정합니다. 응답의 `status`는 기존처럼 저장 상태를 표시하므로 인기 GRAB 결과가 전환 지연 중에는 `WISH`일 수 있습니다. 화면은 조회 영역과 상세 `actions`를 기준으로 구매 동작을 결정합니다.
+인기 정렬은 예외적으로 서버 시각의 실제 탐색 단계로 후보를 정합니다. `status=WISH&sort=wishCount,desc`는 저장 상태 WISH이면서 `now < saleStartsAt`인 상품의 활성 WISH(`wishes.canceled_at IS NULL`) 수를 사용합니다. `status=GRAB&sort=soldQuantity,desc`는 저장 상태 WISH 또는 GRAB이며 `saleStartsAt <= now < saleEndsAt`인 상품 중 활성 SKU의 가용 재고가 1개 이상인 상품만 반환합니다. 취소·종료·비공개 상품은 제외합니다. GRAB 점수는 `paid_at IS NOT NULL AND canceled_at IS NULL`인 주문의 `order_items.quantity` 합계이며 미결제·만료·취소 주문과 결제 시도 횟수는 포함하지 않습니다. 서버는 이 값을 상품의 전체 SKU(비활성 포함) `sold_quantity` 합으로 계산합니다. `sold_quantity`는 결제 확정과 결제 후 취소에서만 주문 상태와 같은 트랜잭션으로 바뀌므로 두 값은 같습니다(ERD 3.2·3.3). 판매 수량을 바꾸는 경로가 추가되면 이 동등성을 다시 확인합니다. 점수가 같으면 두 정렬 모두 `publishedAt DESC, id DESC`를 적용하고 0건 상품도 포함합니다. 해당 인기 정렬은 지정한 상태 조합에서만 허용하며 `status` 생략·다른 상태·오름차순은 거부합니다. 메인은 각각 `page=0&size=8`, 목록은 `size=24`로 조회하며, `categoryId`·`keyword`·`soldOut` 필터는 기존대로 적용합니다. 인기 GRAB 후보는 이미 가용 재고가 있는 상품뿐이므로 `soldOut=true`를 함께 보내면 오류 없이 빈 목록을 반환하고, `soldOut=false`는 결과에 영향을 주지 않습니다. 서버 시각은 조회 시 한 번 고정하고 상태 전환 배치 지연과 무관하게 판정합니다. 응답의 `status`는 기존처럼 저장 상태를 표시하므로 인기 GRAB 결과가 전환 지연 중에는 `WISH`일 수 있습니다. 화면은 조회 영역과 상세 `actions`를 기준으로 구매 동작을 결정합니다.
 
 **오류 코드:**
 - `INVALID_REQUEST` — `page`가 0 미만, `size`가 1 미만 또는 100 초과, 허용되지 않은 `status`·`sort` 값·인기 정렬/상태 조합, 숫자가 아닌 `categoryId`, `keyword` 100자 초과
@@ -607,10 +607,69 @@ GET /api/v1/seller/drops/{dropId}/stocks
 - `DROP_NOT_FOUND` — 없는 DROP
 - `DROP_ACCESS_DENIED` — 다른 판매자의 DROP
 
+### 2.8 사진 기반 DROP 초안 (AI, GR-187)
+
+```http
+POST /api/v1/seller/drop-drafts
+```
+
+- **인증**: `SELLER`
+
+DROP 생성·DRAFT 편집 폼에서 업로드를 마친 이미지(이미지 업로드 API 1.1)로 상품명·설명·카테고리·이미지 대체 설명 **초안**을 만든다(DROP-010). 저장하지 않는다. 화면은 응답을 기본 정보·대체 설명 칸에 채우고, 이미 입력한 칸은 판매자가 덮어쓰기를 허락할 때만 바꾼다. 판매자가 확인 후 저장해야 DROP에 반영된다. 가격·재고·옵션·일정·배송은 만들지 않는다.
+
+**요청:**
+
+```json
+{
+  "images": [
+    {
+      "imageId": "7c0d3a1e-1b2f-4c55-9d1e-2a4b6c8d0e1f",
+      "imageUrl": "https://<project>.supabase.co/storage/v1/object/public/drop-images/images/7c0d3a1e-1b2f-4c55-9d1e-2a4b6c8d0e1f.jpg"
+    }
+  ]
+}
+```
+
+- `images`: 필수 1~3개. 폼의 이미지 순서대로 보낸다(GALLERY 우선). `imageId`·`imageUrl`은 업로드 URL 발급 응답 값 그대로이며, DROP 저장(2.1)과 같은 규칙으로 `imageUrl`이 `imageId`의 공개 이미지 URL인지 확인한다. 다른 주소는 내려받지 않는다(서버 측 요청 위조 방지).
+
+**응답:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "name": "블랙 오버핏 니트 가디건",
+    "description": "도톰한 짜임의 블랙 니트 가디건입니다. 여유 있는 오버핏 실루엣에 앞여밈 단추 5개가 달려 있습니다.",
+    "categoryId": 1,
+    "images": [
+      { "imageId": "7c0d3a1e-1b2f-4c55-9d1e-2a4b6c8d0e1f", "altText": "블랙 니트 가디건 정면 사진" }
+    ]
+  }
+}
+```
+
+- 항목마다 검증에 실패하면 그 항목만 `null`이다(상품명 100자, 설명 1,000자, 대체 설명 300자 초과 또는 빈 값, 카테고리가 활성 목록에 없음). 모든 항목이 `null`이면 `AI_DRAFT_FAILED`다.
+- `categoryId`는 활성 카테고리 중 하나이거나, 사진으로 판단할 수 없으면 `null`이다.
+
+**처리 규칙:**
+
+- LLM에는 이미지와 활성 카테고리 코드·이름 목록만 보낸다. 판매자가 폼에 입력한 텍스트는 보내지 않는다.
+- 사진 속 글자는 상품 정보로만 읽고 지시로 따르지 않는다. 응답 형식은 JSON으로 고정하고 응답 스키마(항목·타입)도 함께 넘긴다. 스키마 없이 JSON 형식만 지정하면 가벼운 모델이 객체 뒤에 문장 조각을 반복해 붙여 응답 전체가 버려지는 일이 있었다.
+- 사진으로 확인할 수 없는 사실(정품 여부, 최저가, 소재 함량, 원산지, 효능 등)은 쓰지 않는다. 확인할 수 없는 내용은 빼고 보이는 특징만 설명한다.
+- 호출 시간 제한 20초, 재시도하지 않는다. 설명 생성(9초)과 HTTP 시간 제한이 달라 전용 Gemini Client(HTTP 19초)로 호출하고, 모델·온도는 공용 설정(`spring.ai.google.genai.chat.options`)을 따른다. 판매자별 하루(KST) 20회까지 요청할 수 있다(Redis 카운터, 설정 `grab.drop.ai-draft.*`). 한도는 요청 수로 세며 실패한 호출도 포함한다.
+- LLM 모델이 설정되지 않았으면(`DEMAND_LLM_PROVIDER=none`) `AI_DRAFT_UNAVAILABLE`이다. 폼의 다른 기능에는 영향이 없다.
+- 결과 지표: `grab.drop.ai-draft`(`outcome`: `generated`, `partial`, `failed`), 응답 시간, 토큰 사용량.
+
+**오류 코드:**
+- `VALIDATION_FAILED` — 이미지 0개·4개 이상, `imageUrl`이 `imageId`의 공개 이미지 URL이 아님(`field`는 `images[i].imageUrl`)
+- `AI_DRAFT_LIMIT_EXCEEDED` — 하루 요청 한도 초과
+- `AI_DRAFT_UNAVAILABLE` — LLM 모델 미설정
+- `AI_DRAFT_FAILED` — 이미지를 읽지 못함, LLM 호출 실패·시간 초과, 응답 형식 오류
+
 ---
 
 ## 공개 DROP 변경 구독 (GR-110 단계별 구현)
 
 `GET /api/v1/drops/stock-stream?dropIds=100,101`은 재고·판매량·상태 변경 후 기존 조회 API 재사용을 위한 단일·다중 상품 SSE다. 인증은 불필요하되 전달된 무효 인증 쿠키는 기존 JWT 정책상 401이다. 구독은 최대 100개 입력 ID를 허용하며, DRAFT·없는 ID가 하나라도 있으면 전체 404다. WISH·GRAB·ENDED·CANCELED는 허용한다.
 
-성공 응답은 일반 ApiResponse 대신 지속 스트림이다. `ready`, `drop-changed`, `stream-closed`의 필드·예시·오류·복구·조회 경합은 [실시간 변경 전달 계약](../REALTIME_STOCK.md) 6~9절을 정본으로 따른다. 기존 상세·목록·재고 조회 형식은 유지한다. 초기 운영 기본값·검증 목표는 정본 11~13절을 따른다. GR-110에서 endpoint·전송·커밋 후 도메인 자동 알림과 OpenAPI 스냅샷·프론트 생성 타입을 구현했다. 프론트 구독 제어기·화면 갱신은 GR-111/112, Redis·프록시·운영 부하는 GR-113 범위다.
+성공 응답은 일반 ApiResponse 대신 지속 스트림이다. `ready`, `drop-changed`, `stream-closed`의 필드·예시·오류·복구·조회 경합은 [실시간 변경 전달 계약](../REALTIME_STOCK.md) 6~9절을 정본으로 따른다. 기존 상세·목록·재고 조회 형식은 유지한다. 초기 운영 기본값·검증 목표는 정본 11~13절을 따른다. GR-110에서 endpoint·전송·커밋 후 도메인 자동 알림과 OpenAPI 스냅샷·프론트 생성 타입을 구현했다. 프론트 구독 제어기·화면 갱신은 GR-111/112, 프록시·운영 부하는 GR-180 범위이고 다중 서버 Redis 전달은 보류했다(GR-113 취소).

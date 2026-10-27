@@ -164,9 +164,12 @@ public class DropService {
             case WISH_COUNT -> dropRepository.findPopularWishDrops(
                     categoryId, normalizedKeyword, soldOut, OffsetDateTime.now(ZoneOffset.UTC),
                     PageRequest.of(page, size));
-            case SOLD_QUANTITY -> dropRepository.findPopularGrabDrops(
-                    categoryId, normalizedKeyword, soldOut, OffsetDateTime.now(ZoneOffset.UTC),
-                    PageRequest.of(page, size));
+            // 인기 GRAB 후보는 가용 재고가 있는 상품뿐이라 soldOut=true는 항상 빈 목록, false는 필터 없음과 같다.
+            case SOLD_QUANTITY -> Boolean.TRUE.equals(soldOut)
+                    ? Page.empty(PageRequest.of(page, size))
+                    : dropRepository.findPopularGrabDrops(
+                            categoryId, normalizedKeyword, OffsetDateTime.now(ZoneOffset.UTC),
+                            PageRequest.of(page, size));
         };
         return PageResponse.from(drops.map(PublicDropListResponse::from));
     }

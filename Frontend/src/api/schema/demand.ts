@@ -24,6 +24,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/seller/drops/{dropId}/demand-analysis/explanation': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * 수요 분석 설명 요청
+     * @description 판매자가 고른 가정(재계산과 같은 본문, 비우면 기본 가정)으로 계산한 결과를 LLM으로 설명한다. 같은 입력이면 저장된 설명을 다시 쓴다. 생성 실패도 200으로 status에 담는다. 규칙은 DEMAND.md 3절 참고
+     */
+    post: operations['explain']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/seller/drops/{dropId}/demand-analysis/calculate': {
     parameters: {
       query?: never
@@ -168,6 +188,25 @@ export interface components {
       conversionBasis?: 'OWN' | 'MARKET'
       conversionRate?: number
       safetyStockRate?: number
+    }
+    ApiResponseDemandExplanationResponse: {
+      success?: boolean
+      data?: components['schemas']['DemandExplanationResponse']
+      message?: string
+    }
+    DemandExplanation: {
+      summary?: string
+      reasons?: string[]
+      risks?: string[]
+      dataGaps?: string[]
+      notRecommended?: string[]
+    }
+    DemandExplanationResponse: {
+      /** @enum {string} */
+      status?: 'GENERATED' | 'DISCARDED' | 'FAILED' | 'DISABLED'
+      explanation?: components['schemas']['DemandExplanation']
+      /** Format: date-time */
+      generatedAt?: string
     }
     ApiResponseDemandAnalysisResponse: {
       success?: boolean
@@ -345,6 +384,86 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['ApiResponseStockRecommendationResponse']
+        }
+      }
+    }
+  }
+  explain: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        dropId: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['DemandCalculateRequest']
+      }
+    }
+    responses: {
+      /** @description GENERATED, DISCARDED, FAILED, DISABLED */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDemandExplanationResponse']
+        }
+      }
+      /** @description INVALID_REQUEST, VALIDATION_FAILED */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDemandExplanationResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDemandExplanationResponse']
+        }
+      }
+      /** @description ACCESS_DENIED, DROP_ACCESS_DENIED */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDemandExplanationResponse']
+        }
+      }
+      /** @description DROP_NOT_FOUND */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDemandExplanationResponse']
+        }
+      }
+      /** @description DEMAND_ANALYSIS_UNAVAILABLE */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDemandExplanationResponse']
+        }
+      }
+      /** @description DEMAND_EXPLANATION_LIMIT_EXCEEDED */
+      429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDemandExplanationResponse']
         }
       }
     }

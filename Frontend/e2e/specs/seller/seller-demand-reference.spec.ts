@@ -136,3 +136,74 @@ test('기본 분석을 다시 조회하면 이전 재계산 결과와 가정 입
     card.getByRole('radio', { name: '자동 (신뢰도 높은 기준)' }),
   ).toBeChecked()
 })
+
+test('AI 설명은 누를 때만 지금 보이는 결과의 가정으로 요청한다', async ({
+  page,
+}) => {
+  const requests: unknown[] = []
+  page.on('request', (request) => {
+    if (request.url().endsWith('/demand-analysis/explanation'))
+      requests.push(request.postDataJSON())
+  })
+  await page.goto('/#/seller/drops/101')
+  const card = page.getByRole('region', { name: '수요 분석' })
+  const panel = card.getByRole('region', { name: 'AI 설명' })
+  await expect(panel).toContainText('기본 가정으로 계산한 결과')
+  expect(requests).toHaveLength(0)
+
+  await panel.getByRole('button', { name: 'AI 설명 보기' }).click()
+  await expect(panel).toContainText(
+    '시장 평균 전환율을 적용하면 예상 판매량은 82개, 준비 권장 수량은 91개입니다.',
+  )
+  await expect(panel).toContainText('위험')
+  expect(requests).toEqual([{}])
+
+  // 다시 계산하면 이전 설명을 지우고, 다시 누르면 고른 가정으로 요청한다
+  await card.getByText('근거와 가정 보기').click()
+  await card.getByRole('radio', { name: '내 실적' }).check()
+  await card.getByRole('button', { name: '다시 계산' }).click()
+  await expect(panel).toContainText('다시 계산한 가정으로 계산한 결과')
+  await expect(panel).not.toContainText('시장 평균 전환율을 적용하면')
+  await panel.getByRole('button', { name: 'AI 설명 보기' }).click()
+  await expect(panel).toContainText('내 실적 전환율을 적용하면')
+  expect(requests[1]).toEqual({ conversionBasis: 'OWN', safetyStockRate: 0.1 })
+})
+
+test('AI 설명을 만들지 못하거나 한도를 넘으면 이유를 안내하고 계산 결과는 그대로 둔다', async ({
+  page,
+}) => {
+  let call = 0
+  await page.route(
+    '**/api/v1/seller/drops/101/demand-analysis/explanation',
+    (route) =>
+      ++call === 1
+        ? route.fulfill({
+            json: {
+              success: true,
+              data: { status: 'DISCARDED', explanation: null },
+            },
+          })
+        : route.fulfill({
+            status: 429,
+            json: {
+              success: false,
+              error: {
+                code: 'DEMAND_EXPLANATION_LIMIT_EXCEEDED',
+                fieldErrors: [],
+              },
+            },
+          }),
+  )
+  await page.goto('/#/seller/drops/101')
+  const card = page.getByRole('region', { name: '수요 분석' })
+  const panel = card.getByRole('region', { name: 'AI 설명' })
+  await panel.getByRole('button', { name: 'AI 설명 보기' }).click()
+  await expect(panel).toContainText('계산 결과와 맞지 않는 설명이 나와')
+  await panel.getByRole('button', { name: '다시 요청' }).click()
+  await expect(panel.getByRole('alert')).toContainText(
+    '오늘 요청할 수 있는 AI 설명 횟수를 모두 썼어요',
+  )
+  await expect(card.locator('.demand-metrics')).toContainText(
+    '준비 권장 수량91개',
+  )
+})

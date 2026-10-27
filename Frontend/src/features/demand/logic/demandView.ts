@@ -151,6 +151,14 @@ export function toCalculateRequest(
   return request
 }
 
+// 설명이 없을 때 이유를 알린다. GENERATED는 설명을 그대로 보여 주므로 문구가 없다(DEMAND.md 3.1)
+export const EXPLANATION_STATUS_TEXT: Record<string, string> = {
+  DISCARDED:
+    '계산 결과와 맞지 않는 설명이 나와 보여 주지 않았어요. 계산 결과를 참고해주세요.',
+  FAILED: 'AI 설명을 만들지 못했어요. 잠시 후 다시 시도해주세요.',
+  DISABLED: '지금은 AI 설명을 쓸 수 없어요. 계산 결과를 참고해주세요.',
+}
+
 // 기본 가정 대비 바뀐 수량. 어느 한쪽이라도 계산하지 못했으면 비교하지 않는다.
 export function planChange(base?: DemandAnalysis, next?: DemandAnalysis) {
   const diff = (a?: number | null, b?: number | null) =>
@@ -163,6 +171,8 @@ export function planChange(base?: DemandAnalysis, next?: DemandAnalysis) {
 
 const ERROR_MESSAGES: Record<string, string> = {
   DEMAND_ANALYSIS_UNAVAILABLE: '판매가 시작되어 수요 분석을 볼 수 없어요.',
+  DEMAND_EXPLANATION_LIMIT_EXCEEDED:
+    '오늘 요청할 수 있는 AI 설명 횟수를 모두 썼어요. 내일 다시 시도해주세요.',
   VALIDATION_FAILED:
     '입력값을 확인해주세요. 전환율은 1~100%, 안전 재고율은 0~100%예요.',
   DROP_ACCESS_DENIED: '이 DROP을 관리할 권한이 없어요.',

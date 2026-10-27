@@ -19,9 +19,14 @@ import useAuth from '../../features/auth/logic/useAuth'
 import { categoryKeys } from '../../features/drop/logic/queryKeys'
 import StockRecommendationPanel from '../../features/demand/components/StockRecommendationPanel'
 import { applyRecommendedStock } from '../../features/demand/logic/stockRecommendation'
+import DropAiDraftPanel from '../../features/seller/components/DropAiDraftPanel'
 import DropImageField from '../../features/seller/components/DropImageField'
 import DropFieldErrors from '../../features/seller/components/DropFieldErrors'
 import OptionGroupBuilder from '../../features/seller/OptionGroupBuilder'
+import {
+  applyDropAiDraft,
+  draftOverwrites,
+} from '../../features/seller/logic/dropAiDraft'
 import {
   rebuildSkuValues,
   toSellerDropRequest,
@@ -231,13 +236,42 @@ function SellerDropForm({
             <div className="section-number">01</div>
             <div className="form-content">
               <h2>기본 정보</h2>
+              <DropAiDraftPanel
+                gallery={gallery}
+                uploading={uploading}
+                onDraft={(draft) => {
+                  const categoryIds = (categories.data ?? []).flatMap(
+                    (category) =>
+                      category.categoryId ? [category.categoryId] : [],
+                  )
+                  const target = { values, gallery }
+                  const overwrite =
+                    draftOverwrites(target, draft, categoryIds) &&
+                    window.confirm(
+                      '이미 입력한 내용도 AI 초안으로 바꿀까요? 취소하면 빈 칸만 채워요.',
+                    )
+                  const next = applyDropAiDraft(
+                    target,
+                    draft,
+                    categoryIds,
+                    overwrite,
+                  )
+                  setValues(next.values)
+                  setGallery(next.gallery)
+                  return next.filled
+                }}
+              />
               <label>
                 상품명
                 <input
                   required
                   name="name"
                   maxLength={200}
-                  defaultValue={values.name ?? ''}
+                  value={values.name ?? ''}
+                  onChange={(event) => {
+                    const name = event.target.value
+                    setValues((current) => ({ ...current, name }))
+                  }}
                   placeholder="상품 이름"
                 />
                 <DropFieldErrors field="name" errors={fields} />
@@ -247,7 +281,11 @@ function SellerDropForm({
                 <textarea
                   required
                   name="description"
-                  defaultValue={values.description ?? ''}
+                  value={values.description ?? ''}
+                  onChange={(event) => {
+                    const description = event.target.value
+                    setValues((current) => ({ ...current, description }))
+                  }}
                   rows={4}
                   placeholder="상품과 브랜드의 이야기를 적어주세요."
                 />

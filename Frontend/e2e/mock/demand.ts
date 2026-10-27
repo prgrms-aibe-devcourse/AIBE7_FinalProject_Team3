@@ -267,4 +267,31 @@ export async function installDemandApi(page: Page) {
       return json(route, { success: true, data: analyze(body) })
     },
   )
+  // 수요 분석 설명(DEMAND.md 3.1). 요청한 가정으로 계산한 수량을 그대로 문장에 넣는다
+  await page.route(
+    '**/api/v1/seller/drops/*/demand-analysis/explanation',
+    async (route) => {
+      const request = route.request()
+      if (request.method() !== 'POST') return route.fallback()
+      const body: CalculateRequest = request.postDataJSON() ?? {}
+      const plan = analyze(body).plan!
+      const basis = body.conversionBasis === 'OWN' ? '내 실적' : '시장 평균'
+      return json(route, {
+        success: true,
+        data: {
+          status: 'GENERATED',
+          explanation: {
+            summary: `${basis} 전환율을 적용하면 예상 판매량은 ${plan.expected}개, 준비 권장 수량은 ${plan.recommended}개입니다.`,
+            reasons: ['활성 WISH 248명을 기준으로 계산했습니다.'],
+            risks: [
+              'WISH 없이 구매한 사용자가 많으면 예상보다 빨리 품절될 수 있습니다.',
+            ],
+            dataGaps: [],
+            notRecommended: [],
+          },
+          generatedAt: FIXED_NOW.toISOString(),
+        },
+      })
+    },
+  )
 }
