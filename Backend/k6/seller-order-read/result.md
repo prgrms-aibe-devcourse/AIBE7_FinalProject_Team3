@@ -87,3 +87,13 @@ VARCHAR) IS NOT NULL`로 바꿔, `paymentStatus`가 없을 때 LATERAL 서브쿼
   애초에 이 경우는 필터링에 필요한 비용이라 최적화 대상이 아님)
 - 기존 회귀 테스트(`OrderRepositoryTest#findsSellerOrdersWithLatestPaymentAndOptionalFilters`)가
   필터 있음/없음 두 경로 모두 통과함을 확인(5개 테스트 전부 통과)
+
+**운영 DB 왕복(RTT) 반영**: 위 수치는 로컬 docker 네트워크(RTT 사실상 0)에서 잰
+DB 실행시간만이다. 운영 Supabase psql 실측 RTT(`SELECT 1` 기준 3.2~3.5ms, 3ms로
+계산)를 더하면, `findSellerOrders` 목록 조회 1페이지는 본문 쿼리·countQuery 각각
+별도 DB 호출이라 왕복 2회가 든다:
+- 적용 전: 78.1ms(본문) + 726.8ms(count) + 2×3ms(RTT) = **약 810.9ms**
+- 적용 후(인덱스+countQuery 수정 모두 반영): 0.2ms(본문) + 52.9ms(count) + 2×3ms(RTT)
+  = **약 59.1ms**
+- API 기준 개선폭은 **약 13.7배**다. "본문 쿼리만 390배"는 countQuery 병목을 가리는
+  과장된 비교였고, 실제 체감 개선은 이 13.7배가 맞다.
