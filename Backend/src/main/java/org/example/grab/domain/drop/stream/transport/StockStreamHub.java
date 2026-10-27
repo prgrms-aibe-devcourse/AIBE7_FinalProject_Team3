@@ -267,7 +267,7 @@ public class StockStreamHub implements SmartLifecycle {
                 write(connection, SseEmitter.event().name("stream-closed").data(closeReason.event(), MediaType.APPLICATION_JSON));
                 dispose(connection);
             } else if (!changes.isEmpty()) {
-                // 공개 → DRAFT 전이·물리 삭제가 없어 구독 시점 검증으로 충분하다. 비공개 전이가 생기면 여기서 다시 검증한다(GR-163).
+                // 공개 → DRAFT 전이·물리 삭제가 없어 구독 시점 검증으로 충분하다. 비공개 전이가 생기면 커밋 후 이벤트로 해당 상품 구독을 종료한다(REALTIME_STOCK 8절, GR-163).
                 for (StockStreamEvent.Changed change : changes) {
                     write(connection, SseEmitter.event().name("drop-changed").data(change, MediaType.APPLICATION_JSON));
                 }
