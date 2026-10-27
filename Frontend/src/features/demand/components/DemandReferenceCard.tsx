@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import type { DemandAnalysis } from '../../../api/demand/demand'
 import EmptyState from '../../../components/EmptyState/EmptyState'
 import { dateLabel } from '../../../utils/date'
@@ -105,13 +104,7 @@ export default function DemandReferenceCard({ dropId }: { dropId: number }) {
         {(shown.notes ?? []).map((note) => (
           <li key={note}>{note}</li>
         ))}
-        <li>
-          참고용이며 재고를 바꾸지 않아요. 재고는{' '}
-          <Link className="text-link" to={`/seller/inventory?dropId=${dropId}`}>
-            옵션별 재고
-          </Link>
-          에서 조정해주세요.
-        </li>
+        <li>참고용이며 재고를 바꾸지 않아요.</li>
       </ul>
     </section>
   )

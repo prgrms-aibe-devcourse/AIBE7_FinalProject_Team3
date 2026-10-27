@@ -24,10 +24,8 @@ test('판매 시작 전 WISH DROP 상세에만 수요 분석 참고 카드를 �
   await expect(
     card.getByRole('button', { name: /저장|수락|거절/ }),
   ).toHaveCount(0)
-  await expect(card.getByRole('link', { name: '옵션별 재고' })).toHaveAttribute(
-    'href',
-    '#/seller/inventory?dropId=101',
-  )
+  // 공개 후에는 재고를 수정할 수 없어 재고 조정 링크를 두지 않는다
+  await expect(card.getByRole('link')).toHaveCount(0)
 
   await page.goto('/#/seller/drops/401')
   await expect(page.getByRole('heading', { name: '상품 정보' })).toBeVisible()
