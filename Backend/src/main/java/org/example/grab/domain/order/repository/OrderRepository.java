@@ -52,7 +52,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                 WHERE p.order_id = o.id
                 ORDER BY p.created_at DESC, p.id DESC
                 LIMIT 1
-            ) payment ON TRUE
+            ) payment ON CAST(:paymentStatus AS VARCHAR) IS NOT NULL
             WHERE (CAST(:dropId AS BIGINT) IS NULL OR o.drop_id = :dropId)
               AND (CAST(:orderStatus AS VARCHAR) IS NULL OR o.status = :orderStatus)
               AND (CAST(:paymentStatus AS VARCHAR) IS NULL OR payment.status = :paymentStatus)
