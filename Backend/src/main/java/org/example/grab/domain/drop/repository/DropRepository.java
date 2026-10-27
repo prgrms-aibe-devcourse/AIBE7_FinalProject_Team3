@@ -174,18 +174,16 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
     /*
      * 인기 GRAB 목록(DISC-007). 판매 수량 내림차순, 동률은 published_at DESC, id DESC로 고정한다.
      * 판매 수량은 결제 확정·미취소 주문(paid_at IS NOT NULL AND canceled_at IS NULL)의 order_items.quantity 합이다.
-     * 미결제·만료·취소 주문과 결제 시도 횟수는 세지 않는다. 주문은 DROP 하나에만 속하므로
-     * orders(drop_id, ...) 인덱스로 주문을 좁힌 뒤 order_items를 붙이고, 상관 서브쿼리로 DROP별 합을 구해
-     * 다중 옵션·다중 주문이 목록 행을 늘리거나 다른 집계를 부풀리지 않게 한다.
+     * 미결제·만료·취소 주문과 결제 시도 횟수는 세지 않는다. 이 합은 DROP의 모든 SKU(비활성 포함) sold_quantity 합과 같다.
+     * sold_quantity는 결제 확정(markPaid와 같은 트랜잭션에서 reserved → sold)과 결제 후 취소(cancel과 같은 트랜잭션에서
+     * sold 감소)에서만 바뀌기 때문이다(ERD.md 3.2·3.3). 그래서 후보마다 orders·order_items를 집계하지 않고
+     * 이미 읽는 drop_options에서 합을 구한다(GR-176). 재고 원장을 바꾸는 경로가 늘면 이 동등성을 다시 확인한다.
      * 정렬·페이징·now 처리는 findPopularWishDrops와 같다.
      */
     @Query(value = PUBLIC_DROP_SELECT + POPULAR_GRAB_WHERE + PUBLIC_DROP_FILTERS + """
-            ORDER BY (SELECT COALESCE(SUM(oi.quantity), 0)
-                        FROM orders od
-                        JOIN order_items oi ON oi.order_id = od.id AND oi.drop_id = od.drop_id
-                       WHERE od.drop_id = d.id
-                         AND od.paid_at IS NOT NULL
-                         AND od.canceled_at IS NULL) DESC,
+            ORDER BY (SELECT COALESCE(SUM(o.sold_quantity), 0)
+                        FROM drop_options o
+                       WHERE o.drop_id = d.id) DESC,
                      d.published_at DESC, d.id DESC
             """,
             countQuery = PUBLIC_DROP_COUNT + POPULAR_GRAB_WHERE + PUBLIC_DROP_FILTERS,
