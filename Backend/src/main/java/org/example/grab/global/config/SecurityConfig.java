@@ -7,6 +7,7 @@ import org.example.grab.global.security.handler.RestAuthenticationEntryPoint;
 import org.example.grab.global.security.jwt.AccessTokenProperties;
 import org.example.grab.global.security.jwt.JwtAuthenticationFilter;
 import org.example.grab.global.security.jwt.JwtProvider;
+import org.example.grab.global.security.password.PasswordHashProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -29,7 +30,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
 
 @Configuration
-@EnableConfigurationProperties({AccessTokenProperties.class, CorsProperties.class})
+@EnableConfigurationProperties({AccessTokenProperties.class, CorsProperties.class, PasswordHashProperties.class})
 public class SecurityConfig {
 
     @Bean

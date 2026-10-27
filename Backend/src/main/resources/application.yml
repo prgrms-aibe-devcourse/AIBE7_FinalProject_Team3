@@ -154,6 +154,13 @@ grab:
         email-window: 24h
         ip-max-requests: 30
         ip-window: 1h
+  # 비밀번호 해시(Argon2id) 동시 실행 상한(GR-178, NFR-014). 해시 1건이 힙 약 19MiB를 잡으므로 동시 실행 수를 묶는다.
+  # 자리가 없으면 acquire-timeout까지 기다리고, 그 안에 차례가 오지 않으면 503 AUTH_TEMPORARILY_UNAVAILABLE로 거부한다
+  password-hash:
+    max-concurrent: 4
+    acquire-timeout: 3s
+    # 거부 응답의 Retry-After 헤더 값. 1초 이상의 정수 초만 허용한다
+    retry-after: 3s
   cors:
     # Credential(쿠키) 요청을 허용할 프론트엔드 Origin(GR-44 M00-04). 기본값은 로컬 Vite 개발 서버다.
     # 여러 개는 쉼표로 구분하고 끝에 /를 붙이지 않는다. 운영을 같은 출처로 서비스하면 쓰이지 않는다
