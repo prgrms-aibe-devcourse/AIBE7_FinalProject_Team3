@@ -201,8 +201,9 @@ class OrderRepositoryTest {
                 SELECT id, 'MOCK', ?, ?, repeat('b', 64), 3500, 'SUCCEEDED', CURRENT_TIMESTAMP
                 FROM orders WHERE public_id = ?
                 """, "payment-new-" + uniqueValue, "client-new-" + uniqueValue, orderId);
-        // 결제 전(페이먼트 없음) 두 번째 주문. countQuery가 paymentStatus 필터 없이도 LATERAL을
-        // 건너뛰지 않고(ON 조건이 항상 참이 되어) 이 주문까지 정확히 세는지 확인하는 용도다(GR-194).
+        // 결제 전(페이먼트 없음) 두 번째 주문. countQuery는 paymentStatus가 null이면 ON 조건이
+        // 거짓이 되어 LATERAL 조회를 건너뛰는데, 그래도 이 주문까지 정확히 세는지 확인하는
+        // 용도다(GR-194).
         jdbcTemplate.queryForObject("""
                 INSERT INTO orders (
                     order_number, buyer_id, drop_id, idempotency_key, request_hash, status,
