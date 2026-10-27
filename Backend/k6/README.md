@@ -35,7 +35,9 @@ k6/
 2. 백엔드 기동: `docker compose up --build` (nano 제한 환경으로 돌리려면 GR-149의
    `docker compose -f compose.yaml -f compose.loadtest-nano.yaml up --build`,
    t3.micro 수준은 `compose.loadtest-micro.yaml`로 바꿔 쓴다. SSE 시나리오는 그 뒤에
-   `-f compose.loadtest-sse.yaml`을 덧붙인다)
+   `-f compose.loadtest-sse.yaml`을 덧붙인다. DB까지 운영 Supabase Nano 수준으로 제한하려면
+   마지막에 `-f compose.loadtest-db-nano.yaml`을 덧붙이고 `k6/drop-detail-scale/netem.sh`로 왕복 지연을
+   건다 — [db-nano/result.md](db-nano/result.md))
 3. 테스트 계정 시드 (최초 1회, 재실행해도 안전):
    ```
    docker compose exec -T postgres psql -U grab -d grab -f - < k6/common/accounts-seed.sql
@@ -61,6 +63,7 @@ verify.sql 실행 명령은 각 SQL 파일 상단 주석을 본다.
 | PG 장애 주입 | [`payment-fault-injection/`](payment-fault-injection/payment-fault-injection.js) | MockPaymentGateway로 결제 승인 거절·결과불명·취소 결과불명을 섞어, 결제 배치(진행 중 결제 정리·취소 재요청)가 해소하는지와 보정 환불 중복 생성 여부를 확인 (`GRAB_PAYMENT_MOCK_GATEWAY_ENABLED=true`와 `GRAB_MOCK_*_RATE`로 실행) | [result.md](payment-fault-injection/result.md) |
 | 공개 DROP 목록 대용량 기준선 | [`drop-list-scale/`](drop-list-scale/drop-list.js) | DROP 5,000건 seed에서 정렬(날짜/인기 WISH/인기 GRAB) × 필터(없음/categoryId/keyword/soldOut) 12개 조합의 실행 계획(`explain.sh`, auto_explain)과 p95를 기록해 개선 후보를 판단하고, 동시 접속 VU 25→800 단계별 처리량·p95·HikariCP 대기(`concurrency.sh`)를 개선 전 기준선으로 남김 (nano 제한 대신 `compose.swapoff.yaml`로 스왑만 차단, k6는 compose 네트워크에서 실행) | [result.md](drop-list-scale/result.md) |
 | 공개 DROP 상세·재고 대용량 기준선 | [`drop-detail-scale/`](drop-detail-scale/measure.sh) | 같은 대용량 seed(옵션 그룹 포함)에서 상세·재고 요청당 쿼리 수·응답시간·동시 접속 천장을 기록하고, `netem.sh`로 DB 왕복 지연(1·3ms)을 주입해 외부 DB(Supabase)에서 왕복 수가 처리량 천장을 정하는지 확인 (`drop-list-scale/concurrency.sh`를 SCRIPT로 재사용) | [result.md](drop-detail-scale/result.md) |
+| 운영 DB 모사 환경 | [`db-nano/`](db-nano/check.sh) | postgres를 Supabase 무료 티어(Nano) 수준(512MiB·스왑 없음, vCPU 1개 가정, `max_connections=60`)으로 제한하는 `compose.loadtest-db-nano.yaml`과 `netem.sh` 왕복 지연이 적용됐는지 확인하고, netem 값별 `SELECT 1` 왕복을 운영 실측(3.2~3.4ms)과 비교 (부하 시나리오가 아니라 GR-180 측정 환경 검증) | [result.md](db-nano/result.md) |
 | WISH 판매 알림 메일 폭주 | [`wish-mail-storm/`](wish-mail-storm/seed.sql) | DROP 오픈 시 WISH 수천 명 규모 알림 메일이 `noticeMailTaskExecutor`(pool=1) 큐에서 적체·유실 없이 처리되는지, 동시/연속 전이가 서로 지연시키는지 (k6 대신 seed.sql + Mailpit 수신 시각 비교로 측정) | [result.md](wish-mail-storm/result.md) |
 | 드롭 상태 전이 배치 | [`drop-transition-batch/`](drop-transition-batch/seed.sql) | DROP 수백 건이 같은 시각에 동시 전이 대상이 될 때 `DropTransitionService`(BATCH_SIZE=500)가 한 스케줄러 주기 안에 전부 처리하는지, 전이 이벤트(메일 트리거)의 동기 수신자 조회가 배치 루프를 지연시키는지 (k6 대신 seed.sql + DB 상태 폴링으로 측정) | [result.md](drop-transition-batch/result.md) |
 | 배송 진행 배치 롱런(soak) | [`shipment-progress-soak/`](shipment-progress-soak/seed.sql) | 평상시 수준의 배송 중 주문량을 장시간 유지해 `ShipmentProgressScheduler`(배송 단계 Mock 자동 진행)의 메모리·커넥션 누수, 배송 상태 전이 중복·유실 여부를 확인 (`GRAB_MOCK_DELIVERY_ENABLED=true`로 실행, HTTP 트리거가 없는 배치라 k6 대신 seed.sql + feed-shipments.sh로 부하를 건다) | [result.md](shipment-progress-soak/result.md) |
