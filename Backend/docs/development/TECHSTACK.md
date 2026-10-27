@@ -18,7 +18,7 @@
 | API Docs | SpringDoc OpenAPI / Swagger UI | 3.1.0 | Spring Boot 4 기반 API 명세를 자동 생성하고 프론트엔드와 공유한다. |
 | Monitoring Endpoint | Spring Boot Actuator | Boot 관리 | 상태 확인, 메트릭 노출 및 배포 성공 여부를 검증한다. |
 | Scheduling | Spring `@Scheduled` + PostgreSQL 인덱스 폴링 | Boot 관리 | DROP 상태(WISH→GRAB→ENDED) 자동 전환, 결제 배치(진행 중 결제 정리·결제 대기 만료·결제 취소 재요청·보정 환불), 배송 단계 Mock 진행. 별도 스케줄러 인프라 없이 기존 DB·인덱스만 사용한다(1.1절, 1.2절). 스케줄러 스레드는 4개(`spring.task.scheduling.pool.size`)로 두어 작업끼리 서로를 기다리지 않게 한다. 기본값 1이면 결제 배치의 PG 지연이 DROP 판매 시작 전환까지 늦춘다. |
-| AI | Spring AI + Google GenAI(Gemini) | 2.0.x | 팀 합의로 도입(GR-146). WISH 단계 수요 분석 결과의 설명을 구조화 JSON으로 생성한다. 계산에는 쓰지 않는다. 모델명은 설정값이며 평가셋으로 비교해 정한다(1.3절, GR-146). |
+| AI | Spring AI + Google GenAI(Gemini) | 2.0.x | 팀 합의로 도입(GR-146). WISH 단계 수요 분석 결과의 설명과 상품 사진 기반 DROP 초안(상품명·설명·카테고리·대체 설명, DROP.md 2.8)을 구조화 JSON으로 생성한다. 계산에는 쓰지 않는다. 모델명은 설정값이며 평가셋으로 비교해 정한다(1.3절, GR-146). |
 | AI Embedding | Spring AI + Google GenAI Embedding | 2.0.x | 팀 합의, GR-147에서 활성화. 유사 상품 표본 선택용 DROP 임베딩을 생성한다(1.3절, GR-147). |
 
 ### 1.1 DROP 상태 자동 전환 선정 이유 (GR-18)

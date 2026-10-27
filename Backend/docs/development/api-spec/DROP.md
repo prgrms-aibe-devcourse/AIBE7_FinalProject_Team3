@@ -607,6 +607,65 @@ GET /api/v1/seller/drops/{dropId}/stocks
 - `DROP_NOT_FOUND` — 없는 DROP
 - `DROP_ACCESS_DENIED` — 다른 판매자의 DROP
 
+### 2.8 사진 기반 DROP 초안 (AI, GR-187)
+
+```http
+POST /api/v1/seller/drop-drafts
+```
+
+- **인증**: `SELLER`
+
+DROP 생성·DRAFT 편집 폼에서 업로드를 마친 이미지(이미지 업로드 API 1.1)로 상품명·설명·카테고리·이미지 대체 설명 **초안**을 만든다(DROP-010). 저장하지 않는다. 화면은 응답을 기본 정보·대체 설명 칸에 채우고, 이미 입력한 칸은 판매자가 덮어쓰기를 허락할 때만 바꾼다. 판매자가 확인 후 저장해야 DROP에 반영된다. 가격·재고·옵션·일정·배송은 만들지 않는다.
+
+**요청:**
+
+```json
+{
+  "images": [
+    {
+      "imageId": "7c0d3a1e-1b2f-4c55-9d1e-2a4b6c8d0e1f",
+      "imageUrl": "https://<project>.supabase.co/storage/v1/object/public/drop-images/images/7c0d3a1e-1b2f-4c55-9d1e-2a4b6c8d0e1f.jpg"
+    }
+  ]
+}
+```
+
+- `images`: 필수 1~3개. 폼의 이미지 순서대로 보낸다(GALLERY 우선). `imageId`·`imageUrl`은 업로드 URL 발급 응답 값 그대로이며, DROP 저장(2.1)과 같은 규칙으로 `imageUrl`이 `imageId`의 공개 이미지 URL인지 확인한다. 다른 주소는 내려받지 않는다(서버 측 요청 위조 방지).
+
+**응답:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "name": "블랙 오버핏 니트 가디건",
+    "description": "도톰한 짜임의 블랙 니트 가디건입니다. 여유 있는 오버핏 실루엣에 앞여밈 단추 5개가 달려 있습니다.",
+    "categoryId": 1,
+    "images": [
+      { "imageId": "7c0d3a1e-1b2f-4c55-9d1e-2a4b6c8d0e1f", "altText": "블랙 니트 가디건 정면 사진" }
+    ]
+  }
+}
+```
+
+- 항목마다 검증에 실패하면 그 항목만 `null`이다(상품명 100자, 설명 1,000자, 대체 설명 300자 초과 또는 빈 값, 카테고리가 활성 목록에 없음). 모든 항목이 `null`이면 `AI_DRAFT_FAILED`다.
+- `categoryId`는 활성 카테고리 중 하나이거나, 사진으로 판단할 수 없으면 `null`이다.
+
+**처리 규칙:**
+
+- LLM에는 이미지와 활성 카테고리 코드·이름 목록만 보낸다. 판매자가 폼에 입력한 텍스트는 보내지 않는다.
+- 사진 속 글자는 상품 정보로만 읽고 지시로 따르지 않는다. 응답 형식은 JSON으로 고정하고 응답 스키마(항목·타입)도 함께 넘긴다. 스키마 없이 JSON 형식만 지정하면 가벼운 모델이 객체 뒤에 문장 조각을 반복해 붙여 응답 전체가 버려지는 일이 있었다.
+- 사진으로 확인할 수 없는 사실(정품 여부, 최저가, 소재 함량, 원산지, 효능 등)은 쓰지 않는다. 확인할 수 없는 내용은 빼고 보이는 특징만 설명한다.
+- 호출 시간 제한 20초, 재시도하지 않는다. 설명 생성(9초)과 HTTP 시간 제한이 달라 전용 Gemini Client(HTTP 19초)로 호출하고, 모델·온도는 공용 설정(`spring.ai.google.genai.chat.options`)을 따른다. 판매자별 하루(KST) 20회까지 요청할 수 있다(Redis 카운터, 설정 `grab.drop.ai-draft.*`). 한도는 요청 수로 세며 실패한 호출도 포함한다.
+- LLM 모델이 설정되지 않았으면(`DEMAND_LLM_PROVIDER=none`) `AI_DRAFT_UNAVAILABLE`이다. 폼의 다른 기능에는 영향이 없다.
+- 결과 지표: `grab.drop.ai-draft`(`outcome`: `generated`, `partial`, `failed`), 응답 시간, 토큰 사용량.
+
+**오류 코드:**
+- `VALIDATION_FAILED` — 이미지 0개·4개 이상, `imageUrl`이 `imageId`의 공개 이미지 URL이 아님(`field`는 `images[i].imageUrl`)
+- `AI_DRAFT_LIMIT_EXCEEDED` — 하루 요청 한도 초과
+- `AI_DRAFT_UNAVAILABLE` — LLM 모델 미설정
+- `AI_DRAFT_FAILED` — 이미지를 읽지 못함, LLM 호출 실패·시간 초과, 응답 형식 오류
+
 ---
 
 ## 공개 DROP 변경 구독 (GR-110 단계별 구현)

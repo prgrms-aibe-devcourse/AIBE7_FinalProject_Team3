@@ -215,6 +215,9 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 | `SALE_NOT_STARTED` | 409 | 판매 시작 전 |
 | `SALE_ENDED` | 409 | 판매 종료 후 |
 | `DUPLICATE_OPTION_COMBINATION` | 409 | 동일한 옵션값 조합의 SKU 중복 |
+| `AI_DRAFT_LIMIT_EXCEEDED` | 429 | 사진 기반 DROP 초안 하루 요청 한도 초과 |
+| `AI_DRAFT_FAILED` | 502 | 사진 기반 DROP 초안 생성 실패(이미지 읽기·LLM 호출·응답 형식) |
+| `AI_DRAFT_UNAVAILABLE` | 503 | 사진 기반 DROP 초안을 쓸 수 없음(LLM 미설정) |
 | `ORDER_NOT_CANCELABLE` | 409 | 취소할 수 없는 주문 |
 | `ORDER_STATUS_CONFLICT` | 409 | 주문 상태 동시 변경 충돌 |
 | `PAYMENT_ALREADY_PROCESSED` | 409 | 이미 처리된 결제 (결제 완료 주문, 진행 중인 결제가 있는 주문, 이미 처리된 `paymentKey`) |
