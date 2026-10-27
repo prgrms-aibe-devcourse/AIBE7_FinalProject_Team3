@@ -6,6 +6,7 @@
 #   Backend/k6/sse-stream/run.sh <이름> <SSE 연결 수> <주문/초> <주문 시간(초)>
 #   Backend/k6/sse-stream/run.sh r0 0 50 300     # SSE 비활성 기준선
 #   Backend/k6/sse-stream/run.sh r2 200 50 300   # 피크
+#   REFETCH=1 Backend/k6/sse-stream/run.sh f800 800 50 180   # GR-180: 알림마다 재조회(sse-clients.mjs 상단 주석)
 #
 # 결과는 out/<이름>-*.{txt,json,log}에 남는다. 주문 p95는 <이름>-k6.json의 "http_req_duration{name:order}".
 # 시드 실패는 즉시 중단하고, 그 밖의 실패(k6 threshold, SSE 준비 수 부족, verify.sql 위반)는 끝까지 기록한 뒤 종료 코드 1로 알린다.
@@ -38,6 +39,9 @@ BACKEND=$(docker compose ps -q backend)
     docker stats --no-stream --format '{{.Name}} {{.CPUPerc}} {{.MemUsage}} {{.MemPerc}}' \
       | grep -E 'backend-1|postgres-1' | sed "s/^/$(date +%s) /"
     echo "$(date +%s) backend-swap $(docker exec $BACKEND cat /sys/fs/cgroup/memory.swap.current 2>/dev/null || echo down)"
+    # GR-180: Tomcat 스레드·HikariCP를 같은 시간축에 남긴다(Prometheus 15초 스크랩보다 촘촘하게).
+    echo "$(date +%s) metrics $(curl -s -m 2 localhost:8080/actuator/prometheus \
+      | awk '/^(tomcat_threads_(busy|current)_threads|tomcat_threads_config_max_threads|hikaricp_connections_(active|pending))[{ ]/{sub(/\{.*\}/, "", $1); printf "%s=%s ", $1, $2}')"
     sleep 3
   done ) > $O/$NAME-stats.txt &
 STATS=$!
@@ -45,12 +49,18 @@ trap 'kill $STATS 2>/dev/null; wait $STATS 2>/dev/null' EXIT
 
 if [ "$CONNS" -gt 0 ]; then
   # 주문 시간 + 램프업 대기(30초) + 마지막 알림 여유(15초)만큼 연결을 유지한다.
-  CONNECTIONS=$CONNS RAMP_SEC=20 DURATION_SEC=$((DUR + 45)) OUT=$O/$NAME-sse.json \
+  CONNECTIONS=$CONNS RAMP_SEC=20 DURATION_SEC=$((DUR + 45)) OUT=$O/$NAME-sse.json REFETCH=${REFETCH:-0} \
     node k6/sse-stream/sse-clients.mjs > $O/$NAME-sse.txt 2>&1 &
   SSE=$!
   sleep 30
 fi
 
+# 회차 조건을 결과와 같이 남긴다(GR-180: 캐시 전후 비교, DB 지연).
+{
+  echo "commit=$(git rev-parse --short HEAD) refetch=${REFETCH:-0}"
+  docker compose exec -T backend printenv GRAB_DROP_CACHE_STORE JDK_JAVA_OPTIONS 2>/dev/null | sed 's/^/backend /'
+  k6/drop-detail-scale/netem.sh show 2>/dev/null | grep qdisc
+} > $O/$NAME-meta.txt
 echo "[$NAME] 주문 ${RATE}/초 × ${DUR}초 시작 (SSE 연결 $CONNS)"
 START=$(date +%s)
 RATE=$RATE DURATION=${DUR}s k6 run -q --summary-export=$O/$NAME-k6.json \
@@ -98,6 +108,7 @@ const s = require(process.argv[1]).metrics["http_req_duration{name:order}"] || {
 console.log(`주문 p50 ${s.med?.toFixed(1)}ms / p95 ${s["p(95)"]?.toFixed(1)}ms / 최대 ${s.max?.toFixed(1)}ms`);
 ' "$PWD/$O/$NAME-k6.json"
 grep -E 'checks_failed|http_req_failed' $O/$NAME-k6.txt
+cat $O/$NAME-meta.txt
 [ "$CONNS" -gt 0 ] && echo "전달 지연: $(tr -d ' \n' < $O/$NAME-latency.json)"
 cat $O/$NAME-prom.txt
 awk '/backend-swap/{if($3=="down")down=1; else if($3>sw)sw=$3} END{printf "backend 스왑 최대 %.1fMiB%s\n", sw/1048576, down?" (측정 중 컨테이너 응답 없음)":""}' $O/$NAME-stats.txt

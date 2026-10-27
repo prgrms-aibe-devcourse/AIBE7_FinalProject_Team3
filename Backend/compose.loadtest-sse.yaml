@@ -11,6 +11,12 @@ services:
       GRAB_STOCKSTREAM_CONNECTRATEMAX: ${GRAB_STOCKSTREAM_CONNECTRATEMAX:-1000}
       # 서버 전체 연결 상한(기본 1000, GR-185. 전송 큐 크기도 이 값을 따른다). GR-157 측정은 200으로 했다.
       GRAB_STOCKSTREAM_MAXCONNECTIONS: ${GRAB_STOCKSTREAM_MAXCONNECTIONS:-1000}
+      # GR-180 Nginx 읽기 유휴 제한 검증에서 heartbeat를 늦춰 데이터 없는 구간을 만든다. 기본값은 application.yml과 같다.
+      GRAB_STOCKSTREAM_HEARTBEATINTERVAL: ${GRAB_STOCKSTREAM_HEARTBEATINTERVAL:-15s}
+      # GR-180 원인 분리용 DB 커넥션 풀 크기. 기본값은 HikariCP 기본(10)과 같다.
+      SPRING_DATASOURCE_HIKARI_MAXIMUMPOOLSIZE: ${GRAB_DB_POOL_SIZE:-10}
+      # GR-180 대기 위치 분리용 Tomcat 스레드 지표(tomcat_threads_busy/current/config_max). 기본 설정에선 노출되지 않는다.
+      SERVER_TOMCAT_MBEANREGISTRY_ENABLED: "true"
 
   postgres:
     # 쿼리별 호출 수 측정용(GR-157 → GR-163 비교). Prometheus 15초 스크랩으로는 쿼리 수를 잡지 못한다.
