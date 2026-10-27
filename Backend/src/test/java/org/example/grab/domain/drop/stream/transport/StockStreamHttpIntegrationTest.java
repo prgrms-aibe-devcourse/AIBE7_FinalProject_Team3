@@ -194,26 +194,6 @@ class StockStreamHttpIntegrationTest {
     }
 
     @Test
-    @DisplayName("기존 구독 상품이 비공개가 되면 변경을 전송하지 않고 재연결 금지 종료를 보낸다")
-    void invalidatesPrivateSubscription() throws Exception {
-        // given: 테스트 DB에서만 상태를 바꿔 향후 비공개 전이를 재현한다. 운영용 API를 추가하지 않는다.
-        Stream stream = open(first.toString());
-        assertThat(stream.next()).contains("ready");
-        jdbc.update("UPDATE drops SET status='DRAFT' WHERE id=?", first);
-
-        // when
-        hub.publish(first, Set.of(StockChange.STATUS));
-
-        // then
-        String frame;
-        do {
-            frame = stream.next();
-            assertThat(frame).doesNotContain("drop-changed");
-        } while (!frame.contains("stream-closed"));
-        assertThat(frame).contains("SUBSCRIPTION_INVALIDATED", "\"reconnect\":false");
-    }
-
-    @Test
     @DisplayName("전체 연결 상한 초과는 JSON 503과 Retry-After이며 다른 IP 슬롯도 보존한다")
     void returnsRetryAfterAtServerLimit() throws Exception {
         // given: 실제 remoteAddr를 조작하지 않고 다른 IP의 예약 슬롯으로 전체 용량을 채운다.

@@ -4,7 +4,6 @@ import org.example.grab.domain.drop.stream.config.StockStreamProperties;
 import org.example.grab.domain.drop.stream.config.StockStreamExecutors;
 import org.example.grab.domain.drop.stream.model.StockChange;
 import org.example.grab.domain.drop.stream.model.StockStreamSubscription;
-import org.example.grab.domain.drop.stream.service.PublicDropSubscriptionService;
 import org.example.grab.domain.drop.stream.service.StockStreamRegistry;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.domain.drop.error.DropErrorCode;
@@ -44,7 +43,6 @@ class StockStreamHubTest {
     private StockStreamHub hub;
     private ThreadPoolExecutor sender;
     private ScheduledThreadPoolExecutor scheduler;
-    private PublicDropSubscriptionService publicDrops;
 
     @BeforeEach
     void setUp() {
@@ -52,10 +50,9 @@ class StockStreamHubTest {
                 Duration.ofMinutes(10), Duration.ofMillis(100), 100, 100, 200, 20, Duration.ofMinutes(1),
                 30, Duration.ofMinutes(1), 10000);
         registry = new StockStreamRegistry(properties, Clock.systemUTC());
-        publicDrops = mock(PublicDropSubscriptionService.class);
         sender = new ThreadPoolExecutor(2, 2, 0, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(200));
         scheduler = new ScheduledThreadPoolExecutor(1);
-        hub = new StockStreamHub(properties, registry, publicDrops, new StockStreamExecutors(sender, scheduler));
+        hub = new StockStreamHub(properties, registry, new StockStreamExecutors(sender, scheduler));
     }
 
     @AfterEach
@@ -89,7 +86,6 @@ class StockStreamHubTest {
             return frames.stream().anyMatch(frame -> frame.contains("drop-changed"));
         });
         assertThat(next(frames)).contains("event:drop-changed", "STOCK", "SALES").doesNotContain("999");
-        verify(publicDrops).validatePublicDrops(List.of(1L));
     }
 
     @Test
@@ -195,28 +191,6 @@ class StockStreamHubTest {
             assertThat(error.getRetryAfterSeconds()).isEqualTo(60);
         });
         assertThat(registry.countConnections()).isZero();
-    }
-
-    @Test
-    @DisplayName("비공개 재검증 실패는 수량 이벤트 없이 구독 무효화 종료로 처리한다")
-    void closesInvalidSubscriptionWithoutData() throws Exception {
-        // given
-        SseEmitter emitter = mock(SseEmitter.class);
-        BlockingQueue<String> frames = capture(emitter);
-        StockStreamSubscription subscription = register(emitter);
-        hub.activate(subscription.id(), () -> true);
-        assertThat(next(frames)).contains("ready");
-        doThrow(new BusinessException(DropErrorCode.DROP_NOT_FOUND)).when(publicDrops).validatePublicDrops(List.of(1L));
-
-        // when
-        hub.publish(1, Set.of(StockChange.STOCK));
-        await(() -> {
-            hub.tick();
-            return registry.countConnections() == 0;
-        });
-
-        // then
-        assertThat(next(frames)).contains("SUBSCRIPTION_INVALIDATED", "reconnect=false").doesNotContain("drop-changed");
     }
 
     @Test
