@@ -101,6 +101,193 @@
           "legendFormat": "idle"
         }
       ]
+    },
+    {
+      "id": 6,
+      "title": "HikariCP 커넥션 획득 횟수",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus-ds" },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-ds" },
+          "expr": "rate(hikaricp_connections_acquire_seconds_count{job=\"backend\"}[1m])",
+          "legendFormat": "acquire/s"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "SSE 연결·구독",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus-ds" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-ds" },
+          "expr": "grab_stock_stream_connections{job=\"backend\"}",
+          "legendFormat": "connections"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-ds" },
+          "expr": "grab_stock_stream_subscriptions{job=\"backend\"}",
+          "legendFormat": "subscriptions (연결×구독 상품)"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-ds" },
+          "expr": "grab_stock_stream_pending{job=\"backend\"}",
+          "legendFormat": "pending (전송 대기 상품)"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "SSE 변경 처리량",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus-ds" },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-ds" },
+          "expr": "rate(grab_stock_stream_signals_total{job=\"backend\"}[1m])",
+          "legendFormat": "signals (재고 변경 발생)"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-ds" },
+          "expr": "rate(grab_stock_stream_merged_total{job=\"backend\"}[1m])",
+          "legendFormat": "merged (병합된 변경)"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-ds" },
+          "expr": "rate(grab_stock_stream_sent_total{job=\"backend\"}[1m])",
+          "legendFormat": "sent (전송한 drop-changed)"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "SSE 거절·실패",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "datasource": { "type": "prometheus", "uid": "prometheus-ds" },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-ds" },
+          "expr": "sum(rate(grab_stock_stream_rejected_total{job=\"backend\"}[1m])) by (reason)",
+          "legendFormat": "rejected {{reason}}"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-ds" },
+          "expr": "rate(grab_stock_stream_failures_total{job=\"backend\"}[1m])",
+          "legendFormat": "send failures"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-ds" },
+          "expr": "rate(grab_stock_stream_timeouts_total{job=\"backend\"}[1m])",
+          "legendFormat": "send timeouts"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-ds" },
+          "expr": "rate(grab_stock_stream_queue_rejected_total{job=\"backend\"}[1m])",
+          "legendFormat": "queue rejected"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "JVM 메모리 합계 (확보 기준)",
+      "description": "JVM이 OS에서 확보한 힙과 힙 외 영역(Metaspace·코드 캐시 등)을 쌓아 보여준다. 여기에 JVM 밖 네이티브 메모리(스레드 스택·malloc 등, 이 대시보드에 없음)가 더해져 컨테이너 메모리가 된다. 빨간 점선은 부하테스트(compose.loadtest-micro.yaml) 컨테이너 한도 1GiB.",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-ds"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes", "min": 0,
+          "custom": {
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "fillOpacity": 30
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "micro 컨테이너 한도 1GiB"
+            },
+            "properties": [
+              {
+                "id": "custom.stacking",
+                "value": {
+                  "mode": "none",
+                  "group": "A"
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus-ds"
+          },
+          "expr": "sum(jvm_memory_committed_bytes{job=\"backend\", area=\"heap\"})",
+          "legendFormat": "heap committed (확보 힙)"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus-ds"
+          },
+          "expr": "sum(jvm_memory_committed_bytes{job=\"backend\", area=\"nonheap\"})",
+          "legendFormat": "nonheap committed (Metaspace·코드 캐시 등)"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus-ds"
+          },
+          "expr": "vector(1073741824)",
+          "legendFormat": "micro 컨테이너 한도 1GiB"
+        }
+      ]
     }
   ]
 }

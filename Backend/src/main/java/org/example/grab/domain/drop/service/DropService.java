@@ -26,6 +26,7 @@ import org.example.grab.domain.drop.repository.DropImageRepository;
 import org.example.grab.domain.drop.repository.DropRepository;
 import org.example.grab.domain.category.service.CategoryService;
 import org.example.grab.domain.drop.event.DropCanceledEvent;
+import org.example.grab.domain.drop.event.DropPublishedEvent;
 import org.example.grab.domain.seller.service.SellerProfileService;
 import org.example.grab.domain.wish.service.WishQueryService;
 import org.example.grab.global.common.ErrorResponse;
@@ -105,6 +106,7 @@ public class DropService {
         drop.publish(OffsetDateTime.now(ZoneOffset.UTC));
         // 공개 이후 카테고리 활성 여부를 마지막으로 확인한다. 실패하면 트랜잭션 롤백으로 WISH 전환이 취소된다.
         validateCategory(drop.getCategoryId());
+        eventPublisher.publishEvent(new DropPublishedEvent(dropId));
         return drop;
     }
 

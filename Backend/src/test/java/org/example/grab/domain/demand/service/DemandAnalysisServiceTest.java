@@ -2,10 +2,12 @@ package org.example.grab.domain.demand.service;
 
 import org.example.grab.domain.demand.config.DemandSuggestionProperties;
 import org.example.grab.domain.demand.dto.AssumptionSource;
+import org.example.grab.domain.demand.dto.ConversionBasis;
 import org.example.grab.domain.demand.dto.ConversionConfidence;
 import org.example.grab.domain.demand.dto.ConversionSample;
 import org.example.grab.domain.demand.dto.DemandAnalysisResponse;
 import org.example.grab.domain.demand.dto.DemandAnalysisResponse.DailyWish;
+import org.example.grab.domain.demand.dto.DemandAnalysisResponse.InitialRecommendation;
 import org.example.grab.domain.demand.dto.DemandCalculateRequest;
 import org.example.grab.domain.demand.dto.DemandDataGap;
 import org.example.grab.domain.demand.dto.DemandOption;
@@ -177,6 +179,47 @@ class DemandAnalysisServiceTest {
         assertThatThrownBy(() -> service.analyze(SELLER_ID, DROP_ID, DemandCalculateRequest.defaults()))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(DemandErrorCode.DEMAND_ANALYSIS_UNAVAILABLE);
+    }
+
+    @Test
+    @DisplayName("공개 시점 재고 추천 기록이 있으면 비교용으로 함께 반환하고, 없으면 null이다")
+    void analyze_includesInitialRecommendation() {
+        // given
+        givenTarget("WISH", NOW.plusDays(1));
+        given(repository.findOwnConversionSample(SELLER_ID, CATEGORY_ID, DROP_ID, 20))
+                .willReturn(ConversionSample.empty());
+        InitialRecommendation initial = new InitialRecommendation(
+                NOW.minusDays(3), ConversionBasis.MARKET, 25, 40, 60, 44, 120);
+        given(repository.findInitialRecommendation(DROP_ID)).willReturn(Optional.of(initial));
+
+        // when
+        DemandAnalysisResponse response = service.analyze(SELLER_ID, DROP_ID, DemandCalculateRequest.defaults());
+
+        // then
+        assertThat(response.initialRecommendation()).isEqualTo(initial);
+        given(repository.findInitialRecommendation(DROP_ID)).willReturn(Optional.empty());
+        assertThat(service.analyze(SELLER_ID, DROP_ID, DemandCalculateRequest.defaults()).initialRecommendation())
+                .isNull();
+    }
+
+    @Test
+    @DisplayName("판매 시작 시점 기록용 계산은 상태·시각 조건 없이 기본 가정으로 하고, 남은 시간은 0이다")
+    void analyzeAtSaleStart_ignoresAvailabilityAndUsesDefaults() {
+        // given: 이미 GRAB으로 전환되고 판매 시작 시각이 지난 DROP
+        TargetDrop started = new TargetDrop(DROP_ID, SELLER_ID, "GRAB", CATEGORY_ID, NOW.minusMinutes(5));
+        given(repository.countActiveWishes(DROP_ID)).willReturn(100L);
+        given(repository.findOwnConversionSample(SELLER_ID, CATEGORY_ID, DROP_ID, 20))
+                .willReturn(new ConversionSample(3, 85, 34, 34));
+        given(repository.findActiveOptions(DROP_ID)).willReturn(List.of(new DemandOption(1, "기본", 40, 0)));
+
+        // when
+        DemandAnalysisResponse response = service.analyzeAtSaleStart(started);
+
+        // then
+        assertThat(response.demand().hoursUntilSaleStart()).isZero();
+        assertThat(response.assumptions().conversionRate().source()).isEqualTo(AssumptionSource.OWN);
+        assertThat(response.assumptions().safetyStockRate().source()).isEqualTo(AssumptionSource.DEFAULT);
+        assertThat(response.plan().expected()).isEqualTo(40);
     }
 
     private void givenTarget(String status, OffsetDateTime saleStartsAt) {
