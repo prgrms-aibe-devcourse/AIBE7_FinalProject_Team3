@@ -3,6 +3,7 @@ package org.example.grab.domain.shipment.service;
 import org.example.grab.domain.order.repository.OrderRepository;
 import org.example.grab.domain.shipment.repository.ShipmentRepository;
 import org.example.grab.global.config.JpaConfig;
+import org.example.grab.support.TestcontainersConfiguration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,7 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ShipmentProgressServiceIntegrationTest {
 
     @Container
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18");
+    static PostgreSQLContainer postgres = new PostgreSQLContainer(TestcontainersConfiguration.POSTGRES_IMAGE);
 
     @DynamicPropertySource
     static void datasourceProperties(DynamicPropertyRegistry registry) {

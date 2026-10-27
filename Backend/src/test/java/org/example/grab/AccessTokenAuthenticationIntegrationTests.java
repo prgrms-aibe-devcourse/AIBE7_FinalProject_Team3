@@ -5,6 +5,7 @@ import org.example.grab.domain.drop.service.DropService;
 import org.example.grab.domain.order.service.OrderQueryService;
 import org.example.grab.global.security.AuthRole;
 import org.example.grab.global.security.jwt.JwtProvider;
+import org.example.grab.support.TestcontainersConfiguration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -42,7 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AccessTokenAuthenticationIntegrationTests {
 
     @Container
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18");
+    static PostgreSQLContainer postgres = new PostgreSQLContainer(TestcontainersConfiguration.POSTGRES_IMAGE);
 
     @DynamicPropertySource
     static void datasourceProperties(DynamicPropertyRegistry registry) {

@@ -44,6 +44,8 @@ services:
       DEMAND_LLM_PROVIDER: ${DEMAND_LLM_PROVIDER:-none}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      DEMAND_EMBEDDING_PROVIDER: ${DEMAND_EMBEDDING_PROVIDER:-none}
+      GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-gemini-embedding-001}
       # 쿠키를 포함한 요청을 허용할 프론트엔드 Origin. 기본값은 로컬 Vite 개발 서버다
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
       REDIS_HOST: redis
@@ -78,7 +80,9 @@ services:
         condition: service_started
 
   postgres:
-    image: postgres:18
+    # pgvector 확장(GR-147) 포함 이미지. 기존 postgres:18과 메이저 버전·데비안 trixie(glibc) 기반이 같아
+    # 기존 데이터 볼륨을 그대로 쓴다. trixie가 아닌 태그는 정렬 규칙(collation) 버전이 달라 경고가 난다
+    image: pgvector/pgvector:0.8.2-pg18-trixie
     environment:
       POSTGRES_DB: grab
       POSTGRES_USER: grab
