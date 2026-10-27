@@ -31,6 +31,13 @@ public class DropAiDraftConfig {
     private static final int POOL_SIZE = 4;
     private static final int QUEUE_CAPACITY = 10;
 
+    /*
+        사진 초안 전용 ChatModel. ChatModel 타입 빈으로 등록하면 자동 구성(@ConditionalOnMissingBean)이
+        수요 분석 설명용 ChatModel을 만들지 않으므로 이 타입으로 감싸 등록한다.
+     */
+    public record DraftChatModel(GoogleGenAiChatModel chatModel) {
+    }
+
     @Bean(name = DROP_AI_DRAFT_TASK_EXECUTOR, defaultCandidate = false)
     public ThreadPoolTaskExecutor dropAiDraftTaskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
@@ -44,7 +51,7 @@ public class DropAiDraftConfig {
     // spring.ai.model.chat=google-genai일 때만 만든다. 키 검사는 공용 Client(DemandExplanationConfig)가 한다
     @Bean
     @ConditionalOnProperty(name = "spring.ai.model.chat", havingValue = "google-genai")
-    public DropAiDraftChatModel dropAiDraftChatModel(
+    public DraftChatModel dropAiDraftChatModel(
             @Value("${spring.ai.google.genai.api-key:}") String apiKey,
             GoogleGenAiChatModel chatModel,
             ObjectProvider<RetryTemplate> retryTemplate,
@@ -57,7 +64,7 @@ public class DropAiDraftConfig {
                         .timeout(Math.toIntExact(properties.httpTimeout().toMillis()))
                         .build())
                 .build();
-        return new DropAiDraftChatModel(GoogleGenAiChatModel.builder()
+        return new DraftChatModel(GoogleGenAiChatModel.builder()
                 .genAiClient(client)
                 .options(chatModel.getOptions())
                 .retryTemplate(retryTemplate.getIfUnique(() -> RetryUtils.DEFAULT_RETRY_TEMPLATE))

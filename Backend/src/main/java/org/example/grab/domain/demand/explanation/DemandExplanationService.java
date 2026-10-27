@@ -9,11 +9,11 @@ import org.example.grab.domain.demand.dto.DemandAnalysisResponse;
 import org.example.grab.domain.demand.dto.DemandCalculateRequest;
 import org.example.grab.domain.demand.error.DemandErrorCode;
 import org.example.grab.domain.demand.explanation.DemandExplanationClient.Generation;
-import org.example.grab.domain.demand.repository.DemandExplanationLimitRepository;
 import org.example.grab.domain.demand.repository.DemandExplanationRepository;
 import org.example.grab.domain.demand.repository.DemandExplanationRepository.StoredExplanation;
 import org.example.grab.domain.demand.service.DemandAnalysisService;
 import org.example.grab.global.error.BusinessException;
+import org.example.grab.global.ratelimit.DailyRequestLimitRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.TaskExecutor;
@@ -25,6 +25,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.HexFormat;
@@ -49,11 +50,13 @@ import java.util.concurrent.TimeoutException;
 public class DemandExplanationService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    // 하루 한도 Redis 키 접두사(DailyRequestLimitRepository)
+    static final String LIMIT_SCOPE = "demand:explanation";
 
     private final DemandAnalysisService demandAnalysisService;
     private final DemandExplanationClient client;
     private final DemandExplanationRepository explanationRepository;
-    private final DemandExplanationLimitRepository limitRepository;
+    private final DailyRequestLimitRepository limitRepository;
     private final DemandExplanationProperties properties;
     private final ObjectMapper objectMapper;
     private final TaskExecutor executor;
@@ -65,7 +68,7 @@ public class DemandExplanationService {
             DemandAnalysisService demandAnalysisService,
             DemandExplanationClient client,
             DemandExplanationRepository explanationRepository,
-            DemandExplanationLimitRepository limitRepository,
+            DailyRequestLimitRepository limitRepository,
             DemandExplanationProperties properties,
             ObjectMapper objectMapper,
             @Qualifier(DemandExplanationConfig.DEMAND_EXPLANATION_TASK_EXECUTOR) TaskExecutor executor,
@@ -79,7 +82,7 @@ public class DemandExplanationService {
             DemandAnalysisService demandAnalysisService,
             DemandExplanationClient client,
             DemandExplanationRepository explanationRepository,
-            DemandExplanationLimitRepository limitRepository,
+            DailyRequestLimitRepository limitRepository,
             DemandExplanationProperties properties,
             ObjectMapper objectMapper,
             TaskExecutor executor,
@@ -110,7 +113,8 @@ public class DemandExplanationService {
             count("reused");
             return toResponse(stored.get());
         }
-        long requests = limitRepository.increment(sellerId, OffsetDateTime.now(clock).atZoneSameInstant(KST).toLocalDate());
+        LocalDate today = OffsetDateTime.now(clock).atZoneSameInstant(KST).toLocalDate();
+        long requests = limitRepository.increment(LIMIT_SCOPE, sellerId, today);
         if (requests > properties.dailyLimit()) {
             throw new BusinessException(DemandErrorCode.DEMAND_EXPLANATION_LIMIT_EXCEEDED);
         }

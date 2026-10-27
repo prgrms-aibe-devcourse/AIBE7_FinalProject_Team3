@@ -14,6 +14,7 @@ import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.global.common.ErrorResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
+import org.example.grab.global.ratelimit.DailyRequestLimitRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.TaskExecutor;
@@ -46,10 +47,12 @@ import java.util.stream.IntStream;
 public class DropAiDraftService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    // 하루 한도 Redis 키 접두사(DailyRequestLimitRepository)
+    static final String LIMIT_SCOPE = "drop:ai-draft";
 
     private final DropAiDraftClient client;
     private final DropAiDraftImageLoader imageLoader;
-    private final DropAiDraftLimitRepository limitRepository;
+    private final DailyRequestLimitRepository limitRepository;
     private final CategoryService categoryService;
     private final DropAiDraftProperties properties;
     private final ObjectMapper objectMapper;
@@ -61,7 +64,7 @@ public class DropAiDraftService {
     public DropAiDraftService(
             DropAiDraftClient client,
             DropAiDraftImageLoader imageLoader,
-            DropAiDraftLimitRepository limitRepository,
+            DailyRequestLimitRepository limitRepository,
             CategoryService categoryService,
             DropAiDraftProperties properties,
             ObjectMapper objectMapper,
@@ -75,7 +78,7 @@ public class DropAiDraftService {
     DropAiDraftService(
             DropAiDraftClient client,
             DropAiDraftImageLoader imageLoader,
-            DropAiDraftLimitRepository limitRepository,
+            DailyRequestLimitRepository limitRepository,
             CategoryService categoryService,
             DropAiDraftProperties properties,
             ObjectMapper objectMapper,
@@ -100,7 +103,7 @@ public class DropAiDraftService {
         if (!client.available()) {
             throw new BusinessException(DropErrorCode.AI_DRAFT_UNAVAILABLE);
         }
-        if (limitRepository.increment(sellerId, LocalDate.now(clock.withZone(KST))) > properties.dailyLimit()) {
+        if (limitRepository.increment(LIMIT_SCOPE, sellerId, LocalDate.now(clock.withZone(KST))) > properties.dailyLimit()) {
             throw new BusinessException(DropErrorCode.AI_DRAFT_LIMIT_EXCEEDED);
         }
 

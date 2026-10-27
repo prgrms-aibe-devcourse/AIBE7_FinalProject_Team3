@@ -10,6 +10,7 @@ import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.global.common.ErrorResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
+import org.example.grab.global.ratelimit.DailyRequestLimitRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -59,7 +60,7 @@ class DropAiDraftServiceTest {
 
     private DropAiDraftClient client;
     private DropAiDraftImageLoader imageLoader;
-    private DropAiDraftLimitRepository limitRepository;
+    private DailyRequestLimitRepository limitRepository;
     private CategoryService categoryService;
     private SimpleMeterRegistry meterRegistry;
 
@@ -67,13 +68,13 @@ class DropAiDraftServiceTest {
     void setUp() throws IOException {
         client = mock(DropAiDraftClient.class);
         imageLoader = mock(DropAiDraftImageLoader.class);
-        limitRepository = mock(DropAiDraftLimitRepository.class);
+        limitRepository = mock(DailyRequestLimitRepository.class);
         categoryService = mock(CategoryService.class);
         meterRegistry = new SimpleMeterRegistry();
         given(client.available()).willReturn(true);
         given(imageLoader.contentTypeOf(any(), anyString())).willReturn(Optional.of("image/jpeg"));
         given(imageLoader.load(anyString(), anyString())).willReturn(new DraftImage(new byte[]{1}, "image/jpeg"));
-        given(limitRepository.increment(anyLong(), any())).willReturn(1L);
+        given(limitRepository.increment(anyString(), anyLong(), any())).willReturn(1L);
         given(categoryService.findActiveCategories()).willReturn(CATEGORIES);
     }
 
@@ -87,7 +88,7 @@ class DropAiDraftServiceTest {
 
         assertThat(response).isEqualTo(new DropAiDraftResponse("블랙 니트 가디건", "도톰한 블랙 니트 가디건입니다.", 1L,
                 List.of(new ImageAltText(FIRST, "가디건 정면"), new ImageAltText(SECOND, "가디건 뒷면"))));
-        verify(limitRepository).increment(SELLER_ID, LocalDate.of(2026, 10, 26));
+        verify(limitRepository).increment(DropAiDraftService.LIMIT_SCOPE, SELLER_ID, LocalDate.of(2026, 10, 26));
         assertThat(meterRegistry.counter("grab.drop.ai-draft", "outcome", "generated").count()).isEqualTo(1);
         assertThat(meterRegistry.summary("grab.drop.ai-draft.tokens", "model", "gemini-2.5-flash").totalAmount())
                 .isEqualTo(900);
@@ -116,7 +117,7 @@ class DropAiDraftServiceTest {
                     assertThat(e.getFieldErrors()).extracting(ErrorResponse.FieldError::field)
                             .containsExactly("images[1].imageUrl");
                 });
-        verify(limitRepository, never()).increment(anyLong(), any());
+        verify(limitRepository, never()).increment(anyString(), anyLong(), any());
         verify(imageLoader, never()).load(anyString(), anyString());
     }
 
@@ -126,10 +127,10 @@ class DropAiDraftServiceTest {
         given(client.available()).willReturn(false);
         assertThatThrownBy(() -> service(Runnable::run, Duration.ofSeconds(20)).draft(SELLER_ID, request(1)))
                 .extracting("errorCode").isEqualTo(DropErrorCode.AI_DRAFT_UNAVAILABLE);
-        verify(limitRepository, never()).increment(anyLong(), any());
+        verify(limitRepository, never()).increment(anyString(), anyLong(), any());
 
         given(client.available()).willReturn(true);
-        given(limitRepository.increment(anyLong(), any())).willReturn(21L);
+        given(limitRepository.increment(anyString(), anyLong(), any())).willReturn(21L);
         assertThatThrownBy(() -> service(Runnable::run, Duration.ofSeconds(20)).draft(SELLER_ID, request(1)))
                 .extracting("errorCode").isEqualTo(DropErrorCode.AI_DRAFT_LIMIT_EXCEEDED);
         verify(imageLoader, never()).load(anyString(), anyString());

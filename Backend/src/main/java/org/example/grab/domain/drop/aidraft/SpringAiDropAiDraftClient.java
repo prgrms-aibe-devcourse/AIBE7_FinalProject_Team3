@@ -22,11 +22,11 @@ import java.util.List;
 @Component
 public class SpringAiDropAiDraftClient implements DropAiDraftClient {
 
-    private final ObjectProvider<DropAiDraftChatModel> chatModelProvider;
+    private final ObjectProvider<DropAiDraftConfig.DraftChatModel> chatModelProvider;
     private final DropAiDraftProperties properties;
 
     public SpringAiDropAiDraftClient(
-            ObjectProvider<DropAiDraftChatModel> chatModelProvider,
+            ObjectProvider<DropAiDraftConfig.DraftChatModel> chatModelProvider,
             DropAiDraftProperties properties
     ) {
         this.chatModelProvider = chatModelProvider;

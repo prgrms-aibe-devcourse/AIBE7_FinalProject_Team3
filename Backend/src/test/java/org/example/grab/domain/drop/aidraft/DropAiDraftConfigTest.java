@@ -36,7 +36,7 @@ class DropAiDraftConfigTest {
                     assertThat(context.getBeansOfType(ChatModel.class)).hasSize(1);
                     assertThat(httpTimeout(context.getBean(Client.class))).contains(9_000);
 
-                    GoogleGenAiChatModel draft = context.getBean(DropAiDraftChatModel.class).chatModel();
+                    GoogleGenAiChatModel draft = context.getBean(DropAiDraftConfig.DraftChatModel.class).chatModel();
                     Client draftClient = (Client) ReflectionTestUtils.getField(draft, "genAiClient");
                     assertThat(httpTimeout(draftClient)).contains(19_000);
                     assertThat(draft.getOptions().getModel()).isEqualTo("gemini-2.5-flash-lite");
@@ -48,7 +48,7 @@ class DropAiDraftConfigTest {
     @DisplayName("Gemini가 꺼져 있으면 사진 초안 전용 ChatModel을 만들지 않는다")
     void dropAiDraftChatModel_absentWhenDisabled() {
         runner.withPropertyValues("spring.ai.model.chat=none")
-                .run(context -> assertThat(context).doesNotHaveBean(DropAiDraftChatModel.class));
+                .run(context -> assertThat(context).doesNotHaveBean(DropAiDraftConfig.DraftChatModel.class));
     }
 
     @Test

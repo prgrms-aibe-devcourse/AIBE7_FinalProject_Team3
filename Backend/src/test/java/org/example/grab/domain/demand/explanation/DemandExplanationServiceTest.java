@@ -6,11 +6,11 @@ import org.example.grab.domain.demand.dto.DemandAnalysisResponse;
 import org.example.grab.domain.demand.dto.DemandCalculateRequest;
 import org.example.grab.domain.demand.error.DemandErrorCode;
 import org.example.grab.domain.demand.explanation.DemandExplanationClient.Generation;
-import org.example.grab.domain.demand.repository.DemandExplanationLimitRepository;
 import org.example.grab.domain.demand.repository.DemandExplanationRepository;
 import org.example.grab.domain.demand.repository.DemandExplanationRepository.StoredExplanation;
 import org.example.grab.domain.demand.service.DemandAnalysisService;
 import org.example.grab.global.error.BusinessException;
+import org.example.grab.global.ratelimit.DailyRequestLimitRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -59,7 +59,7 @@ class DemandExplanationServiceTest {
     private DemandAnalysisService analysisService;
     private DemandExplanationClient client;
     private DemandExplanationRepository repository;
-    private DemandExplanationLimitRepository limitRepository;
+    private DailyRequestLimitRepository limitRepository;
     private SimpleMeterRegistry meterRegistry;
     private String input;
     private String inputHash;
@@ -69,12 +69,12 @@ class DemandExplanationServiceTest {
         analysisService = mock(DemandAnalysisService.class);
         client = mock(DemandExplanationClient.class);
         repository = mock(DemandExplanationRepository.class);
-        limitRepository = mock(DemandExplanationLimitRepository.class);
+        limitRepository = mock(DailyRequestLimitRepository.class);
         meterRegistry = new SimpleMeterRegistry();
         given(analysisService.analyze(SELLER_ID, DROP_ID, REQUEST)).willReturn(analysis);
         given(client.available()).willReturn(true);
         given(repository.find(anyLong(), anyString())).willReturn(Optional.empty());
-        given(limitRepository.increment(anyLong(), any())).willReturn(1L);
+        given(limitRepository.increment(anyString(), anyLong(), any())).willReturn(1L);
         input = DemandExplanationPrompt.input(analysis, objectMapper);
         inputHash = DemandExplanationService.inputHash(input);
     }
@@ -96,7 +96,7 @@ class DemandExplanationServiceTest {
         assertThat(response.generatedAt()).isEqualTo(OffsetDateTime.ofInstant(NOW, ZoneOffset.UTC));
         verify(repository).save(eq(DROP_ID), eq(inputHash), eq("GENERATED"), contains("\"summary\""),
                 eq("gemini-2.5-flash"), eq(DemandExplanationPrompt.VERSION), eq(812), any());
-        verify(limitRepository).increment(SELLER_ID, LocalDate.of(2026, 10, 27));
+        verify(limitRepository).increment(DemandExplanationService.LIMIT_SCOPE, SELLER_ID, LocalDate.of(2026, 10, 27));
         assertThat(meterRegistry.counter("grab.demand.explanation", "outcome", "generated").count()).isEqualTo(1);
         assertThat(meterRegistry.summary("grab.demand.explanation.tokens", "model", "gemini-2.5-flash")
                 .totalAmount()).isEqualTo(812);
@@ -117,7 +117,7 @@ class DemandExplanationServiceTest {
         assertThat(response.explanation().summary()).isEqualTo("저장된 설명");
         assertThat(response.generatedAt()).isEqualTo(storedAt);
         verify(client, never()).generate(anyString(), anyString());
-        verify(limitRepository, never()).increment(anyLong(), any());
+        verify(limitRepository, never()).increment(anyString(), anyLong(), any());
         assertThat(meterRegistry.counter("grab.demand.explanation", "outcome", "reused").count()).isEqualTo(1);
     }
 
@@ -145,14 +145,14 @@ class DemandExplanationServiceTest {
                 .explain(SELLER_ID, DROP_ID, REQUEST);
 
         assertThat(response).isEqualTo(DemandExplanationResponse.of(ExplanationStatus.DISABLED));
-        verify(limitRepository, never()).increment(anyLong(), any());
+        verify(limitRepository, never()).increment(anyString(), anyLong(), any());
         verify(repository, never()).find(anyLong(), anyString());
     }
 
     @Test
     @DisplayName("하루 한도를 넘으면 LLM을 부르지 않고 DEMAND_EXPLANATION_LIMIT_EXCEEDED로 거부한다")
     void explain_rejectsOverDailyLimit() {
-        given(limitRepository.increment(anyLong(), any())).willReturn(31L);
+        given(limitRepository.increment(anyString(), anyLong(), any())).willReturn(31L);
 
         assertThatThrownBy(() -> service(Runnable::run, Duration.ofSeconds(10)).explain(SELLER_ID, DROP_ID, REQUEST))
                 .isInstanceOf(BusinessException.class)

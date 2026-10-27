@@ -30,8 +30,8 @@ class SpringAiDropAiDraftClientTest {
                 .model("gemini-2.5-flash-lite").temperature(0.2).build());
         given(chatModel.call(any(Prompt.class))).willReturn(mock(ChatResponse.class, RETURNS_DEEP_STUBS));
         @SuppressWarnings("unchecked")
-        ObjectProvider<DropAiDraftChatModel> provider = mock(ObjectProvider.class);
-        given(provider.getObject()).willReturn(new DropAiDraftChatModel(chatModel));
+        ObjectProvider<DropAiDraftConfig.DraftChatModel> provider = mock(ObjectProvider.class);
+        given(provider.getObject()).willReturn(new DropAiDraftConfig.DraftChatModel(chatModel));
         DropAiDraftProperties properties = new DropAiDraftProperties(
                 Duration.ofSeconds(20), Duration.ofSeconds(19), Duration.ofSeconds(5), 20, 1024, 0);
 
