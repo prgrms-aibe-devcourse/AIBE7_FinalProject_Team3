@@ -42,3 +42,6 @@ Frontend/dist/
 
 ### 로컬 작업 메모 ###
 todo.md
+
+### macOS ###
+.DS_Store
