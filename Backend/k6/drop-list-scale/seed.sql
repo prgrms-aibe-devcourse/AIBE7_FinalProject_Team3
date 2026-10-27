@@ -237,6 +237,20 @@ COMMIT;
 -- (측정마다 계획이 달라짐). VACUUM까지 해 seed 직후 상태를 항상 같게 만든다. 트랜잭션 밖에서 실행해야 한다.
 VACUUM (ANALYZE) drops, drop_options, drop_images, wishes, orders, order_items;
 
+-- 이 seed 밖의 공개 DROP(다른 시나리오 seed 등)도 공개 목록 쿼리 대상이라 측정에 섞인다.
+-- 있으면 경고만 하고 계속한다. 건수가 의미 있게 크면 DB를 초기화하고 다시 넣거나 결과 해석에 감안한다.
+DO $$
+DECLARE
+    others BIGINT;
+BEGIN
+    SELECT COUNT(*) INTO others
+    FROM drops
+    WHERE status NOT IN ('DRAFT') AND (name IS NULL OR name NOT LIKE 'k6 대용량 %');
+    IF others > 0 THEN
+        RAISE WARNING '이 seed 밖의 공개 DROP %건이 측정 대상에 섞인다', others;
+    END IF;
+END $$;
+
 -- 확인용 분포.
 SELECT d.status, COUNT(*) AS drops,
        COUNT(*) FILTER (WHERE NOT EXISTS (
