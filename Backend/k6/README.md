@@ -25,7 +25,8 @@ k6/
 ├── expiry/
 ├── drop-open-spike/
 ├── steady-read/
-└── login-burst/
+├── login-burst/
+└── sse-stream/              # 연결 유지는 Node(sse-clients.mjs), 주문은 k6(order-load.js)
 ```
 
 ## 0. 사전 준비
@@ -33,7 +34,8 @@ k6/
 1. k6 설치: https://k6.io/docs/get-started/installation/
 2. 백엔드 기동: `docker compose up --build` (nano 제한 환경으로 돌리려면 GR-149의
    `docker compose -f compose.yaml -f compose.loadtest-nano.yaml up --build`,
-   t3.micro 수준은 `compose.loadtest-micro.yaml`로 바꿔 쓴다)
+   t3.micro 수준은 `compose.loadtest-micro.yaml`로 바꿔 쓴다. SSE 시나리오는 그 뒤에
+   `-f compose.loadtest-sse.yaml`을 덧붙인다)
 3. 테스트 계정 시드 (최초 1회, 재실행해도 안전):
    ```
    docker compose exec -T postgres psql -U grab -d grab -f - < k6/common/accounts-seed.sql
@@ -54,6 +56,7 @@ verify.sql 실행 명령은 각 SQL 파일 상단 주석을 본다.
 | 평상시 조회 | [`steady-read/`](steady-read/steady-read.js) | 캐시 없는 상태의 목록/상세 조회 하한선 | [result.md](steady-read/result.md) |
 | DB 커넥션 풀 고갈 | [`connection-pool-exhaustion/`](connection-pool-exhaustion/pool-exhaustion.js) | 풀 크기(기본 10)보다 뚜렷이 많은 동시 요청에 타임아웃/5xx가 나는지 | [result.md](connection-pool-exhaustion/result.md) |
 | 로그인 동시 폭주 | [`login-burst/`](login-burst/login-burst.js) | 로그인(Argon2) 요청이 동시에 몰릴 때 어느 VU부터 5xx·힙 OOM이 나는지, 실패 로그인도 같은 비용인지 (`compose.loadtest-micro.yaml`로 측정. 초기 측정은 임시 설정, 스크립트 상단 주석 참고) | [result.md](login-burst/result.md) |
+| SSE 동시 연결 | [`sse-stream/`](sse-stream/order-load.js) | SSE 200 연결 유지 + 주문 50/초에서 연결 실패·알림 유실·재고 정합성·주문 p95 악화 여부 (`compose.loadtest-micro.yaml` + `compose.loadtest-sse.yaml`로 측정, 한 회차는 [`run.sh`](sse-stream/run.sh)로 실행) | [result.md](sse-stream/result.md) |
 | 결제 배치 롱런(soak) | [`payment-batch-soak/`](payment-batch-soak/payment-batch-soak.js) | 평상시 수준 주문·결제·취소 트래픽을 장시간 유지해 결제 배치의 메모리·커넥션 누수 여부를 확인 (`GRAB_PAYMENT_MOCK_GATEWAY_ENABLED=true`로 실행해 실제 토스를 안 때림) | [result.md](payment-batch-soak/result.md) |
 | PG 장애 주입 | [`payment-fault-injection/`](payment-fault-injection/payment-fault-injection.js) | MockPaymentGateway로 결제 승인 거절·결과불명·취소 결과불명을 섞어, 결제 배치(진행 중 결제 정리·취소 재요청)가 해소하는지와 보정 환불 중복 생성 여부를 확인 (`GRAB_PAYMENT_MOCK_GATEWAY_ENABLED=true`와 `GRAB_MOCK_*_RATE`로 실행) | [result.md](payment-fault-injection/result.md) |
 | WISH 판매 알림 메일 폭주 | [`wish-mail-storm/`](wish-mail-storm/seed.sql) | DROP 오픈 시 WISH 수천 명 규모 알림 메일이 `noticeMailTaskExecutor`(pool=1) 큐에서 적체·유실 없이 처리되는지, 동시/연속 전이가 서로 지연시키는지 (k6 대신 seed.sql + Mailpit 수신 시각 비교로 측정) | [result.md](wish-mail-storm/result.md) |
