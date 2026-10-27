@@ -29,3 +29,20 @@ SELECT calls, round(total_exec_time::numeric, 1) AS total_ms, left(query, 120) A
 FROM pg_stat_statements
 ORDER BY calls DESC
 LIMIT 10;
+
+-- 5) 1)에 행이 있으면 오류로 끝낸다. run.sh는 ON_ERROR_STOP=1로 실행해 회차 실패로 처리한다(위 결과는 이미 출력된 뒤다).
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM drop_options o
+        JOIN drops d ON d.id = o.drop_id
+        WHERE d.name LIKE 'k6 SSE 상품 %'
+          AND (
+                o.reserved_quantity + o.sold_quantity + o.withheld_quantity > o.total_quantity
+                OR o.reserved_quantity < 0 OR o.sold_quantity < 0 OR o.withheld_quantity < 0
+              )
+    ) THEN
+        RAISE EXCEPTION '재고 정합성 위반: 1) 결과 참고';
+    END IF;
+END $$;
