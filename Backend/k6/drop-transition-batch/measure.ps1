@@ -1,4 +1,4 @@
-# PERF(GR-171): DROP 상태 전이 배치 부하 측정. k6를 쓰지 않는다 — 측정 대상이
+﻿# PERF(GR-171): DROP 상태 전이 배치 부하 측정. k6를 쓰지 않는다 — 측정 대상이
 # HTTP 트래픽이 아니라 DropTransitionScheduler(10초 주기) 한 번이 DropTransitionService
 # (BATCH_SIZE=500)·DropTransitionBatchService(FOR UPDATE SKIP LOCKED)로 수백 건을
 # 한 번에 전이시키는 DB 배치
@@ -37,6 +37,11 @@ function Get-GrabCount {
     $escaped = $Name.Replace("'", "''")
     $sql = "SELECT count(*) FROM drops WHERE name = '$escaped' AND status = 'GRAB';"
     $out = docker compose exec -T postgres psql -t -A -U grab -d grab -c $sql
+    if ($LASTEXITCODE -ne 0) {
+        # exec/psql 실패 시 $out은 보통 빈 문자열이라, 체크 없이 [int]로 변환하면 "GRAB 0건"으로
+        # 오인해 "아직 전이 안 됨"과 구별이 안 된다. 조회 실패는 측정 자체를 중단시킨다.
+        throw "DROP 상태 조회 실패(exit $LASTEXITCODE): $sql"
+    }
     return [int]($out -join '').Trim()
 }
 
@@ -76,6 +81,7 @@ else {
     $final = Get-GrabCount -Name $DropName
     Write-Host "경고: 제한 시간(${TimeoutSeconds}초) 안에 전부 전이되지 않음: $final / $ExpectedCount"
     Write-Host "다음 스케줄러 주기로 밀렸을 수 있다 — 백엔드 로그의 DropTransitionService 라인을 확인하세요."
+    exit 1
 }
 Write-Host "내부 배치 왕복 횟수(500+100 등)와 락 경합 여부는 백엔드 로그로 교차 확인한다:"
 Write-Host "  docker compose logs backend --since 2m | Select-String 'DropTransitionService|deadlock|lock'"
