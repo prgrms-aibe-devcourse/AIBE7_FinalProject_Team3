@@ -1,0 +1,15 @@
+# 로그인 부하테스트(GR-161·GR-178, k6/login-burst) 전용 오버라이드. 스펙 파일(micro) 뒤에 겹쳐 쓴다:
+#   docker compose -f compose.yaml -f compose.loadtest-micro.yaml -f compose.loadtest-login.yaml up -d --build backend
+# 다른 시나리오의 측정 조건을 바꾸지 않도록 스펙 파일과 분리했다. 메모리·CPU·힙·GC 종류는 스펙 파일 값을 그대로 쓴다.
+services:
+  backend:
+    environment:
+      # GC 로그. GC 직후 힙(살아 있는 힙)의 분포는 actuator 지표로 볼 수 없어 GC 로그로 센다(result.md 3절).
+      # 스펙 파일의 JDK_JAVA_OPTIONS(-Xmx550m -XX:+UseG1GC)를 덮어쓰지 않도록 JVM이 따로 읽는 JAVA_TOOL_OPTIONS에 둔다.
+      # 단계 사이에 backend를 재시작하지 않아 로그가 한 파일에 쌓이므로, 실제 시각(time)을 붙여 k6 실행 시각으로 구간을 나눈다.
+      # 앱 사용자(1000)가 /app에 쓸 수 없어 /tmp에 남긴다. 컨테이너를 다시 만들면 사라지므로 측정이 끝나면 docker cp로 꺼낸다.
+      JAVA_TOOL_OPTIONS: -Xlog:gc:file=/tmp/gc.log:time,uptime,level,tags:filecount=0
+      # 비밀번호 해시 동시 실행 상한(GR-178). 기본값은 application.yml(grab.password-hash.*)과 같다.
+      # 개선 전 조건(상한 없음)은 Tomcat 최대 스레드(200)보다 큰 값으로 실행한다: GRAB_PASSWORDHASH_MAXCONCURRENT=1000
+      GRAB_PASSWORDHASH_MAXCONCURRENT: ${GRAB_PASSWORDHASH_MAXCONCURRENT:-4}
+      GRAB_PASSWORDHASH_ACQUIRETIMEOUT: ${GRAB_PASSWORDHASH_ACQUIRETIMEOUT:-3s}
