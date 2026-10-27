@@ -9,8 +9,8 @@ import java.time.OffsetDateTime;
 public record SimilarSalesResponse(
         @Schema(nullable = true) Basis basis,
         Reason reason,
-        @Schema(nullable = true) OwnSales own,
-        OthersSales others
+        @Schema(nullable = true) OwnSimilarSales own,
+        OthersSimilarSales others
 ) {
 
     // 기준으로 삼은 쪽. 다른 판매자 지표가 보호 단위 미달이라 쓸 수 없으면 null이다
@@ -41,7 +41,7 @@ public record SimilarSalesResponse(
         ALL_SELLERS
     }
 
-    public record OwnSales(
+    public record OwnSimilarSales(
             Selection selection,
             int dropCount,
             BigDecimal soldOutRate,
@@ -52,7 +52,7 @@ public record SimilarSalesResponse(
     }
 
     // 보호 단위 미달이면 dropCountBand가 NONE이고 지표가 null이다
-    public record OthersSales(
+    public record OthersSimilarSales(
             Selection selection,
             Scope scope,
             String dropCountBand,

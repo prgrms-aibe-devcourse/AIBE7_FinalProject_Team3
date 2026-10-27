@@ -1,7 +1,7 @@
 package org.example.grab.domain.demand.service;
 
-import org.example.grab.domain.demand.dto.SimilarSalesResponse.OthersSales;
-import org.example.grab.domain.demand.dto.SimilarSalesResponse.OwnSales;
+import org.example.grab.domain.demand.dto.SimilarSalesResponse.OthersSimilarSales;
+import org.example.grab.domain.demand.dto.SimilarSalesResponse.OwnSimilarSales;
 import org.example.grab.domain.demand.dto.SimilarSalesResponse.Scope;
 import org.example.grab.domain.demand.dto.SimilarSalesResponse.Selection;
 import org.example.grab.domain.demand.repository.SimilarSalesRepository.SimilarSample;
@@ -27,8 +27,8 @@ final class SimilarSalesCalculator {
     private SimilarSalesCalculator() {
     }
 
-    static OwnSales own(List<SimilarSample> samples, Selection selection) {
-        return new OwnSales(
+    static OwnSimilarSales own(List<SimilarSample> samples, Selection selection) {
+        return new OwnSimilarSales(
                 selection,
                 samples.size(),
                 soldOutRate(samples),
@@ -37,13 +37,13 @@ final class SimilarSalesCalculator {
                 soldPerWish(samples));
     }
 
-    static OthersSales others(List<SimilarSample> samples, Selection selection, Scope scope, OffsetDateTime asOf) {
+    static OthersSimilarSales others(List<SimilarSample> samples, Selection selection, Scope scope, OffsetDateTime asOf) {
         long sellers = samples.stream().map(SimilarSample::sellerId).distinct().count();
         if (sellers < MIN_MARKET_SELLERS || samples.size() < MIN_MARKET_DROPS) {
-            return new OthersSales(selection, scope, "NONE", null, null, null, null, asOf);
+            return new OthersSimilarSales(selection, scope, "NONE", null, null, null, null, asOf);
         }
         Integer minutes = medianSellOutMinutes(samples);
-        return new OthersSales(
+        return new OthersSimilarSales(
                 selection,
                 scope,
                 samples.size() >= MARKET_DROP_BAND ? "20_PLUS" : "10_TO_19",

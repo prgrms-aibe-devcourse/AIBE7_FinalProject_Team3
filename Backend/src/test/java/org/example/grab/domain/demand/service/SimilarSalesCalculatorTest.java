@@ -1,7 +1,7 @@
 package org.example.grab.domain.demand.service;
 
-import org.example.grab.domain.demand.dto.SimilarSalesResponse.OthersSales;
-import org.example.grab.domain.demand.dto.SimilarSalesResponse.OwnSales;
+import org.example.grab.domain.demand.dto.SimilarSalesResponse.OthersSimilarSales;
+import org.example.grab.domain.demand.dto.SimilarSalesResponse.OwnSimilarSales;
 import org.example.grab.domain.demand.dto.SimilarSalesResponse.Scope;
 import org.example.grab.domain.demand.dto.SimilarSalesResponse.Selection;
 import org.example.grab.domain.demand.repository.SimilarSalesRepository.SimilarSample;
@@ -29,7 +29,7 @@ class SimilarSalesCalculatorTest {
                 new SimilarSample(4, 9, 30, 10, false, null, null));
 
         // when
-        OwnSales own = SimilarSalesCalculator.own(samples, Selection.SIMILAR);
+        OwnSimilarSales own = SimilarSalesCalculator.own(samples, Selection.SIMILAR);
 
         // then
         assertThat(own.dropCount()).isEqualTo(4);
@@ -43,7 +43,7 @@ class SimilarSalesCalculatorTest {
     @Test
     @DisplayName("매진된 DROP과 WISH 기록이 없으면 매진 시간·WISH 대비 판매량은 null이다")
     void own_nullWithoutSoldOutOrWishRecords() {
-        OwnSales own = SimilarSalesCalculator.own(List.of(new SimilarSample(1, 9, 10, 5, false, null, null)),
+        OwnSimilarSales own = SimilarSalesCalculator.own(List.of(new SimilarSample(1, 9, 10, 5, false, null, null)),
                 Selection.ALL);
 
         assertThat(own.soldOutRate()).isEqualByComparingTo("0");
@@ -61,8 +61,8 @@ class SimilarSalesCalculatorTest {
                 .mapToObj(i -> new SimilarSample(i, i % 4, 20, 20, true, 7, null)).toList();
 
         // when
-        OthersSales available = SimilarSalesCalculator.others(enough, Selection.SIMILAR, Scope.ALL_SELLERS, AS_OF);
-        OthersSales hidden = SimilarSalesCalculator.others(fewSellers, Selection.SIMILAR, Scope.ALL_SELLERS, AS_OF);
+        OthersSimilarSales available = SimilarSalesCalculator.others(enough, Selection.SIMILAR, Scope.ALL_SELLERS, AS_OF);
+        OthersSimilarSales hidden = SimilarSalesCalculator.others(fewSellers, Selection.SIMILAR, Scope.ALL_SELLERS, AS_OF);
 
         // then
         assertThat(available.dropCountBand()).isEqualTo("10_TO_19");
@@ -81,7 +81,7 @@ class SimilarSalesCalculatorTest {
         List<SimilarSample> samples = IntStream.range(0, 20)
                 .mapToObj(i -> new SimilarSample(i, i % 5, 20, 20, true, 1, null)).toList();
 
-        OthersSales others = SimilarSalesCalculator.others(samples, Selection.CATEGORY, Scope.NEW_SELLERS, AS_OF);
+        OthersSimilarSales others = SimilarSalesCalculator.others(samples, Selection.CATEGORY, Scope.NEW_SELLERS, AS_OF);
 
         assertThat(others.medianSellOutMinutes()).isEqualTo(5);
         assertThat(others.dropCountBand()).isEqualTo("20_PLUS");

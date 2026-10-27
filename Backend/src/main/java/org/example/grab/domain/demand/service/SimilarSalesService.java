@@ -5,8 +5,8 @@ import org.example.grab.domain.demand.config.StockRecommendationProperties;
 import org.example.grab.domain.demand.dto.SimilarSalesRequest;
 import org.example.grab.domain.demand.dto.SimilarSalesResponse;
 import org.example.grab.domain.demand.dto.SimilarSalesResponse.Basis;
-import org.example.grab.domain.demand.dto.SimilarSalesResponse.OthersSales;
-import org.example.grab.domain.demand.dto.SimilarSalesResponse.OwnSales;
+import org.example.grab.domain.demand.dto.SimilarSalesResponse.OthersSimilarSales;
+import org.example.grab.domain.demand.dto.SimilarSalesResponse.OwnSimilarSales;
 import org.example.grab.domain.demand.dto.SimilarSalesResponse.Reason;
 import org.example.grab.domain.demand.dto.SimilarSalesResponse.Scope;
 import org.example.grab.domain.demand.dto.SimilarSalesResponse.Selection;
@@ -137,7 +137,7 @@ public class SimilarSalesService {
                 : !ownSimilar.isEmpty() ? Reason.OWN_FEW
                 : ownEnded > 0 ? Reason.OWN_NOT_SIMILAR
                 : Reason.FIRST_SALE;
-        OwnSales own = null;
+        OwnSimilarSales own = null;
         if (!ownSimilar.isEmpty()) {
             own = SimilarSalesCalculator.own(ownSimilar, Selection.SIMILAR);
         } else if (ownEnded > 0) {
@@ -146,7 +146,7 @@ public class SimilarSalesService {
             own = ownAll.isEmpty() ? null : SimilarSalesCalculator.own(ownAll, Selection.ALL);
         }
 
-        OthersSales others = others(target, reason, asOf);
+        OthersSimilarSales others = others(target, reason, asOf);
         Basis basis = reason == Reason.OWN_ENOUGH ? Basis.OWN : others.available() ? Basis.OTHERS : null;
         return new SimilarSalesResponse(basis, reason, own, others);
     }
@@ -155,11 +155,11 @@ public class SimilarSalesService {
         다른 판매자: 비슷한 굿즈 → 같은 카테고리 전체 순으로 넓힌다. 첫 판매면 비슷한 단계 판매자부터 보고,
         보호 단위를 못 넘으면 전체 판매자로 넓힌다(7.1). 끝까지 못 넘으면 마지막 결과(NONE)를 돌려준다.
      */
-    private OthersSales others(Target target, Reason reason, OffsetDateTime asOf) {
+    private OthersSimilarSales others(Target target, Reason reason, OffsetDateTime asOf) {
         List<Scope> scopes = reason == Reason.FIRST_SALE
                 ? List.of(Scope.NEW_SELLERS, Scope.ALL_SELLERS)
                 : List.of(Scope.ALL_SELLERS);
-        OthersSales last = null;
+        OthersSimilarSales last = null;
         for (Scope scope : scopes) {
             SellerScope sellerScope = scope == Scope.NEW_SELLERS ? SellerScope.NEW_SELLERS : SellerScope.OTHERS;
             if (target.queryVector() != null) {
