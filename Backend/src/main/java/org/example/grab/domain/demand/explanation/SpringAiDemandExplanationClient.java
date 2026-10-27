@@ -14,7 +14,7 @@ import java.util.List;
 
 /*
     Spring AI ChatModel로 설명을 요청한다. spring.ai.model.chat이 none이면 ChatModel 빈이 없어 available()이 false다.
-    응답 형식은 JSON으로 고정하고(responseMimeType), 모델·온도는 spring.ai.google.genai.chat.options 기본값을 쓴다.
+    응답 형식은 JSON으로 고정하고(responseMimeType), 모델·온도는 spring.ai.google.genai.chat.options 기본값을 이어받는다.
  */
 @Component
 public class SpringAiDemandExplanationClient implements DemandExplanationClient {
@@ -38,7 +38,9 @@ public class SpringAiDemandExplanationClient implements DemandExplanationClient 
     @Override
     public Generation generate(String systemPrompt, String input) {
         ChatModel chatModel = chatModelProvider.getObject();
-        GoogleGenAiChatOptions options = GoogleGenAiChatOptions.builder()
+        // 요청에 옵션을 넣으면 기본 옵션과 합치지 않고 그대로 쓴다. 새로 만들면 설정한 모델·온도가 빠지고
+        // 빌더 기본값(gemini-2.5-flash·0.7)으로 나가므로 기본 옵션에서 시작한다
+        GoogleGenAiChatOptions options = ((GoogleGenAiChatOptions) chatModel.getOptions()).mutate()
                 .responseMimeType("application/json")
                 .maxOutputTokens(properties.maxOutputTokens())
                 .thinkingBudget(properties.thinkingBudget())

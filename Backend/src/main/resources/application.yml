@@ -58,6 +58,11 @@ spring:
           options:
             model: ${GEMINI_MODEL:gemini-2.5-flash}
             temperature: 0.2
+    # Spring AI 기본값은 실패 시 최대 10회(2초부터 5배씩 늘어나는 간격) 재시도한다. 서비스가 시간 제한으로 결과를 버려도
+    # 재시도가 뒤에서 계속 돌며 전용 풀 작업자를 몇 분씩 붙잡아 이후 요청까지 실패시켰다. 설명은 재시도하지 않으므로(DEMAND.md 3.4) 끈다
+    # (max-attempts는 첫 호출을 뺀 재시도 횟수다)
+    retry:
+      max-attempts: 0
 
   jpa:
     open-in-view: false
