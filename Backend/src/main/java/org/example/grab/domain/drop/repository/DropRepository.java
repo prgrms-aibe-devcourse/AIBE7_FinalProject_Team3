@@ -166,6 +166,12 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
                      FROM drop_options o WHERE o.drop_id = d.id AND o.is_active) > 0
             """;
 
+    // 관련 DROP 추천(DROP.md 1.4)의 카드. 목록 항목과 같은 형식이며 순서는 호출하는 쪽이 정한다
+    @Query(value = PUBLIC_DROP_SELECT + """
+            WHERE d.id IN (:ids)
+            """, nativeQuery = true)
+    List<PublicDropListProjection> findPublicDropsByIds(@Param("ids") List<Long> ids);
+
     /*
      * 공개 DROP 목록 조회(DISC-001·002·003, STOCK-006). 날짜 정렬은 Pageable Sort로 받는다.
      * statuses는 서비스가 채워 넘기며 DRAFT·CANCELED는 들어오지 않는다. 카테고리는 INNER JOIN이다.

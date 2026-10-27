@@ -330,6 +330,14 @@ class SecurityFilterChainTests {
     }
 
     @Test
+    @DisplayName("관련 DROP 추천은 인증 쿠키 없이 보안을 통과한다")
+    void allowsPublicRelatedDropsWithoutAuthentication() throws Exception {
+        // 매핑된 공개 경로라 인증 없이 통과한다. 없는 DROP이면 404 DROP_NOT_FOUND(401·403이 아님)
+        mockMvc.perform(get("/api/v1/drops/1/related"))
+                .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotIn(401, 403));
+    }
+
+    @Test
     @DisplayName("WISH 등 기존 보호 API는 여전히 인증을 요구한다")
     void stillProtectsWishApi() throws Exception {
         mockMvc.perform(get("/api/v1/drops/1/wish"))
