@@ -2,6 +2,7 @@ package org.example.grab.domain.demand.service;
 
 import org.example.grab.domain.category.service.CategoryService;
 import org.example.grab.domain.demand.config.StockRecommendationProperties;
+import org.example.grab.domain.demand.dto.ConversionBasis;
 import org.example.grab.domain.demand.dto.ConversionConfidence;
 import org.example.grab.domain.demand.dto.SampleSelection;
 import org.example.grab.domain.demand.dto.SalesSample;
@@ -76,9 +77,29 @@ public class StockRecommendationService {
         this.clock = clock;
     }
 
+    /*
+        추천 결과와 기준별로 계산에 쓴 표본. 옵션별 배분(DEMAND.md 7절)이 같은 표본 DROP의 옵션을 읽는 데 쓴다.
+     */
+    public record Calculation(StockRecommendationResponse response, List<SalesSample> ownSamples,
+                              List<SalesSample> marketSamples) {
+
+        // 기준(basis)의 표본. 기준이 없으면 빈 목록이다
+        public List<SalesSample> basisSamples() {
+            if (response.basis() == null) {
+                return List.of();
+            }
+            return response.basis() == ConversionBasis.OWN ? ownSamples : marketSamples;
+        }
+    }
+
     // 카테고리 검증은 DROP 저장과 같은 오류 형식을 쓴다(DROP.md 2.1)
     @Transactional(readOnly = true)
     public StockRecommendationResponse recommend(long sellerId, StockRecommendationRequest request) {
+        return calculateWithSamples(sellerId, request).response();
+    }
+
+    @Transactional(readOnly = true)
+    public Calculation calculateWithSamples(long sellerId, StockRecommendationRequest request) {
         if (!categoryService.isActive(request.categoryId())) {
             throw new BusinessException(
                     CommonErrorCode.VALIDATION_FAILED,
@@ -96,7 +117,7 @@ public class StockRecommendationService {
                 request.optionGroups() == null ? List.of() : request.optionGroups().stream()
                         .map(group -> new OptionGroup(group.name(), group.values()))
                         .toList()));
-        return calculate(sellerId, request.categoryId(), unitPrices, quantities, safetyStockRate, queryVector);
+        return compute(sellerId, request.categoryId(), unitPrices, quantities, safetyStockRate, queryVector);
     }
 
     // 요청 임베딩(pgvector 입력 형식). 만들 수 없으면 null이고 카테고리 기준으로 계산한다(5.1)
@@ -114,6 +135,11 @@ public class StockRecommendationService {
      */
     StockRecommendationResponse calculate(long sellerId, long categoryId, long[] unitPrices, int[] quantities,
                                           BigDecimal safetyStockRate, String queryVector) {
+        return compute(sellerId, categoryId, unitPrices, quantities, safetyStockRate, queryVector).response();
+    }
+
+    private Calculation compute(long sellerId, long categoryId, long[] unitPrices, int[] quantities,
+                                BigDecimal safetyStockRate, String queryVector) {
         OffsetDateTime now = OffsetDateTime.now(clock);
         OffsetDateTime marketAsOf = now.atZoneSameInstant(KST).toLocalDate().atStartOfDay(KST).toOffsetDateTime();
         long referencePrice = StockRecommendationCalculator.referencePrice(unitPrices, quantities);
@@ -124,27 +150,30 @@ public class StockRecommendationService {
 
         // 기준마다 비슷한 상품 표본을 먼저 보고, 신뢰도가 NONE이면 카테고리 표본으로 계산한다(5.1)
         SampleSelection ownSelection = SampleSelection.CATEGORY;
+        List<SalesSample> ownSamples = null;
         OwnSales own = null;
         if (similarity != null) {
-            own = StockRecommendationCalculator.ownSales(
-                    repository.findSimilarOwnSales(sellerId, categoryId, priceRange, similarity, limit));
+            ownSamples = repository.findSimilarOwnSales(sellerId, categoryId, priceRange, similarity, limit);
+            own = StockRecommendationCalculator.ownSales(ownSamples);
             ownSelection = SampleSelection.SIMILAR;
         }
         if (own == null || own.confidence() == ConversionConfidence.NONE) {
-            own = StockRecommendationCalculator.ownSales(
-                    repository.findOwnSales(sellerId, categoryId, priceRange, limit));
+            ownSamples = repository.findOwnSales(sellerId, categoryId, priceRange, limit);
+            own = StockRecommendationCalculator.ownSales(ownSamples);
             ownSelection = SampleSelection.CATEGORY;
         }
         SampleSelection marketSelection = SampleSelection.CATEGORY;
+        List<SalesSample> marketSamples = null;
         MarketSales market = null;
         if (similarity != null) {
-            market = StockRecommendationCalculator.marketSales(repository.findSimilarMarketSales(
-                    sellerId, categoryId, marketAsOf, priceRange, similarity, limit), marketAsOf);
+            marketSamples = repository.findSimilarMarketSales(
+                    sellerId, categoryId, marketAsOf, priceRange, similarity, limit);
+            market = StockRecommendationCalculator.marketSales(marketSamples, marketAsOf);
             marketSelection = SampleSelection.SIMILAR;
         }
         if (market == null || market.confidence() == ConversionConfidence.NONE) {
-            market = StockRecommendationCalculator.marketSales(
-                    repository.findMarketSales(sellerId, categoryId, marketAsOf, priceRange, limit), marketAsOf);
+            marketSamples = repository.findMarketSales(sellerId, categoryId, marketAsOf, priceRange, limit);
+            market = StockRecommendationCalculator.marketSales(marketSamples, marketAsOf);
             marketSelection = SampleSelection.CATEGORY;
         }
         StockRecommendationCalculator.Result result = StockRecommendationCalculator.recommend(
@@ -154,7 +183,7 @@ public class StockRecommendationService {
                 : repository.findMarketSales(sellerId, categoryId, marketAsOf, null,
                         properties.priceReferenceSampleDrops());
 
-        return new StockRecommendationResponse(
+        StockRecommendationResponse response = new StockRecommendationResponse(
                 now.atZoneSameInstant(KST).toOffsetDateTime(),
                 StockRecommendationCalculator.CALCULATION_VERSION,
                 referencePrice,
@@ -165,6 +194,11 @@ public class StockRecommendationService {
                 result.recommendation(),
                 StockRecommendationCalculator.priceReference(referencePrice, priceSamples, properties.priceBandRatio()),
                 result.dataGaps());
+        return new Calculation(response, nullToEmpty(ownSamples), nullToEmpty(marketSamples));
+    }
+
+    private static List<SalesSample> nullToEmpty(List<SalesSample> samples) {
+        return samples == null ? List.of() : samples;
     }
 
     // 대표 가격이 0이면 가격 조건 없이 고른다(5.1)

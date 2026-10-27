@@ -148,7 +148,7 @@ class StockRecommendationCalculatorTest {
     void priceReference_positionsAndBands() {
         // given: 판매자 5명, 가격 1만~3만원(30개), 기준 2만원 → 비슷한 가격대 14,000~26,000원
         List<SalesSample> samples = IntStream.range(0, 30)
-                .mapToObj(i -> new SalesSample(i % 5, 10000 + i * 690L, 40, 20, false)).toList();
+                .mapToObj(i -> new SalesSample(i, i % 5, 10000 + i * 690L, 40, 20, false)).toList();
 
         PriceReference reference = StockRecommendationCalculator.priceReference(20000, samples, BAND);
 
@@ -171,7 +171,7 @@ class StockRecommendationCalculatorTest {
     @DisplayName("다른 판매자 표본이 보호 단위에 못 미치면 참고 가격 범위와 위치를 주지 않는다")
     void priceReference_hidesTypicalRangeBelowMinimumUnit() {
         List<SalesSample> fourSellers = IntStream.range(0, 12)
-                .mapToObj(i -> new SalesSample(i % 4, 20000, 40, 20, false)).toList();
+                .mapToObj(i -> new SalesSample(i, i % 4, 20000, 40, 20, false)).toList();
 
         PriceReference reference = StockRecommendationCalculator.priceReference(20000, fourSellers, BAND);
 
@@ -181,6 +181,6 @@ class StockRecommendationCalculatorTest {
     }
 
     private static SalesSample sample(long sellerId, int sold, int prepared, boolean soldOut) {
-        return new SalesSample(sellerId, 10000, prepared, sold, soldOut);
+        return new SalesSample(0, sellerId, 10000, prepared, sold, soldOut);
     }
 }

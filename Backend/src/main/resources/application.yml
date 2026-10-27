@@ -117,6 +117,10 @@ grab:
     suggestion:
       min-active-wishes: 30
       hours-before-start: 48
+    # 옵션별 재고 배분의 LLM 매칭(수요 분석 API 7절). LLM을 실제로 부르는 요청만 판매자별 하루 daily-limit회로 센다
+    option-match:
+      timeout: 10s
+      daily-limit: 30
     # DROP 임베딩(수요 분석 API 6절). 배치는 임베딩이 없거나 다른 모델로 만든 공개 DROP을 주기마다 batch-size개씩 채운다
     embedding:
       timeout: 10s

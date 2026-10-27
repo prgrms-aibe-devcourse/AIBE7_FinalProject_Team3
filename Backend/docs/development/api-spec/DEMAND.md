@@ -620,7 +620,7 @@ POST /api/v1/seller/stock-recommendations/option-allocation
 
 - `basis`·`sampleSelection`·`recommended`: 5.5와 같다. 기준이 없으면 `recommended`·`options[].recommendedQuantity`가 `null`이고 그룹은 모두 `EVEN`이다.
 - `groups[].allocation`: `SALES`(비슷한 상품 판매 비율), `EVEN`(균등). `sharePercent`는 `SALES`일 때만 정수 %이며 그룹 합이 100이 되도록 최대 나머지 방식으로 맞춘다.
-- `matchStatus`: `TEXT_ONLY`(글자 매칭만으로 끝남), `GENERATED`(LLM 매칭), `REUSED`(저장된 매칭 재사용), `DISCARDED`(LLM 응답 형식 오류로 버림), `FAILED`(호출 실패·시간 초과·대기열 가득 참), `DISABLED`(모델 꺼짐). `DISCARDED`·`FAILED`·`DISABLED`이면 글자 매칭 결과만으로 계산한다.
+- `matchStatus`: `TEXT_ONLY`(글자 매칭만으로 끝남), `GENERATED`(LLM 매칭), `REUSED`(저장된 매칭 재사용), `DISCARDED`(LLM 응답 형식 오류로 버림), `FAILED`(호출 실패·시간 초과·대기열 가득 참), `DISABLED`(모델 꺼짐). `DISCARDED`·`FAILED`·`DISABLED`이면 글자 매칭 결과만으로 계산한다. 기준이 없어 매칭하지 않았으면 `null`이다.
 
 **오류 코드:**
 

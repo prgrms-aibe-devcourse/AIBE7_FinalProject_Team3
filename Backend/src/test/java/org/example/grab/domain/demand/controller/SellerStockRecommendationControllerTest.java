@@ -1,8 +1,10 @@
 package org.example.grab.domain.demand.controller;
 
+import org.example.grab.domain.demand.dto.OptionAllocationRequest;
 import org.example.grab.domain.demand.dto.StockRecommendationRequest;
 import org.example.grab.domain.demand.dto.StockRecommendationRequest.OptionGroupInput;
 import org.example.grab.domain.demand.dto.StockRecommendationRequest.OptionInput;
+import org.example.grab.domain.demand.option.OptionAllocationService;
 import org.example.grab.domain.demand.service.StockRecommendationService;
 import org.example.grab.global.error.GlobalExceptionHandler;
 import org.example.grab.global.error.ValidationErrorCodeResolver;
@@ -33,16 +35,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SellerStockRecommendationControllerTest {
 
     private StockRecommendationService service;
+    private OptionAllocationService optionAllocationService;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         service = mock(StockRecommendationService.class);
+        optionAllocationService = mock(OptionAllocationService.class);
         CurrentSellerIdProvider currentSellerIdProvider = mock(CurrentSellerIdProvider.class);
         given(currentSellerIdProvider.currentSellerId()).willReturn(3L);
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
-        mockMvc = MockMvcBuilders.standaloneSetup(new SellerStockRecommendationController(service, currentSellerIdProvider))
+        mockMvc = MockMvcBuilders.standaloneSetup(new SellerStockRecommendationController(
+                        service, optionAllocationService, currentSellerIdProvider))
                 .setControllerAdvice(new GlobalExceptionHandler(new ValidationErrorCodeResolver(List.of())))
                 .setValidator(validator)
                 .build();
@@ -91,5 +96,36 @@ class SellerStockRecommendationControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
         verify(service, never()).recommend(anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("옵션별 배분은 상품명·설명·옵션 구성과 SKU 값을 받아 로그인한 판매자로 계산한다")
+    void allocate_passesFormInput() throws Exception {
+        mockMvc.perform(post("/api/v1/seller/stock-recommendations/option-allocation")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"categoryId\":7,\"name\":\"티셔츠\",\"description\":\"코튼\","
+                                + "\"optionGroups\":[{\"name\":\"색상\",\"values\":[\"블랙\"]}],"
+                                + "\"options\":[{\"unitPrice\":59000,\"values\":[\"블랙\"]}]}"))
+                .andExpect(status().isOk());
+        verify(optionAllocationService).allocate(3L, new OptionAllocationRequest(7L,
+                List.of(new OptionAllocationRequest.OptionInput(59000L, null, List.of("블랙"))), null,
+                "티셔츠", "코튼", List.of(new OptionGroupInput("색상", List.of("블랙")))));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "{\"categoryId\":7,\"description\":\"코튼\",\"optionGroups\":[{\"name\":\"색상\",\"values\":[\"블랙\"]}],\"options\":[{\"unitPrice\":1,\"values\":[\"블랙\"]}]}",
+            "{\"categoryId\":7,\"name\":\"티셔츠\",\"description\":\"코튼\",\"optionGroups\":[],\"options\":[{\"unitPrice\":1,\"values\":[\"블랙\"]}]}",
+            "{\"categoryId\":7,\"name\":\"티셔츠\",\"description\":\"코튼\",\"optionGroups\":[{\"name\":\"색상\",\"values\":[\"블랙\"]}],\"options\":[{\"unitPrice\":1}]}"
+    })
+    @DisplayName("옵션별 배분은 상품명·옵션 구성·SKU 값이 없으면 VALIDATION_FAILED로 거부한다")
+    void allocate_rejectsMissingCatalog(String body) throws Exception {
+        mockMvc.perform(post("/api/v1/seller/stock-recommendations/option-allocation")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+        verify(optionAllocationService, never()).allocate(org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.any());
     }
 }

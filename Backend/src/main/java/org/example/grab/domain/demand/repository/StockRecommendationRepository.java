@@ -137,6 +137,7 @@ public class StockRecommendationRepository {
     }
 
     private static final RowMapper<SalesSample> SALES_SAMPLE = (resultSet, rowNumber) -> new SalesSample(
+            resultSet.getLong("id"),
             resultSet.getLong("seller_id"),
             resultSet.getLong("reference_price"),
             resultSet.getInt("prepared"),
@@ -163,7 +164,7 @@ public class StockRecommendationRepository {
                 GROUP BY d.id, d.seller_id, d.closed_at
                 HAVING SUM(o.total_quantity) > 0
             )
-            SELECT seller_id, reference_price, prepared, sold, available = 0 AS sold_out
+            SELECT id, seller_id, reference_price, prepared, sold, available = 0 AS sold_out
             FROM candidates
             %s
             ORDER BY %s

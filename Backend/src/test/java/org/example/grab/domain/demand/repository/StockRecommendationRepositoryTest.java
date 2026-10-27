@@ -87,8 +87,8 @@ class StockRecommendationRepositoryTest {
 
         // then: 판매량 합·준비 수량 합·품절(가용 0) 여부를 DROP 단위로 계산한다
         assertThat(samples).containsExactly(
-                new SalesSample(sellerId, 25000, 40, 22, false),
-                new SalesSample(sellerId, 20000, 20, 20, true));
+                new SalesSample(weighted, sellerId, 25000, 40, 22, false),
+                new SalesSample(older, sellerId, 20000, 20, 20, true));
         assertThat(repository.findOwnSales(sellerId, categoryId, AROUND_20000, 1)).hasSize(1);
         assertThat(repository.findOwnSales(sellerId, categoryId, null, 20)).hasSize(3);
     }
@@ -97,7 +97,8 @@ class StockRecommendationRepositoryTest {
     @DisplayName("시장 표본은 본인 DROP과 기준 시점 이후 종료 DROP을 빼고 판매자 ID와 함께 반환한다")
     void findMarketSales_excludesOwnAndRecent() {
         // given
-        insertOption(insertDrop(otherSellerId, categoryId, "ENDED", "TIME_EXPIRED", AS_OF.minusHours(1)), 20000, 10, 4);
+        Long market = insertDrop(otherSellerId, categoryId, "ENDED", "TIME_EXPIRED", AS_OF.minusHours(1));
+        insertOption(market, 20000, 10, 4);
         insertOption(insertDrop(otherSellerId, categoryId, "ENDED", "TIME_EXPIRED", AS_OF), 20000, 10, 4);
         insertOption(insertDrop(sellerId, categoryId, "ENDED", "TIME_EXPIRED", AS_OF.minusHours(1)), 20000, 10, 4);
 
@@ -105,7 +106,7 @@ class StockRecommendationRepositoryTest {
         List<SalesSample> samples = repository.findMarketSales(sellerId, categoryId, AS_OF, AROUND_20000, 20);
 
         // then
-        assertThat(samples).containsExactly(new SalesSample(otherSellerId, 20000, 10, 4, false));
+        assertThat(samples).containsExactly(new SalesSample(market, otherSellerId, 20000, 10, 4, false));
     }
 
     @Test

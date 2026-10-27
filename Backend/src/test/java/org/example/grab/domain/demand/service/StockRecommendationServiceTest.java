@@ -189,6 +189,6 @@ class StockRecommendationServiceTest {
     }
 
     private static SalesSample sample(int sold) {
-        return new SalesSample(SELLER_ID, 20000, 50, sold, false);
+        return new SalesSample(sold, SELLER_ID, 20000, 50, sold, false);
     }
 }
