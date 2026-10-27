@@ -131,9 +131,9 @@ data: {"reason":"RECONNECT_REQUIRED","reconnect":true}
 | reason | reconnect | 처리 |
 | --- | --- | --- |
 | `RECONNECT_REQUIRED` | true | 수명 만료·서버 종료·전달 기반 장애. 지연 분산 후 재접속·ready 후 최신 조회 |
-| `SUBSCRIPTION_INVALIDATED` | false | 등록 후 비공개/삭제 감지. 전체 구독 종료, ID 목록을 보내지 않음. 상세/목록 재조회로 구독 집합 재계산 |
+| `SUBSCRIPTION_INVALIDATED` | false | 예약. 등록 후 비공개/삭제 감지 시 전체 구독 종료, ID 목록을 보내지 않음. 상세/목록 재조회로 구독 집합 재계산. 현재 서버는 보내지 않는다(아래 참고) |
 
-현재 공개 상태에서 DRAFT로 돌아가는 API는 없다. 향후 비공개 전이가 추가되면 전송 전 공개 여부 검증과 무효화를 필수로 구현한다. ENDED·CANCELED는 공개 상태이므로 구독을 종료하지 않고 이후 실제 반환도 전달할 수 있다.
+현재 공개 상태에서 DRAFT로 돌아가는 API와 DROP 물리 삭제 경로는 없다. 그래서 구독 시점 검증을 통과한 상품은 이후에도 공개 상태이며, 서버는 전송 전 공개 여부를 다시 확인하지 않는다(GR-163). 향후 비공개 전이가 추가되면 전송 전 공개 여부 검증과 무효화를 필수로 구현한다. 이때 전송마다 연결별로 조회하지 않고, 비공개 전이 트랜잭션의 커밋 후 이벤트로 해당 상품 구독 연결만 종료한다(3단계 `StockChangePublisher` → `StockChangeListener` 경로와 같은 방식). 프론트는 이 종료 안내 처리를 유지한다. ENDED·CANCELED는 공개 상태이므로 구독을 종료하지 않고 이후 실제 반환도 전달할 수 있다.
 
 EventSource는 Axios 인증·401 인터셉터를 거치지 않고 onerror에 HTTP 상태·JSON 본문·Retry-After를 노출하지 않는다. 프론트는 onerror에서 기존 EventSource를 close하고 하나의 자체 재연결 타이머만 운용한다. 이를 통해 브라우저 자동 재연결과 중복하지 않는다. 진단을 위해 별도 연결 검사 API를 만들지 않는다.
 
@@ -350,11 +350,11 @@ Servlet async 시작 후 최초 onWritePossible 통지를 받은 연결만 활�
 
 송신 스레드 8개·유한 대기 큐(연결 상한 크기)와 timer 2개를 사용한다. 전용 실행기는 소유자 빈 안에 두고 Executor/ScheduledExecutorService 타입으로 노출하지 않아 기존 공용 스케줄러 자동 설정을 대체하지 않는다. 연결마다 타이머나 상시 전용 스레드를 만들지 않는다. 50ms pump에서 연결별 상품 병합 창·수명·정체·IP TTL을 확인한다. 구독 ID 상한과 pending 한도를 설정 시 함께 검증하므로 상품별 pending 집합이 무한 증가하지 않는다. ready 전 변경도 이 집합에 합치고 ready 뒤 전달한다.
 
-동일 연결의 송신은 한 작업으로 직렬화하며, 종료·오류·not-ready·큐 거절은 멱등하게 emitter·인덱스·슬롯·대기 작업을 정리한다. 송신 전 공개 상태를 다시 확인해 DRAFT/삭제가 감지되면 데이터 대신 SUBSCRIPTION_INVALIDATED 종료를 시도한다. CANCELED·ENDED는 계속 공개로 취급한다. 서버 종료는 SmartLifecycle에서 웹 서버 graceful shutdown보다 먼저 종료 안내·정리를 수행한다.
+동일 연결의 송신은 한 작업으로 직렬화하며, 종료·오류·not-ready·큐 거절은 멱등하게 emitter·인덱스·슬롯·대기 작업을 정리한다. 송신 전 공개 상태를 다시 확인해 DRAFT/삭제가 감지되면 데이터 대신 SUBSCRIPTION_INVALIDATED 종료를 시도한다. CANCELED·ENDED는 계속 공개로 취급한다. 이 송신 전 재확인은 비공개 전이가 없어 결과가 항상 같고 연결 수에 비례해 DB 조회를 만들어 GR-163에서 제거했다(8절, `k6/sse-stream/result.md`). 서버 종료는 SmartLifecycle에서 웹 서버 graceful shutdown보다 먼저 종료 안내·정리를 수행한다.
 
 내부 `StockStreamHub.publish`는 로컬 변경 신호의 전달 진입점이다. 이번 단계에서는 테스트가 이를 호출하며, 주문·결제·배치가 자동으로 호출하지 않는다. 운영용 테스트 이벤트 API는 추가하지 않았다. 3단계에서 실제 변경의 커밋 후 전달을 연결한다.
 
-검증은 PostgreSQL Testcontainers와 실제 Tomcat HTTP/TCP에서 수행한다. 두 독립 연결·다중 구독·다른 상품 제외·ready/heartbeat/수명 종료, 연결 전 400/401/404/429/503·JSON/Retry-After, 비공개 감지, 반복 단절을 확인한다. 별도 TCP 시험은 작은 수신 버퍼에서 ready 후 읽기를 멈춰 전송 자원이 30초 연결 수명 전에 정리되는지 확인하며, 운영 피크 부하나 실제 프록시 검증을 대신하지 않는다. 단위 테스트는 병합·ready 경합·정체 감시·큐 거절·실패 격리·종료 정리를 검증한다.
+검증은 PostgreSQL Testcontainers와 실제 Tomcat HTTP/TCP에서 수행한다. 두 독립 연결·다중 구독·다른 상품 제외·ready/heartbeat/수명 종료, 연결 전 400/401/404/429/503·JSON/Retry-After, 비공개 감지(GR-163에서 제거), 반복 단절을 확인한다. 별도 TCP 시험은 작은 수신 버퍼에서 ready 후 읽기를 멈춰 전송 자원이 30초 연결 수명 전에 정리되는지 확인하며, 운영 피크 부하나 실제 프록시 검증을 대신하지 않는다. 단위 테스트는 병합·ready 경합·정체 감시·큐 거절·실패 격리·종료 정리를 검증한다.
 
 최종 검증: `./gradlew build` 전체 테스트 1,596건 성공·실패 0·건너뜀 0으로 통과했다(로컬 init script는 결과 요약 출력용). 기본 테스트 힙의 OOM을 재현해 테스트 JVM 힙을 1GiB로 명시했다. 실제 서버 시험은 전용 PostgreSQL 컨테이너·작은 DB 풀·클래스 종료 시 컨텍스트 정리로 격리한다. 기존 공용 스케줄러의 4개 스레드 설정 보존도 검증했다. 문서 상대 링크·JSON/SSE 예시·공백 검사도 통과했다.
 
