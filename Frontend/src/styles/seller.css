@@ -669,6 +669,23 @@
   font-size: 12px;
   line-height: 1.5;
 }
+.drop-ai-draft {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px dashed var(--line);
+  border-radius: 4px;
+  background: var(--soft);
+}
+.drop-ai-draft-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.drop-ai-draft-head button {
+  flex-shrink: 0;
+}
 .drop-image-picker {
   display: grid;
   gap: 8px;
