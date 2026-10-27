@@ -37,7 +37,11 @@ SELECT setseed(0.164);
 
 DELETE FROM drop_notifications
     WHERE drop_id IN (SELECT id FROM drops WHERE name LIKE 'k6 대용량 %');
-DELETE FROM demand_plans
+DELETE FROM demand_analysis_snapshots
+    WHERE drop_id IN (SELECT id FROM drops WHERE name LIKE 'k6 대용량 %');
+DELETE FROM demand_explanations
+    WHERE drop_id IN (SELECT id FROM drops WHERE name LIKE 'k6 대용량 %');
+DELETE FROM drop_stock_recommendations
     WHERE drop_id IN (SELECT id FROM drops WHERE name LIKE 'k6 대용량 %');
 DELETE FROM order_items
     WHERE drop_id IN (SELECT id FROM drops WHERE name LIKE 'k6 대용량 %');
