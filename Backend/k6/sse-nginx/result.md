@@ -14,7 +14,7 @@
 | 최대 연결 수 (Ubuntu 기본값 흉내) | **미통과** | 워커 2 × `worker_connections 768`에서 1000개 중 **766개**만 연결. `768 worker_connections are not enough` |
 | 최대 연결 수 (올린 값) | **통과** | `worker_connections 4096`, 파일 디스크립터 8192에서 1000개 전원 ready |
 | reload(배포 전환) 중 연결 유지 | **통과** | reload 전후 300개 연결 끊김 0, heartbeat 간격 최대 15.06초. 이전 워커는 `shutting down`으로 남아 기존 연결을 계속 전달 |
-| 종료 시 drain·재접속 | **통과(조건부)** | backend 종료 시 300개 전원이 `stream-closed`(RECONNECT_REQUIRED)를 받고 전원 재접속. 단일 backend라 재기동 중 502가 나서 복구 p50 13.4초 |
+| 종료 시 drain·재접속 | **통과(조건부: 단일 backend 재시작)** | backend 종료 시 300개 전원이 `stream-closed`(RECONNECT_REQUIRED)를 받고 전원 재접속. 단일 backend라 재기동 중 502가 나서 복구 p50 13.4초 |
 
 **운영 조치 필요:** SSE 하나가 Nginx 연결 2개(클라이언트·업스트림)를 쓰므로 기본값(워커당 768)이면 SSE 약 760개에서 막힌다.
 운영 EC2의 `/etc/nginx/nginx.conf`에서 `worker_connections`를 확인하고, 1000 연결을 받으려면 4096 이상과 `worker_rlimit_nofile`
