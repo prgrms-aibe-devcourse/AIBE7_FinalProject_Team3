@@ -17,8 +17,8 @@ FROM orders o JOIN drops d ON d.id = o.drop_id
 WHERE d.name LIKE 'k6 SSE 상품 %';
 
 -- 3) 공개 여부 검증 COUNT 쿼리(countPublicDropsForSubscription) 호출 수.
---    구독 시점 1회(연결 수만큼) + 전송 시점 연결마다 1회(GR-163 제거 대상)가 합쳐져 있다.
---    전송 시점 호출 수 = calls - 연결 성공 수(sse-clients.mjs 요약의 ready 수).
+--    구독 시점 1회(연결 수만큼)만 남는다. GR-163 이전에는 전송 시점 연결마다 1회가 더해졌다.
+--    전송 시점 호출 수 = calls - 연결 성공 수(sse-clients.mjs 요약의 ready 수). GR-163 이후 0이어야 한다.
 SELECT calls, round(total_exec_time::numeric, 1) AS total_ms, round(mean_exec_time::numeric, 3) AS mean_ms, query
 FROM pg_stat_statements
 WHERE query ILIKE 'select count(%from drops%status<>%'
