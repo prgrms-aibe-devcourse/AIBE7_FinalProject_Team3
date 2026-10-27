@@ -6,6 +6,8 @@ import { json } from './api/shared'
 type StockRequest = components['schemas']['StockRecommendationRequest']
 type Analysis = components['schemas']['DemandAnalysisResponse']
 type CalculateRequest = components['schemas']['DemandCalculateRequest']
+type SimilarSalesRequest = components['schemas']['SimilarSalesRequest']
+type SimilarSales = components['schemas']['SimilarSalesResponse']
 
 // 판매 시작 전 WISH DROP(101)만 분석할 수 있다. 수치는 DEMAND.md 1.6 식을 그대로 따른다.
 const DEMAND_DROP_ID = 101
@@ -234,6 +236,75 @@ function recommendStock(request: StockRequest) {
   }
 }
 
+/*
+    비슷한 DROP 실적(DEMAND.md 7절). WISH 단계 DROP 101은 내 비슷한 DROP이 2개라 다른 판매자 자료를 기준으로 한다.
+    생성 단계는 카테고리 1(패션)만 다른 판매자 표본이 있고, 상품명이 있어야 비슷한 굿즈로 고른다.
+ */
+const SIMILAR_AS_OF = '2026-10-01T00:00:00+09:00'
+
+function similarSalesForDrop(): SimilarSales {
+  return {
+    basis: 'OTHERS',
+    reason: 'OWN_FEW',
+    own: {
+      selection: 'SIMILAR',
+      dropCount: 2,
+      soldOutRate: 0.5,
+      medianSellOutMinutes: 12,
+      sellThroughRate: 0.88,
+      soldPerWish: 0.41,
+    },
+    others: {
+      selection: 'SIMILAR',
+      scope: 'ALL_SELLERS',
+      dropCountBand: '10_TO_19',
+      soldOutRate: 0.4,
+      medianSellOutMinutes: 15,
+      sellThroughRate: 0.81,
+      soldPerWish: 0.35,
+      asOf: SIMILAR_AS_OF,
+    },
+  }
+}
+
+function similarSalesForForm(request: SimilarSalesRequest): SimilarSales {
+  const available = request.categoryId === 1
+  const selection = request.name ? 'SIMILAR' : 'CATEGORY'
+  return {
+    basis: available ? 'OTHERS' : null,
+    reason: 'OWN_NOT_SIMILAR',
+    own: {
+      selection: 'ALL',
+      dropCount: 3,
+      soldOutRate: 0.33,
+      medianSellOutMinutes: 40,
+      sellThroughRate: 0.72,
+      soldPerWish: null,
+    },
+    others: available
+      ? {
+          selection,
+          scope: 'ALL_SELLERS',
+          dropCountBand: '20_PLUS',
+          soldOutRate: 0.55,
+          medianSellOutMinutes: 90,
+          sellThroughRate: 0.84,
+          soldPerWish: null,
+          asOf: SIMILAR_AS_OF,
+        }
+      : {
+          selection: 'CATEGORY',
+          scope: 'ALL_SELLERS',
+          dropCountBand: 'NONE',
+          soldOutRate: null,
+          medianSellOutMinutes: null,
+          sellThroughRate: null,
+          soldPerWish: null,
+          asOf: SIMILAR_AS_OF,
+        },
+  }
+}
+
 // 수요 분석 경로만 처리한다. 다른 판매자 경로는 기존 핸들러가 맡는다
 export async function installDemandApi(page: Page) {
   await page.route('**/api/v1/seller/stock-recommendations', async (route) => {
@@ -243,6 +314,23 @@ export async function installDemandApi(page: Page) {
       success: true,
       data: recommendStock(request.postDataJSON()),
     })
+  })
+  await page.route('**/api/v1/seller/similar-sales', async (route) => {
+    const request = route.request()
+    if (request.method() !== 'POST') return route.fallback()
+    return json(route, {
+      success: true,
+      data: similarSalesForForm(request.postDataJSON()),
+    })
+  })
+  await page.route('**/api/v1/seller/drops/*/similar-sales', async (route) => {
+    const match = new URL(route.request().url()).pathname.match(
+      /^\/api\/v1\/seller\/drops\/(\d+)\/similar-sales$/,
+    )
+    if (!match) return route.fallback()
+    if (Number(match[1]) !== DEMAND_DROP_ID)
+      return json(route, error('DEMAND_ANALYSIS_UNAVAILABLE'), 409)
+    return json(route, { success: true, data: similarSalesForDrop() })
   })
   // WISH 단계 수요 분석(DEMAND.md 2.1·2.2). DROP 101 외에는 판매 시작 후로 보고 409를 준다
   await page.route(

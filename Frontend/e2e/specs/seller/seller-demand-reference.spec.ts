@@ -25,6 +25,18 @@ test('판매 시작 전 WISH DROP 상세에만 수요 분석 참고 카드를 �
   await expect(
     card.getByRole('button', { name: /저장|수락|거절/ }),
   ).toHaveCount(0)
+  // 비슷한 DROP 실적: 내 비슷한 DROP이 2개라 다른 판매자 자료를 기준으로 한다(DEMAND.md 7.2)
+  const similar = card.getByRole('region', { name: '비슷한 DROP 실적' })
+  await expect(similar).toContainText(
+    '내 비슷한 DROP이 2개라 다른 판매자의 비슷한 굿즈를 기준으로 했어요.',
+  )
+  await expect(similar).toContainText('표본이 적어 참고용')
+  await expect(similar).toContainText(
+    '비슷한 DROP 2개 중 1개가 매진됐고, 매진까지 보통 12분 걸렸어요.',
+  )
+  await expect(similar.locator('li.is-used')).toContainText(
+    '다른 판매자의 비슷한 굿즈 10~19개 중 40%가 매진됐고, 매진까지 보통 15분 걸렸어요.',
+  )
   // 공개 후에는 재고를 수정할 수 없어 재고 조정 링크를 두지 않는다
   await expect(card.getByRole('link')).toHaveCount(0)
 

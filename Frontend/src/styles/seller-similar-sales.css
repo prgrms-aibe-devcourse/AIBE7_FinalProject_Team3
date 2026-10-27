@@ -1,0 +1,79 @@
+/* 비슷한 DROP 실적(GR-196). 수요 분석 카드 안, DROP 폼 재고 추천 패널 아래에 둔다. */
+.similar-sales {
+  display: grid;
+  gap: 10px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.similar-sales h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.similar-sales-hint,
+.similar-sales small {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.similar-sales-hint .text-link {
+  border: 0;
+  background: none;
+  font-size: 12px;
+}
+.similar-sales-basis {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+.similar-sales-sides {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.similar-sales-sides li {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.similar-sales-sides li.is-used {
+  border-color: var(--ink);
+}
+.similar-sales-sides strong {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.similar-sales-sides strong span {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--line);
+  font-size: 10px;
+}
+.similar-sales-sides li.is-used strong span {
+  background: var(--lime);
+}
+.similar-sales-sides p {
+  margin: 0;
+}
+
+@media (max-width: 720px) {
+  .similar-sales {
+    padding: 14px;
+  }
+  .similar-sales-sides {
+    grid-template-columns: 1fr;
+  }
+}
