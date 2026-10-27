@@ -53,6 +53,18 @@ public final class DropEmbeddingText {
         }
     }
 
+    // pgvector 입력 형식 "[0.1,0.2,...]"
+    public static String toVectorLiteral(float[] embedding) {
+        StringBuilder literal = new StringBuilder("[");
+        for (int i = 0; i < embedding.length; i++) {
+            if (i > 0) {
+                literal.append(',');
+            }
+            literal.append(embedding[i]);
+        }
+        return literal.append(']').toString();
+    }
+
     // 줄바꿈·연속 공백을 공백 하나로 바꿔 형식의 줄 구분을 지킨다
     private static String oneLine(String value) {
         return value == null ? "" : value.strip().replaceAll("\\s+", " ");

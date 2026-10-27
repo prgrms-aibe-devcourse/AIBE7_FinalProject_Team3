@@ -12,10 +12,15 @@ public record StockRecommendationResponse(
         OwnSales own,
         MarketSales market,
         ConversionBasis basis,
+        SampleSelections sampleSelection,
         Recommendation recommendation,
         PriceReference priceReference,
         List<StockDataGap> dataGaps
 ) {
+
+    // 기준마다 표본을 고른 방법(DEMAND.md 5.1)
+    public record SampleSelections(SampleSelection own, SampleSelection market) {
+    }
 
     public record OwnSales(
             Integer soldLow,

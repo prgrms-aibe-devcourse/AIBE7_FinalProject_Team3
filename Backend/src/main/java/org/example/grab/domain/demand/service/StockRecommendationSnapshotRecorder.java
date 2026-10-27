@@ -2,6 +2,7 @@ package org.example.grab.domain.demand.service;
 
 import org.example.grab.domain.demand.dto.StockRecommendationResponse;
 import org.example.grab.domain.demand.dto.StockRecommendationResponse.OptionRecommendation;
+import org.example.grab.domain.demand.repository.DropEmbeddingRepository;
 import org.example.grab.domain.demand.repository.StockRecommendationRepository;
 import org.example.grab.domain.demand.repository.StockRecommendationRepository.PublishedDrop;
 import org.example.grab.domain.demand.repository.StockRecommendationRepository.PublishedOption;
@@ -28,6 +29,7 @@ public class StockRecommendationSnapshotRecorder {
 
     private final StockRecommendationService stockRecommendationService;
     private final StockRecommendationRepository repository;
+    private final DropEmbeddingRepository embeddingRepository;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
@@ -35,19 +37,22 @@ public class StockRecommendationSnapshotRecorder {
     public StockRecommendationSnapshotRecorder(
             StockRecommendationService stockRecommendationService,
             StockRecommendationRepository repository,
+            DropEmbeddingRepository embeddingRepository,
             ObjectMapper objectMapper
     ) {
-        this(stockRecommendationService, repository, objectMapper, Clock.systemUTC());
+        this(stockRecommendationService, repository, embeddingRepository, objectMapper, Clock.systemUTC());
     }
 
     StockRecommendationSnapshotRecorder(
             StockRecommendationService stockRecommendationService,
             StockRecommendationRepository repository,
+            DropEmbeddingRepository embeddingRepository,
             ObjectMapper objectMapper,
             Clock clock
     ) {
         this.stockRecommendationService = stockRecommendationService;
         this.repository = repository;
+        this.embeddingRepository = embeddingRepository;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -63,8 +68,13 @@ public class StockRecommendationSnapshotRecorder {
         List<PublishedOption> options = drop.options();
         long[] unitPrices = options.stream().mapToLong(PublishedOption::unitPrice).toArray();
         int[] quantities = options.stream().mapToInt(PublishedOption::quantity).toArray();
+        // 표본 선택도 공개 시점 DROP의 카탈로그 텍스트로 같은 방식을 쓴다(5.6). 공개 응답이 임베딩 API를 기다리지 않도록
+        // 판매자가 같은 내용으로 추천을 받아 캐시에 남은 요청 임베딩만 쓰고, 없으면 카테고리 기준이다
+        String queryVector = embeddingRepository.findSource(drop.dropId())
+                .map(stockRecommendationService::cachedQueryVector)
+                .orElse(null);
         StockRecommendationResponse result = stockRecommendationService.calculate(drop.sellerId(), drop.categoryId(),
-                unitPrices, quantities, StockRecommendationService.DEFAULT_SAFETY_STOCK_RATE);
+                unitPrices, quantities, StockRecommendationService.DEFAULT_SAFETY_STOCK_RATE, queryVector);
 
         List<OptionRecommendation> recommended = result.recommendation().options();
         List<Map<String, Object>> prepared = new ArrayList<>();

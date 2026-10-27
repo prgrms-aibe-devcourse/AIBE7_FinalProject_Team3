@@ -1,7 +1,9 @@
 package org.example.grab.domain.demand.repository;
 
 import org.example.grab.domain.demand.dto.SalesSample;
+import org.example.grab.domain.demand.embedding.DropEmbeddingText;
 import org.example.grab.domain.demand.repository.StockRecommendationRepository.PriceRange;
+import org.example.grab.domain.demand.repository.StockRecommendationRepository.Similarity;
 import org.example.grab.domain.demand.repository.StockRecommendationRepository.PublishedDrop;
 import org.example.grab.support.TestcontainersConfiguration;
 import org.junit.jupiter.api.BeforeEach;
@@ -107,6 +109,35 @@ class StockRecommendationRepositoryTest {
     }
 
     @Test
+    @DisplayName("비슷한 상품 표본은 같은 조건의 후보 중 임베딩 거리가 기준 이하인 DROP만 가까운 순으로 고른다")
+    void findSimilarSales_ordersByDistance() {
+        // given: 요청과 같은 방향(거리 0), 조금 다른 방향(거리 약 0.2), 반대 축(거리 1), 임베딩 없음
+        Long same = insertDrop(sellerId, categoryId, "ENDED", "TIME_EXPIRED", AS_OF.minusDays(5));
+        insertOption(same, 20000, 10, 7);
+        Long close = insertDrop(sellerId, categoryId, "ENDED", "TIME_EXPIRED", AS_OF.minusDays(1));
+        insertOption(close, 20000, 10, 5);
+        Long far = insertDrop(sellerId, categoryId, "ENDED", "TIME_EXPIRED", AS_OF.minusDays(1));
+        insertOption(far, 20000, 10, 3);
+        insertOption(insertDrop(sellerId, categoryId, "ENDED", "TIME_EXPIRED", AS_OF.minusDays(1)), 20000, 10, 1);
+        Long market = insertDrop(otherSellerId, categoryId, "ENDED", "TIME_EXPIRED", AS_OF.minusDays(1));
+        insertOption(market, 20000, 10, 9);
+        insertEmbedding(same, axis(0, 1f, 1, 0f));
+        insertEmbedding(close, axis(0, 0.8f, 1, 0.6f));
+        insertEmbedding(far, axis(1, 1f, 1, 1f));
+        insertEmbedding(market, axis(0, 1f, 1, 0f));
+        Similarity similarity = new Similarity(DropEmbeddingText.toVectorLiteral(axis(0, 1f, 1, 0f)), 0.25);
+
+        // when
+        List<SalesSample> own = repository.findSimilarOwnSales(sellerId, categoryId, AROUND_20000, similarity, 20);
+        List<SalesSample> others = repository.findSimilarMarketSales(sellerId, categoryId, AS_OF, AROUND_20000,
+                similarity, 20);
+
+        // then: 최근 종료순이 아니라 가까운 순이고, 기준 밖·임베딩 없는 DROP은 빠진다
+        assertThat(own).extracting(SalesSample::sold).containsExactly(7, 5);
+        assertThat(others).extracting(SalesSample::sold).containsExactly(9);
+    }
+
+    @Test
     @DisplayName("공개한 DROP의 활성 옵션 가격·수량을 정렬 순서대로 읽고, 기록은 DROP당 한 건만 남긴다")
     void publishedDropAndSnapshot() {
         // given
@@ -136,6 +167,21 @@ class StockRecommendationRepositoryTest {
         return jdbcTemplate.queryForObject(
                 "INSERT INTO sellers (user_id, brand_name, contact_email) VALUES (?, '브랜드', ?) RETURNING id",
                 Long.class, userId, "contact-" + UUID.randomUUID() + "@example.com");
+    }
+
+    // 두 축만 값이 있는 768차원 벡터
+    private static float[] axis(int first, float firstValue, int second, float secondValue) {
+        float[] vector = new float[DropEmbeddingText.DIMENSIONS];
+        vector[first] = firstValue;
+        vector[second] = secondValue;
+        return vector;
+    }
+
+    private void insertEmbedding(Long dropId, float[] embedding) {
+        jdbcTemplate.update("""
+                INSERT INTO drop_embeddings (drop_id, embedding, model, source_hash)
+                VALUES (?, CAST(? AS vector), 'gemini-embedding-001', ?)
+                """, dropId, DropEmbeddingText.toVectorLiteral(embedding), "h".repeat(64));
     }
 
     private Long insertCategory() {

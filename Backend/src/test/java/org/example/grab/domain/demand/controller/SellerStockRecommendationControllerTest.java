@@ -1,6 +1,7 @@
 package org.example.grab.domain.demand.controller;
 
 import org.example.grab.domain.demand.dto.StockRecommendationRequest;
+import org.example.grab.domain.demand.dto.StockRecommendationRequest.OptionGroupInput;
 import org.example.grab.domain.demand.dto.StockRecommendationRequest.OptionInput;
 import org.example.grab.domain.demand.service.StockRecommendationService;
 import org.example.grab.global.error.GlobalExceptionHandler;
@@ -56,7 +57,20 @@ class SellerStockRecommendationControllerTest {
                                 + "{\"unitPrice\":59000}],\"safetyStockRate\":0.05}"))
                 .andExpect(status().isOk());
         verify(service).recommend(3L, new StockRecommendationRequest(7L, List.of(
-                new OptionInput(59000L, 40), new OptionInput(59000L, null)), new BigDecimal("0.05")));
+                new OptionInput(59000L, 40), new OptionInput(59000L, null)), new BigDecimal("0.05"),
+                null, null, null));
+    }
+
+    @Test
+    @DisplayName("비슷한 상품 표본용 상품명·설명·옵션 구성을 함께 받는다")
+    void recommend_passesCatalogText() throws Exception {
+        mockMvc.perform(post("/api/v1/seller/stock-recommendations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"categoryId\":7,\"options\":[{\"unitPrice\":59000}],\"name\":\"티셔츠\","
+                                + "\"description\":\"코튼 티셔츠\",\"optionGroups\":[{\"name\":\"색상\",\"values\":[\"블랙\"]}]}"))
+                .andExpect(status().isOk());
+        verify(service).recommend(3L, new StockRecommendationRequest(7L, List.of(new OptionInput(59000L, null)), null,
+                "티셔츠", "코튼 티셔츠", List.of(new OptionGroupInput("색상", List.of("블랙")))));
     }
 
     @ParameterizedTest

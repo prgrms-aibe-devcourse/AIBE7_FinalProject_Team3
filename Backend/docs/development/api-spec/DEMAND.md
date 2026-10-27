@@ -331,6 +331,7 @@ POST /api/v1/seller/drops/{dropId}/demand-analysis/explanation
 | `grab.demand.explanation.duration` | `model` | LLM 응답 시간 |
 | `grab.demand.explanation.tokens` | `model` | 토큰 사용량 |
 | `grab.demand.embedding` | `outcome`(`created`, `skipped`, `failed`) | DROP 임베딩 생성 결과(GR-147) |
+| `grab.demand.embedding.query` | `outcome`(`created`, `cached`, `failed`) | 재고 추천 요청 임베딩 결과(GR-147, 5.1). `cached`는 캐시를 다시 쓴 경우 |
 
 평가셋 실행 결과는 지표가 아니라 버전별 기록 파일로 남긴다(GR-146). 카테고리 기준과 유사 상품 기준의 예측 오차 비교도 같은 방식으로 기록한다(GR-147).
 
@@ -492,7 +493,7 @@ POST /api/v1/seller/stock-recommendations
 ### 5.6 공개 시점 기록
 
 - DROP 공개(`POST /api/v1/seller/drops/{dropId}/publish`, DROP.md 2.5)가 커밋된 뒤 별도 트랜잭션에서 DROP의 카테고리·옵션 가격·준비 수량으로 5.2를 다시 계산해 `drop_stock_recommendations`(ERD.md 1.7)에 DROP당 한 건 저장한다(DEMAND-012).
-- 표본 선택(5.1)도 공개 시점 DROP의 카테고리명·상품명·설명·옵션 구성으로 같은 방식을 쓴다. 판매자가 같은 내용으로 추천을 받았다면 요청 임베딩 캐시를 다시 쓴다.
+- 표본 선택(5.1)도 공개 시점 DROP의 카테고리명·상품명·설명·옵션 구성으로 같은 방식을 쓴다. 다만 공개 응답이 임베딩 API를 기다리지 않도록 캐시에 남은 요청 임베딩(판매자가 같은 내용으로 추천을 받은 경우)만 쓰고, 없으면 카테고리 기준으로 기록한다.
 - 판매자가 편집 중에 본 값이 아니라 공개 시점 값이다. 화면에서 "추천 수량 채우기"를 눌렀는지는 받지 않고, 옵션별 실제 준비 수량이 추천 배분과 모두 같으면 추천을 적용한 것으로 기록한다.
 - 공개 트랜잭션과 분리하므로 계산·저장에 실패해도 공개는 그대로이고 기록만 빠진다(WARN 로그). 서버가 커밋 직후 종료되면 기록이 빠질 수 있다. 평가용 기록이라 재시도하지 않는다.
 - 실제 판매량과의 비교(추천 범위 적중률 등)는 종료 후 SQL로 집계하며 API로 제공하지 않는다.

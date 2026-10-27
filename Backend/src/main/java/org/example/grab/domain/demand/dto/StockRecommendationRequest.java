@@ -15,10 +15,20 @@ import java.util.List;
 public record StockRecommendationRequest(
         @NotNull Long categoryId,
         @NotNull @Size(min = 1, max = 100) List<@Valid @NotNull OptionInput> options,
-        @DecimalMin("0") @DecimalMax("1") @Digits(integer = 1, fraction = 2) BigDecimal safetyStockRate
+        @DecimalMin("0") @DecimalMax("1") @Digits(integer = 1, fraction = 2) BigDecimal safetyStockRate,
+        // 비슷한 상품 표본(5.1)을 고르는 데만 쓴다. 상품명·설명이 모두 있어야 비슷한 상품으로 고른다
+        @Size(max = 200) String name,
+        @Size(max = 5000) String description,
+        @Size(max = 10) List<@Valid @NotNull OptionGroupInput> optionGroups
 ) {
 
     // quantity는 판매자가 입력한 준비 수량이며 비어 있을 수 있다. 모두 1 이상이면 배분 비율과 대표 가격 가중치로 쓴다
     public record OptionInput(@NotNull @Min(0) Long unitPrice, @Min(0) Integer quantity) {
+    }
+
+    public record OptionGroupInput(
+            @NotNull @Size(max = 100) String name,
+            @NotNull @Size(max = 50) List<@NotNull @Size(max = 100) String> values
+    ) {
     }
 }

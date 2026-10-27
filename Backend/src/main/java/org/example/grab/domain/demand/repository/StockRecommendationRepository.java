@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -30,7 +31,16 @@ public class StockRecommendationRepository {
 
     // 본인의 같은 카테고리 종료 DROP. 가격 범위가 없으면(대표 가격 0) 가격 조건 없이 고른다
     public List<SalesSample> findOwnSales(long sellerId, long categoryId, PriceRange priceRange, int limit) {
-        return findSales("d.seller_id = :sellerId", sellerId, categoryId, null, priceRange, limit);
+        return findSales("d.seller_id = :sellerId", sellerId, categoryId, null, priceRange, null, limit);
+    }
+
+    /*
+        findOwnSales 후보 중 임베딩이 있고 요청 임베딩과의 코사인 거리가 maxDistance(1 - 유사도 기준) 이하인 DROP을
+        가까운 순으로 고른다(DEMAND.md 5.1, GR-147). queryVector는 pgvector 입력 형식이다.
+     */
+    public List<SalesSample> findSimilarOwnSales(long sellerId, long categoryId, PriceRange priceRange,
+                                                 Similarity similarity, int limit) {
+        return findSales("d.seller_id = :sellerId", sellerId, categoryId, null, priceRange, similarity, limit);
     }
 
     /*
@@ -41,7 +51,14 @@ public class StockRecommendationRepository {
     public List<SalesSample> findMarketSales(long sellerId, long categoryId, OffsetDateTime closedBefore,
                                              PriceRange priceRange, int limit) {
         return findSales("d.seller_id <> :sellerId AND d.closed_at < :closedBefore",
-                sellerId, categoryId, closedBefore, priceRange, limit);
+                sellerId, categoryId, closedBefore, priceRange, null, limit);
+    }
+
+    // findMarketSales 후보 중 비슷한 상품(findSimilarOwnSales와 같은 조건). 보호 규칙은 그대로 적용한다
+    public List<SalesSample> findSimilarMarketSales(long sellerId, long categoryId, OffsetDateTime closedBefore,
+                                                    PriceRange priceRange, Similarity similarity, int limit) {
+        return findSales("d.seller_id <> :sellerId AND d.closed_at < :closedBefore",
+                sellerId, categoryId, closedBefore, priceRange, similarity, limit);
     }
 
     public Optional<PublishedDrop> findPublishedDrop(long dropId) {
@@ -88,19 +105,35 @@ public class StockRecommendationRepository {
     public record PriceRange(BigDecimal min, BigDecimal max) {
     }
 
+    public record Similarity(String queryVector, double maxDistance) {
+    }
+
     private List<SalesSample> findSales(String sellerCondition, long sellerId, long categoryId,
-                                        OffsetDateTime closedBefore, PriceRange priceRange, int limit) {
+                                        OffsetDateTime closedBefore, PriceRange priceRange, Similarity similarity,
+                                        int limit) {
         MapSqlParameterSource parameters = new MapSqlParameterSource()
                 .addValue("sellerId", sellerId)
                 .addValue("categoryId", categoryId)
                 .addValue("closedBefore", closedBefore)
                 .addValue("limit", limit);
-        String priceCondition = "";
+        List<String> conditions = new ArrayList<>();
         if (priceRange != null) {
-            priceCondition = "WHERE reference_price BETWEEN :minPrice AND :maxPrice";
+            conditions.add("reference_price BETWEEN :minPrice AND :maxPrice");
             parameters.addValue("minPrice", priceRange.min()).addValue("maxPrice", priceRange.max());
         }
-        return jdbcTemplate.query(SALES_SAMPLES.formatted(sellerCondition, priceCondition), parameters, SALES_SAMPLE);
+        String distance = "NULL::FLOAT8";
+        String order = "closed_at DESC, id DESC";
+        if (similarity != null) {
+            // 임베딩이 없는 DROP은 거리가 NULL이라 조건에서 빠진다
+            distance = "(SELECT e.embedding <=> CAST(:queryVector AS vector) FROM drop_embeddings e WHERE e.drop_id = d.id)";
+            conditions.add("distance <= :maxDistance");
+            order = "distance, closed_at DESC, id DESC";
+            parameters.addValue("queryVector", similarity.queryVector())
+                    .addValue("maxDistance", similarity.maxDistance());
+        }
+        String where = conditions.isEmpty() ? "" : "WHERE " + String.join(" AND ", conditions);
+        return jdbcTemplate.query(SALES_SAMPLES.formatted(distance, sellerCondition, where, order), parameters,
+                SALES_SAMPLE);
     }
 
     private static final RowMapper<SalesSample> SALES_SAMPLE = (resultSet, rowNumber) -> new SalesSample(
@@ -111,7 +144,7 @@ public class StockRecommendationRepository {
             resultSet.getBoolean("sold_out"));
 
     /*
-        첫 %s에는 판매자·기간 조건, 둘째 %s에는 가격 조건이 들어간다.
+        %s에는 차례로 요청 임베딩과의 거리(비슷한 상품 표본일 때만), 판매자·기간 조건, 가격·유사도 조건, 정렬이 들어간다.
         DROP별로 옵션을 합산한 뒤 가격 조건을 걸어야 "대표 가격"으로 고를 수 있어 CTE로 나눈다.
         품절은 종료 시점 가용 재고 합계가 0인 DROP이다(SOLD_OUT 조기 종료는 쓰지 않는다, ERD.md 1.3).
      */
@@ -121,7 +154,8 @@ public class StockRecommendationRepository {
                        SUM(o.total_quantity) AS prepared,
                        SUM(o.sold_quantity) AS sold,
                        SUM(o.total_quantity - o.reserved_quantity - o.sold_quantity - o.withheld_quantity) AS available,
-                       ROUND(SUM(o.unit_price * o.total_quantity)::NUMERIC / SUM(o.total_quantity)) AS reference_price
+                       ROUND(SUM(o.unit_price * o.total_quantity)::NUMERIC / SUM(o.total_quantity)) AS reference_price,
+                       %s AS distance
                 FROM drops d
                 JOIN drop_options o ON o.drop_id = d.id
                 WHERE %s AND d.category_id = :categoryId
@@ -132,7 +166,7 @@ public class StockRecommendationRepository {
             SELECT seller_id, reference_price, prepared, sold, available = 0 AS sold_out
             FROM candidates
             %s
-            ORDER BY closed_at DESC, id DESC
+            ORDER BY %s
             LIMIT :limit
             """;
 }
