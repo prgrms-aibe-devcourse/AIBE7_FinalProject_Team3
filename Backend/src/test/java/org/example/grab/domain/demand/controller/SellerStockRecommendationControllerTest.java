@@ -108,7 +108,7 @@ class SellerStockRecommendationControllerTest {
                                 + "\"options\":[{\"unitPrice\":59000,\"values\":[\"블랙\"]}]}"))
                 .andExpect(status().isOk());
         verify(optionAllocationService).allocate(3L, new OptionAllocationRequest(7L,
-                List.of(new OptionAllocationRequest.OptionInput(59000L, null, List.of("블랙"))), null,
+                List.of(new OptionAllocationRequest.SkuInput(59000L, null, List.of("블랙"))), null,
                 "티셔츠", "코튼", List.of(new OptionGroupInput("색상", List.of("블랙")))));
     }
 

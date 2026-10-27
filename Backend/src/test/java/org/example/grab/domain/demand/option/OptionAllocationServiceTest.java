@@ -3,7 +3,7 @@ package org.example.grab.domain.demand.option;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.example.grab.domain.demand.dto.ConversionBasis;
 import org.example.grab.domain.demand.dto.OptionAllocationRequest;
-import org.example.grab.domain.demand.dto.OptionAllocationRequest.OptionInput;
+import org.example.grab.domain.demand.dto.OptionAllocationRequest.SkuInput;
 import org.example.grab.domain.demand.dto.OptionAllocationResponse;
 import org.example.grab.domain.demand.dto.OptionAllocationResponse.Allocation;
 import org.example.grab.domain.demand.dto.OptionAllocationResponse.MatchStatus;
@@ -182,7 +182,7 @@ class OptionAllocationServiceTest {
     @DisplayName("SKU 값이 옵션 구성 순서·개수와 맞지 않으면 VALIDATION_FAILED(options)로 거부한다")
     void allocate_rejectsMismatchedValues() {
         OptionAllocationRequest request = new OptionAllocationRequest(1L,
-                List.of(new OptionInput(20000L, null, List.of("레드"))), null, "티셔츠", "코튼",
+                List.of(new SkuInput(20000L, null, List.of("레드"))), null, "티셔츠", "코튼",
                 List.of(new OptionGroupInput("색상", List.of("블랙"))));
 
         assertThatThrownBy(() -> service.allocate(SELLER_ID, request))
@@ -193,7 +193,7 @@ class OptionAllocationServiceTest {
 
     private static OptionAllocationRequest request(String... colors) {
         return new OptionAllocationRequest(1L,
-                java.util.Arrays.stream(colors).map(color -> new OptionInput(20000L, null, List.of(color))).toList(),
+                java.util.Arrays.stream(colors).map(color -> new SkuInput(20000L, null, List.of(color))).toList(),
                 null, "티셔츠", "코튼 티셔츠", List.of(new OptionGroupInput("색상", List.of(colors))));
     }
 

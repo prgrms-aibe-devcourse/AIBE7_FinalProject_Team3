@@ -19,14 +19,15 @@ import java.util.List;
  */
 public record OptionAllocationRequest(
         @NotNull Long categoryId,
-        @NotNull @Size(min = 1, max = 100) List<@Valid @NotNull OptionInput> options,
+        @NotNull @Size(min = 1, max = 100) List<@Valid @NotNull SkuInput> options,
         @DecimalMin("0") @DecimalMax("1") @Digits(integer = 1, fraction = 2) BigDecimal safetyStockRate,
         @NotBlank @Size(max = 200) String name,
         @NotBlank @Size(max = 5000) String description,
         @NotNull @Size(min = 1, max = 10) List<@Valid @NotNull OptionGroupInput> optionGroups
 ) {
 
-    public record OptionInput(
+    // 재고 추천 요청의 OptionInput과 OpenAPI 스키마 이름이 겹치지 않도록 다른 이름을 쓴다
+    public record SkuInput(
             @NotNull @Min(0) Long unitPrice,
             @Min(0) Integer quantity,
             @NotNull @Size(min = 1, max = 10) List<@NotNull @Size(max = 100) String> values

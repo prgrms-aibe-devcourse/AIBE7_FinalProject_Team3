@@ -3,7 +3,7 @@ package org.example.grab.domain.demand.option;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.example.grab.domain.demand.dto.OptionAllocationRequest;
-import org.example.grab.domain.demand.dto.OptionAllocationRequest.OptionInput;
+import org.example.grab.domain.demand.dto.OptionAllocationRequest.SkuInput;
 import org.example.grab.domain.demand.dto.OptionAllocationResponse;
 import org.example.grab.domain.demand.dto.OptionAllocationResponse.MatchStatus;
 import org.example.grab.domain.demand.dto.OptionAllocationResponse.OptionAllocation;
@@ -208,7 +208,7 @@ public class OptionAllocationService {
     /*
         SKU마다 옵션 구성 순서대로 값 번호를 찾는다. 개수가 다르거나 그룹에 없는 값이면 VALIDATION_FAILED(options).
      */
-    static int[][] skuValues(List<OptionGroupInput> groups, List<OptionInput> options) {
+    static int[][] skuValues(List<OptionGroupInput> groups, List<SkuInput> options) {
         Set<String> uniqueGroups = new HashSet<>();
         for (OptionGroupInput group : groups) {
             if (group.values().isEmpty() || !uniqueGroups.add(OptionCandidates.normalize(group.name()))) {
