@@ -29,7 +29,14 @@ Write-Host "1) Mailpit 받은 메일함 비우는 중..."
 Invoke-RestMethod -Method Delete -Uri "$MailpitBase/api/v1/messages" | Out-Null
 
 Write-Host "2) seed.sql 실행 중 (DROP 2개, WISH 3000명)..."
-Get-Content "$PSScriptRoot/seed.sql" -Raw | docker compose exec -T postgres psql -U grab -d grab -f -
+# seed.sql은 UTF-8로 저장돼 있다. 콘솔 출력 인코딩을 UTF-8로 맞추지 않으면 네이티브 명령으로
+# 넘어가는 파이프 입력에서 한글 리터럴이 깨져(seed.sql의 DROP 이름 등) WHERE 절이 기존 행과
+# 매치되지 않는 재실행 실패로 이어질 수 있다.
+$OutputEncoding = [System.Text.Encoding]::UTF8
+Get-Content "$PSScriptRoot/seed.sql" -Raw -Encoding UTF8 | docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U grab -d grab -f -
+if ($LASTEXITCODE -ne 0) {
+    throw "seed.sql 실행 실패(exit $LASTEXITCODE). 측정을 중단합니다."
+}
 $seedDoneAt = Get-Date
 $saleStartsAt = $seedDoneAt.AddSeconds($SaleStartDelaySeconds)
 Write-Host "   sale_starts_at (예상): $saleStartsAt"

@@ -54,12 +54,16 @@ BCC 30통(100명 단위), 총 60통. `sale_starts_at`을 30초 뒤로 짧게 잡
 
 - **재현됨: 다른 DROP의 발송이 끝날 때까지 지연된다.** 소량 DROP의 "판매 시작" 발송
   요청은 01:13:03.843에 큐에 들어갔지만(자신의 `sale_starts_at`인 01:12:58.416 대비
-  감지 지연 5.4초로 정상 범위), 실제 메일은 01:13:04.701에야 나갔다 — **대량 DROP의
-  500통짜리 작업이 끝난 직후**(01:13:04.685, 16ms 뒤)다. `noticeMailTaskExecutor`가
-  스레드 1개뿐이라 작업이 요청 순서대로 직렬 처리되기 때문이다
-  (`MailAsyncConfig.NOTICE_POOL_SIZE = 1`).
-- 이번에도 실제 지연 폭(16ms)은 작았다 — **소량 DROP의 이벤트가 대량 작업이 거의
-  끝나갈 때 도착한 우연** 때문이다. 대량 작업은 01:12:55.042~01:13:04.685(약
+  감지 지연 5.4초로 정상 범위), 실제 메일은 01:13:04.701에야 나갔다 — **발송 요청부터
+  실제 수신까지 858ms가 걸린 것**이다. 소량 DROP은 수신자 1명(메일 1통)뿐이라 원래
+  수십 ms 안에 끝나야 할 일이 858ms나 걸린 이유는, 그 작업이 **대량 DROP의 500통짜리
+  작업이 끝날 때까지 큐에서 기다렸기 때문**이다 — 소량 메일이 실제로 나간 시각
+  (01:13:04.701)은 대량 작업의 마지막 메일(01:13:04.685)로부터 16ms 뒤로, 대량
+  작업이 끝나자마자 곧바로 처리됐다. `noticeMailTaskExecutor`가 스레드 1개뿐이라
+  작업이 요청 순서대로 직렬 처리되기 때문이다(`MailAsyncConfig.NOTICE_POOL_SIZE = 1`).
+- 이번에 관찰된 실제 지연 폭(858ms)은 이론상 최대치보다 훨씬 작았다 — **소량 DROP의
+  이벤트가 대량 작업이 거의 끝나갈 때 도착한 우연** 때문이다. 대량 작업은
+  01:12:55.042~01:13:04.685(약
   9.6초)간 실행 중이었고, 소량 이벤트가 그 창 안 어디에 도착했든(최악의 경우 대량
   작업 시작 직후) 최대 9.6초까지 지연될 수 있었다. 즉 **지연 폭은 앞선 DROP의
   수신자 수(BCC 통수)에 선형으로 비례**하며, 이는 리소스 제한 없는 환경과
@@ -102,8 +106,11 @@ BCC 30통(100명 단위), 총 60통. `sale_starts_at`을 30초 뒤로 짧게 잡
 # 사전: docker compose -f compose.yaml -f compose.loadtest-micro.yaml up -d --build backend,
 #       common/accounts-seed.sql 1회 실행
 powershell -File k6/wish-mail-storm/measure.ps1                 # 시나리오 A(동시 전이)
+```
 
-# 시나리오 B(스태거 전이)는 measure.ps1이 아직 지원하지 않는다. 수동으로:
+시나리오 B(스태거 전이)는 `measure.ps1`이 아직 지원하지 않는다. Bash(Git Bash 등)에서 수동으로:
+
+```bash
 docker compose exec -T postgres psql -U grab -d grab -f - < k6/wish-mail-storm/seed-stagger.sql
 # 40~50초 뒤 Mailpit에서 제목별 Created 시각 비교(위 표를 만든 방법)
 curl -s "http://127.0.0.1:8025/api/v1/messages?limit=1100" | python3 -c "

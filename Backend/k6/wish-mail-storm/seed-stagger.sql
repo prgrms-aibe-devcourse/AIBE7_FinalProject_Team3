@@ -17,7 +17,10 @@ DELETE FROM drop_options
 DELETE FROM drops WHERE name IN ('k6 메일폭주 대량 상품', 'k6 메일폭주 소량 상품');
 DELETE FROM users WHERE email LIKE 'k6-wishstorm2-%@loadtest.local';
 
--- 대량 DROP은 바로 다음 tick에, 소량 DROP은 그로부터 10초 뒤(그다음 tick)에 전이되게 둔다.
+-- sale_starts_at은 아직 정하지 않는다. 이 트랜잭션은 아래에서 5만 행을 넣어 수 초가 걸릴 수
+-- 있는데, now()는 트랜잭션 시작 시각으로 고정되므로 여기서 "now() + 12초"를 미리 정하면
+-- 실제 커밋 시점에는 이미 그 여유가 insert 소요 시간만큼 줄어들어 있다(최악엔 이미 지난 시각).
+-- 임시로 먼 미래 값을 넣고, 커밋 후 별도의 짧은 트랜잭션에서 실제 현재 시각 기준으로 바꾼다.
 INSERT INTO drops (
     seller_id, category_id, status, name, description, shipping_fee, shipping_notice,
     sale_starts_at, sale_ends_at, published_at
@@ -25,10 +28,9 @@ INSERT INTO drops (
 SELECT s.id, c.id, 'WISH', v.name,
        'GR-170 메일 폭주(스태거) 검증용 더미 상품입니다. 실제 판매 상품이 아닙니다.',
        0, '부하테스트용 더미 데이터이며 실제 배송은 없습니다.',
-       now() + v.delay, now() + interval '1 day', now() - interval '1 hour'
+       now() + interval '1 hour', now() + interval '1 day', now() - interval '1 hour'
 FROM sellers s, categories c,
-     (VALUES ('k6 메일폭주 대량 상품', interval '12 seconds'),
-             ('k6 메일폭주 소량 상품', interval '24 seconds')) AS v(name, delay)
+     (VALUES ('k6 메일폭주 대량 상품'), ('k6 메일폭주 소량 상품')) AS v(name)
 WHERE s.contact_email = 'k6-seller@loadtest.local' AND c.code = 'FASHION';
 
 INSERT INTO drop_options (drop_id, unit_price, total_quantity, is_active, sort_order)
@@ -64,6 +66,13 @@ SELECT su.id, d.id, now()
 FROM small_users su, drops d
 WHERE d.name = 'k6 메일폭주 소량 상품';
 
+COMMIT;
+
+-- 대량/소량 WISH 행이 이미 커밋된 뒤, 여기서부터 실제 현재 시각 기준으로 12초·24초 뒤를 못박는다.
+-- 이 트랜잭션은 UPDATE 두 건뿐이라 ms 단위로 끝나, insert 소요 시간이 간격을 갉아먹지 않는다.
+BEGIN;
+UPDATE drops SET sale_starts_at = now() + interval '12 seconds' WHERE name = 'k6 메일폭주 대량 상품';
+UPDATE drops SET sale_starts_at = now() + interval '24 seconds' WHERE name = 'k6 메일폭주 소량 상품';
 COMMIT;
 
 SELECT d.id AS drop_id, d.name, d.sale_starts_at, count(w.id) AS wish_count
