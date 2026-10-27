@@ -24,7 +24,8 @@ FAIL=0
 for CONNS in "$@"; do
   NAME=$MODE${TAG:+-$TAG}-$CONNS
   echo "===== [$NAME] backend 재기동 (GRAB_DROP_CACHE_STORE=$MODE)"
-  GRAB_DROP_CACHE_STORE=$MODE docker compose up -d --force-recreate --wait backend > $O/up-$NAME.txt 2>&1 \
+  # --no-deps: postgres 설정(cpus 등)이 기본값과 다르면 compose가 postgres까지 다시 만들어 netem 지연과 CPU 한도가 사라진다.
+  GRAB_DROP_CACHE_STORE=$MODE docker compose up -d --no-deps --force-recreate --wait backend > $O/up-$NAME.txt 2>&1 \
     || { echo "실패: backend 기동 ($O/up-$NAME.txt)"; exit 1; }
   # backend 서비스에는 헬스체크가 없어 --wait가 앱 기동을 기다리지 않는다. 공개 목록이 응답할 때까지 기다린다.
   for _ in $(seq 1 90); do

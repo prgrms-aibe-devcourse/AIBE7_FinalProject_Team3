@@ -26,6 +26,8 @@ const DURATION_SEC = Number(process.env.DURATION_SEC || 300);
 const OUT = process.env.OUT || 'Backend/k6/sse-stream/out/sse-result.json';
 const KEYWORD = 'k6 SSE 상품';
 const REFETCH = process.env.REFETCH === '1';
+// REFETCH_LIST=0이면 목록 연결은 구독·알림 수신은 그대로 두고 재조회만 하지 않는다(GR-180 목록 HTTP 영향 분리).
+const REFETCH_LIST = process.env.REFETCH_LIST !== '0';
 const REFRESH_MIN_INTERVAL_MS = 2000;
 const RESYNC_INTERVAL_MS = 30_000;
 const RESYNC_JITTER_MS = 5000;
@@ -96,10 +98,10 @@ function handleFrame(conn, frame) {
     const payload = JSON.parse(data);
     if (event === 'ready') {
         conn.readyAt = now;
-        if (REFETCH) startResync(conn);
+        if (REFETCH && (conn.detail || REFETCH_LIST)) startResync(conn);
     } else if (event === 'drop-changed') {
         conn.changes.push([now, payload.dropId]);
-        if (REFETCH) markDirty(conn, 'signal');
+        if (REFETCH && (conn.detail || REFETCH_LIST)) markDirty(conn, 'signal');
     } else if (event === 'stream-closed') {
         conn.closeReason = payload.reason;
         conn.closedAt = now;
@@ -241,6 +243,7 @@ const summary = {
             p50: percentile(ms, 50), p95: percentile(ms, 95), p99: percentile(ms, 99), max: ms.at(-1) ?? null,
         }];
     })) : null,
+    refetchList: REFETCH_LIST,
     eventLoopDelayMs: { p99: loopDelay.percentile(99) / 1e6, max: loopDelay.max / 1e6 },
 };
 console.log(JSON.stringify(summary, null, 2));

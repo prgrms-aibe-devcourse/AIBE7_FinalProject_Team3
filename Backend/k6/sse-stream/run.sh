@@ -7,6 +7,7 @@
 #   Backend/k6/sse-stream/run.sh r0 0 50 300     # SSE 비활성 기준선
 #   Backend/k6/sse-stream/run.sh r2 200 50 300   # 피크
 #   REFETCH=1 Backend/k6/sse-stream/run.sh f800 800 50 180   # GR-180: 알림마다 재조회(sse-clients.mjs 상단 주석)
+#   (주의) Tomcat·HikariCP 샘플은 수집 명령 실행 시간 + 3초라 실제 간격이 약 5초다.
 #
 # 결과는 out/<이름>-*.{txt,json,log}에 남는다. 주문 p95는 <이름>-k6.json의 "http_req_duration{name:order}".
 # 시드 실패는 즉시 중단하고, 그 밖의 실패(k6 threshold, SSE 준비 수 부족, verify.sql 위반)는 끝까지 기록한 뒤 종료 코드 1로 알린다.
@@ -59,6 +60,8 @@ fi
 {
   echo "commit=$(git rev-parse --short HEAD) refetch=${REFETCH:-0}"
   docker compose exec -T backend printenv GRAB_DROP_CACHE_STORE JDK_JAVA_OPTIONS 2>/dev/null | sed 's/^/backend /'
+  docker inspect -f 'postgres nanocpus={{.HostConfig.NanoCpus}} memory={{.HostConfig.Memory}}' $(docker compose ps -q postgres)
+  echo "sse detailRatio=${DETAIL_RATIO:-0.7} refetchList=${REFETCH_LIST:-1}"
   k6/drop-detail-scale/netem.sh show 2>/dev/null | grep qdisc
 } > $O/$NAME-meta.txt
 echo "[$NAME] 주문 ${RATE}/초 × ${DUR}초 시작 (SSE 연결 $CONNS)"

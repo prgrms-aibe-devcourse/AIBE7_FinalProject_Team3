@@ -24,7 +24,8 @@ STEPS=${*:-idle limit limit-up reload restart}
 
 # 재접속이 몰려도 구독 요청 제한(60초 75회, 부하용 1000회)에 먼저 걸리지 않게 크게 둔다. 이번 검증 대상이 아니다.
 backend() {
-  GRAB_STOCKSTREAM_CONNECTRATEMAX=100000 "$@" docker compose up -d --force-recreate --wait backend > /dev/null 2>&1
+  # --no-deps: postgres를 다시 만들지 않는다(netem 지연·CPU 한도 유지, stages.sh와 같은 이유).
+  GRAB_STOCKSTREAM_CONNECTRATEMAX=100000 "$@" docker compose up -d --no-deps --force-recreate --wait backend > /dev/null 2>&1
   for _ in $(seq 1 90); do
     [ "$(curl -s -o /dev/null -w '%{http_code}' localhost:8080/api/v1/drops?size=1)" = 200 ] && return 0
     sleep 2

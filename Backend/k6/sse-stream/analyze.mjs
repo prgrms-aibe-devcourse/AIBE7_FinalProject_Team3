@@ -73,7 +73,8 @@ for (const [t, dropId] of orders) {
             continue;
         }
         latencies.push(at - t);
-        if (!refetchOn || end - REFLECT_TAIL_MS < t) continue;
+        // 목록 재조회를 끈 회차(REFETCH_LIST=0)의 목록 연결은 화면 반영 표본에서 뺀다.
+        if (!refetchOn || end - REFLECT_TAIL_MS < t || (!conn.detail && summary.refetchList === false)) continue;
         const i = indexAtOrAfter(refetchStarts, at);
         if (i === null || refetches[i][1] > end) reflectMissing++;
         else reflects.push(refetches[i][1] - t);
