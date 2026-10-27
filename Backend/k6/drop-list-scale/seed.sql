@@ -233,12 +233,9 @@ WHERE o.id = ko.id;
 
 COMMIT;
 
-ANALYZE drops;
-ANALYZE drop_options;
-ANALYZE drop_images;
-ANALYZE wishes;
-ANALYZE orders;
-ANALYZE order_items;
+-- ANALYZE만 하면 visibility map이 비어 있어 autovacuum이 언제 도느냐에 따라 Index Only Scan 여부가 바뀐다
+-- (측정마다 계획이 달라짐). VACUUM까지 해 seed 직후 상태를 항상 같게 만든다. 트랜잭션 밖에서 실행해야 한다.
+VACUUM (ANALYZE) drops, drop_options, drop_images, wishes, orders, order_items;
 
 -- 확인용 분포.
 SELECT d.status, COUNT(*) AS drops,
