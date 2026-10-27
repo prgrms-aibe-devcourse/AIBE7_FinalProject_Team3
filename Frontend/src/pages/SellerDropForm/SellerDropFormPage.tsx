@@ -17,6 +17,8 @@ import {
 } from '../../features/auth/logic/authUser'
 import useAuth from '../../features/auth/logic/useAuth'
 import { categoryKeys } from '../../features/drop/logic/queryKeys'
+import StockRecommendationPanel from '../../features/demand/components/StockRecommendationPanel'
+import { applyRecommendedStock } from '../../features/demand/logic/stockRecommendation'
 import DropImageField from '../../features/seller/components/DropImageField'
 import DropFieldErrors from '../../features/seller/components/DropFieldErrors'
 import OptionGroupBuilder from '../../features/seller/OptionGroupBuilder'
@@ -330,6 +332,15 @@ function SellerDropForm({
                 onGroupsChange={(next) => {
                   setGroups(next)
                   setValues((current) => rebuildSkuValues(next, current))
+                }}
+              />
+              <StockRecommendationPanel
+                values={values}
+                onApply={(recommendation, rowKeys) => {
+                  setValues((current) =>
+                    applyRecommendedStock(current, rowKeys, recommendation),
+                  )
+                  notify('추천 수량을 재고 칸에 채웠어요. 필요하면 고쳐주세요.')
                 }}
               />
             </div>

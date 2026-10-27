@@ -428,7 +428,7 @@ MVP는 주문당 배송 한 건만 지원한다. 배송 상태는 `orders.status
 
 ### 1.7 수요 분석 (GR-140)
 
-수요 분석 데이터(활성 WISH 수·추이·전환율)는 저장하지 않고 조회 시 `wishes`·`orders`·`order_items`에서 계산한다. 판매자가 저장한 계획과 결정, 유사 상품 검색용 임베딩만 기록한다. 계산식과 다른 판매자 데이터 보호 규칙은 [수요 분석 API](api-spec/DEMAND.md) 1절을 따른다.
+수요 분석 데이터(활성 WISH 수·추이·전환율)와 생성 단계 재고 추천은 저장하지 않고 조회 시 `wishes`·`orders`·`order_items`에서 계산한다. 판매자가 저장한 계획과 결정, 공개 시점 재고 추천 스냅샷, 유사 상품 검색용 임베딩만 기록한다. 계산식과 다른 판매자 데이터 보호 규칙은 [수요 분석 API](api-spec/DEMAND.md) 1절을 따른다.
 
 #### `demand_plans`
 
@@ -459,6 +459,25 @@ MVP는 주문당 배송 한 건만 지원한다. 배송 상태는 `orders.status
 - `explanation_status`: 설명 생성이 꺼져 있으면 저장 시 `DISABLED`로 두고 바꾸지 않는다(GR-146 구현 전·비용 한도 초과). 켜져 있으면 저장 직후 `PENDING`, 수치 검증 통과 시 `GENERATED`, 검증 실패 시 `DISCARDED`(응답 원문은 저장하지 않음), 호출 실패·시간 초과 시 `FAILED`. 설명 상태는 계획의 결정 상태와 무관하다.
 - `conversion_basis`는 `assumptions`의 전환율 출처를 그대로 옮긴 값이다. 어느 기준을 고른 계획이 실제 판매량에 가까웠는지 집계할 때 JSONB를 풀지 않고 조회하려고 컬럼으로 둔다.
 - 실제 판매 결과(판매 수량·품절 여부)는 저장하지 않고 지표 집계 시 주문 데이터에서 계산한다.
+
+#### `drop_stock_recommendations` (GR-167)
+
+| 컬럼 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `id` | BIGINT | O | PK |
+| `drop_id` | BIGINT | O | FK drops, UQ (DROP당 한 건) |
+| `calculation_version` | VARCHAR(20) | O | 재고 추천 계산 버전(`s1`) |
+| `basis` | VARCHAR(20) | X | 추천에 쓴 기준: `OWN`, `MARKET`. 기준이 없으면 NULL |
+| `result` | JSONB | O | 공개 시점에 다시 계산한 추천 결과 스냅샷(수요 분석 API 5.5 응답 `data`와 같은 형식, 시장 평균은 보호 규칙을 적용한 값만) |
+| `recommended_total` | INT | X | 준비 권장 수량. 기준이 없으면 NULL |
+| `prepared_total` | INT | O | 공개 시점 옵션 준비 수량 합계 |
+| `prepared_quantities` | JSONB | O | 옵션별 `{ optionId, quantity, recommendedQuantity }` |
+| `applied` | BOOLEAN | O | 옵션별 준비 수량이 추천 배분과 모두 같으면 TRUE |
+| `created_at` | TIMESTAMPTZ | O | 기록 시각 |
+
+- DROP 공개가 커밋된 뒤 별도 트랜잭션에서 저장한다. 실패해도 공개는 그대로이고 기록만 빠진다(수요 분석 API 5.6).
+- 추가만 하고 고치지 않는다. 종료 후 실제 판매량(`drop_options.sold_quantity` 합계)과 비교해 추천 범위 적중률과 준비 수량 대비 판매율을 집계한다.
+- 외부에 행 단위로 노출하지 않아 `public_id`를 두지 않는다.
 
 #### `drop_embeddings` (GR-147)
 

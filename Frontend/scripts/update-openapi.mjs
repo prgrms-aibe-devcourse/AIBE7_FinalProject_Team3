@@ -3,6 +3,7 @@ import { writeFile } from 'node:fs/promises'
 const groups = [
   'category',
   'dashboard',
+  'demand',
   'drop',
   'order',
   'payment',

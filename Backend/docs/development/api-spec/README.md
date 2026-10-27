@@ -169,6 +169,7 @@
 | GET | `/api/v1/seller/drops/{dropId}/demand-plans` | SELLER | DROP별 판매 계획 이력 조회 |
 | GET | `/api/v1/seller/demand-plans/{planId}` | SELLER | 판매 계획 상세·설명 조회 |
 | POST | `/api/v1/seller/demand-plans/{planId}/decision` | SELLER | 수락·수정·거절 결정 기록 (재고 미반영) |
+| POST | `/api/v1/seller/stock-recommendations` | SELLER | DROP 생성 단계 재고 추천·가격대 참고 (저장하지 않음) |
 
 > 계산은 서버가 하고 LLM은 저장된 계획의 설명만 만듭니다. 제안과 결정은 재고·가격·판매 상태를 바꾸지 않습니다. 다른 판매자의 판매 데이터는 익명 집계값으로만 사용합니다. 구현 시 OpenAPI `demand` 그룹을 추가합니다.
 
@@ -188,7 +189,7 @@
 | 배송 | 7 | 판매자 주문 조회 및 배송 상태 관리 |
 | 대시보드 | 3 | 판매자 운영 통계 |
 | 이미지 | 1 | 상품 이미지 업로드 |
-| 수요 분석 | 6 | 수요 분석, 판매 계획 저장·결정 |
-| **합계** | **61** | |
+| 수요 분석 | 7 | 수요 분석, 판매 계획 저장·결정, 생성 단계 재고 추천 |
+| **합계** | **62** | |
 
 ---
