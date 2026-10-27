@@ -27,9 +27,9 @@ class StockStreamPropertiesTest {
             assertThat(properties.connectionLifetime()).isEqualTo(Duration.ofMinutes(10));
             assertThat(properties.sendTimeout()).isEqualTo(Duration.ofSeconds(5));
             assertThat(properties.maxDropIds()).isEqualTo(100);
-            assertThat(properties.maxConnections()).isEqualTo(200);
-            assertThat(properties.maxConnectionsPerIp()).isEqualTo(20);
-            assertThat(properties.connectRateMax()).isEqualTo(30);
+            assertThat(properties.maxConnections()).isEqualTo(1000);
+            assertThat(properties.maxConnectionsPerIp()).isEqualTo(50);
+            assertThat(properties.connectRateMax()).isEqualTo(75);
             assertThat(properties.connectRateWindow()).isEqualTo(Duration.ofSeconds(60));
             assertThat(properties.retryAfter()).isEqualTo(Duration.ofSeconds(60));
             assertThat(context).hasBean("stockStreamRegistry");

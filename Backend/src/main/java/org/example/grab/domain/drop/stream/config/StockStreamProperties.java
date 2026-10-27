@@ -13,10 +13,10 @@ public record StockStreamProperties(
         @DefaultValue("5s") Duration sendTimeout,
         @DefaultValue("100") int maxPendingDrops,
         @DefaultValue("100") int maxDropIds,
-        @DefaultValue("200") int maxConnections,
-        @DefaultValue("20") int maxConnectionsPerIp,
+        @DefaultValue("1000") int maxConnections,
+        @DefaultValue("50") int maxConnectionsPerIp,
         @DefaultValue("60s") Duration connectRateWindow,
-        @DefaultValue("30") int connectRateMax,
+        @DefaultValue("75") int connectRateMax,
         @DefaultValue("60s") Duration retryAfter,
         @DefaultValue("10000") int maxTrackedIps
 ) {
