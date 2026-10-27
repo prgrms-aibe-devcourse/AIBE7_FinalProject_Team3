@@ -389,8 +389,8 @@ POST /api/v1/seller/stock-recommendations
       "low": 25, "expected": 40, "high": 60,
       "recommended": 44, "safetyStockRate": 0.1,
       "options": [
-        { "index": 0, "recommendedQuantity": 30 },
-        { "index": 1, "recommendedQuantity": 14 }
+        { "index": 0, "recommendedQuantity": 29 },
+        { "index": 1, "recommendedQuantity": 15 }
       ]
     },
     "priceReference": {
@@ -403,7 +403,7 @@ POST /api/v1/seller/stock-recommendations
         { "band": "HIGHER", "sellThroughRate": null, "dropCountBand": "NONE" }
       ]
     },
-    "dataGaps": ["SMALL_SALES_SAMPLE"]
+    "dataGaps": []
   }
 }
 ```

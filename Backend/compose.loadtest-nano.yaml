@@ -20,4 +20,6 @@ services:
       # JDK17은 컨테이너 메모리 한도의 1/4을 기본 힙으로 잡는다(128MB) — Spring Boot 기동엔 빠듯해
       # 메타스페이스·스레드 스택 몫을 남기고 힙을 명시한다. OOM 발생 시 이 값부터 낮춰 원인을 좁힌다.
       # JAVA_TOOL_OPTS는 이 이미지의 java 런처에 인식되지 않아 무시된다(검증 완료) — JDK_JAVA_OPTIONS를 쓴다.
-      JDK_JAVA_OPTIONS: -Xmx384m
+      # JVM은 메모리·CPU가 작은 컨테이너에선 기본 컬렉터를 G1 대신 Serial 등으로 바꿀 수 있다(에르고노믹스).
+      # nano/micro 두 환경을 같은 조건으로 비교하려고 컨테이너 크기와 무관하게 G1GC로 고정한다.
+      JDK_JAVA_OPTIONS: -Xmx384m -XX:+UseG1GC
