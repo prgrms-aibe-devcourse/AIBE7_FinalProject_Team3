@@ -1,4 +1,5 @@
 import type { StockRecommendation } from '../../../api/demand/stockRecommendation'
+import type { OptionGroup } from '../../../types/drop'
 import { won } from '../../../utils/price'
 import { CONFIDENCE_LABEL, count, percent } from '../logic/demandFormat'
 import {
@@ -47,12 +48,14 @@ function BasisLine({
  */
 export default function StockRecommendationPanel({
   values,
+  groups,
   onApply,
 }: {
   values: Record<string, string>
+  groups: OptionGroup[]
   onApply: (recommendation: StockRecommendation, rowKeys: string[]) => void
 }) {
-  const input = toRecommendationInput(values)
+  const input = toRecommendationInput(values, groups)
   const query = useStockRecommendation(input?.request ?? null)
   const data = input ? query.data : undefined
   const recommendation = data?.recommendation
@@ -121,6 +124,12 @@ export default function StockRecommendationPanel({
               </button>
             </>
           )}
+          {(data.sampleSelection?.own === 'SIMILAR' ||
+            data.sampleSelection?.market === 'SIMILAR') && (
+            <p className="stock-recommendation-hint">
+              상품명·설명이 비슷한 종료 DROP을 골라 비교했어요.
+            </p>
+          )}
           {data.dataGaps!.length > 0 && (
             <ul className="stock-recommendation-gaps">
               {data.dataGaps!.map((gap) => (
@@ -133,17 +142,13 @@ export default function StockRecommendationPanel({
               title="내 실적"
               sales={data.own!}
               used={data.basis === 'OWN'}
-              sample={`내 종료 DROP ${data.own!.dropCount}개`}
+              sample={`${data.sampleSelection?.own === 'SIMILAR' ? '내 비슷한 상품' : '내 종료 DROP'} ${data.own!.dropCount}개`}
             />
             <BasisLine
               title="시장 평균"
               sales={data.market!}
               used={data.basis === 'MARKET'}
-              sample={
-                data.market!.dropCountBand === '20_PLUS'
-                  ? '다른 판매자 DROP 20개 이상'
-                  : '다른 판매자 DROP 10~19개'
-              }
+              sample={`다른 판매자 ${data.sampleSelection?.market === 'SIMILAR' ? '비슷한 상품' : 'DROP'} ${data.market!.dropCountBand === '20_PLUS' ? '20개 이상' : '10~19개'}`}
             />
           </ul>
           {(position && PRICE_POSITION_LABEL[position]) ||

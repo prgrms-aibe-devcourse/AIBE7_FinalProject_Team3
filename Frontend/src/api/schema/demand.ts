@@ -88,6 +88,10 @@ export interface paths {
 export type webhooks = Record<string, never>
 export interface components {
   schemas: {
+    OptionGroupInput: {
+      name: string
+      values: string[]
+    }
     OptionInput: {
       /** Format: int64 */
       unitPrice: number
@@ -99,6 +103,9 @@ export interface components {
       categoryId: number
       options: components['schemas']['OptionInput'][]
       safetyStockRate?: number
+      name?: string
+      description?: string
+      optionGroups?: components['schemas']['OptionGroupInput'][]
     }
     ApiResponseStockRecommendationResponse: {
       success?: boolean
@@ -167,6 +174,12 @@ export interface components {
       safetyStockRate?: number
       options?: components['schemas']['OptionRecommendation'][]
     }
+    SampleSelections: {
+      /** @enum {string} */
+      own?: 'SIMILAR' | 'CATEGORY'
+      /** @enum {string} */
+      market?: 'SIMILAR' | 'CATEGORY'
+    }
     StockRecommendationResponse: {
       /** Format: date-time */
       calculatedAt?: string
@@ -177,6 +190,7 @@ export interface components {
       market?: components['schemas']['MarketSales']
       /** @enum {string} */
       basis?: 'OWN' | 'MARKET'
+      sampleSelection?: components['schemas']['SampleSelections']
       recommendation?: components['schemas']['Recommendation']
       priceReference?: components['schemas']['PriceReference']
       dataGaps?: (
@@ -225,7 +239,7 @@ export interface components {
     }
     Conversion: {
       /** @enum {string} */
-      selection?: 'CATEGORY'
+      selection?: 'SIMILAR' | 'CATEGORY'
       own?: components['schemas']['OwnConversion']
       market?: components['schemas']['MarketConversion']
     }

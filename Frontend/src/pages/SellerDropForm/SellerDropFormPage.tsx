@@ -374,6 +374,7 @@ function SellerDropForm({
               />
               <StockRecommendationPanel
                 values={values}
+                groups={groups}
                 onApply={(recommendation, rowKeys) => {
                   setValues((current) =>
                     applyRecommendedStock(current, rowKeys, recommendation),

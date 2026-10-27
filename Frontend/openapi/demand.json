@@ -346,6 +346,27 @@
   },
   "components": {
     "schemas": {
+      "OptionGroupInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 0
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "minLength": 0
+            },
+            "maxItems": 50,
+            "minItems": 0
+          }
+        },
+        "required": ["name", "values"]
+      },
       "OptionInput": {
         "type": "object",
         "properties": {
@@ -381,6 +402,24 @@
             "type": "number",
             "maximum": 1,
             "minimum": 0
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 0
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 5000,
+            "minLength": 0
+          },
+          "optionGroups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OptionGroupInput"
+            },
+            "maxItems": 10,
+            "minItems": 0
           }
         },
         "required": ["categoryId", "options"]
@@ -545,6 +584,19 @@
           }
         }
       },
+      "SampleSelections": {
+        "type": "object",
+        "properties": {
+          "own": {
+            "type": "string",
+            "enum": ["SIMILAR", "CATEGORY"]
+          },
+          "market": {
+            "type": "string",
+            "enum": ["SIMILAR", "CATEGORY"]
+          }
+        }
+      },
       "StockRecommendationResponse": {
         "type": "object",
         "properties": {
@@ -568,6 +620,9 @@
           "basis": {
             "type": "string",
             "enum": ["OWN", "MARKET"]
+          },
+          "sampleSelection": {
+            "$ref": "#/components/schemas/SampleSelections"
           },
           "recommendation": {
             "$ref": "#/components/schemas/Recommendation"
@@ -714,7 +769,7 @@
         "properties": {
           "selection": {
             "type": "string",
-            "enum": ["CATEGORY"]
+            "enum": ["SIMILAR", "CATEGORY"]
           },
           "own": {
             "$ref": "#/components/schemas/OwnConversion"

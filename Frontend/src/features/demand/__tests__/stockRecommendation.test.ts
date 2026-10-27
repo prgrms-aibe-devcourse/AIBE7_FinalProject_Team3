@@ -29,6 +29,38 @@ test('카테고리와 가격이 정해진 활성 SKU만 순서대로 요청에 �
   })
 })
 
+test('상품명과 설명이 모두 있으면 비슷한 상품 표본용으로 옵션 구성과 함께 보낸다', () => {
+  const values = {
+    categoryId: '3',
+    name: ' 오버핏 티셔츠 ',
+    description: '부드러운 코튼',
+    [`${BLACK}:price`]: '59000',
+  }
+  const groups = [
+    {
+      id: 'g1',
+      name: '색상',
+      values: [
+        { id: 'black', label: '블랙' },
+        { id: 'blank', label: ' ' },
+      ],
+    },
+    { id: 'g2', name: ' ', values: [{ id: 'x', label: 'X' }] },
+  ]
+
+  expect(toRecommendationInput(values, groups)?.request).toEqual({
+    categoryId: 3,
+    options: [{ unitPrice: 59000 }],
+    name: '오버핏 티셔츠',
+    description: '부드러운 코튼',
+    optionGroups: [{ name: '색상', values: ['블랙'] }],
+  })
+  // 설명이 없으면 상품명도 보내지 않는다(카테고리 기준)
+  expect(
+    toRecommendationInput({ ...values, description: '' }, groups)?.request,
+  ).toEqual({ categoryId: 3, options: [{ unitPrice: 59000 }] })
+})
+
 test('카테고리가 없거나 가격을 정한 SKU가 없으면 요청하지 않는다', () => {
   expect(toRecommendationInput({ [`${BLACK}:price`]: '1000' })).toBeNull()
   expect(

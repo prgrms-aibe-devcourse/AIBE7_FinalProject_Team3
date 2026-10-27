@@ -2,6 +2,7 @@ import type {
   StockRecommendation,
   StockRecommendationRequest,
 } from '../../../api/demand/stockRecommendation'
+import type { OptionGroup } from '../../../types/drop'
 
 // DROP 폼의 SKU 입력은 values의 `sku:<선택 JSON>:price|stock|active` 키에 있다(sellerDropForm)
 export type RecommendationInput = {
@@ -14,12 +15,48 @@ const wholeNumber = (value?: string) => {
   return /^\d{1,12}$/.test(trimmed) ? Number(trimmed) : null
 }
 
+// 요청 한도(DEMAND.md 5.5)를 넘는 입력은 잘라 보낸다. 비슷한 상품을 고르는 데만 쓰여 저장 값과는 무관하다
+const MAX_NAME = 200
+const MAX_DESCRIPTION = 5000
+const MAX_GROUPS = 10
+const MAX_VALUES = 50
+const MAX_LABEL = 100
+
+/*
+    입력 중인 상품명·설명·옵션 구성을 보내 비슷한 상품 표본을 고르게 한다(DEMAND.md 5.1, GR-147).
+    상품명과 설명이 모두 있어야 서버가 비슷한 상품으로 고르고, 없으면 보내지 않아 카테고리 기준이 된다.
+ */
+function catalogText(
+  values: Record<string, string>,
+  groups: OptionGroup[],
+): Pick<StockRecommendationRequest, 'name' | 'description' | 'optionGroups'> {
+  const name = (values.name ?? '').trim().slice(0, MAX_NAME)
+  const description = (values.description ?? '')
+    .trim()
+    .slice(0, MAX_DESCRIPTION)
+  if (!name || !description) return {}
+  const optionGroups = groups
+    .map((group) => ({
+      name: group.name.trim().slice(0, MAX_LABEL),
+      values: group.values
+        .map((value) => value.label.trim().slice(0, MAX_LABEL))
+        .filter(Boolean)
+        .slice(0, MAX_VALUES),
+    }))
+    .filter((group) => group.name && group.values.length)
+    .slice(0, MAX_GROUPS)
+  return optionGroups.length
+    ? { name, description, optionGroups }
+    : { name, description }
+}
+
 /*
     카테고리와 가격이 정해진 활성 SKU만 추천 요청에 넣는다. 재고는 입력돼 있으면 함께 보내
     배분 비율·대표 가격 가중치로 쓰게 한다(DEMAND.md 5.1·5.2). 요청할 수 없으면 null이다.
  */
 export function toRecommendationInput(
   values: Record<string, string>,
+  groups: OptionGroup[] = [],
 ): RecommendationInput | null {
   const categoryId = wholeNumber(values.categoryId)
   if (!categoryId) return null
@@ -38,7 +75,10 @@ export function toRecommendationInput(
     )
   }
   if (!options.length || options.length > 100) return null
-  return { request: { categoryId, options }, rowKeys }
+  return {
+    request: { categoryId, options, ...catalogText(values, groups) },
+    rowKeys,
+  }
 }
 
 // 추천 배분을 각 SKU의 재고 칸에 채운다. 추천이 없으면 그대로 둔다

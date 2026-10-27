@@ -186,6 +186,11 @@ function recommendStock(request: StockRequest) {
     calculationVersion: 's1',
     referencePrice: request.options[0].unitPrice,
     own,
+    // 상품명·설명을 보내면 시장 평균을 비슷한 상품 표본으로 고른 것으로 본다(DEMAND.md 5.1)
+    sampleSelection: {
+      own: 'CATEGORY',
+      market: request.name && request.description ? 'SIMILAR' : 'CATEGORY',
+    },
     market: available
       ? {
           soldLow: 25,
