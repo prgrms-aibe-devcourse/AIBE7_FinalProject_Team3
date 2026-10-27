@@ -43,3 +43,27 @@ export async function calculateDemand(
     throw new Error('수요 분석 재계산 응답 형식이 올바르지 않습니다.')
   return data.data!
 }
+
+export type DemandExplanationResult = Schemas['DemandExplanationResponse']
+
+const EXPLANATION_STATUSES = ['GENERATED', 'DISCARDED', 'FAILED', 'DISABLED']
+
+// 판매자가 고른 가정의 분석 결과를 LLM으로 설명한다. 생성 실패도 200으로 status에 담긴다(DEMAND.md 3.1)
+export async function requestDemandExplanation(
+  dropId: number,
+  request: DemandCalculateRequest,
+) {
+  const { data } = await api.post<
+    Schemas['ApiResponseDemandExplanationResponse']
+  >(`/seller/drops/${dropId}/demand-analysis/explanation`, request)
+  const result = data.data
+  if (
+    data.success !== true ||
+    !result ||
+    !EXPLANATION_STATUSES.includes(result.status ?? '') ||
+    (result.status === 'GENERATED' &&
+      typeof result.explanation?.summary !== 'string')
+  )
+    throw new Error('수요 분석 설명 응답 형식이 올바르지 않습니다.')
+  return result
+}

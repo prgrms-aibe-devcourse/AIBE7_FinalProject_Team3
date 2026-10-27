@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import {
   calculateDemand,
   getDemandAnalysis,
+  requestDemandExplanation,
   type DemandCalculateRequest,
 } from '../../../api/demand/demand'
 import { demandKeys } from './queryKeys'
@@ -24,5 +25,13 @@ export function useCalculateDemand(dropId: number) {
   return useMutation({
     mutationFn: (request: DemandCalculateRequest) =>
       calculateDemand(dropId, request),
+  })
+}
+
+// 판매자가 "AI 설명 보기"를 누를 때만 부른다. 화면에 보이는 결과의 가정을 그대로 보낸다
+export function useDemandExplanation(dropId: number) {
+  return useMutation({
+    mutationFn: (request: DemandCalculateRequest) =>
+      requestDemandExplanation(dropId, request),
   })
 }

@@ -276,6 +276,51 @@
   font-size: 12px;
 }
 
+.demand-explanation {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.demand-explanation-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.demand-explanation-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.demand-explanation-heading button {
+  flex-shrink: 0;
+}
+.demand-explanation-pending {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.demand-explanation-body {
+  display: grid;
+  gap: 8px;
+}
+.demand-explanation-body p,
+.demand-explanation-body h4 {
+  margin: 0;
+}
+.demand-explanation-body h4 {
+  font-size: 12px;
+}
+.demand-explanation-body ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
 @media (max-width: 1000px) {
   .demand-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -287,6 +332,10 @@
   }
   .demand-metrics dd {
     font-size: 22px;
+  }
+  .demand-explanation-heading {
+    align-items: stretch;
+    flex-direction: column;
   }
   .demand-bases,
   .demand-assumption-fields {

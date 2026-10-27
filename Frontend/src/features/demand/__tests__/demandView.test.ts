@@ -146,6 +146,7 @@ test.each([
   ['DEMAND_ANALYSIS_UNAVAILABLE', '판매가 시작되어'],
   ['VALIDATION_FAILED', '입력값을 확인'],
   ['DROP_ACCESS_DENIED', '권한이 없어요'],
+  ['DEMAND_EXPLANATION_LIMIT_EXCEEDED', '내일 다시'],
 ])('%s 오류를 구분해 안내한다', (code, text) => {
   expect(demandErrorMessage(serverError(code))).toContain(text)
 })

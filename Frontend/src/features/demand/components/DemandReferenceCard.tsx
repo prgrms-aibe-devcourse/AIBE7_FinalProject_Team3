@@ -1,5 +1,8 @@
 import { useState } from 'react'
-import type { DemandAnalysis } from '../../../api/demand/demand'
+import type {
+  DemandAnalysis,
+  DemandCalculateRequest,
+} from '../../../api/demand/demand'
 import EmptyState from '../../../components/EmptyState/EmptyState'
 import { dateLabel } from '../../../utils/date'
 import { apiErrorCode } from '../../auth/logic/authUser'
@@ -13,6 +16,7 @@ import {
 import { useCalculateDemand, useDemandAnalysis } from '../logic/useDemand'
 import DemandAssumptionForm from './DemandAssumptionForm'
 import DemandEvidence from './DemandEvidence'
+import DemandExplanationPanel from './DemandExplanationPanel'
 import DemandOptionPlan from './DemandOptionPlan'
 import DemandPlanOverview from './DemandPlanOverview'
 
@@ -24,6 +28,7 @@ export default function DemandReferenceCard({ dropId }: { dropId: number }) {
   // 기본 분석이 다시 조회되면(WISH 수가 바뀌었을 수 있음) 이전 재계산은 버리고 가정 입력도 처음으로 돌린다
   const [calculated, setCalculated] = useState<{
     baseAt: number
+    request: DemandCalculateRequest
     result: DemandAnalysis
   } | null>(null)
 
@@ -57,8 +62,10 @@ export default function DemandReferenceCard({ dropId }: { dropId: number }) {
 
   const base = analysis.data
   const baseAt = analysis.dataUpdatedAt
-  const current = calculated?.baseAt === baseAt ? calculated.result : null
-  const shown = current ?? base
+  const current = calculated?.baseAt === baseAt ? calculated : null
+  const shown = current?.result ?? base
+  // AI 설명은 지금 보이는 결과의 가정으로 요청한다. 기본 가정은 빈 본문이다
+  const explanationRequest = current?.request ?? {}
   const comparison = initialComparison(shown)
   return (
     <section className="panel demand-card" aria-label="수요 분석">
@@ -93,6 +100,12 @@ export default function DemandReferenceCard({ dropId }: { dropId: number }) {
           </small>
         </p>
       )}
+      <DemandExplanationPanel
+        key={`${baseAt}:${JSON.stringify(explanationRequest)}`}
+        dropId={dropId}
+        request={explanationRequest}
+        recalculated={!!current}
+      />
       <details className="demand-details">
         <summary>근거와 가정 보기</summary>
         <DemandOptionPlan analysis={shown} />
@@ -100,11 +113,11 @@ export default function DemandReferenceCard({ dropId }: { dropId: number }) {
         <DemandAssumptionForm
           key={baseAt}
           base={base}
-          calculated={current}
+          calculated={current?.result ?? null}
           calculating={calculate.isPending}
           onCalculate={async (request) => {
             const result = await calculate.mutateAsync(request)
-            setCalculated({ baseAt, result })
+            setCalculated({ baseAt, request, result })
           }}
           onReset={() => setCalculated(null)}
         />
