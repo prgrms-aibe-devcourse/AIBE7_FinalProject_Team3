@@ -79,6 +79,8 @@ class WishSaleNoticeMailIntegrationTest {
     void tearDown() {
         jdbcTemplate.update(
                 "DELETE FROM wishes WHERE drop_id IN (SELECT id FROM drops WHERE seller_id = ?)", sellerId);
+        // 판매 시작 전환 후 수요 분석 기록(GR-175)이 DROP을 참조하므로 먼저 지운다
+        jdbcTemplate.update("DELETE FROM demand_analysis_snapshots WHERE drop_id IN (SELECT id FROM drops WHERE seller_id = ?)", sellerId);
         jdbcTemplate.update("DELETE FROM drops WHERE seller_id = ?", sellerId);
         jdbcTemplate.update("DELETE FROM users WHERE email LIKE ?", emailPrefix() + "%");
         jdbcTemplate.update("DELETE FROM sellers WHERE id = ?", sellerId);

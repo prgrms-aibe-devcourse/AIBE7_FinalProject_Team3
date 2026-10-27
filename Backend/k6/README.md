@@ -3,13 +3,17 @@
 로컬 백엔드(`localhost:8080`)만 대상으로 한다. 운영/외부 서비스로는 쏘지 않는다.
 
 > 각 시나리오 결과는 **운영 캐파시티 수치가 아니라 하한선 검증**이다. 목표는
-> 운영(t3.small, 2vCPU/2GB)보다 약한 t3.nano(1vCPU/0.5GB) 환경에서도 재고
-> 동시성이 깨지지 않는다는 것을 확인하는 것이고, 정확한 RPS·응답시간을
-> 측정하는 것이 아니다. nano 제한 환경으로 돌릴 때는 `docker compose -f
-> compose.yaml -f compose.loadtest.yaml up --build`(backend: 1 vCPU, 512MiB,
-> `-Xmx384m`)를 쓰고, k6는 로컬 바이너리 대신 `grafana/k6` 도커 이미지로
-> 실행(`--add-host=host.docker.internal:host-gateway`,
-> `BASE_URL=http://host.docker.internal:8080`)한다.
+> 운영(t3.small, vCPU 2개/2GB)보다 메모리가 약한 t3.nano(vCPU 2개/0.5GB, 베이스라인
+> CPU 성능 vCPU당 5%) 환경에서도 재고 동시성이 깨지지 않는다는 것을 확인하는 것이고,
+> 정확한 RPS·응답시간을 측정하는 것이 아니다. t3 계열은 nano~large가 전부 vCPU
+> 2개이고 메모리·베이스라인 CPU%만 다르다(CPU 코어 수를 1개로 제한했던 건 잘못된
+> 전제였다 — 2026-10-26 수정). nano 제한 환경으로 돌릴 때는 `docker compose -f
+> compose.yaml -f compose.loadtest-nano.yaml up --build`(backend: vCPU 2개, 512MiB,
+> `-Xmx384m`, 스왑은 memswap_limit으로 차단)를 쓰고, k6는 로컬 바이너리 대신
+> `grafana/k6` 도커 이미지로 실행(`--add-host=host.docker.internal:host-gateway`,
+> `BASE_URL=http://host.docker.internal:8080`)한다. t3.micro(vCPU 2개, 1GiB) 수준으로
+> 비교하고 싶으면 `compose.loadtest-nano.yaml` 대신 `compose.loadtest-micro.yaml`을
+> 합친다 — 둘은 같은 `backend` 서비스를 겹쳐 쓰므로 동시에 쓰지 않고 하나만 고른다.
 
 ```
 k6/
@@ -27,7 +31,8 @@ k6/
 
 1. k6 설치: https://k6.io/docs/get-started/installation/
 2. 백엔드 기동: `docker compose up --build` (nano 제한 환경으로 돌리려면 GR-149의
-   `docker compose -f compose.yaml -f compose.loadtest.yaml up --build`)
+   `docker compose -f compose.yaml -f compose.loadtest-nano.yaml up --build`,
+   t3.micro 수준은 `compose.loadtest-micro.yaml`로 바꿔 쓴다)
 3. 테스트 계정 시드 (최초 1회, 재실행해도 안전):
    ```
    docker compose exec -T postgres psql -U grab -d grab -f - < k6/common/accounts-seed.sql
@@ -47,3 +52,5 @@ verify.sql 실행 명령은 각 SQL 파일 상단 주석을 본다.
 | 드롭 오픈 순간 스파이크 | [`drop-open-spike/`](drop-open-spike/spike.js) | 오픈 순간 조회 램프업 + 주문 스파이크에 서버가 버티는지 (seed.sql 실행 직후 바로 돌려야 함) | [result.md](drop-open-spike/result.md) |
 | 평상시 조회 | [`steady-read/`](steady-read/steady-read.js) | 캐시 없는 상태의 목록/상세 조회 하한선 | [result.md](steady-read/result.md) |
 | DB 커넥션 풀 고갈 | [`connection-pool-exhaustion/`](connection-pool-exhaustion/pool-exhaustion.js) | 풀 크기(기본 10)보다 뚜렷이 많은 동시 요청에 타임아웃/5xx가 나는지 | [result.md](connection-pool-exhaustion/result.md) |
+| 결제 배치 롱런(soak) | [`payment-batch-soak/`](payment-batch-soak/payment-batch-soak.js) | 평상시 수준 주문·결제·취소 트래픽을 장시간 유지해 결제 배치의 메모리·커넥션 누수 여부를 확인 (`GRAB_PAYMENT_MOCK_GATEWAY_ENABLED=true`로 실행해 실제 토스를 안 때림) | [result.md](payment-batch-soak/result.md) |
+| PG 장애 주입 | [`payment-fault-injection/`](payment-fault-injection/payment-fault-injection.js) | MockPaymentGateway로 결제 승인 거절·결과불명·취소 결과불명을 섞어, 결제 배치(진행 중 결제 정리·취소 재요청)가 해소하는지와 보정 환불 중복 생성 여부를 확인 (`GRAB_PAYMENT_MOCK_GATEWAY_ENABLED=true`와 `GRAB_MOCK_*_RATE`로 실행) | [result.md](payment-fault-injection/result.md) |

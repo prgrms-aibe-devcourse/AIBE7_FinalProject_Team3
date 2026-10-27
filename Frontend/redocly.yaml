@@ -7,6 +7,10 @@ apis:
     root: ./openapi/dashboard.json
     x-openapi-ts:
       output: ./src/api/schema/dashboard.ts
+  demand:
+    root: ./openapi/demand.json
+    x-openapi-ts:
+      output: ./src/api/schema/demand.ts
   drop:
     root: ./openapi/drop.json
     x-openapi-ts:
