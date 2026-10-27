@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { StorageUploadError } from '../../../api/storage/upload'
-import { apiErrorCode } from './authUser'
+import { AUTH_TEMPORARILY_UNAVAILABLE_MESSAGE, apiErrorCode } from './authUser'
 import { DUPLICATE_NICKNAME_MESSAGE, fallbackMessage } from './signupErrors'
 import {
   NICKNAME_RULE_MESSAGE,
@@ -105,6 +105,9 @@ export function passwordChangeFailure(error: unknown): PasswordChangeFailure {
     }
     case 'PASSWORD_NOT_AVAILABLE':
       return { kind: 'general', message: PASSWORD_NOT_AVAILABLE_MESSAGE }
+    // 비밀번호는 바뀌지 않았고 세션도 유지되므로 입력을 그대로 두고 다시 보낼 수 있다(MEMBER_AUTH 1.11)
+    case 'AUTH_TEMPORARILY_UNAVAILABLE':
+      return { kind: 'general', message: AUTH_TEMPORARILY_UNAVAILABLE_MESSAGE }
   }
   return { kind: 'general', message: fallbackMessage(error) }
 }

@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { apiErrorCode } from './authUser'
+import { AUTH_TEMPORARILY_UNAVAILABLE_MESSAGE, apiErrorCode } from './authUser'
 import {
   NICKNAME_RULE_MESSAGE,
   PASSWORD_RULE_MESSAGE,
@@ -134,6 +134,10 @@ export function signupFailure(error: unknown): SignupFailure {
     if (Object.keys(fieldErrors).length > 0) {
       return { kind: 'fields', fieldErrors }
     }
+  }
+  // 가입 컨텍스트는 소비되지 않으므로 같은 단계에서 다시 보낼 수 있다(MEMBER_AUTH 1.2.3)
+  if (code === 'AUTH_TEMPORARILY_UNAVAILABLE') {
+    return { kind: 'general', message: AUTH_TEMPORARILY_UNAVAILABLE_MESSAGE }
   }
   return { kind: 'general', message: fallbackMessage(error) }
 }
