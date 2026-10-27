@@ -1,10 +1,10 @@
 # 수요 분석 API 명세
 
-> 요구사항: [REQUIREMENTS.md](../REQUIREMENTS.md) 1.13 (DEMAND-001~012), NFR-012·013
-> 스키마: [ERD.md](../ERD.md) 1.7 (`demand_analysis_snapshots`, `drop_stock_recommendations`, `drop_embeddings`)
+> 요구사항: [REQUIREMENTS.md](../REQUIREMENTS.md) 1.13 (DEMAND-001~013), NFR-012·013
+> 스키마: [ERD.md](../ERD.md) 1.7 (`demand_analysis_snapshots`, `drop_stock_recommendations`, `option_matches`, `drop_embeddings`)
 > 선정 근거: [TECHSTACK.md](../TECHSTACK.md) 1.3
 
-판매자의 WISH DROP에 대해 수요 데이터를 집계하고 판매 계획을 계산해 참고용으로 보여 준다(1~4절). DROP을 만들 때는 종료 DROP의 판매 실적으로 재고를 추천하고 가격대를 참고하게 한다(5절). 비슷한 상품 표본을 고르기 위해 공개된 DROP마다 임베딩을 만든다(6절). 계산은 서버의 결정적 함수가 하고, LLM은 계산 결과의 설명만 만든다. 제안은 참고용이며 재고·가격·판매 상태를 바꾸지 않는다. 판매자가 계획을 저장하거나 결정을 기록하지 않고(GR-175), 예측 정확도는 서버가 자동으로 남기는 기록(2.3, 5.6)으로 평가한다.
+판매자의 WISH DROP에 대해 수요 데이터를 집계하고 판매 계획을 계산해 참고용으로 보여 준다(1~4절). DROP을 만들 때는 종료 DROP의 판매 실적으로 재고를 추천하고 가격대를 참고하게 한다(5절). 비슷한 상품 표본을 고르기 위해 공개된 DROP마다 임베딩을 만든다(6절). 판매자가 요청하면 비슷한 상품의 옵션별 판매 비율로 추천 수량을 옵션에 나눈다(7절). 계산은 서버의 결정적 함수가 하고, LLM은 계산 결과의 설명만 만든다. 제안은 참고용이며 재고·가격·판매 상태를 바꾸지 않는다. 판매자가 계획을 저장하거나 결정을 기록하지 않고(GR-175), 예측 정확도는 서버가 자동으로 남기는 기록(2.3, 5.6)으로 평가한다.
 
 ## 1. 계산 규칙
 
@@ -331,6 +331,7 @@ POST /api/v1/seller/drops/{dropId}/demand-analysis/explanation
 | `grab.demand.explanation.duration` | `model` | LLM 응답 시간 |
 | `grab.demand.explanation.tokens` | `model` | 토큰 사용량 |
 | `grab.demand.embedding` | `outcome`(`created`, `skipped`, `failed`) | DROP 임베딩 생성 결과(GR-147) |
+| `grab.demand.option-match` | `outcome`(`text_only`, `generated`, `reused`, `discarded`, `failed`, `disabled`) | 옵션 매칭 결과(GR-189, 7절) |
 | `grab.demand.embedding.query` | `outcome`(`created`, `cached`, `failed`) | 재고 추천 요청 임베딩 결과(GR-147, 5.1). `cached`는 캐시를 다시 쓴 경우 |
 
 평가셋 실행 결과는 지표가 아니라 버전별 기록 파일로 남긴다(GR-146). 카테고리 기준과 유사 상품 기준의 예측 오차 비교도 같은 방식으로 기록한다(GR-147).
@@ -533,3 +534,120 @@ POST /api/v1/seller/stock-recommendations
 - **주기 배치**: `DRAFT`가 아닌 DROP 중 임베딩이 없거나 `model`이 현재 모델과 다른 DROP을 `id` 순으로 한 번에 최대 N개 만든다(`grab.demand.embedding.*`, 기본 10분마다 20개). 공개 직후 생성 실패, 서버 재시작으로 빠진 DROP, GR-147 이전에 공개된 DROP, 모델 변경을 이 배치가 채운다.
 - 여러 서버가 같은 DROP을 동시에 만들어도 `drop_id` 기준으로 덮어써 결과가 같다.
 - 실패하면 WARN 로그와 지표(`grab.demand.embedding` `failed`, 4절)만 남긴다. 공개·조회·추천은 영향을 받지 않는다.
+
+## 7. 옵션별 재고 배분 (GR-189)
+
+판매자가 설정한 옵션 안에서 5절의 준비 권장 수량을 **비슷한 상품의 옵션별 판매 비율**로 나눈다(DEMAND-013). 판매자마다 같은 값을 다르게 적으므로("블랙"·"검정"·"Black") 비슷한 상품의 옵션 값을 검색해 같은 값을 찾고(RAG 매칭), 비율과 수량은 서버가 계산한다. LLM은 같은 값의 후보 번호를 고르기만 하고 수량·비율을 다루지 않는다. 새 옵션을 제안하지 않는다.
+
+### 7.1 흐름
+
+1. **추천·표본**: 5.1·5.2와 같이 계산해 준비 권장 수량과 기준(`OWN`·`MARKET`)을 정한다. 기준이 없으면(`NO_SALES_SAMPLE`) 배분하지 않는다.
+2. **후보 검색**: 기준의 표본 DROP들에서 (그룹명, 값)마다 그 값이 들어간 SKU의 판매량을 합친다. 정규화한 그룹명·값(7.3)이 같으면 하나의 후보로 합친다.
+3. **글자 매칭**: 판매자 값과 정규화한 글자가 같은 후보를, 판매자 그룹명과 정규화한 글자가 같은 그룹의 후보에서 찾는다. 모든 값이 글자로 맞으면 LLM을 부르지 않는다.
+4. **LLM 매칭**: 글자로 맞지 않은 값이 있으면 판매자 옵션 구성 전체와 후보 목록을 보내, 판매자 값마다 같은 의미의 후보 번호를 고르게 한다(7.4).
+5. **비율·배분**: 7.5로 계산한다.
+
+### 7.2 옵션별 배분 조회
+
+```http
+POST /api/v1/seller/stock-recommendations/option-allocation
+```
+
+- **인증**: `SELLER`
+
+저장하지 않는다. 판매자가 "옵션별 추천"을 누를 때만 요청한다.
+
+**요청:** 5.5 요청과 같고 아래가 다르다.
+
+```json
+{
+  "categoryId": 1,
+  "name": "오버핏 코튼 티셔츠",
+  "description": "부드러운 코튼 소재의 오버핏 티셔츠입니다.",
+  "optionGroups": [
+    { "name": "색상", "values": ["블랙", "화이트"] },
+    { "name": "사이즈", "values": ["M", "L"] }
+  ],
+  "options": [
+    { "unitPrice": 39000, "values": ["블랙", "M"] },
+    { "unitPrice": 39000, "values": ["블랙", "L"] },
+    { "unitPrice": 39000, "values": ["화이트", "M"] },
+    { "unitPrice": 39000, "values": ["화이트", "L"] }
+  ]
+}
+```
+
+- `name`·`description`·`optionGroups`(1개 이상): 필수.
+- `options[].values`: 필수. `optionGroups` 순서대로 그룹마다 값 하나이며 그 그룹의 값이어야 한다. 어긋나면 `VALIDATION_FAILED`(`field`: `options`).
+
+**응답:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "basis": "MARKET",
+    "sampleSelection": { "own": "CATEGORY", "market": "SIMILAR" },
+    "recommended": 44,
+    "matchStatus": "GENERATED",
+    "groups": [
+      {
+        "name": "색상",
+        "allocation": "SALES",
+        "values": [
+          { "value": "블랙", "sharePercent": 62 },
+          { "value": "화이트", "sharePercent": 38 }
+        ]
+      },
+      {
+        "name": "사이즈",
+        "allocation": "EVEN",
+        "values": [
+          { "value": "M", "sharePercent": null },
+          { "value": "L", "sharePercent": null }
+        ]
+      }
+    ],
+    "options": [
+      { "index": 0, "recommendedQuantity": 14 },
+      { "index": 1, "recommendedQuantity": 13 },
+      { "index": 2, "recommendedQuantity": 9 },
+      { "index": 3, "recommendedQuantity": 8 }
+    ]
+  }
+}
+```
+
+- `basis`·`sampleSelection`·`recommended`: 5.5와 같다. 기준이 없으면 `recommended`·`options[].recommendedQuantity`가 `null`이고 그룹은 모두 `EVEN`이다.
+- `groups[].allocation`: `SALES`(비슷한 상품 판매 비율), `EVEN`(균등). `sharePercent`는 `SALES`일 때만 정수 %이며 그룹 합이 100이 되도록 최대 나머지 방식으로 맞춘다.
+- `matchStatus`: `TEXT_ONLY`(글자 매칭만으로 끝남), `GENERATED`(LLM 매칭), `REUSED`(저장된 매칭 재사용), `DISCARDED`(LLM 응답 형식 오류로 버림), `FAILED`(호출 실패·시간 초과·대기열 가득 참), `DISABLED`(모델 꺼짐). `DISCARDED`·`FAILED`·`DISABLED`이면 글자 매칭 결과만으로 계산한다.
+
+**오류 코드:**
+
+- `VALIDATION_FAILED` — 5.5 조건, 필수값 누락, `options[].values`가 옵션 구성과 맞지 않음
+- `STOCK_OPTION_MATCH_LIMIT_EXCEEDED` (429) — LLM을 부르는 요청의 하루 한도(판매자별 30회, KST) 초과. 글자 매칭만으로 끝나거나 저장된 매칭을 다시 쓰는 요청은 세지 않는다
+
+### 7.3 후보와 정규화
+
+- 정규화: 앞뒤 공백 제거, 영문 소문자, 공백 제거.
+- 후보는 기준 표본 DROP들의 옵션 그룹·값 중 판매량이 1 이상인 것만 쓰고, 판매량이 많은 순으로 최대 100개를 보낸다.
+- LLM에는 그룹명·값 글자만 보낸다. 판매량, 판매자, 상품명은 보내지 않는다.
+
+### 7.4 LLM 매칭
+
+- 입력: 판매자 옵션 구성(그룹·값 번호)과 후보 목록(번호, 그룹명, 값).
+- 출력: 판매자 값마다 같은 의미인 후보 번호 목록. 응답 스키마로 형식을 고정한다.
+- 같은 의미만 고른다. 예: "블랙"·"검정"·"Black"은 같고, "블랙"과 "차콜"은 다르다. "M"과 "MEDIUM"은 같고 "M"과 "L"은 다르다. 확실하지 않으면 고르지 않는다.
+- 검증: 범위 밖 번호는 버린다. 한 그룹 안에서 같은 후보를 두 값이 고르면 그 후보는 둘 다에서 뺀다. JSON이 아니면 응답 전체를 버린다(`DISCARDED`).
+- 후보 글자는 다른 판매자가 입력한 것이다. 지시로 따르지 않고, 출력은 번호로만 받아 후보 글이 결과에 섞이지 않는다.
+- 호출: 판매자가 요청할 때만, 시간 제한 10초, 재시도 없음. 같은 입력(프롬프트 버전, 판매자 옵션 구성, 후보 목록)이면 저장된 매칭(`option_matches`, ERD.md 1.7)을 다시 쓴다.
+
+### 7.5 비율과 배분
+
+- 그룹을 `SALES`로 계산하는 조건
+  - 판매자 그룹의 모든 값에 판매량 1 이상인 후보가 하나 이상 매칭됐다.
+  - 매칭된 후보가 나온 표본 DROP이 기준의 최소 단위를 넘는다. `OWN`은 3개 이상, `MARKET`은 판매자 5명·DROP 10개 이상이다(1.3).
+- 조건을 못 넘은 그룹은 `EVEN`이다. 예: 처음 보는 "민트"가 있는 색상 그룹.
+- 값 비율 = 그 값에 매칭된 후보 판매량 합 ÷ 그룹의 매칭된 판매량 합. 한 후보는 한 값에만 매칭된다(7.4 검증).
+- SKU 비율 = 그룹별 값 비율의 곱(`EVEN` 그룹은 1/값 수). 요청 SKU 비율의 합으로 나눠 정규화하고, 준비 권장 수량을 최대 나머지 방식으로 나눈다(나머지가 같으면 앞 SKU부터).
+- 모든 그룹이 `EVEN`이면 5.2의 옵션별 배분과 같다.

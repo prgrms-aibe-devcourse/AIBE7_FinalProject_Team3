@@ -488,6 +488,21 @@ MVP는 주문당 배송 한 건만 지원한다. 배송 상태는 `orders.status
 - 추가만 하고 고치지 않는다. 종료 후 실제 판매량(`drop_options.sold_quantity` 합계)과 비교해 추천 범위 적중률과 준비 수량 대비 판매율을 집계한다.
 - 외부에 행 단위로 노출하지 않아 `public_id`를 두지 않는다.
 
+#### `option_matches` (GR-189)
+
+옵션별 재고 배분(수요 분석 API 7절)에서 LLM이 고른 옵션 매칭 결과를 같은 입력이면 다시 쓰려고 남긴다.
+
+| 컬럼 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `input_hash` | VARCHAR(64) | O | PK. 프롬프트 버전·판매자 옵션 구성·후보 목록 JSON의 SHA-256 16진수 |
+| `matches` | JSONB | O | 판매자 값마다 고른 후보 번호(검증을 통과한 것만) |
+| `llm_model` | VARCHAR(100) | X | 응답에 실린 모델명 |
+| `prompt_version` | VARCHAR(20) | O | 매칭 프롬프트 버전 |
+| `created_at` | TIMESTAMPTZ | O | 생성 시각 |
+
+- 저장 전 폼 입력에도 쓰므로 DROP·판매자와 연결하지 않는다. 후보 글자·판매량은 저장하지 않고 번호만 남긴다.
+- 동시에 저장하면 먼저 저장된 행이 남는다. 응답 형식 오류·호출 실패는 남기지 않는다.
+
 #### `drop_embeddings` (GR-147)
 
 유사 상품 표본 선택용 DROP 임베딩이다. PostgreSQL `vector` 확장(pgvector)이 필요하다.
