@@ -20,7 +20,12 @@ import DemandPlanOverview from './DemandPlanOverview'
 export default function DemandReferenceCard({ dropId }: { dropId: number }) {
   const analysis = useDemandAnalysis(dropId, true)
   const calculate = useCalculateDemand(dropId)
-  const [calculated, setCalculated] = useState<DemandAnalysis | null>(null)
+  // 재계산 결과는 그 계산의 바탕이 된 기본 분석(조회 시각)에 묶는다.
+  // 기본 분석이 다시 조회되면(WISH 수가 바뀌었을 수 있음) 이전 재계산은 버리고 가정 입력도 처음으로 돌린다
+  const [calculated, setCalculated] = useState<{
+    baseAt: number
+    result: DemandAnalysis
+  } | null>(null)
 
   if (analysis.isPending)
     return (
@@ -51,7 +56,9 @@ export default function DemandReferenceCard({ dropId }: { dropId: number }) {
     )
 
   const base = analysis.data
-  const shown = calculated ?? base
+  const baseAt = analysis.dataUpdatedAt
+  const current = calculated?.baseAt === baseAt ? calculated.result : null
+  const shown = current ?? base
   const comparison = initialComparison(shown)
   return (
     <section className="panel demand-card" aria-label="수요 분석">
@@ -91,12 +98,14 @@ export default function DemandReferenceCard({ dropId }: { dropId: number }) {
         <DemandOptionPlan analysis={shown} />
         <DemandEvidence analysis={shown} />
         <DemandAssumptionForm
+          key={baseAt}
           base={base}
-          calculated={calculated}
+          calculated={current}
           calculating={calculate.isPending}
-          onCalculate={async (request) =>
-            setCalculated(await calculate.mutateAsync(request))
-          }
+          onCalculate={async (request) => {
+            const result = await calculate.mutateAsync(request)
+            setCalculated({ baseAt, result })
+          }}
           onReset={() => setCalculated(null)}
         />
       </details>

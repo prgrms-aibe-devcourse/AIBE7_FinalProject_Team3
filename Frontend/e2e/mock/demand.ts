@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 import type { components } from '../../src/api/schema/demand'
-import { FIXED_NOW } from './api/drop/fixtures'
+import { baseDrops, FIXED_NOW } from './api/drop/fixtures'
 import { json } from './api/shared'
 
 type StockRequest = components['schemas']['StockRecommendationRequest']
@@ -10,10 +10,47 @@ type CalculateRequest = components['schemas']['DemandCalculateRequest']
 // 판매 시작 전 WISH DROP(101)만 분석할 수 있다. 수치는 DEMAND.md 1.6 식을 그대로 따른다.
 const DEMAND_DROP_ID = 101
 const ACTIVE_WISHES = 248
-const OPTIONS = [
-  { optionId: 1011, name: '내추럴', currentQuantity: 30 },
-  { optionId: 1012, name: '블랙', currentQuantity: 30 },
-]
+// DROP 101 상세 fixture의 옵션을 그대로 쓴다. 판매 전이라 가용 재고가 현재 준비 수량이고,
+// 표시명은 서버처럼 옵션 그룹 순서대로 값을 " / "로 잇는다(DEMAND.md 2.1)
+const OPTIONS = (() => {
+  const drop = baseDrops().find((item) => item.dropId === DEMAND_DROP_ID)!
+  return drop.options.map((option) => ({
+    optionId: option.optionId,
+    name: drop.groups
+      .map(
+        (group) =>
+          group.values.find(
+            (value) =>
+              value.valueId ===
+              option.selections.find(
+                (selection) => selection.groupId === group.groupId,
+              )?.valueId,
+          )?.value,
+      )
+      .join(' / '),
+    currentQuantity: option.availableStock,
+  }))
+})()
+
+// 준비 권장 수량을 현재 수량 비율로 나누는 최대 나머지 배분(DEMAND.md 1.6)
+function allocate(total: number) {
+  const current = OPTIONS.reduce(
+    (sum, option) => sum + option.currentQuantity,
+    0,
+  )
+  const shares = OPTIONS.map(
+    (option) => (total * option.currentQuantity) / current,
+  )
+  const allocated = shares.map(Math.floor)
+  let left = total - allocated.reduce((sum, value) => sum + value, 0)
+  shares
+    .map((share, index) => ({ index, remainder: share - Math.floor(share) }))
+    .sort((a, b) => b.remainder - a.remainder || a.index - b.index)
+    .forEach(({ index }) => {
+      if (left-- > 0) allocated[index] += 1
+    })
+  return allocated
+}
 const OWN = {
   rate: 0.4,
   rateLow: 0.3,
@@ -68,7 +105,7 @@ function analyze(request: CalculateRequest = {}): Analysis {
     (sum, option) => sum + option.currentQuantity,
     0,
   )
-  const first = Math.ceil(recommended / 2)
+  const allocated = allocate(recommended)
   return {
     dropId: DEMAND_DROP_ID,
     calculatedAt: FIXED_NOW.toISOString(),
@@ -104,7 +141,7 @@ function analyze(request: CalculateRequest = {}): Analysis {
       differenceFromCurrent: recommended - current,
       options: OPTIONS.map((option, index) => ({
         ...option,
-        recommendedQuantity: index === 0 ? first : recommended - first,
+        recommendedQuantity: allocated[index],
       })),
     },
     initialRecommendation: INITIAL_RECOMMENDATION,

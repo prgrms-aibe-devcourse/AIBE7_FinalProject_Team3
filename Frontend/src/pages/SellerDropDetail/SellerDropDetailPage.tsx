@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Link,
   Navigate,
@@ -30,6 +30,8 @@ import { sellerDropError } from '../../features/seller/logic/sellerDropErrors'
 import { dateLabel } from '../../utils/date'
 import { won } from '../../utils/price'
 
+const MAX_TIMER_DELAY = 2_147_483_647
+
 export default function SellerDropDetailPage({
   user,
   authStatus,
@@ -54,8 +56,20 @@ export default function SellerDropDetailPage({
     queryFn: getCategories,
     enabled,
   })
-  // 수요 분석 카드는 판매 시작 전에만 보인다. 렌더마다 시각이 바뀌지 않게 진입 시각을 쓴다(SellerDropActions와 같음)
-  const [now] = useState(() => Date.now())
+  // 수요 분석 카드는 판매 시작 전에만 보인다. 렌더마다 시각이 바뀌지 않게 진입 시각을 쓰고(SellerDropActions와 같음),
+  // 화면을 열어 둔 채 판매 시작 시각이 되면 다시 판단해 카드를 내린다
+  const [now, setNow] = useState(() => Date.now())
+  const saleStartsAt = query.data?.saleStartsAt
+  useEffect(() => {
+    if (!saleStartsAt) return
+    const startsAt = Date.parse(saleStartsAt)
+    const delay = startsAt - Date.now()
+    // setTimeout은 약 24.8일(2^31-1ms)을 넘는 지연을 바로 실행하므로 그보다 먼 일정은 다음 진입 때 판단한다
+    if (delay <= 0 || delay > MAX_TIMER_DELAY) return
+    // 타이머가 울린 시점은 판매 시작 시각이므로 그 시각으로 판단한다
+    const timer = window.setTimeout(() => setNow(startsAt), delay)
+    return () => window.clearTimeout(timer)
+  }, [saleStartsAt])
   const { status, page } = readSellerDropQuery(params)
   const backTo = `/seller/drops?status=${status}&page=${page}`
   if (authStatus === 'loading') return <AuthLoading />
