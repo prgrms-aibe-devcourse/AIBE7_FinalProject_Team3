@@ -4,6 +4,7 @@ import { getAuth, installAuthApi } from './mock/auth'
 import { installStockStream } from './mock/stockStream'
 import { installDropImageUploads } from './mock/dropImages'
 import { installSellerDropApi } from './mock/sellerDrops'
+import { installDemandApi } from './mock/demand'
 import { installFakeToss } from './mock/toss'
 
 export type { Page }
@@ -32,6 +33,8 @@ export const test = base.extend({
     await installPublicApi(page)
     await installDropImageUploads(page)
     await installSellerDropApi(page)
+    // 수요 분석 경로만 처리하고 나머지 판매자 경로는 위 핸들러로 넘긴다(GR-168).
+    await installDemandApi(page)
     // 인증 API는 공개 API 뒤에 등록해 인증 경로만 처리하고 나머지는 위 핸들러로 넘긴다.
     installAuthApi(page)
     await provide(page)
