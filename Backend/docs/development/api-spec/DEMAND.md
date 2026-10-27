@@ -247,9 +247,9 @@ POST /api/v1/seller/drops/{dropId}/demand-plans
 
 - **인증**: `SELLER`
 
-요청은 2.2와 같다. 서버가 저장 시점 데이터로 다시 계산해 `DRAFT`로 저장하고, 커밋 후 LLM 설명 생성을 비동기로 시작한다(3절).
+요청은 2.2와 같다. 서버가 저장 시점 데이터로 다시 계산해 `DRAFT`로 저장한다. 설명 생성이 켜져 있으면 `explanationStatus: PENDING`으로 저장하고 커밋 후 LLM 설명 생성을 비동기로 시작한다(3절). 꺼져 있으면 `DISABLED`로 저장하고 설명을 요청하지 않는다. GR-146 구현 전에는 항상 꺼져 있고, 이후에는 비용 한도 초과 등으로 설정에서 끈 경우다.
 
-**응답:** `201 Created`, 본문은 2.5의 계획 상세(`explanationStatus: PENDING`)
+**응답:** `201 Created`, 본문은 2.5의 계획 상세
 
 ### 2.4 판매 계획 목록
 
@@ -297,7 +297,8 @@ GET /api/v1/seller/demand-plans/{planId}
 ```
 
 - `decision`: 결정 후 `{ "status", "quantities", "reason", "decidedAt" }`.
-- `explanationStatus`가 `GENERATED`가 아니면 `explanation`은 `null`이다. `PENDING`이 생성 후 2분을 넘으면 응답에서 `FAILED`로 표시한다(저장값은 바꾸지 않음).
+- `explanationStatus`가 `GENERATED`가 아니면 `explanation`은 `null`이다. `PENDING`이 생성 후 2분을 넘으면 응답에서 `FAILED`로 표시한다(저장값은 바꾸지 않음). `DISABLED`는 설명을 요청하지 않은 계획으로, 화면은 실패가 아니라 설명 없이 계산 결과만 보여 준다.
+- 없는 계획과 다른 판매자의 계획은 구분하지 않고 `DEMAND_PLAN_NOT_FOUND`(404)로 응답한다. 형식이 잘못된 `planId`는 `RESOURCE_NOT_FOUND`(404)다.
 
 ### 2.6 판매 계획 결정 기록
 

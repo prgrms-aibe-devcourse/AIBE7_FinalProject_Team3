@@ -204,6 +204,7 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 | `ACCOUNT_DISABLED` | 403 | 정지·탈퇴 등 이용할 수 없는 계정 |
 | `RESOURCE_NOT_FOUND` | 404 | 리소스 없음 |
 | `ORDER_NOT_FOUND` | 404 | 주문 없음 (구매자 주문 조회에서는 다른 사용자의 주문도 포함) |
+| `DEMAND_PLAN_NOT_FOUND` | 404 | 판매 계획 없음 (다른 판매자의 계획도 포함) |
 | `DUPLICATE_IDEMPOTENCY_KEY` | 409 | 같은 멱등 키에 다른 요청 본문 사용 |
 | `PAYMENT_CANCELLATION_UNKNOWN` | 409 | 결제 취소 진행·확인 중이라 배송 준비·발송 불가 |
 | `DUPLICATE_EMAIL` | 409 | 이메일 중복 |

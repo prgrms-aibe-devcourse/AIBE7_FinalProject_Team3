@@ -3,13 +3,17 @@
 로컬 백엔드(`localhost:8080`)만 대상으로 한다. 운영/외부 서비스로는 쏘지 않는다.
 
 > 각 시나리오 결과는 **운영 캐파시티 수치가 아니라 하한선 검증**이다. 목표는
-> 운영(t3.small, 2vCPU/2GB)보다 약한 t3.nano(1vCPU/0.5GB) 환경에서도 재고
-> 동시성이 깨지지 않는다는 것을 확인하는 것이고, 정확한 RPS·응답시간을
-> 측정하는 것이 아니다. nano 제한 환경으로 돌릴 때는 `docker compose -f
-> compose.yaml -f compose.loadtest.yaml up --build`(backend: 1 vCPU, 512MiB,
-> `-Xmx384m`)를 쓰고, k6는 로컬 바이너리 대신 `grafana/k6` 도커 이미지로
-> 실행(`--add-host=host.docker.internal:host-gateway`,
-> `BASE_URL=http://host.docker.internal:8080`)한다.
+> 운영(t3.small, vCPU 2개/2GB)보다 메모리가 약한 t3.nano(vCPU 2개/0.5GB, 베이스라인
+> CPU 성능 vCPU당 5%) 환경에서도 재고 동시성이 깨지지 않는다는 것을 확인하는 것이고,
+> 정확한 RPS·응답시간을 측정하는 것이 아니다. t3 계열은 nano~large가 전부 vCPU
+> 2개이고 메모리·베이스라인 CPU%만 다르다(CPU 코어 수를 1개로 제한했던 건 잘못된
+> 전제였다 — 2026-10-26 수정). nano 제한 환경으로 돌릴 때는 `docker compose -f
+> compose.yaml -f compose.loadtest-nano.yaml up --build`(backend: vCPU 2개, 512MiB,
+> `-Xmx384m`, 스왑은 memswap_limit으로 차단)를 쓰고, k6는 로컬 바이너리 대신
+> `grafana/k6` 도커 이미지로 실행(`--add-host=host.docker.internal:host-gateway`,
+> `BASE_URL=http://host.docker.internal:8080`)한다. t3.micro(vCPU 2개, 1GiB) 수준으로
+> 비교하고 싶으면 `compose.loadtest-nano.yaml` 대신 `compose.loadtest-micro.yaml`을
+> 합친다 — 둘은 같은 `backend` 서비스를 겹쳐 쓰므로 동시에 쓰지 않고 하나만 고른다.
 
 ```
 k6/
@@ -28,7 +32,8 @@ k6/
 
 1. k6 설치: https://k6.io/docs/get-started/installation/
 2. 백엔드 기동: `docker compose up --build` (nano 제한 환경으로 돌리려면 GR-149의
-   `docker compose -f compose.yaml -f compose.loadtest.yaml up --build`)
+   `docker compose -f compose.yaml -f compose.loadtest-nano.yaml up --build`,
+   t3.micro 수준은 `compose.loadtest-micro.yaml`로 바꿔 쓴다)
 3. 테스트 계정 시드 (최초 1회, 재실행해도 안전):
    ```
    docker compose exec -T postgres psql -U grab -d grab -f - < k6/common/accounts-seed.sql
@@ -49,3 +54,4 @@ verify.sql 실행 명령은 각 SQL 파일 상단 주석을 본다.
 | 평상시 조회 | [`steady-read/`](steady-read/steady-read.js) | 캐시 없는 상태의 목록/상세 조회 하한선 | [result.md](steady-read/result.md) |
 | DB 커넥션 풀 고갈 | [`connection-pool-exhaustion/`](connection-pool-exhaustion/pool-exhaustion.js) | 풀 크기(기본 10)보다 뚜렷이 많은 동시 요청에 타임아웃/5xx가 나는지 | [result.md](connection-pool-exhaustion/result.md) |
 | SSE 동시 연결 | [`sse-stream/`](sse-stream/order-load.js) | SSE 200 연결 유지 + 주문 50/초에서 연결 실패·알림 유실·재고 정합성·주문 p95 악화 여부 (한 회차는 [`run.sh`](sse-stream/run.sh)로 실행) | [result.md](sse-stream/result.md) |
+| 결제 배치 롱런(soak) | [`payment-batch-soak/`](payment-batch-soak/payment-batch-soak.js) | 평상시 수준 주문·결제·취소 트래픽을 장시간 유지해 결제 배치의 메모리·커넥션 누수 여부를 확인 (`GRAB_PAYMENT_MOCK_GATEWAY_ENABLED=true`로 실행해 실제 토스를 안 때림) | [result.md](payment-batch-soak/result.md) |
