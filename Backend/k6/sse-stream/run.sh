@@ -8,7 +8,10 @@
 #   Backend/k6/sse-stream/run.sh r2 200 50 300   # 피크
 #
 # 결과는 out/<이름>-*.{txt,json,log}에 남는다. 주문 p95는 <이름>-k6.json의 "http_req_duration{name:order}".
+# 시드 실패는 즉시 중단하고, 그 밖의 실패(k6 threshold, SSE 준비 수 부족, verify.sql 위반)는 끝까지 기록한 뒤 종료 코드 1로 알린다.
 set -u
+FAIL=0
+fail() { echo "실패: $1"; FAIL=1; }
 if [ $# -ne 4 ]; then
   sed -n '6,8p' "$0"
   exit 1
@@ -24,7 +27,10 @@ O=k6/sse-stream/out; mkdir -p $O
 # k6 --console-output은 기존 파일 뒤에 이어 쓰므로, 같은 이름으로 다시 돌릴 때 이전 결과가 섞이지 않게 지운다.
 rm -f $O/$NAME-*
 
-docker compose exec -T postgres psql -U grab -d grab -f - < k6/sse-stream/seed.sql > $O/$NAME-seed.txt 2>&1
+if ! docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U grab -d grab -f - < k6/sse-stream/seed.sql > $O/$NAME-seed.txt 2>&1; then
+  echo "실패: seed.sql ($O/$NAME-seed.txt)"
+  exit 1
+fi
 
 BACKEND=$(docker compose ps -q backend)
 # backend·postgres CPU/메모리와 backend cgroup 스왑 사용량을 3초 간격으로 남긴다. 줄 앞은 epoch 초.
@@ -48,10 +54,16 @@ fi
 echo "[$NAME] 주문 ${RATE}/초 × ${DUR}초 시작 (SSE 연결 $CONNS)"
 START=$(date +%s)
 RATE=$RATE DURATION=${DUR}s k6 run -q --summary-export=$O/$NAME-k6.json \
-  --console-output=$O/$NAME-orders.log k6/sse-stream/order-load.js > $O/$NAME-k6.txt 2>&1
+  --console-output=$O/$NAME-orders.log k6/sse-stream/order-load.js > $O/$NAME-k6.txt 2>&1 \
+  || fail "k6 종료 코드 $? (threshold 위반 등, $O/$NAME-k6.txt)"
 END=$(date +%s)
 
-[ "$CONNS" -gt 0 ] && wait $SSE
+if [ "$CONNS" -gt 0 ]; then
+  wait $SSE
+  # 고정 대기(30초) 안에 일부 연결이 429·503 등으로 준비되지 못했으면 지연 표본이 줄어든 회차라 실패로 본다.
+  READY=$(node -e 'console.log(require(process.argv[1]).summary.ready)' "$PWD/$O/$NAME-sse.json" 2>/dev/null || echo 0)
+  [ "$READY" = "$CONNS" ] || fail "SSE 준비 ${READY}/${CONNS} ($O/$NAME-sse.txt)"
+fi
 kill $STATS 2>/dev/null; wait $STATS 2>/dev/null
 sleep 20  # Prometheus 스크랩 간격(15초)만큼 기다려야 마지막 구간이 반영된다.
 
@@ -76,7 +88,8 @@ q() {
   done
 } > $O/$NAME-prom.txt
 
-docker compose exec -T postgres psql -U grab -d grab -f - < k6/sse-stream/verify.sql > $O/$NAME-verify.txt 2>&1
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U grab -d grab -f - < k6/sse-stream/verify.sql > $O/$NAME-verify.txt 2>&1 \
+  || fail "verify.sql 재고 정합성 위반 또는 SQL 오류 ($O/$NAME-verify.txt)"
 [ "$CONNS" -gt 0 ] && node k6/sse-stream/analyze.mjs $O/$NAME-sse.json $O/$NAME-orders.log > $O/$NAME-latency.json
 
 # 요약 출력
@@ -93,3 +106,4 @@ docker exec $BACKEND sh -c 'grep -E "^oom_kill " /sys/fs/cgroup/memory.events' 2
 awk '/backend-1/{gsub("%","",$3); gsub("%","",$7); c+=$3; n++; if($3>m)m=$3; if($7>mm)mm=$7}
      END{printf "backend CPU 평균 %.1f%% / 최대 %.1f%%, 메모리 최대 %.1f%%\n", c/n, m, mm}' $O/$NAME-stats.txt
 echo "결과: $O/$NAME-*"
+exit $FAIL
