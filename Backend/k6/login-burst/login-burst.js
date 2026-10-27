@@ -18,30 +18,24 @@
 //
 // 아래 명령은 모두 Backend/에서 Git Bash로 실행한다.
 //
-// [환경] nano 설정(compose.loadtest.yaml만 사용)이 아니라 t3.micro 기준 임시 설정으로 측정했다.
-// nano 설정(512MiB, -Xmx384m)은 힙 밖 메모리만 약 300MiB라 로그인 1명 부하에서도 OOM-kill된다(result.md 부록).
-// 임시 설정 파일은 저장소에 두지 않는다. 저장소 밖(예: 임시 폴더)에 아래 내용으로 만들어 세 번째 -f로 얹는다.
-//   # compose.micro.yaml. memswap_limit을 mem_limit과 같게 두어 스왑을 막는다
-//   services:
-//     backend:
-//       mem_limit: 1g
-//       memswap_limit: 1g
-//       environment:
-//         JDK_JAVA_OPTIONS: -Xmx512m -Xlog:gc   # environment는 값 전체를 덮어쓰므로 -Xlog:gc도 다시 적는다
+// [환경] 저장소 compose.loadtest-micro.yaml(t3.micro 기준: 1GiB·스왑 없음, CPU 2개, -Xmx550m -XX:+UseG1GC)로 측정한다.
+// nano 설정(compose.loadtest-nano.yaml, 512MiB, -Xmx384m)은 힙 밖 메모리만 약 300MiB라 로그인 1명 부하에서도
+// OOM-kill된다(result.md 부록 B). 2026-10-26의 CPU 1개·2개 측정은 저장소에 micro 설정이 생기기 전이라
+// 저장소 밖 임시 설정(1GiB, -Xmx512m -Xlog:gc, Serial GC)을 썼다. 그 내용은 result.md 1.1절에 있다.
 //
 // [준비]
-//   docker compose -f compose.yaml -f compose.loadtest.yaml -f <임시 폴더>/compose.micro.yaml up -d --build
-//   docker inspect backend-backend-1 --format 'Memory={{.HostConfig.Memory}} MemorySwap={{.HostConfig.MemorySwap}}'
-//     → 둘 다 1073741824(스왑 없음)
-//   docker compose logs backend | head -3              → NOTE: Picked up JDK_JAVA_OPTIONS: -Xmx512m -Xlog:gc
-//   docker compose logs backend | grep '\[gc\] Using'  → 메모리 1GiB(1792MB 미만)에서는 CPU 수와 관계없이 Serial
+//   docker compose -f compose.yaml -f compose.loadtest-micro.yaml up -d --build backend
+//   docker inspect backend-backend-1 --format 'Memory={{.HostConfig.Memory}} MemorySwap={{.HostConfig.MemorySwap}} NanoCpus={{.HostConfig.NanoCpus}}'
+//     → Memory·MemorySwap 모두 1073741824(스왑 없음), NanoCpus 2000000000
+//   docker compose logs backend | head -3              → NOTE: Picked up JDK_JAVA_OPTIONS: -Xmx550m -XX:+UseG1GC
+//   curl -s localhost:8080/actuator/prometheus | grep -m1 'gc="G1'   → G1 지표가 나오면 G1이다
 //   docker compose exec -T postgres psql -U grab -d grab -f - < k6/common/accounts-seed.sql
 //   측정 전 Redis 상태를 기록한다(측정 후와 비교해 로그인 폭주가 남긴 증가량을 본다):
 //   docker compose exec -T redis redis-cli DBSIZE
 //   docker compose exec -T redis redis-cli INFO memory | grep '^used_memory_human'
 //
 // [실행] VU 단계(5 → 10 → 20 → 40, 40에서도 버티면 80)마다 따로 실행한다. 5xx·타임아웃·
-// 힙 OutOfMemoryError·컨테이너 종료가 처음 나온 단계를 한계 단계로 기록한다.
+// 힙 OutOfMemoryError·컨테이너 종료·응답 불가가 처음 나온 단계를 한계 단계로 기록한다.
 //   k6 run -e VUS=5 k6/login-burst/login-burst.js                 # steady: 30초 동안 계속 로그인
 //   k6 run -e VUS=5 -e SHAPE=burst k6/login-burst/login-burst.js  # burst: VU마다 1번씩 동시에
 //   k6 run -e VUS=20 -e MODE=fail k6/login-burst/login-burst.js   # 실패 로그인(비교용)
@@ -52,11 +46,17 @@
 //   while true; do echo "$(date +%T) $(docker stats --no-stream --format '{{.CPUPerc}} {{.MemUsage}}' backend-backend-1)"; done | tee stats.log
 //   실행 후 컨테이너 생존(재시작 정책이 없어 OOM-kill이면 exited로 남는다):
 //   docker inspect backend-backend-1 --format 'Status={{.State.Status}} OOMKilled={{.State.OOMKilled}} RestartCount={{.RestartCount}}'
-//   실행 후 힙 부족과 GC(컨테이너 OOM-kill과 구분해 기록한다):
-//   docker compose logs --since 5m backend | grep -E 'OutOfMemoryError|ERROR'
-//   docker compose logs --since 5m backend | grep '\[gc\]' > gc.log
-//   GC 로그 한 줄은 `Pause Young (Allocation Failure) 210M->48M(370M) 4.123ms` 형태다(GC 전 → 후 힙 사용량,
-//   괄호는 확보된 힙, 끝은 정지 시간). Pause Full이 잦아지거나 GC 뒤에도 사용량이 거의 줄지 않으면 힙이 한계다.
+//   실행 후 응답 여부. 힙 OOM으로 Tomcat Poller 스레드가 죽으면 컨테이너는 running인데 아무 요청에도
+//   응답하지 않고, 재시작 전까지 회복되지 않는다(result.md 2.5절). 응답이 없으면 그 단계를 한계로 기록하고 재시작한다:
+//   curl -s -m 5 localhost:8080/actuator/health
+//   실행 후 힙 부족(컨테이너 OOM-kill과 구분해 기록한다). ERROR 줄 아래 예외가 OutOfMemoryError면 힙 OOM,
+//   QueryTimeoutException이면 Redis 타임아웃이다:
+//   docker compose logs --since 5m backend | grep -E 'OutOfMemoryError|ERROR|Exception in thread'
+//   GC: micro 설정에는 -Xlog:gc가 없으므로 실행 직전과 직후에 actuator 지표를 저장해 차이를 본다:
+//   curl -s localhost:8080/actuator/prometheus | grep -E '^jvm_gc_(pause_seconds_(count|sum)|memory_allocated_bytes_total)' > gc-before.txt
+//   (실행 후 같은 명령으로 gc-after.txt). jvm_gc_pause_seconds_count{gc="G1 Old Generation"}가 Full GC 횟수,
+//   jvm_gc_pause_seconds_sum 합이 정지 합계, jvm_gc_memory_allocated_bytes_total 증가량 ÷ 로그인 시도 수가
+//   1건당 할당이다. Full GC가 잦아지면 힙이 한계다. JDK 17 지표에는 G1 Remark·Cleanup 정지가 없다.
 //   Grafana는 15초 수집이라 짧은 피크를 놓칠 수 있어 보조로만 본다.
 //
 // [정리] success 모드는 로그인마다 Redis에 세션 키 2개(TTL 14일)를 남긴다. 모든 실행이 끝나면 측정 후
