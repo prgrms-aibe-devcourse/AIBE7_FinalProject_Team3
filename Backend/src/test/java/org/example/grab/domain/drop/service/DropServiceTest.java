@@ -12,6 +12,7 @@ import org.example.grab.domain.drop.dto.request.ShippingRequest;
 import org.example.grab.domain.category.dto.response.CategoryResponse;
 import org.example.grab.domain.category.service.CategoryService;
 import org.example.grab.domain.drop.dto.response.PublicDropDetailResponse;
+import org.example.grab.domain.drop.dto.response.PublicDropListResponse;
 import org.example.grab.domain.drop.dto.response.PublicDropStockResponse;
 import org.example.grab.domain.drop.dto.response.SellerDropStockResponse;
 import org.example.grab.domain.drop.dto.response.SellerDropWishCountResponse;
@@ -33,6 +34,7 @@ import org.example.grab.domain.seller.service.SellerProfileService;
 import org.example.grab.domain.drop.repository.DropImageRepository;
 import org.example.grab.domain.drop.repository.DropRepository;
 import org.example.grab.global.common.ErrorResponse;
+import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
 import org.example.grab.global.storage.ImageStorage;
@@ -149,21 +151,35 @@ class DropServiceTest {
     }
 
     @Test
-    @DisplayName("인기 GRAB 정렬은 정렬 없는 페이지로 인기 GRAB 쿼리를 호출한다")
+    @DisplayName("인기 GRAB 정렬은 정렬 없는 페이지로 인기 GRAB 쿼리를 호출하고 soldOut=false는 필터 없이 조회한다")
     void findPublicDrops_routesSoldQuantitySortToPopularGrabQuery() {
         // given
-        given(dropRepository.findPopularGrabDrops(any(), any(), any(), any(), any()))
+        given(dropRepository.findPopularGrabDrops(any(), any(), any(), any()))
                 .willReturn(Page.empty());
 
         // when
-        dropService.findPublicDrops(DropStatus.GRAB, null, null, true,
+        dropService.findPublicDrops(DropStatus.GRAB, null, null, false,
                 PublicDropSort.parse("soldQuantity,desc"), 0, 24);
 
         // then
         verify(dropRepository).findPopularGrabDrops(
-                eq(null), eq(null), eq(true), any(OffsetDateTime.class), eq(PageRequest.of(0, 24)));
+                eq(null), eq(null), any(OffsetDateTime.class), eq(PageRequest.of(0, 24)));
         verify(dropRepository, never()).findPublicDrops(any(), any(), any(), any(), any());
         verify(dropRepository, never()).findPopularWishDrops(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("인기 GRAB에 soldOut=true를 주면 후보가 모두 재고가 있으므로 조회 없이 빈 목록이다")
+    void findPublicDrops_returnsEmptyForSoldOutPopularGrab() {
+        // when
+        PageResponse<PublicDropListResponse> response = dropService.findPublicDrops(DropStatus.GRAB, null, null, true,
+                PublicDropSort.parse("soldQuantity,desc"), 0, 24);
+
+        // then
+        assertThat(response.content()).isEmpty();
+        assertThat(response.totalElements()).isZero();
+        assertThat(response.hasNext()).isFalse();
+        verifyNoInteractions(dropRepository);
     }
 
     @Test

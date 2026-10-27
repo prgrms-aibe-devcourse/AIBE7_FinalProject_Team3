@@ -690,7 +690,7 @@ class DropRepositoryTest {
 
         // when
         Page<PublicDropListProjection> page = dropRepository.findPopularGrabDrops(
-                null, null, null, OffsetDateTime.now(ZoneOffset.UTC), PageRequest.of(0, 20));
+                null, null, OffsetDateTime.now(ZoneOffset.UTC), PageRequest.of(0, 20));
 
         // then: 다중 옵션·다중 주문이 행을 늘리거나 다른 집계를 부풀리지 않는다
         assertThat(idsOf(page)).containsExactly(multi, single, none);
@@ -718,7 +718,7 @@ class DropRepositoryTest {
 
         // when
         List<Long> ids = idsOf(dropRepository.findPopularGrabDrops(
-                null, null, null, OffsetDateTime.now(ZoneOffset.UTC), PageRequest.of(0, 20)));
+                null, null, OffsetDateTime.now(ZoneOffset.UTC), PageRequest.of(0, 20)));
 
         // then: 6(비활성 5 + 활성 1) > 3. 활성 SKU만 셌다면 1 < 3으로 순서가 뒤집힌다
         assertThat(ids).containsExactly(deactivated, active);
@@ -737,7 +737,7 @@ class DropRepositoryTest {
 
         // when
         List<Long> ids = idsOf(dropRepository.findPopularGrabDrops(
-                null, null, null, OffsetDateTime.now(ZoneOffset.UTC), PageRequest.of(0, 20)));
+                null, null, OffsetDateTime.now(ZoneOffset.UTC), PageRequest.of(0, 20)));
 
         // then
         assertThat(ids).containsExactly(sameTimeSecond, sameTimeFirst, oldest);
@@ -768,7 +768,7 @@ class DropRepositoryTest {
 
         // when
         Page<PublicDropListProjection> page = dropRepository.findPopularGrabDrops(
-                null, null, null, OffsetDateTime.now(ZoneOffset.UTC), PageRequest.of(0, 20));
+                null, null, OffsetDateTime.now(ZoneOffset.UTC), PageRequest.of(0, 20));
 
         // then: 응답 status는 저장 상태를 유지한다
         assertThat(idsOf(page)).containsExactlyInAnyOrder(grab, startDelayed);
@@ -790,10 +790,10 @@ class DropRepositoryTest {
 
         // when & then
         assertThat(idsOf(dropRepository.findPopularGrabDrops(
-                null, null, null, startsAt, PageRequest.of(0, 20))))
+                null, null, startsAt, PageRequest.of(0, 20))))
                 .containsExactly(dropId);
         assertThat(dropRepository.findPopularGrabDrops(
-                null, null, null, endsAt, PageRequest.of(0, 20)).getContent())
+                null, null, endsAt, PageRequest.of(0, 20)).getContent())
                 .isEmpty();
     }
 
@@ -813,9 +813,9 @@ class DropRepositoryTest {
 
         // when
         Page<PublicDropListProjection> firstPage = dropRepository.findPopularGrabDrops(
-                null, null, null, now, PageRequest.of(0, 2));
+                null, null, now, PageRequest.of(0, 2));
         Page<PublicDropListProjection> secondPage = dropRepository.findPopularGrabDrops(
-                null, null, null, now, PageRequest.of(1, 2));
+                null, null, now, PageRequest.of(1, 2));
 
         // then
         assertThat(idsOf(firstPage)).containsExactly(first, second);
@@ -826,7 +826,7 @@ class DropRepositoryTest {
     }
 
     @Test
-    @DisplayName("인기 GRAB에 soldOut=true를 주면 빈 목록이고 soldOut=false·keyword·categoryId 필터는 그대로 적용된다")
+    @DisplayName("인기 GRAB에 keyword·categoryId 필터가 그대로 적용된다")
     void appliesFiltersToPopularGrab() {
         // given
         Long sneakers = insertSellingDrop(DropStatus.GRAB, "스니커즈", 20);
@@ -838,19 +838,15 @@ class DropRepositoryTest {
                 Long.class, "TEST-" + UUID.randomUUID());
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
-        // when & then
-        Page<PublicDropListProjection> soldOut = dropRepository.findPopularGrabDrops(
-                null, null, true, now, PageRequest.of(0, 20));
-        assertThat(soldOut.getContent()).isEmpty();
-        assertThat(soldOut.getTotalElements()).isZero();
+        // when & then: soldOut은 서비스가 처리한다(DropServiceTest).
         assertThat(idsOf(dropRepository.findPopularGrabDrops(
-                null, null, false, now, PageRequest.of(0, 20))))
+                null, null, now, PageRequest.of(0, 20))))
                 .containsExactly(hoodie, sneakers);
         assertThat(idsOf(dropRepository.findPopularGrabDrops(
-                null, "%스니커%", null, now, PageRequest.of(0, 20))))
+                null, "%스니커%", now, PageRequest.of(0, 20))))
                 .containsExactly(sneakers);
         assertThat(dropRepository.findPopularGrabDrops(
-                otherCategory, null, null, now, PageRequest.of(0, 20)).getTotalElements())
+                otherCategory, null, now, PageRequest.of(0, 20)).getTotalElements())
                 .isZero();
     }
 

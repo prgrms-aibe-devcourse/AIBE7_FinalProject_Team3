@@ -76,8 +76,10 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
      * DROP→판매자라 목록 행이 늘지 않아 다른 집계를 부풀리지 않는다.
      * 활성 WISH 집계(canceled_at IS NULL)는 WishRepository 대신 같은 쿼리 안에서 네이티브로 센다.
      * 썸네일은 GALLERY 중 순서가 가장 앞선 이미지이고 DETAIL은 쓰지 않는다(DROP.md 1.2).
-     * 가용 재고 합계식은 soldOut·availableStock SELECT와 PUBLIC_DROP_FILTERS 세 곳에 중복되므로
-     * 한쪽만 바꾸지 않도록 주의한다(활성 SKU 없으면 COALESCE로 0).
+     * 가용 재고 합계식은 soldOut·availableStock SELECT, PUBLIC_DROP_FILTERS, POPULAR_GRAB_WHERE에 중복되므로
+     * 한쪽만 바꾸지 않도록 주의한다(활성 SKU 없으면 COALESCE로 0). LATERAL 조인으로 한 번만 계산하면
+     * 필터가 없을 때도 후보 전체에 계산이 강제돼 오히려 느려진다(GR-177, k6/drop-list-scale/result.md).
+     * 지금 식은 필터가 없으면 건너뛰고 SELECT 쪽은 LIMIT 뒤 행에서만 계산된다.
      */
     String PUBLIC_DROP_SELECT = """
             SELECT d.id AS "dropId", d.name AS "name", s.brand_name AS "brandName",
@@ -106,12 +108,16 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
             """;
 
     /*
-     * categoryId·keyword·soldOut 필터. WHERE 절 뒤에 AND로 이어 붙인다.
+     * categoryId·keyword 필터. WHERE 절 뒤에 AND로 이어 붙인다.
      * PostgreSQL은 네이티브 쿼리의 null 파라미터 타입을 추론하지 못하므로 CAST로 타입을 지정한다.
      */
-    String PUBLIC_DROP_FILTERS = """
+    String CATEGORY_KEYWORD_FILTERS = """
               AND (CAST(:categoryId AS BIGINT) IS NULL OR d.category_id = :categoryId)
               AND (CAST(:keyword AS TEXT) IS NULL OR d.name ILIKE :keyword ESCAPE '\\')
+            """;
+
+    // categoryId·keyword·soldOut 필터. 인기 GRAB은 후보가 이미 가용 재고 > 0이라 soldOut 필터를 붙이지 않는다(GR-177).
+    String PUBLIC_DROP_FILTERS = CATEGORY_KEYWORD_FILTERS + """
               AND (CAST(:soldOut AS BOOLEAN) IS NULL
                    OR (SELECT COALESCE(SUM(o.total_quantity - o.reserved_quantity - o.sold_quantity - o.withheld_quantity), 0) = 0
                          FROM drop_options o WHERE o.drop_id = d.id AND o.is_active) = :soldOut)
@@ -179,19 +185,20 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
      * sold 감소)에서만 바뀌기 때문이다(ERD.md 3.2·3.3). 그래서 후보마다 orders·order_items를 집계하지 않고
      * 이미 읽는 drop_options에서 합을 구한다(GR-176). 재고 원장을 바꾸는 경로가 늘면 이 동등성을 다시 확인한다.
      * 정렬·페이징·now 처리는 findPopularWishDrops와 같다.
+     * soldOut 필터는 받지 않는다. 후보 조건(가용 재고 > 0)과 같은 합계를 후보마다 한 번 더 계산할 뿐이라
+     * 서비스가 soldOut=true는 빈 목록으로, false는 필터 없이 처리한다(DROP.md 1.2, GR-177).
      */
-    @Query(value = PUBLIC_DROP_SELECT + POPULAR_GRAB_WHERE + PUBLIC_DROP_FILTERS + """
+    @Query(value = PUBLIC_DROP_SELECT + POPULAR_GRAB_WHERE + CATEGORY_KEYWORD_FILTERS + """
             ORDER BY (SELECT COALESCE(SUM(o.sold_quantity), 0)
                         FROM drop_options o
                        WHERE o.drop_id = d.id) DESC,
                      d.published_at DESC, d.id DESC
             """,
-            countQuery = PUBLIC_DROP_COUNT + POPULAR_GRAB_WHERE + PUBLIC_DROP_FILTERS,
+            countQuery = PUBLIC_DROP_COUNT + POPULAR_GRAB_WHERE + CATEGORY_KEYWORD_FILTERS,
             nativeQuery = true)
     Page<PublicDropListProjection> findPopularGrabDrops(
             @Param("categoryId") Long categoryId,
             @Param("keyword") String keyword,
-            @Param("soldOut") Boolean soldOut,
             @Param("now") OffsetDateTime now,
             Pageable pageable);
 
