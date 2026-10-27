@@ -501,9 +501,9 @@ POST /api/v1/seller/stock-recommendations
 | --- | --- |
 | 모델 | Spring AI Google GenAI 임베딩, `gemini-embedding-001`(설정값) |
 | 출력 차원 | 768 (`VECTOR(768)`) |
-| 작업 유형 | `SEMANTIC_SIMILARITY` (상품끼리 비교) |
+| 작업 유형 | 지정하지 않음. Spring AI 2.0.1의 Gemini 임베딩은 작업 유형(`taskType`)을 요청에 넣지 않는다. 모든 DROP과 비교 대상을 같은 방식으로 만들어 유사도 비교에는 영향이 없다 |
 | 켜기 | `DEMAND_EMBEDDING_PROVIDER=google-genai`와 `GEMINI_API_KEY`. 기본값 `none`이면 임베딩 모델 빈이 없어 생성하지 않고, 표본은 카테고리 기준을 쓴다 |
-| 호출 | 시간 제한 10초, 재시도 없음(다음 배치가 다시 시도) |
+| 호출 | HTTP 시간 제한 10초, 재시도 없음(다음 배치가 다시 시도). 자동 구성 연결은 시간 제한이 없고 키가 없으면 기동에 실패해 쓰지 않고, 임베딩을 켰을 때만 연결을 직접 등록한다 |
 
 ### 6.3 생성 시점
 
