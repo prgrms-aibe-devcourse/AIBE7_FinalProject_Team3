@@ -196,6 +196,98 @@
           "legendFormat": "queue rejected"
         }
       ]
+    },
+    {
+      "id": 10,
+      "title": "JVM 메모리 합계 (확보 기준)",
+      "description": "JVM이 OS에서 확보한 힙과 힙 외 영역(Metaspace·코드 캐시 등)을 쌓아 보여준다. 여기에 JVM 밖 네이티브 메모리(스레드 스택·malloc 등, 이 대시보드에 없음)가 더해져 컨테이너 메모리가 된다. 빨간 점선은 부하테스트(compose.loadtest.yaml) 컨테이너 한도 512MiB.",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-ds"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes", "min": 0,
+          "custom": {
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "fillOpacity": 30
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "nano 컨테이너 한도 512MiB"
+            },
+            "properties": [
+              {
+                "id": "custom.stacking",
+                "value": {
+                  "mode": "none",
+                  "group": "A"
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus-ds"
+          },
+          "expr": "sum(jvm_memory_committed_bytes{job=\"backend\", area=\"heap\"})",
+          "legendFormat": "heap committed (확보 힙)"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus-ds"
+          },
+          "expr": "sum(jvm_memory_committed_bytes{job=\"backend\", area=\"nonheap\"})",
+          "legendFormat": "nonheap committed (Metaspace·코드 캐시 등)"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus-ds"
+          },
+          "expr": "vector(536870912)",
+          "legendFormat": "nano 컨테이너 한도 512MiB"
+        }
+      ]
     }
   ]
 }
