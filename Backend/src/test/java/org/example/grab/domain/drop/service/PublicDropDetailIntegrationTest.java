@@ -314,7 +314,7 @@ class PublicDropDetailIntegrationTest {
     }
 
     @Test
-    @DisplayName("상세 조회는 자식 컬렉션을 @BatchSize로 묶어 쿼리 수를 고정한다(N+1 아님)")
+    @DisplayName("상세 조회는 DROP·이미지와 다른 테이블 값을 묶고 자식 컬렉션을 @BatchSize로 묶어 쿼리 6회로 고정한다")
     void findPublicDrop_avoidsNPlusOne() {
         // given
         Long dropId = publishDrop();
@@ -325,9 +325,25 @@ class PublicDropDetailIntegrationTest {
         // when
         dropService.findPublicDrop(dropId);
 
-        // then: DROP·카테고리·WISH 수·판매자 브랜드 + 자식 컬렉션 배치(이미지·그룹·값·옵션·valueMap)로 9회.
-        // 배치가 풀리면 자식 수에 비례해 늘어나므로 10으로 상한을 둔다.
-        assertThat(statistics.getPrepareStatementCount()).isLessThanOrEqualTo(10);
+        // then: DROP+이미지 1, 브랜드·카테고리·활성 WISH 수 1, 자식 컬렉션 배치(옵션·valueMap·그룹·값) 4로 6회(GR-184).
+        // SSE 알림마다 다시 불리는 경로라 쿼리 하나가 DB 왕복 하나다. 배치가 풀리거나 조회가 다시 나뉘면 늘어나므로 6으로 고정한다.
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(6);
+    }
+
+    @Test
+    @DisplayName("공개 재고 재조회는 DROP과 옵션을 한 쿼리로 읽는다")
+    void findPublicStocks_readsDropAndOptionsInOneQuery() {
+        // given
+        Long dropId = publishDrop();
+        entityManager.clear();
+        Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+        statistics.clear();
+
+        // when
+        dropService.findPublicStocks(dropId);
+
+        // then: SSE 알림마다 상세와 함께 다시 불리는 경로라 왕복 하나로 끝나야 한다(GR-184).
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(1);
     }
 
     // 그룹·값·SKU의 sort_order를 뒤섞어 저장해도 응답은 sortOrder 순이어야 한다.

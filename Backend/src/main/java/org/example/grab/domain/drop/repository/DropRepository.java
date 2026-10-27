@@ -1,5 +1,6 @@
 package org.example.grab.domain.drop.repository;
 
+import org.example.grab.domain.drop.dto.PublicDropDetailExtrasProjection;
 import org.example.grab.domain.drop.dto.PublicDropListProjection;
 import org.example.grab.domain.drop.dto.SellerDropListProjection;
 import org.example.grab.domain.drop.entity.Drop;
@@ -25,6 +26,30 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
 
     @EntityGraph(attributePaths = "options")
     Optional<Drop> findWithOptionsById(Long id);
+
+    /*
+     * 공개 상세(GR-184). DROP과 이미지를 한 쿼리로 가져와 이미지 컬렉션 조회 왕복을 줄인다.
+     * 옵션·옵션 그룹은 List라 함께 fetch join하면 MultipleBagFetchException이 나므로 기존 @BatchSize 지연 로딩에 맡긴다.
+     */
+    @EntityGraph(attributePaths = "images")
+    Optional<Drop> findWithImagesById(Long id);
+
+    /*
+     * 공개 상세의 브랜드·카테고리·활성 WISH 수(GR-184). 판매자·카테고리·WISH 도메인 service로 따로 조회하던 세 값을
+     * 한 쿼리로 모아 요청당 DB 왕복을 줄인다. 공개 목록 쿼리(PUBLIC_DROP_SELECT)와 같이 다른 도메인의 엔티티·repository가 아니라
+     * 테이블을 네이티브로 읽는다. 기존 조회와 같은 값을 낸다: 브랜드는 sellers PK, 카테고리는 활성 여부와 무관한 PK,
+     * WISH 수는 canceled_at IS NULL인 행 수다. 판매자·카테고리 행이 없으면 빈 결과다(호출자가 DROP_NOT_FOUND로 숨긴다).
+     */
+    @Query(value = """
+            SELECT s.brand_name AS "brandName", c.id AS "categoryId", c.name AS "categoryName",
+                   (SELECT COUNT(*) FROM wishes w
+                     WHERE w.drop_id = d.id AND w.canceled_at IS NULL) AS "wishCount"
+            FROM drops d
+            JOIN sellers s ON s.id = d.seller_id
+            JOIN categories c ON c.id = d.category_id
+            WHERE d.id = :dropId
+            """, nativeQuery = true)
+    Optional<PublicDropDetailExtrasProjection> findPublicDetailExtras(@Param("dropId") Long dropId);
 
     /*
      * DROP 행의 쓰기 경로(수정·공개·취소)에서 행을 잠그고 조회한다(GR-18, GR-64 R03).
