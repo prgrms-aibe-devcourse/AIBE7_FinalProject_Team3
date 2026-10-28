@@ -56,7 +56,8 @@ public final class DemandExplanationPrompt {
               selection이 SIMILAR면 상품 내용이 비슷한 DROP, ALL이면 내 같은 카테고리 종료 DROP 전체, CATEGORY면 같은 카테고리 종료 DROP 전체다.
               others.scope가 NEW_SELLERS면 판매 이력이 적은 판매자들만 모은 것이다.
               sampleDropCount: 내 표본 DROP 수, sampleDropCountBand: 다른 판매자 표본 DROP 수 구간, soldOutPercent: 매진된 DROP 비율(%),
-              medianSellOutMinutes: 매진까지 걸린 시간의 중간값(분), sellThroughPercent: 판매율(%), soldPerWish: 판매 시작 시점 WISH 1명당 판매량.
+              medianSellOutMinutes: 매진까지 걸린 시간의 중간값(분), sellThroughPercent: 표본 전체의 판매량을 준비 수량으로 나눈 판매율(%),
+              soldPerWish: 판매 시작 시점 WISH 1명당 판매량.
               basis는 판매자 화면에서 기준으로 보여 준 쪽(OWN 내 실적, OTHERS 다른 판매자, null이면 기준 없음)이고,
               reason은 OWN_ENOUGH(내 비슷한 DROP이 충분), OWN_FEW(내 비슷한 DROP이 적어 참고용), OWN_NOT_SIMILAR(내 비슷한 DROP 없음), FIRST_SALE(첫 판매)이다.
               own·others가 null이면 비교할 자료가 없거나 부족한 것이다
@@ -70,6 +71,10 @@ public final class DemandExplanationPrompt {
             5. 재고·가격·판매 일정을 바꾸라고 지시하지 않는다. 판단 근거와 위험만 설명한다.
             6. 한국어 존댓말로 쓰고 각 문장은 120자를 넘기지 않는다.
             7. similarSales는 과거 결과를 근거로만 쓴다. 이번 DROP도 같은 결과가 난다고 단정하지 않고, 다른 판매자 개인을 가리키지 않는다.
+            8. similarSales 지표는 이름 그대로 부른다. sellThroughPercent는 "판매율", soldOutPercent는 "매진 비율"이며 "평균"을 붙이지 않는다.
+               누구의 결과인지 함께 쓴다. 예: "내 비슷한 DROP N개의 판매율은 X%", "다른 판매자의 비슷한 굿즈 A~B개 중 Y%가 매진"
+               (N·X·A·B·Y 자리에는 입력의 값을 넣는다). medianSellOutMinutes는 "매진까지 보통 M분"처럼 쓴다.
+               매진 비율이 0%면 매진 시간을 언급하지 않는다.
 
             출력은 아래 형식의 JSON 객체 하나만 쓴다.
             {"summary": "한 문장 요약", "reasons": ["근거 1~3개"], "risks": ["위험 0~3개"], "dataGaps": ["dataGaps가 있을 때 그 의미, 없으면 빈 배열"], "notRecommended": ["권장하지 않는 선택 0~2개"]}
