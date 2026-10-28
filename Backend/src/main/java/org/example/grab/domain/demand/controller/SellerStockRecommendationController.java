@@ -48,7 +48,8 @@ public class SellerStockRecommendationController {
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "ACCESS_DENIED")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "429", description = "DEMAND_EXPLANATION_LIMIT_EXCEEDED")
     @PostMapping("/explanation")
-    public ApiResponse<DemandExplanationResponse> explain(@Valid @RequestBody StockExplanationRequest request) {
+    public ApiResponse<DemandExplanationResponse> explainRecommendation(
+            @Valid @RequestBody StockExplanationRequest request) {
         return ApiResponse.success(stockExplanationService.explain(currentSellerIdProvider.currentSellerId(), request));
     }
 }
