@@ -16,9 +16,11 @@
 | reload(배포 전환) 중 연결 유지 | **통과** | reload 전후 300개 연결 끊김 0, heartbeat 간격 최대 15.06초. 이전 워커는 `shutting down`으로 남아 기존 연결을 계속 전달 |
 | 종료 시 drain·재접속 | **통과(조건부: 단일 backend 재시작)** | backend 종료 시 300개 전원이 `stream-closed`(RECONNECT_REQUIRED)를 받고 전원 재접속. 단일 backend라 재기동 중 502가 나서 복구 p50 13.4초 |
 
-**운영 조치 필요:** SSE 하나가 Nginx 연결 2개(클라이언트·업스트림)를 쓰므로 기본값(워커당 768)이면 SSE 약 760개에서 막힌다.
-운영 EC2의 `/etc/nginx/nginx.conf`에서 `worker_connections`를 확인하고, 1000 연결을 받으려면 4096 이상과 `worker_rlimit_nofile`
-(또는 systemd `LimitNOFILE`)을 함께 올려야 한다. 이 값은 레포 밖이라 이 이슈에서 바꾸지 않았다.
+**운영 조치 (GR-199, 2026-10-28 완료):** SSE 하나가 Nginx 연결 2개(클라이언트·업스트림)를 쓰므로 기본값(워커당 768)이면 SSE 약 760개에서 막힌다.
+운영 EC2를 확인한 결과 Ubuntu 24.04.4, `worker_processes auto`(t3.small → 2), `worker_connections 768`, systemd `LimitNOFILE=524288`이라
+위 미통과 회차와 같은 조건이었다. 관리자가 `worker_connections`를 **4096**으로 올렸다(백업 → `nginx -t` → `systemctl reload nginx`).
+파일 디스크립터는 이미 충분해 `worker_rlimit_nofile`은 추가하지 않았다. 이제 Nginx는 SSE 약 4,000개까지 받으며, 서버 SSE 상한(1000, GR-185)이 먼저 걸린다.
+운영 `nginx.conf`는 여전히 레포 밖에 있다(레포에는 server 블록 `deploy/nginx/grab.conf`만 있음).
 
 ## 측정 조건
 
@@ -48,7 +50,7 @@
 
 ## 한계
 
-- 운영 Nginx의 실제 `nginx.conf`·systemd 한도를 보지 못해 기본값을 가정했다. 운영 값으로 다시 재야 확정된다.
+- 측정 당시에는 운영 `nginx.conf`·systemd 한도를 보지 못해 Ubuntu 기본값을 가정했다. 이후 운영 값이 가정과 같음을 확인했다(GR-199).
 - TLS를 뺐다. 운영은 443에서 TLS를 종료하므로 연결당 메모리·CPU가 더 든다.
 - blue/green 두 backend 사이 전환은 재현하지 않았다(backend 하나를 껐다 켬).
 - 클라이언트·Nginx·backend가 같은 Mac에 있어 네트워크 지연이 없다.

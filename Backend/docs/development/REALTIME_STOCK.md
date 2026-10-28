@@ -267,7 +267,7 @@ SSE 연결 수·구독 수·ready 지연·종료 사유·제한 거절·병합 �
 
 배포 프록시는 Nginx다(`deploy/nginx/grab.conf`: SSE 경로에 `proxy_buffering off`, `proxy_read_timeout 1h`). GR-180은 실제 경유 계층에서 버퍼링 비활성, heartbeat가 flush되는지, 읽기 유휴 제한 45초 이상, 최대 연결 수·파일 디스크립터·종료 시 drain을 검증한다. 45초는 15초 heartbeat의 3배라는 초기 가정이다. 확인 없이 프록시 파일이나 운영 설정을 추가하지 않는다.
 
-**GR-180 검증 상태(2026-10-28):** 로컬 Nginx 경유 검증 완료, 운영 설정·TLS·실제 blue/green 전환은 미검증이다([결과](../../k6/sse-nginx/result.md)). 운영 `grab.conf`의 location을 그대로 쓴 로컬 Nginx(1.24, 워커 2)에서 버퍼링 비활성·heartbeat flush(간격 15.03초)·읽기 유휴 90초 유지·reload 중 기존 연결 유지를 확인했다. 첫 reload 회차는 연결은 유지됐지만 heartbeat가 오지 않았고, 다시 실행한 회차는 정상이라 원인을 확인하지 못했다. 재접속은 단일 backend를 종료 후 재시작한 조건에서 300개 연결 전원이 `RECONNECT_REQUIRED`를 받고 재접속했다(재기동 중 502 때문에 복구 p50 13.4초). 최대 연결 수는 Ubuntu 기본값을 가정한 `worker_connections 768`·파일 디스크립터 1024에서 1000개 중 766개만 연결됐고, 4096·8192로 올리면 전원 연결됐다. 운영 Nginx의 실제 값은 레포에 없어 확인이 필요하다.
+**GR-180 검증 상태(2026-10-28):** 로컬 Nginx 경유 검증 완료, 운영 설정·TLS·실제 blue/green 전환은 미검증이다([결과](../../k6/sse-nginx/result.md)). 운영 `grab.conf`의 location을 그대로 쓴 로컬 Nginx(1.24, 워커 2)에서 버퍼링 비활성·heartbeat flush(간격 15.03초)·읽기 유휴 90초 유지·reload 중 기존 연결 유지를 확인했다. 첫 reload 회차는 연결은 유지됐지만 heartbeat가 오지 않았고, 다시 실행한 회차는 정상이라 원인을 확인하지 못했다. 재접속은 단일 backend를 종료 후 재시작한 조건에서 300개 연결 전원이 `RECONNECT_REQUIRED`를 받고 재접속했다(재기동 중 502 때문에 복구 p50 13.4초). 최대 연결 수는 Ubuntu 기본값을 가정한 `worker_connections 768`·파일 디스크립터 1024에서 1000개 중 766개만 연결됐고, 4096·8192로 올리면 전원 연결됐다. 운영 Nginx는 Ubuntu 24.04 기본값(`worker_connections 768`, 워커 2)이라 SSE 약 760개가 상한이었고, GR-199에서 `worker_connections 4096`으로 올렸다(파일 디스크립터 `LimitNOFILE=524288`은 충분). 운영 `nginx.conf`는 레포 밖에 있다.
 
 ## 14. 변경 원천·전달 경계와 후속 이슈 완료 기준
 
