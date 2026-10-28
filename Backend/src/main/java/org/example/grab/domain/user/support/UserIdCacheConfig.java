@@ -2,6 +2,9 @@ package org.example.grab.domain.user.support;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import io.micrometer.core.instrument.Tags;
+import io.micrometer.core.instrument.binder.MeterBinder;
+import io.micrometer.core.instrument.binder.cache.CaffeineCacheMetrics;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,11 +21,23 @@ import java.util.UUID;
 @EnableConfigurationProperties(UserIdCacheProperties.class)
 public class UserIdCacheConfig {
 
+    // 지표의 cache 태그 값. Prometheus에서 cache_gets_total{cache="user-id",result="hit|miss"} 등으로 나온다
+    public static final String CACHE_NAME = "user-id";
+
     @Bean
     public Cache<UUID, Long> userIdCache(UserIdCacheProperties properties) {
         return Caffeine.newBuilder()
                 .maximumSize(properties.maxSize()) // 최대 캐시 항목은 10만개
                 .recordStats() // 적중, 누락 등의 통계 수집을 활성화
                 .build();
+    }
+
+    /*
+        적중·누락·저장·제거 수와 항목 수 지표(M00-05). Spring Cache 추상화를 쓰지 않아 Boot의 캐시 지표 자동 등록이
+        이 캐시를 모르므로, Micrometer 표준 바인더(CaffeineCacheMetrics)를 MeterBinder 빈으로 직접 등록한다.
+     */
+    @Bean
+    public MeterBinder userIdCacheMetrics(Cache<UUID, Long> userIdCache) {
+        return new CaffeineCacheMetrics<>(userIdCache, CACHE_NAME, Tags.empty());
     }
 }
