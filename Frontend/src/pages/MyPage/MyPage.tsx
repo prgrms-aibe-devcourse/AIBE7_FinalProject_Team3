@@ -6,6 +6,7 @@ import Avatar from '../../components/Avatar/Avatar'
 import EmptyState from '../../components/EmptyState/EmptyState'
 import AccountSettings from '../../features/auth/components/AccountSettings'
 import AuthLoading from '../../features/auth/components/AuthLoading'
+import WishRelatedDrops from '../../features/drop/components/WishRelatedDrops'
 import {
   isAdmin,
   isSeller,
@@ -19,6 +20,8 @@ import { dateLabel } from '../../utils/date'
 import { won } from '../../utils/price'
 
 const WISH_PAGE_SIZE = 20
+// 판매 종료·취소된 WISH는 비슷한 굿즈를 펼쳐 볼 수 있다(DROP.md 1.4)
+const CLOSED_WISH_STATUSES = new Set(['ENDED', 'CANCELED'])
 const ORDER_PAGE_SIZE = 20
 
 const WISH_STATUS_TEXT: Record<string, string> = {
@@ -44,6 +47,7 @@ export default function MyPage({
   const navigate = useNavigate()
   const location = useLocation()
   const [page, setPage] = useState(0)
+  const [relatedOpen, setRelatedOpen] = useState<number | null>(null)
   const [orderPage, setOrderPage] = useState(0)
   const [loggingOut, setLoggingOut] = useState(false)
   const [logoutError, setLogoutError] = useState('')
@@ -273,6 +277,23 @@ export default function MyPage({
                         ? dateLabel(item.saleStartsAt)
                         : '미정'}
                     </small>
+                    {CLOSED_WISH_STATUSES.has(item.status ?? '') && (
+                      <button
+                        type="button"
+                        className="wish-related-toggle"
+                        aria-expanded={relatedOpen === item.dropId}
+                        aria-controls={`wish-related-${item.dropId}`}
+                        onClick={() =>
+                          setRelatedOpen((current) =>
+                            current === item.dropId ? null : item.dropId,
+                          )
+                        }
+                      >
+                        {relatedOpen === item.dropId
+                          ? '비슷한 굿즈 접기'
+                          : '비슷한 굿즈 보기'}
+                      </button>
+                    )}
                   </div>
                   <button
                     type="button"
@@ -282,6 +303,12 @@ export default function MyPage({
                   >
                     취소
                   </button>
+                  {relatedOpen === item.dropId && (
+                    <WishRelatedDrops
+                      dropId={item.dropId}
+                      id={`wish-related-${item.dropId}`}
+                    />
+                  )}
                 </div>
               ))}
               {totalPages > 1 && (

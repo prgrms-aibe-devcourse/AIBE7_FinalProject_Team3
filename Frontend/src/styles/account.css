@@ -400,3 +400,42 @@
 .account-heading p {
   overflow-wrap: anywhere;
 }
+/* 판매 종료·취소 WISH의 비슷한 굿즈(GR-195). 행 아래에 전체 폭으로 펼친다. */
+.compact-item .wish-related-toggle {
+  justify-self: start;
+  padding: 0;
+  color: var(--ink);
+  font-weight: 700;
+}
+.compact-item .wish-related {
+  grid-column: 1 / -1;
+  gap: 8px;
+  padding: 12px 14px;
+  border-left: 3px solid var(--lime);
+  border-radius: 4px;
+  background: var(--soft);
+  font-size: 12px;
+}
+.wish-related p {
+  margin: 0;
+}
+.wish-related-title {
+  font-weight: 700;
+}
+.wish-related ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.wish-related li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+.wish-related li a {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
