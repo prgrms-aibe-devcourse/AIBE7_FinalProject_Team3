@@ -42,6 +42,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework.boot:spring-boot-starter-mail'
     implementation "io.jsonwebtoken:jjwt-api:${jjwtVersion}"
+    // 인증 요청의 회원 ID 변환(public_id → users.id) 앱 메모리 캐시(GR-211). 버전은 Spring Boot가 관리한다
+    implementation 'com.github.ben-manes.caffeine:caffeine'
     // 수요 분석 설명 생성(GR-146)과 유사 상품 검색용 DROP 임베딩(GR-147)
     implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'
     implementation 'org.springframework.ai:spring-ai-starter-model-google-genai-embedding'
