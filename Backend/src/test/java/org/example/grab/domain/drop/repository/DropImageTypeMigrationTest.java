@@ -1,5 +1,6 @@
 package org.example.grab.domain.drop.repository;
 
+import org.example.grab.support.TestcontainersConfiguration;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationInfo;
 import org.flywaydb.core.api.MigrationVersion;
@@ -34,7 +35,7 @@ class DropImageTypeMigrationTest {
     private static final MigrationVersion IMAGE_TYPE_VERSION = MigrationVersion.fromVersion("18");
 
     @Container
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18");
+    static PostgreSQLContainer postgres = new PostgreSQLContainer(TestcontainersConfiguration.POSTGRES_IMAGE);
 
     @Test
     @DisplayName("V18 적용 후 기존 이미지는 URL·public_id·순서·대체 설명을 유지한 채 GALLERY가 된다")

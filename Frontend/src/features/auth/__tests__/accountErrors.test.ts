@@ -1,6 +1,7 @@
 import { AxiosError, type AxiosResponse } from 'axios'
 import { describe, expect, it } from 'vitest'
 import { StorageUploadError } from '../../../api/storage/upload'
+import { AUTH_TEMPORARILY_UNAVAILABLE_MESSAGE } from '../logic/authUser'
 import {
   CURRENT_PASSWORD_REQUIRED_MESSAGE,
   NEW_PASSWORD_REQUIRED_MESSAGE,
@@ -124,6 +125,15 @@ describe('passwordChangeFailure', () => {
     ).toEqual({
       kind: 'general',
       message: '이 계정은 비밀번호를 변경할 수 없어요.',
+    })
+  })
+
+  it('비밀번호 해시 동시 처리 상한 초과(503)는 입력을 비우지 않고 폼 하단에 안내한다', () => {
+    expect(
+      passwordChangeFailure(apiError(503, 'AUTH_TEMPORARILY_UNAVAILABLE')),
+    ).toEqual({
+      kind: 'general',
+      message: AUTH_TEMPORARILY_UNAVAILABLE_MESSAGE,
     })
   })
 

@@ -1,6 +1,8 @@
 package org.example.grab.domain.auth.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.headers.Header;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +41,9 @@ public class LoginController {
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "INVALID_REQUEST, VALIDATION_FAILED")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "INVALID_CREDENTIALS")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "ACCOUNT_DISABLED, ACCESS_DENIED(CSRF 토큰 없음·불일치)")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "503",
+            description = "AUTH_TEMPORARILY_UNAVAILABLE(비밀번호 해시 동시 처리 상한 초과, 쿠키 미발급)",
+            headers = @Header(name = "Retry-After", description = "재시도 대기 초", schema = @Schema(type = "integer", format = "int64")))
     @PostMapping
     public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
         LoginResult result = loginService.login(request.email(), request.password());

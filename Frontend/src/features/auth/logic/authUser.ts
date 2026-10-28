@@ -47,6 +47,11 @@ export function isSeller(user: AuthUser | null) {
 
 type ErrorBody = { error?: { code?: string } }
 
+// 비밀번호 해시 동시 처리 상한 초과(503, GR-178). 로그인·회원가입·비밀번호 변경이 함께 쓴다.
+// 일시적 거부라 연결 실패와 구분해 안내하고, 폭주를 키우지 않도록 자동으로 다시 보내지 않는다.
+export const AUTH_TEMPORARILY_UNAVAILABLE_MESSAGE =
+  '접속이 많아요. 잠시 뒤 다시 시도해주세요.'
+
 export function apiErrorCode(error: unknown) {
   if (!axios.isAxiosError(error)) return undefined
   return (error.response?.data as ErrorBody | undefined)?.error?.code
@@ -59,6 +64,9 @@ export function loginErrorMessage(error: unknown) {
     return '이메일 또는 비밀번호를 확인해주세요.'
   }
   if (code === 'ACCOUNT_DISABLED') return '사용할 수 없는 계정이에요.'
+  if (code === 'AUTH_TEMPORARILY_UNAVAILABLE') {
+    return AUTH_TEMPORARILY_UNAVAILABLE_MESSAGE
+  }
   if (code === 'VALIDATION_FAILED' || code === 'INVALID_REQUEST') {
     return '이메일과 비밀번호 형식을 확인해주세요.'
   }

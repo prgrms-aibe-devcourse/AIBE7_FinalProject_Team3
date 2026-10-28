@@ -11,6 +11,8 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -79,16 +81,20 @@ class PublicDropCacheTest {
         AtomicInteger loads = new AtomicInteger();
         CountDownLatch release = new CountDownLatch(1);
         List<Future<String>> results = new ArrayList<>();
+        Queue<Thread> workers = new ConcurrentLinkedQueue<>();
 
         // when
         for (int i = 0; i < 8; i++) {
-            results.add(executor.submit(() -> cache.get(KEY, DROP_ID, String.class, TTL, () -> {
-                loads.incrementAndGet();
-                await(release);
-                return "v";
-            })));
+            results.add(executor.submit(() -> {
+                workers.add(Thread.currentThread());
+                return cache.get(KEY, DROP_ID, String.class, TTL, () -> {
+                    loads.incrementAndGet();
+                    await(release);
+                    return "v";
+                });
+            }));
         }
-        Thread.sleep(200);
+        awaitAllWaiting(workers, 8);
         release.countDown();
 
         // then
@@ -151,14 +157,18 @@ class PublicDropCacheTest {
         CountDownLatch release = new CountDownLatch(1);
         AtomicInteger loads = new AtomicInteger();
         List<Future<String>> results = new ArrayList<>();
+        Queue<Thread> workers = new ConcurrentLinkedQueue<>();
         for (int i = 0; i < 3; i++) {
-            results.add(executor.submit(() -> cache.get(KEY, DROP_ID, String.class, TTL, () -> {
-                loads.incrementAndGet();
-                await(release);
-                throw new BusinessException(DropErrorCode.DROP_NOT_FOUND);
-            })));
+            results.add(executor.submit(() -> {
+                workers.add(Thread.currentThread());
+                return cache.get(KEY, DROP_ID, String.class, TTL, () -> {
+                    loads.incrementAndGet();
+                    await(release);
+                    throw new BusinessException(DropErrorCode.DROP_NOT_FOUND);
+                });
+            }));
         }
-        Thread.sleep(200);
+        awaitAllWaiting(workers, 3);
 
         // when
         release.countDown();
@@ -179,14 +189,18 @@ class PublicDropCacheTest {
         CountDownLatch release = new CountDownLatch(1);
         AtomicInteger loads = new AtomicInteger();
         List<Future<String>> results = new ArrayList<>();
+        Queue<Thread> workers = new ConcurrentLinkedQueue<>();
         for (int i = 0; i < 3; i++) {
-            results.add(executor.submit(() -> cache.get(KEY, DROP_ID, String.class, TTL, () -> {
-                loads.incrementAndGet();
-                await(release);
-                throw new AssertionError("loader failed");
-            })));
+            results.add(executor.submit(() -> {
+                workers.add(Thread.currentThread());
+                return cache.get(KEY, DROP_ID, String.class, TTL, () -> {
+                    loads.incrementAndGet();
+                    await(release);
+                    throw new AssertionError("loader failed");
+                });
+            }));
         }
-        Thread.sleep(200);
+        awaitAllWaiting(workers, 3);
 
         // when
         release.countDown();
@@ -213,6 +227,26 @@ class PublicDropCacheTest {
 
         // then
         assertThat(after).isEqualTo("v2");
+    }
+
+    /*
+     * 작업자 전원이 대기 상태가 될 때까지 기다린다. 조회를 맡은 작업자는 release 래치(시간 제한 대기, TIMED_WAITING)에서,
+     * 나머지는 진행 중인 조회의 join()(WAITING)에서 대기하므로 전원이 대기 중이면 모두 합류한 것이다.
+     * 고정 sleep은 늦게 시작한 작업자가 합류했는지 보장하지 못한다.
+     */
+    private static void awaitAllWaiting(Queue<Thread> workers, int count) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (workers.size() < count || !workers.stream().allMatch(PublicDropCacheTest::isWaiting)) {
+            if (System.nanoTime() > deadline) {
+                throw new AssertionError("작업자가 모두 대기 상태가 되지 않았다");
+            }
+            Thread.sleep(5);
+        }
+    }
+
+    private static boolean isWaiting(Thread thread) {
+        Thread.State state = thread.getState();
+        return state == Thread.State.WAITING || state == Thread.State.TIMED_WAITING;
     }
 
     private static void await(CountDownLatch latch) {

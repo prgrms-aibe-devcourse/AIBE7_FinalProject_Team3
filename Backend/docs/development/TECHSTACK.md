@@ -117,7 +117,7 @@
 - LLM은 판매자가 "AI 설명 보기"를 누를 때만 그 판매자가 고른 가정의 분석 결과로 호출하고, 10초 제한(HTTP 요청은 9초)·재시도 없음으로 둔다. 같은 DROP·같은 입력이면 저장된 설명을 다시 쓰고, LLM을 실제로 부르는 요청만 판매자별 하루 한도(30회)로 센다(수요 분석 API 3절).
 - 설명 생성 결과·응답 시간·토큰 사용량을 지표로 수집하고, 월 비용 한도를 넘으면 설명 생성을 설정으로 끈다(계산 기능은 유지).
 - 모델·프롬프트를 바꾸면 평가셋(정상·데이터 부족·경계값·프롬프트 주입)을 다시 실행해 버전별 결과를 기록한다.
-- 임베딩은 DROP 공개 커밋 후 비동기로 생성하고 실패해도 공개를 막지 않는다. pgvector를 쓰려면 Testcontainers·로컬 compose의 PostgreSQL 이미지를 같은 메이저 버전의 pgvector 포함 이미지로 바꾼다(GR-147).
+- 임베딩은 DROP 공개 커밋 후 비동기로 생성하고 실패해도 공개를 막지 않는다. pgvector를 쓰려고 Testcontainers·로컬 compose·CI의 PostgreSQL 이미지를 `pgvector/pgvector:0.8.2-pg18-trixie`로 바꾼다(GR-147). 메이저 버전은 기존 이미지(`postgres:18`)와 같고, 확장 버전은 운영 Supabase의 `vector` 0.8.2와 같다. 기존 이미지와 같은 데비안 trixie 기반 태그를 써야 기존 로컬 데이터 볼륨에서 정렬 규칙(collation) 버전이 어긋나지 않는다.
 - WISH 중 판매 수량 반영, 앱 내 대화형 Agent, 외부 Agent용 MCP 서버는 사용 데이터로 필요가 확인되면 검토한다.
 
 ## 2. Database
@@ -265,7 +265,7 @@ SSE의 초기 연결·조회 주기·부하 조건과 수용 기준은 [실시�
 | --- | --- | --- |
 | Unit Test | JUnit Jupiter, Mockito, AssertJ | 도메인 상태 전이, 금액 계산, 검증 로직을 테스트한다. |
 | Repository Test | `@DataJpaTest` | JPA 매핑, 제약조건, 잠금 쿼리 및 조회 쿼리를 검증한다. |
-| Integration Test | Spring Boot Test + Testcontainers | 실제 PostgreSQL 환경에서 주문·재고·결제 트랜잭션을 검증한다. GR-147을 진행하면 pgvector 포함 이미지로 바꾼다(이미지 선택은 팀 결정 대기). |
+| Integration Test | Spring Boot Test + Testcontainers | 실제 PostgreSQL 환경에서 주문·재고·결제 트랜잭션을 검증한다. pgvector 확장을 쓰므로 `pgvector/pgvector:0.8.2-pg18-trixie` 이미지를 쓴다(GR-147). |
 | API Test | MockMvc | 인증·권한, 요청 검증 및 API 응답 계약을 테스트한다. |
 | Mail Test | GreenMail | 이메일 인증 코드 발송을 실제 발송 없이 검증한다. |
 | Load Test | k6 | 동시 주문, 재고 선점, 결제 완료 API의 VU·RPS와 Threshold를 검증한다. |

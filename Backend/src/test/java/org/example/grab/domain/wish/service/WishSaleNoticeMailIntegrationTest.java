@@ -6,6 +6,7 @@ import org.example.grab.domain.mail.dto.EmailMessage;
 import org.example.grab.domain.mail.service.AsyncEmailDispatcher;
 import org.example.grab.domain.wish.dto.WishMailRecipientProjection;
 import org.example.grab.domain.wish.repository.WishRepository;
+import org.example.grab.support.TestcontainersConfiguration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -42,7 +43,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 class WishSaleNoticeMailIntegrationTest {
 
     @Container
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18");
+    static PostgreSQLContainer postgres = new PostgreSQLContainer(TestcontainersConfiguration.POSTGRES_IMAGE);
 
     @DynamicPropertySource
     static void datasourceProperties(DynamicPropertyRegistry registry) {

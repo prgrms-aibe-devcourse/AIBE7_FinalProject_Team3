@@ -2,6 +2,7 @@ package org.example.grab.domain.drop.repository;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
+import org.example.grab.support.TestcontainersConfiguration;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
 import org.example.grab.global.config.JpaConfig;
@@ -55,7 +56,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class DropRepositoryTest {
 
     @Container
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18");
+    static PostgreSQLContainer postgres = new PostgreSQLContainer(TestcontainersConfiguration.POSTGRES_IMAGE);
 
     @DynamicPropertySource
     static void datasourceProperties(DynamicPropertyRegistry registry) {

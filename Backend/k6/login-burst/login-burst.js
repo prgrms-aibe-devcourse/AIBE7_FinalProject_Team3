@@ -1,6 +1,8 @@
 // PERF(GR-161): 로그인 동시 폭주. 로그인 비밀번호 검증(Argon2id, 해시 1회에 약 19MiB)이
 // 동시에 몰릴 때 제한 환경이 어느 VU 단계부터 무너지는지 본다. 결과: login-burst/result.md
 // 다른 시나리오는 setup()에서 한 번만 로그인하므로, 로그인 자체의 부하는 이 시나리오에서만 측정한다.
+// GR-178부터 서버는 해시를 동시에 정해진 수(기본 4)까지만 실행하고, 대기 시간(기본 3초) 안에 차례가 오지 않은 요청은
+// 503 AUTH_TEMPORARILY_UNAVAILABLE + Retry-After로 거부한다. 이 거부는 의도한 동작이라 서버 오류와 따로 센다.
 //
 // 반복 1회 = 새 사용자 1명이 앱을 열고(CSRF 발급) 로그인하는 흐름이다. think time은 없다.
 // 합격 기준(thresholds)은 두지 않는다. 목표 수치(NFR-006)가 아직 없고, 무너지는 지점을
@@ -22,20 +24,27 @@
 // nano 설정(compose.loadtest-nano.yaml, 512MiB, -Xmx384m)은 힙 밖 메모리만 약 300MiB라 로그인 1명 부하에서도
 // OOM-kill된다(result.md 부록 B). 2026-10-26의 CPU 1개·2개 측정은 저장소에 micro 설정이 생기기 전이라
 // 저장소 밖 임시 설정(1GiB, -Xmx512m -Xlog:gc, Serial GC)을 썼다. 그 내용은 result.md 1.1절에 있다.
+// micro 위에 compose.loadtest-login.yaml을 겹쳐 GC 로그를 켜고, 해시 동시 실행 상한을 실행 시 바꿀 수 있게 한다.
+// 메모리·CPU·힙·GC 종류는 micro 값 그대로다. 상한 기본값은 application.yml과 같은 4(대기 3초)다.
 //
 // [준비]
-//   docker compose -f compose.yaml -f compose.loadtest-micro.yaml up -d --build backend
+//   docker compose -f compose.yaml -f compose.loadtest-micro.yaml -f compose.loadtest-login.yaml up -d --build backend
+//   개선 전 조건(상한 없음)은 상한을 Tomcat 최대 스레드(200)보다 크게 두고 띄운다. 상한 비교도 같은 방법으로 값만 바꾼다:
+//   GRAB_PASSWORDHASH_MAXCONCURRENT=1000 docker compose -f compose.yaml -f compose.loadtest-micro.yaml -f compose.loadtest-login.yaml up -d backend
 //   docker inspect backend-backend-1 --format 'Memory={{.HostConfig.Memory}} MemorySwap={{.HostConfig.MemorySwap}} NanoCpus={{.HostConfig.NanoCpus}}'
 //     → Memory·MemorySwap 모두 1073741824(스왑 없음), NanoCpus 2000000000
 //   docker compose logs backend | head -3              → NOTE: Picked up JDK_JAVA_OPTIONS: -Xmx550m -XX:+UseG1GC
+//                                                        Picked up JAVA_TOOL_OPTIONS: -Xlog:gc:file=/tmp/gc.log:...
+//   docker compose exec backend printenv GRAB_PASSWORDHASH_MAXCONCURRENT   → 이번 실행의 상한
 //   curl -s localhost:8080/actuator/prometheus | grep -m1 'gc="G1'   → G1 지표가 나오면 G1이다
 //   docker compose exec -T postgres psql -U grab -d grab -f - < k6/common/accounts-seed.sql
 //   측정 전 Redis 상태를 기록한다(측정 후와 비교해 로그인 폭주가 남긴 증가량을 본다):
 //   docker compose exec -T redis redis-cli DBSIZE
 //   docker compose exec -T redis redis-cli INFO memory | grep '^used_memory_human'
 //
-// [실행] VU 단계(5 → 10 → 20 → 40, 40에서도 버티면 80)마다 따로 실행한다. 5xx·타임아웃·
-// 힙 OutOfMemoryError·컨테이너 종료·응답 불가가 처음 나온 단계를 한계 단계로 기록한다.
+// [실행] VU 단계(5 → 10 → 20 → 40, 40에서도 버티면 80)마다 따로 실행한다. 서버 오류(의도한 거절이 아닌 5xx)·
+// 타임아웃·힙 OutOfMemoryError·컨테이너 종료·응답 불가가 처음 나온 단계를 한계 단계로 기록한다.
+// 의도한 거절(login_hash_rejected_total)은 한계로 보지 않고, 로그인 시도 대비 비율로 따로 기록한다(GR-178 M00-07).
 //   k6 run -e VUS=5 k6/login-burst/login-burst.js                 # steady: 30초 동안 계속 로그인
 //   k6 run -e VUS=5 -e SHAPE=burst k6/login-burst/login-burst.js  # burst: VU마다 1번씩 동시에
 //   k6 run -e VUS=20 -e MODE=fail k6/login-burst/login-burst.js   # 실패 로그인(비교용)
@@ -52,7 +61,21 @@
 //   실행 후 힙 부족(컨테이너 OOM-kill과 구분해 기록한다). ERROR 줄 아래 예외가 OutOfMemoryError면 힙 OOM,
 //   QueryTimeoutException이면 Redis 타임아웃이다:
 //   docker compose logs --since 5m backend | grep -E 'OutOfMemoryError|ERROR|Exception in thread'
-//   GC: micro 설정에는 -Xlog:gc가 없으므로 실행 직전과 직후에 actuator 지표를 저장해 차이를 본다:
+//   해시 거부·대기(GR-178): 실행 전후 서버 지표를 저장해, 거부 수 증가량이 k6의 login_hash_rejected_total과 맞는지 본다.
+//   grab_password_hash_waiting은 조회 순간의 대기 수(추정값)라 실행 중에 여러 번 읽어 최댓값을 본다:
+//   curl -s localhost:8080/actuator/prometheus | grep -E '^grab_password_hash_(rejected_total|waiting)'
+//   GC 로그: GC마다 "GC 직전 → 직후 힙(확보한 힙)"이 한 줄씩 남는다. GC 직후 힙의 분포(살아 있는 힙)는 지표로는 볼 수 없어
+//   이 로그로 센다. 단계 사이에 재시작하지 않아 한 파일에 쌓이므로, k6 출력의 "시작:"·"종료:" 시각(UTC)과
+//   줄 앞 시각으로 구간을 나눈다. 줄 앞 시각의 시간대가 +0000이 아니면 UTC로 바꿔 맞춘다.
+//   Git Bash는 /tmp/... 인자를 Windows 경로로 바꾸므로 컨테이너 경로를 넘길 때는 MSYS_NO_PATHCONV=1을 붙인다:
+//   MSYS_NO_PATHCONV=1 docker compose exec backend tail -3 /tmp/gc.log    # 기록되는지 확인
+//   살아 있는 힙은 Full GC 직후 값으로 본다(young GC 직후 값에는 old 영역 쓰레기가 남아 있다). 비교 기준인 평소 힙은
+//   부하 전 대기 상태에서 Full GC를 한 번 일으켜 잰다. backend 이미지(JRE)에 jcmd가 없어 JDK 이미지를 backend PID
+//   네임스페이스에 붙여 실행한다. backend 작업 디렉터리(/app)에 attach 파일을 만들 수 없어 /tmp에 직접 만든다:
+//   MSYS_NO_PATHCONV=1 docker run --rm --pid=container:backend-backend-1 --user 1000:1000 eclipse-temurin:17-jdk-jammy \
+//     sh -c 'touch /proc/1/root/tmp/.attach_pid1; ln -s /proc/1/root/tmp/.java_pid1 /tmp/.java_pid1; jcmd 1 GC.run'
+//   → GC 로그에 "Pause Full (Diagnostic Command) 103M->59M(210M)"처럼 남는다. 화살표 뒤 값이 평소 힙이다
+//   GC: 횟수·정지 합계·할당량은 실행 직전과 직후에 actuator 지표를 저장해 차이를 본다:
 //   curl -s localhost:8080/actuator/prometheus | grep -E '^jvm_gc_(pause_seconds_(count|sum)|memory_allocated_bytes_total)' > gc-before.txt
 //   (실행 후 같은 명령으로 gc-after.txt). jvm_gc_pause_seconds_count{gc="G1 Old Generation"}가 Full GC 횟수,
 //   jvm_gc_pause_seconds_sum 합이 정지 합계, jvm_gc_memory_allocated_bytes_total 증가량 ÷ 로그인 시도 수가
@@ -66,6 +89,8 @@
 //   USER_ID=$(docker compose exec -T postgres psql -U grab -d grab -tAc "SELECT id FROM users WHERE email = 'k6-buyer@loadtest.local'")
 //   docker compose exec -T redis sh -c 'redis-cli EVAL "$(cat)" 0 "$1"' _ "$USER_ID" < k6/login-burst/cleanup-sessions.lua
 //   docker compose exec -T redis redis-cli DBSIZE   # 측정 전 값으로 돌아왔는지 확인
+// GC 로그는 컨테이너를 다시 만들면 사라지므로, 상한을 바꿔 다시 띄우거나 개발 환경으로 되돌리기 전에 꺼낸다(gc-logs/는 커밋하지 않는다):
+//   mkdir -p k6/login-burst/gc-logs && docker cp backend-backend-1:/tmp/gc.log k6/login-burst/gc-logs/gc-<조건>.log
 // 측정이 끝나면 docker compose up -d로 제한 없는 개발 환경으로 되돌린다.
 import http from 'k6/http';
 import { check } from 'k6';
@@ -103,6 +128,9 @@ const loginSuccess = new Counter('login_success_total');
 const loginExpectedReject = new Counter('login_expected_reject_total');
 // 모드와 맞지 않는 4xx·2xx 등(예: success인데 401, fail인데 200)
 const loginUnexpected = new Counter('login_unexpected_total');
+// 해시 동시 실행 상한에 걸린 의도한 거절(503 AUTH_TEMPORARILY_UNAVAILABLE, GR-178). 서버 오류로 세지 않는다
+const loginHashRejected = new Counter('login_hash_rejected_total');
+// 의도한 거절을 뺀 5xx. 한계 판정에 쓴다
 const loginServerError = new Counter('login_server_error_total');
 // status 0: 요청 타임아웃(기본 60초)이나 연결 실패
 const loginNoResponse = new Counter('login_no_response_total');
@@ -159,6 +187,8 @@ export default function () {
         loginSuccess.add(1);
     } else if (MODE === 'fail' && loginRes.status === 401 && errorCode(loginRes) === 'INVALID_CREDENTIALS') {
         loginExpectedReject.add(1);
+    } else if (isHashRejected(loginRes)) {
+        loginHashRejected.add(1);
     } else if (loginRes.status >= 500) {
         loginServerError.add(1);
     } else {
@@ -167,8 +197,12 @@ export default function () {
 
     check(loginRes, {
         [`로그인 ${EXPECTED_STATUS}`]: (r) => r.status === EXPECTED_STATUS,
-        '5xx 아님': (r) => r.status < 500,
+        '서버 오류 아님(의도한 거절 제외 5xx)': (r) => r.status < 500 || isHashRejected(r),
     });
+}
+
+function isHashRejected(res) {
+    return res.status === 503 && errorCode(res) === 'AUTH_TEMPORARILY_UNAVAILABLE';
 }
 
 function errorCode(res) {
@@ -179,6 +213,14 @@ function errorCode(res) {
     }
 }
 
-export function teardown() {
+// GC 로그 구간을 나눌 시각. 컨테이너의 GC 로그와 맞추려고 UTC로 찍는다
+export function setup() {
+    const startedAt = new Date().toISOString();
+    console.log(`시작: ${startedAt}`);
+    return { startedAt };
+}
+
+export function teardown(data) {
+    console.log(`종료: ${new Date().toISOString()} (시작: ${data.startedAt})`);
     console.log(`완료(SHAPE=${SHAPE}, MODE=${MODE}, VUS=${VUS}): docker stats·docker inspect·GC 로그와 함께 단계 결과를 기록하세요.`);
 }
