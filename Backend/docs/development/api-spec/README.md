@@ -169,6 +169,7 @@
 | POST | `/api/v1/seller/drops/{dropId}/demand-analysis/calculate` | SELLER | 가정을 바꿔 판매 계획 재계산 (저장하지 않음) |
 | POST | `/api/v1/seller/drops/{dropId}/demand-analysis/explanation` | SELLER | 판매자가 고른 가정의 분석을 LLM으로 설명 (요청 시에만, 같은 입력이면 저장된 설명 재사용) |
 | POST | `/api/v1/seller/stock-recommendations` | SELLER | DROP 생성 단계 재고 추천·가격대 참고 (저장하지 않음) |
+| POST | `/api/v1/seller/stock-recommendations/explanation` | SELLER | 생성 단계 재고 추천 근거를 비슷한 DROP 실적과 함께 LLM으로 설명 (요청 시에만) |
 | POST | `/api/v1/seller/similar-sales` | SELLER | 생성 단계 비슷한 DROP 실적 (저장하지 않음) |
 | GET | `/api/v1/seller/drops/{dropId}/similar-sales` | SELLER | WISH 단계 비슷한 DROP 실적 |
 
@@ -190,7 +191,7 @@
 | 배송 | 7 | 판매자 주문 조회 및 배송 상태 관리 |
 | 대시보드 | 3 | 판매자 운영 통계 |
 | 이미지 | 1 | 상품 이미지 업로드 |
-| 수요 분석 | 6 | 수요 분석·재계산·설명, 생성 단계 재고 추천, 비슷한 DROP 실적 |
-| **합계** | **63** | |
+| 수요 분석 | 7 | 수요 분석·재계산·설명, 생성 단계 재고 추천·근거 설명, 비슷한 DROP 실적 |
+| **합계** | **64** | |
 
 ---

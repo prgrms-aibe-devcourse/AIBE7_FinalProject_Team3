@@ -327,7 +327,7 @@ POST /api/v1/seller/drops/{dropId}/demand-analysis/explanation
 
 | 지표 | 태그 | 용도 |
 | --- | --- | --- |
-| `grab.demand.explanation` | `outcome`(`generated`, `discarded`, `failed`, `reused`) | 설명 생성 결과. `reused`는 저장된 설명을 다시 쓴 경우 |
+| `grab.demand.explanation` | `outcome`(`generated`, `discarded`, `failed`, `reused`), `stage`(`wish`, `form`) | 설명 생성 결과. `reused`는 저장된 설명을 다시 쓴 경우. `stage`는 수요 분석 설명(3절)·생성 단계 추천 근거 설명(8절) 구분 |
 | `grab.demand.explanation.duration` | `model` | LLM 응답 시간 |
 | `grab.demand.explanation.tokens` | `model` | 토큰 사용량 |
 | `grab.demand.embedding` | `outcome`(`created`, `skipped`, `failed`) | DROP 임베딩 생성 결과(GR-147) |
@@ -638,3 +638,73 @@ POST /api/v1/seller/similar-sales
 - 생성 단계: DROP 생성·DRAFT 편집 폼의 재고 추천 패널 아래에 보여 준다. 카테고리·상품명·설명·가격이 바뀌면 다시 조회한다(입력이 멈춘 뒤).
 - 기준 쪽을 강조하고 이유를 한 줄로 쓴다. 예: "내 비슷한 DROP 4개 기준", "내 비슷한 DROP이 2개라 다른 판매자 자료를 기준으로 했어요", "첫 판매라 처음 판매한 다른 판매자들의 비슷한 굿즈를 기준으로 했어요".
 - 예시 문구: "비슷한 굿즈 4개 중 3개가 매진됐고, 매진까지 보통 6분 걸렸어요."
+
+## 8. 생성 단계 추천 근거 설명 (GR-169)
+
+DROP 생성·DRAFT 편집 폼에서 재고 추천(5.5)의 근거를 LLM이 문장으로 설명한다(DEMAND-014). DROP은 공개 후 재고를 바꿀 수 없으므로, 판매자가 수량을 정하는 폼에서 설명을 보고 바로 재고 칸에 반영할 수 있게 한다.
+
+설명에는 임베딩으로 고른 비슷한 종료 DROP의 실적(7.5)을 근거로 함께 넣는다. 검색(비슷한 DROP) → 입력 보강 → 생성으로 이어지는 RAG다. 수량은 서버가 계산하고(5.2) LLM은 설명만 한다. 설명이 없거나 버려져도 재고 추천과 폼 입력은 그대로 동작한다.
+
+### 8.1 설명 요청
+
+```http
+POST /api/v1/seller/stock-recommendations/explanation
+```
+
+- **인증**: `SELLER`
+- 저장 전 DROP에서도 쓰도록 DROP ID 없이 폼 입력값을 받는다. 판매자가 재고 추천 패널의 "근거 보기"를 누를 때만 호출한다. 재고 추천(5.5)·비슷한 DROP 실적(7.5) 조회는 LLM을 부르지 않는다.
+
+**요청:**
+
+```json
+{
+  "categoryId": 8,
+  "name": "고양이 아크릴 키링",
+  "description": "고양이 일러스트를 담은 양면 아크릴 키링입니다.",
+  "optionGroups": [{ "name": "색상", "values": ["블랙", "화이트"] }],
+  "options": [
+    { "unitPrice": 12000, "quantity": 30 },
+    { "unitPrice": 12000, "quantity": 30 }
+  ],
+  "safetyStockRate": 0.1
+}
+```
+
+- `categoryId`·`options`·`safetyStockRate`: 5.5와 같다.
+- `name`·`description`·`optionGroups`: 7.5와 같다. 비슷한 DROP을 고르는 요청 임베딩에만 쓰고 LLM 입력에는 넣지 않는다(8.2).
+- 서버가 같은 입력으로 재고 추천(5.5)과 비슷한 DROP 실적(7.5, `unitPrices`는 `options`의 단가)을 다시 계산해 LLM 입력을 만든다. 요청 임베딩은 같은 글이면 7.5의 Redis 캐시를 다시 쓰므로 Gemini 임베딩 호출이 늘지 않는다.
+- 하루 요청 한도는 수요 분석 설명(3.1)과 함께 센다(판매자별 30회, KST 날짜 기준). LLM을 실제로 부른 요청만 센다. 넘으면 `DEMAND_EXPLANATION_LIMIT_EXCEEDED`(429).
+
+**응답:** 3.1과 같은 형식이다(`status`, `explanation`, `generatedAt`).
+
+**오류 코드:**
+- `VALIDATION_FAILED` — 필수값 누락, 없거나 비활성인 카테고리(`field`: `categoryId`)
+- `DEMAND_EXPLANATION_LIMIT_EXCEEDED` — 하루 한도 초과
+
+### 8.2 입력
+
+3.2와 같은 원칙을 따른다. 집계값·코드값만 보내고 상품명·설명·옵션 표시명처럼 판매자가 입력한 텍스트는 보내지 않는다. 비율은 정수 %로 바꾼다.
+
+- **재고 추천(5.5)**: `referencePrice`, 내 실적·시장 평균(판매량 범위·중간값, 판매율 %, 품절 비율 %, 신뢰도, 표본 수 또는 구간), 기준(`basis`), 추천(`low`·`expected`·`high`·`recommended`, 안전 재고 %), 옵션 번호별 입력 수량과 추천 수량, 가격대 참고(위치 코드, 가격대별 판매율 %·표본 구간, 참고 가격 범위), `dataGaps`
+- **현재 입력 수량**: 옵션 수량이 모두 입력됐을 때만 합계와 추천 수량의 비교를 3.2처럼 방향(`SHORT`·`OVER`·`EQUAL`)과 크기로 보낸다
+- **비슷한 DROP 실적(7.5)**: `basis`·`reason`(7.2), 내 실적(`selection`, 표본 수), 다른 판매자(`selection`, `scope`, 표본 구간)와 각각의 매진 비율 %·매진 시간 중간값(분)·판매율 %·WISH 1명당 판매량. 다른 판매자는 7.3 보호를 거친 값만 넣고, 보호 단위에 못 미치면 `null`이다
+- 계산 시각·기준 시점(`calculatedAt`, `asOf`)은 넣지 않는다(3.2)
+
+프롬프트는 비슷한 DROP 실적을 과거 결과의 근거로만 쓰고 이번 DROP의 결과를 단정하지 않으며, 다른 판매자 개인을 가리키지 않게 한다. 지표는 이름 그대로("판매율", "매진 비율") 쓰고 "평균"을 붙이지 않는다.
+
+### 8.3 출력과 검증
+
+3.3과 같다. 출력 형식은 같고, 문장 속 모든 숫자를 입력값과 대조해 하나라도 다르면 `DISCARDED`로 응답한다.
+
+### 8.4 호출과 재사용
+
+- 호출 방식(전용 스레드 풀, 시간 제한, 재시도 없음)은 3.4와 같다. 요청 임베딩과 LLM 호출 동안 DB 트랜잭션을 잡지 않는다.
+- 저장 전 DROP이라 `demand_explanations`에 저장하지 않는다. `GENERATED`·`DISCARDED` 결과를 Redis에 판매자·입력 해시(프롬프트 버전 + 입력 JSON의 SHA-256)별로 하루 캐시하고, 같은 입력이면 LLM을 부르지 않는다. Redis를 비우면 다음 요청에서 다시 만든다.
+- 폼 입력·비슷한 DROP 실적이 바뀌면 입력 해시가 바뀌어 새로 만든다.
+
+### 8.5 화면
+
+- 재고 추천 패널에 "근거 보기" 버튼을 둔다. 재고 추천 응답을 받았으면 추천 수량이 없어도 보인다. 표본이 부족해 추천하지 못했을 때(`NO_SALES_SAMPLE`)는 버튼 이름을 "추천하지 못한 이유"로 바꾸고, 설명은 부족한 데이터(`dataGaps`)와 참고할 수 있는 비슷한 DROP 실적·가격대 참고를 근거로 쓴다.
+- 누르면 설명(요약, 근거, 위험, 데이터 부족, 권장하지 않는 선택)을 패널 안에 펼친다. `GENERATED`가 아니면 설명 대신 안내 문구를 보여 준다.
+- 설명을 연 뒤 폼 입력이 바뀌면 설명을 닫는다. 지금 입력과 다른 계산의 설명을 보여 주지 않기 위해서다.
+- 설명은 참고용이며 재고 칸을 바꾸지 않는다. 수량 반영은 기존 "추천 수량 채우기"(5.5) 또는 판매자 입력으로만 한다.
