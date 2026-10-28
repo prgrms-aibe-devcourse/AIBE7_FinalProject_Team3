@@ -1,6 +1,8 @@
 package org.example.grab.domain.user.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.headers.Header;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +48,9 @@ public class SignupController {
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "INVALID_REQUEST, VALIDATION_FAILED, INVALID_PASSWORD, INVALID_NICKNAME")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "EMAIL_SIGNUP_CONTEXT_INVALID")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "DUPLICATE_EMAIL, DUPLICATE_NICKNAME")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "503",
+            description = "AUTH_TEMPORARILY_UNAVAILABLE(비밀번호 해시 동시 처리 상한 초과, 가입 컨텍스트 유지)",
+            headers = @Header(name = "Retry-After", description = "재시도 대기 초", schema = @Schema(type = "integer", format = "int64")))
     @PostMapping
     public ResponseEntity<ApiResponse<SignupResponse>> signup(
             @CookieValue(name = EmailSignupTokenCookie.NAME, required = false) String signupToken,

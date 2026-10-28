@@ -1,5 +1,6 @@
 import { AxiosError, type AxiosResponse } from 'axios'
 import { describe, expect, it } from 'vitest'
+import { AUTH_TEMPORARILY_UNAVAILABLE_MESSAGE } from '../logic/authUser'
 import {
   confirmCodeFailure,
   DUPLICATE_EMAIL_MESSAGE,
@@ -146,6 +147,15 @@ describe('signupFieldErrors', () => {
 })
 
 describe('signupFailure', () => {
+  it('비밀번호 해시 동시 처리 상한 초과(503)는 같은 단계에서 폼 하단에 안내한다', () => {
+    expect(
+      signupFailure(apiError(503, 'AUTH_TEMPORARILY_UNAVAILABLE')),
+    ).toEqual({
+      kind: 'general',
+      message: AUTH_TEMPORARILY_UNAVAILABLE_MESSAGE,
+    })
+  })
+
   it('가입 컨텍스트 무효는 1단계로 돌아간다', () => {
     expect(
       signupFailure(apiError(401, 'EMAIL_SIGNUP_CONTEXT_INVALID')),

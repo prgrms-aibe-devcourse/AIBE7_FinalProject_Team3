@@ -1,6 +1,7 @@
 import { AxiosError, type AxiosResponse } from 'axios'
 import { describe, expect, it } from 'vitest'
 import {
+  AUTH_TEMPORARILY_UNAVAILABLE_MESSAGE,
   hasRole,
   isAdmin,
   isSeller,
@@ -65,6 +66,17 @@ describe('loginErrorMessage', () => {
         axiosError(400, { error: { code: 'VALIDATION_FAILED' } }),
       ),
     ).toBe('이메일과 비밀번호 형식을 확인해주세요.')
+  })
+
+  it('비밀번호 해시 동시 처리 상한 초과(503)는 연결 실패와 구분해 안내한다', () => {
+    expect(
+      loginErrorMessage(
+        axiosError(503, { error: { code: 'AUTH_TEMPORARILY_UNAVAILABLE' } }),
+      ),
+    ).toBe(AUTH_TEMPORARILY_UNAVAILABLE_MESSAGE)
+    expect(AUTH_TEMPORARILY_UNAVAILABLE_MESSAGE).toBe(
+      '접속이 많아요. 잠시 뒤 다시 시도해주세요.',
+    )
   })
 
   it('네트워크·5xx는 연결 실패로 안내한다', () => {

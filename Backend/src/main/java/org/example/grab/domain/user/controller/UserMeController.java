@@ -2,6 +2,8 @@ package org.example.grab.domain.user.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.headers.Header;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -104,6 +106,9 @@ public class UserMeController {
             description = "AUTHENTICATION_REQUIRED(쿠키 없음, 회원 없음·정지·탈퇴), INVALID_TOKEN")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "ACCESS_DENIED(USER 권한 없음, CSRF 토큰 없음·불일치)")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "INTERNAL_SERVER_ERROR")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "503",
+            description = "AUTH_TEMPORARILY_UNAVAILABLE(비밀번호 해시 동시 처리 상한 초과, 비밀번호 미변경·세션 유지)",
+            headers = @Header(name = "Retry-After", description = "재시도 대기 초", schema = @Schema(type = "integer", format = "int64")))
     @PatchMapping("/password")
     public ResponseEntity<Void> changePassword(@Valid @RequestBody PasswordChangeRequest request) {
         passwordChangeService.changePassword(

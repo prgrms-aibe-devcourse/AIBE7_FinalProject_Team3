@@ -233,6 +233,7 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 | `INTERNAL_SERVER_ERROR` | 500 | 처리하지 못한 서버 오류 (Redis·DB 장애 등). 인증 실패가 아니므로 클라이언트는 로그아웃하지 않는다 |
 | `EXTERNAL_SERVICE_ERROR` | 502 | 외부 연동 서비스(스토리지 등) 호출 실패 |
 | `PAYMENT_CANCEL_FAILED` | 502 | PG가 결제 취소를 거절함 |
+| `AUTH_TEMPORARILY_UNAVAILABLE` | 503 | 비밀번호 해시 동시 처리 상한을 넘어 대기 시간 안에 처리하지 못함 (로그인·회원가입·비밀번호 변경). GR-178, Retry-After 초 단위. 인증 실패가 아니므로 클라이언트는 로그아웃하지 않는다 |
 
 소셜 로그인 콜백(MEMBER_AUTH 1.5)은 JSON 오류 응답 대신 프론트엔드 콜백 주소로 302 리다이렉트하고 `error` 쿼리에 아래 코드만 담는다.
 
