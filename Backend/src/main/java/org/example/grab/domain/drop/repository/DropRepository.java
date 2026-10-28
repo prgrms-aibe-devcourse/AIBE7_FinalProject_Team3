@@ -279,13 +279,17 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
     /*
      * 목록 행의 totalCount(COUNT(*) OVER ())로 Page를 만든다. 행이 없으면 건수를 얻을 수 없다.
      * 첫 페이지가 비었으면 전체가 0건이고, 범위를 넘은 페이지만 count 쿼리로 센다(GR-198).
+     * 페이지 없이(unpaged) 조회해 비었으면 전체가 0건이다. unpaged는 getOffset()이 예외를 던지므로 먼저 확인한다.
      */
     private static Page<PublicDropListProjection> toPage(
             List<PublicDropListProjection> rows, Pageable pageable, LongSupplier count) {
         if (!rows.isEmpty()) {
             return new PageImpl<>(rows, pageable, rows.get(0).getTotalCount());
         }
-        return new PageImpl<>(rows, pageable, pageable.getOffset() == 0 ? 0 : count.getAsLong());
+        if (pageable.isUnpaged() || pageable.getOffset() == 0) {
+            return new PageImpl<>(rows, pageable, 0);
+        }
+        return new PageImpl<>(rows, pageable, count.getAsLong());
     }
 
     /*
