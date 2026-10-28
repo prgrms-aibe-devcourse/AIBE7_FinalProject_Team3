@@ -477,3 +477,43 @@ test('조회 중 변경은 같은 키를 병렬로 쌓지 않고 완료 뒤 후�
 
   subscription.dispose()
 })
+
+// GR-209: 목록도 변경 알림으로 생긴 재조회만 max(최소 간격의 남은 시간, 0~1초 무작위)를 기다린다.
+async function listReadyAndIdle() {
+  const context = setup()
+  await vi.advanceTimersByTimeAsync(1)
+  context.source.emit('ready', {
+    dropIds: [101, 102],
+    serverTime: '2026-10-19T00:00:00Z',
+  })
+  await vi.advanceTimersByTimeAsync(1)
+  await vi.advanceTimersByTimeAsync(5000)
+  context.fetchQuery.mockClear()
+  return context
+}
+
+test('목록 변경 알림 재조회는 최소 간격이 지났으면 0~1초 중 무작위로 기다린다', async () => {
+  const { source, fetchQuery, subscription } = await listReadyAndIdle()
+  vi.spyOn(Math, 'random').mockReturnValue(0.3)
+
+  source.emit('drop-changed', { dropId: 101, changes: ['STOCK'] })
+  await vi.advanceTimersByTimeAsync(299)
+  expect(fetchQuery).not.toHaveBeenCalled()
+  await vi.advanceTimersByTimeAsync(1)
+  expect(fetchQuery).toHaveBeenCalledTimes(1)
+  subscription.dispose()
+})
+
+test('목록 수동 갱신은 알림으로 분산 대기 중인 예약을 당겨 바로 조회한다', async () => {
+  const { source, fetchQuery, subscription } = await listReadyAndIdle()
+  vi.spyOn(Math, 'random').mockReturnValue(0.9)
+
+  source.emit('drop-changed', { dropId: 101, changes: ['STOCK'] })
+  await vi.advanceTimersByTimeAsync(100)
+  subscription.refresh()
+  await vi.advanceTimersByTimeAsync(1)
+  expect(fetchQuery).toHaveBeenCalledTimes(1)
+  await vi.advanceTimersByTimeAsync(2000)
+  expect(fetchQuery).toHaveBeenCalledTimes(1)
+  subscription.dispose()
+})

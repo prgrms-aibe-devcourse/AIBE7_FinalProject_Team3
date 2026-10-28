@@ -6,7 +6,10 @@ import {
   openDropStockStream,
 } from '../../../api/drop/stockStream'
 import { dropKeys, type DropListParams } from './queryKeys'
-import { realtimeStockPolicy as policy } from './realtimeStockPolicy'
+import {
+  realtimeStockPolicy as policy,
+  refreshDelay,
+} from './realtimeStockPolicy'
 
 type ListResponse = Awaited<ReturnType<typeof getDrops>>
 type ConnectionHistory = { startedAt: number | null }
@@ -42,6 +45,9 @@ export function subscribeDropListStockStream(
   const key = dropKeys.list(params)
   const lane = {
     dirty: false,
+    urgent: false,
+    jittered: false,
+    dirtySince: 0,
     running: false,
     generation: 0,
     lastStart: -Infinity,
@@ -75,38 +81,46 @@ export function subscribeDropListStockStream(
       !lane.dirty
     )
       return
-    lane.timer = globalThis.setTimeout(
-      () => {
-        lane.timer = 0
-        if (disposed || !active() || !lane.dirty) return
-        lane.dirty = false
-        lane.running = true
-        lane.lastStart = Date.now()
-        const startedGeneration = lane.generation
-        void queryClient
-          .fetchQuery({
-            queryKey: key,
-            queryFn: ({ signal }) => getDrops(params, signal),
-          })
-          .then(
-            () => {
-              lane.running = false
-              schedule()
-            },
-            () => {
-              lane.running = false
-              lane.dirty = true
-              if (lane.generation > startedGeneration) schedule()
-            },
-          )
-      },
-      Math.max(0, lane.lastStart + policy.refreshMinIntervalMs - Date.now()),
-    )
+    lane.timer = globalThis.setTimeout(() => {
+      lane.timer = 0
+      if (disposed || !active() || !lane.dirty) return
+      lane.dirty = false
+      lane.urgent = false
+      lane.running = true
+      lane.lastStart = Date.now()
+      const startedGeneration = lane.generation
+      void queryClient
+        .fetchQuery({
+          queryKey: key,
+          queryFn: ({ signal }) => getDrops(params, signal),
+        })
+        .then(
+          () => {
+            lane.running = false
+            schedule()
+          },
+          () => {
+            lane.running = false
+            lane.dirty = true
+            if (lane.generation > startedGeneration) schedule()
+          },
+        )
+    }, refreshDelay(lane))
+    lane.jittered = !lane.urgent
   }
 
-  const request = () => {
+  // 알림으로 생긴 재조회만 분산 대기를 둔다(상세 훅과 같은 규칙, refreshDelay 참고).
+  const request = (urgent = true) => {
     lane.generation++
+    if (!lane.dirty) lane.dirtySince = Date.now()
     lane.dirty = true
+    if (urgent) {
+      lane.urgent = true
+      if (lane.timer && lane.jittered) {
+        globalThis.clearTimeout(lane.timer)
+        lane.timer = 0
+      }
+    }
     schedule()
   }
 
@@ -280,7 +294,7 @@ export function subscribeDropListStockStream(
           return
         }
         if (payload.changes.some((change) => supportedChanges.has(change)))
-          request()
+          request(false)
       } catch {
         fail()
       }
@@ -380,7 +394,7 @@ export function subscribeDropListStockStream(
     }
   }
 
-  return { dispose, refresh: request }
+  return { dispose, refresh: () => request() }
 }
 
 export function useDropListStockStream(params: DropListParams | null) {
