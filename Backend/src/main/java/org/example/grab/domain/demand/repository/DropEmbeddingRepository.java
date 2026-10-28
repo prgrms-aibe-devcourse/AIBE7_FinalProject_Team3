@@ -1,6 +1,7 @@
 package org.example.grab.domain.demand.repository;
 
 import lombok.RequiredArgsConstructor;
+import org.example.grab.domain.demand.embedding.DropEmbeddingText;
 import org.example.grab.domain.demand.embedding.DropEmbeddingText.OptionGroup;
 import org.example.grab.domain.demand.embedding.DropEmbeddingText.Source;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -89,21 +90,9 @@ public class DropEmbeddingRepository {
                     updated_at = EXCLUDED.updated_at
                 """, new MapSqlParameterSource()
                 .addValue("dropId", dropId)
-                .addValue("embedding", toVectorLiteral(embedding))
+                .addValue("embedding", DropEmbeddingText.toVectorLiteral(embedding))
                 .addValue("model", model)
                 .addValue("sourceHash", sourceHash)
                 .addValue("now", now));
-    }
-
-    // pgvector 입력 형식 "[0.1,0.2,...]"
-    static String toVectorLiteral(float[] embedding) {
-        StringBuilder literal = new StringBuilder("[");
-        for (int i = 0; i < embedding.length; i++) {
-            if (i > 0) {
-                literal.append(',');
-            }
-            literal.append(embedding[i]);
-        }
-        return literal.append(']').toString();
     }
 }

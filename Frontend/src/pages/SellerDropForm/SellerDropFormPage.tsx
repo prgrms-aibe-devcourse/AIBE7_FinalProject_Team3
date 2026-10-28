@@ -17,6 +17,7 @@ import {
 } from '../../features/auth/logic/authUser'
 import useAuth from '../../features/auth/logic/useAuth'
 import { categoryKeys } from '../../features/drop/logic/queryKeys'
+import { SimilarSalesFormPanel } from '../../features/demand/components/SimilarSalesPanel'
 import StockRecommendationPanel from '../../features/demand/components/StockRecommendationPanel'
 import { applyRecommendedStock } from '../../features/demand/logic/stockRecommendation'
 import DropAiDraftPanel from '../../features/seller/components/DropAiDraftPanel'
@@ -381,6 +382,7 @@ function SellerDropForm({
                   notify('추천 수량을 재고 칸에 채웠어요. 필요하면 고쳐주세요.')
                 }}
               />
+              <SimilarSalesFormPanel values={values} groups={groups} />
             </div>
           </section>
           <section className="form-card">

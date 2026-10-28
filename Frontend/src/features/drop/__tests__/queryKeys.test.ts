@@ -44,4 +44,11 @@ describe('DROP 쿼리 키', () => {
     expect(dropKeys.detail(100)).not.toEqual(dropKeys.stocks(100))
     expect(dropKeys.detail(100)).toEqual(['drops', 'detail', 100])
   })
+
+  // 상세 키로 무효화해도 추천은 다시 조회되지 않아야 한다(TanStack Query 접두어 일치)
+  it('관련 DROP 추천 키는 상세 키의 하위에 두지 않는다', () => {
+    const detail = dropKeys.detail(100)
+    expect(dropKeys.related(100).slice(0, detail.length)).not.toEqual(detail)
+    expect(dropKeys.stocks(100).slice(0, detail.length)).toEqual(detail)
+  })
 })

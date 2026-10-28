@@ -42,3 +42,33 @@ test('비교할 표본이 없으면 수량 없이 안내만 하고 입력을 막
   await page.getByLabel('재고', { exact: true }).fill('20')
   await expect(page.getByLabel('재고', { exact: true })).toHaveValue('20')
 })
+
+test('재고 추천 아래에 비슷한 DROP 실적을 보여 주고 상품명을 넣으면 비슷한 굿즈로 좁힌다', async ({
+  page,
+}) => {
+  await loginSeller(page)
+  await page.goto('/#/seller/drops/new')
+  const panel = page.getByRole('region', { name: '비슷한 DROP 실적' })
+  await expect(panel).toContainText('카테고리와 SKU 가격을 입력하면')
+
+  await page.getByLabel('카테고리').selectOption({ label: '패션' })
+  await page.getByLabel('가격', { exact: true }).fill('59000')
+  await expect(panel).toContainText(
+    '내 지난 DROP 중 비슷한 것이 없어 다른 판매자의 같은 카테고리 굿즈를 기준으로 했어요.',
+  )
+  await expect(panel).toContainText(
+    '같은 카테고리 DROP 3개 중 1개가 매진됐고, 매진까지 보통 40분 걸렸어요.',
+  )
+  await expect(panel.locator('li.is-used')).toContainText(
+    '20개 이상 중 55%가 매진됐고, 매진까지 보통 1시간 30분 걸렸어요.',
+  )
+
+  await page.getByLabel('상품명').fill('고양이 아크릴 키링')
+  await expect(panel).toContainText('다른 판매자의 비슷한 굿즈를 기준으로')
+
+  await page.getByLabel('카테고리').selectOption({ index: 2 })
+  await expect(panel).toContainText('비교할 다른 판매자 자료가 아직 부족해요.')
+  await expect(panel).toContainText(
+    '비교할 판매자·DROP 수가 적어 다른 판매자 자료는 보여 주지 않아요.',
+  )
+})

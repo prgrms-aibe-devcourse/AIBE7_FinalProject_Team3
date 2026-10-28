@@ -82,3 +82,61 @@ test('일반 회원은 계정 설정에서 판매자 신청으로 이동한다',
   await seller.getByRole('link', { name: '판매자 신청 ↗' }).click()
   await expect(page).toHaveURL(/#\/seller\/apply$/)
 })
+
+// GR-195: 판매 종료·취소된 WISH는 목록에서 비슷한 굿즈를 펼쳐 볼 수 있다(DROP.md 1.4)
+test('판매 종료·취소된 WISH만 비슷한 굿즈를 펼쳐 보고 상세로 이동한다', async ({
+  page,
+}) => {
+  const item = (dropId: number, name: string, status: string) => ({
+    dropId,
+    name,
+    thumbnailUrl: null,
+    minPrice: 39000,
+    status,
+    saleStartsAt: '2026-09-20T10:00:00+09:00',
+    wishedAt: '2026-09-10T10:00:00+09:00',
+  })
+  await page.route('**/api/v1/users/me/wishes**', (route) =>
+    route.fulfill({
+      json: {
+        success: true,
+        data: {
+          content: [
+            item(301, '에브리데이 캔버스 백 · 판매 종료', 'ENDED'),
+            item(9001, '취소된 굿즈', 'CANCELED'),
+            item(101, '판매 전 굿즈', 'WISH'),
+          ],
+          page: 0,
+          size: 20,
+          totalElements: 3,
+          totalPages: 1,
+          hasNext: false,
+        },
+      },
+    }),
+  )
+  await openMyPage(page)
+  const wishes = page.locator('.wish-panel')
+  const toggles = wishes.getByRole('button', { name: '비슷한 굿즈 보기' })
+  await expect(toggles).toHaveCount(2)
+
+  await toggles.first().click()
+  const ended = wishes.locator('#wish-related-301')
+  await expect(ended).toContainText('비슷한 굿즈가 곧 열려요')
+  await expect(ended.getByRole('link')).toHaveCount(2)
+  await expect(
+    wishes.getByRole('button', { name: '비슷한 굿즈 접기' }),
+  ).toHaveAttribute('aria-expanded', 'true')
+
+  // 한 번에 하나만 펼친다
+  await wishes.getByRole('button', { name: '비슷한 굿즈 보기' }).click()
+  await expect(ended).toHaveCount(0)
+  await expect(wishes.locator('#wish-related-9001')).toHaveText(
+    '지금 WISH할 수 있는 비슷한 굿즈가 없어요.',
+  )
+
+  await wishes.getByRole('button', { name: '비슷한 굿즈 접기' }).click()
+  await wishes.getByRole('button', { name: '비슷한 굿즈 보기' }).first().click()
+  await ended.getByRole('link').first().click()
+  await expect(page).toHaveURL(/#\/drops\/101$/)
+})
