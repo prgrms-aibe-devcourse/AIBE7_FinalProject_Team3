@@ -7,9 +7,11 @@ import org.example.grab.domain.drop.dto.PublicDropSort;
 import org.example.grab.domain.drop.dto.response.PublicDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.PublicDropListResponse;
 import org.example.grab.domain.drop.dto.response.PublicDropStockResponse;
+import org.example.grab.domain.drop.dto.response.RelatedDropsResponse;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.service.DropService;
 import org.example.grab.domain.drop.service.PublicDropReadService;
+import org.example.grab.domain.drop.service.RelatedDropReadService;
 import org.example.grab.global.common.ApiResponse;
 import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
@@ -28,6 +30,7 @@ public class DropController {
 
     private final DropService dropService;
     private final PublicDropReadService publicDropReadService;
+    private final RelatedDropReadService relatedDropReadService;
 
     /*
      * 공개 DROP 목록. page/size와 sort는 서비스 호출 전에 검증해 잘못된 요청이면 서비스를 부르지 않는다.
@@ -81,5 +84,17 @@ public class DropController {
     @GetMapping("/{dropId}/stocks")
     public ApiResponse<PublicDropStockResponse> getStocks(@PathVariable Long dropId) {
         return ApiResponse.success(publicDropReadService.findPublicStocks(dropId));
+    }
+
+    // 관련 DROP 추천. 비로그인 조회이며 DRAFT는 서비스가 DROP_NOT_FOUND로 숨긴다(DROP.md 1.4)
+    @Operation(summary = "관련 DROP 추천",
+            description = "아직 WISH할 수 있는 DROP을 최대 4개 추천한다. 함께 WISH한 DROP(겹친 사용자 3명 이상)을 먼저 쓰고, "
+                    + "없으면 같은 카테고리에서 내용이 비슷한 DROP(임베딩)을 쓴다. basis로 추천 방식을 알려 준다")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "INVALID_REQUEST")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "DROP_NOT_FOUND")
+    @GetMapping("/{dropId}/related")
+    public ApiResponse<RelatedDropsResponse> getRelated(@PathVariable Long dropId) {
+        return ApiResponse.success(relatedDropReadService.findRelated(dropId));
     }
 }

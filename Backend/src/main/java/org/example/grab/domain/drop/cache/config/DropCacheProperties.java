@@ -12,17 +12,20 @@ import java.time.Duration;
  * 상세의 활성 WISH 수·브랜드명은 변경 이벤트가 없어 detail-ttl만큼 늦게 바뀔 수 있다.
  * 변경 이벤트는 같은 인스턴스 안에서만 전달되므로, blue/green 전환 중 다른 인스턴스에서 커밋된 변경은 TTL까지 늦게 보일 수 있다.
  * 그래서 재고 TTL도 짧게 둔다.
+ * 관련 DROP 추천(GR-195)은 모든 사용자에게 같고 몇 분 늦어도 되므로 변경 이벤트 없이 related-ttl만큼 둔다.
  */
 @ConfigurationProperties("grab.drop-cache")
 public record DropCacheProperties(
         @DefaultValue("memory") Store store,
         @DefaultValue("5s") Duration detailTtl,
-        @DefaultValue("5s") Duration stockTtl
+        @DefaultValue("5s") Duration stockTtl,
+        @DefaultValue("3m") Duration relatedTtl
 ) {
     public enum Store { MEMORY, REDIS, NONE }
 
     public DropCacheProperties {
-        if (detailTtl.isNegative() || detailTtl.isZero() || stockTtl.isNegative() || stockTtl.isZero()) {
+        if (detailTtl.isNegative() || detailTtl.isZero() || stockTtl.isNegative() || stockTtl.isZero()
+                || relatedTtl.isNegative() || relatedTtl.isZero()) {
             throw new IllegalArgumentException("grab.drop-cache의 TTL은 0보다 커야 합니다.");
         }
     }

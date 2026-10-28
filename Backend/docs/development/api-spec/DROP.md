@@ -215,6 +215,63 @@ GET /api/v1/drops/{dropId}
 ---
 
 
+### 1.4 관련 DROP 추천 (GR-195)
+
+```http
+GET /api/v1/drops/{dropId}/related
+```
+
+- **인증**: 불필요
+
+DROP 상세에서 아직 WISH할 수 있는 다른 DROP을 최대 4개 추천한다(DROP-011). 한정 굿즈는 상품 내용보다 팬층이 겹치는지가 중요하므로 함께 WISH를 먼저 쓰고, 부족하면 임베딩으로 고른 비슷한 DROP을 쓴다. 응답의 `basis`로 화면이 문구를 골라 추천 방식과 문구가 항상 일치한다.
+
+**후보:** 저장 상태 `WISH`이고 `now < saleStartsAt`인 공개 DROP(1.2 인기 WISH와 같은 기준). 대상 DROP은 뺀다. 같은 판매자의 DROP도 포함한다.
+
+**추천 방식:**
+
+| `basis` | 선택 | 사용 조건 |
+| --- | --- | --- |
+| `CO_WISH` | 대상 DROP을 WISH한 사용자(활성)가 함께 WISH한(활성) 후보를 겹친 사용자 수가 많은 순, 같으면 `saleStartsAt`이 빠른 순 | 겹친 사용자가 3명 이상인 후보가 하나 이상 있을 때 |
+| `SIMILAR` | 대상과 같은 카테고리이며 임베딩(수요 분석 API 6절) 코사인 유사도가 0.75 이상인 후보를 가까운 순 | `CO_WISH` 후보가 없고 대상 DROP의 임베딩이 있을 때 |
+
+- 두 방식을 한 응답에 섞지 않는다. 둘 다 없으면 `basis`는 `null`, `drops`는 빈 배열이다.
+- 겹친 사용자 수와 유사도는 응답에 넣지 않는다. 겹친 사용자 3명 기준은 특정 사용자의 WISH 내역을 짐작하지 못하게 하려는 최소 단위다(설정 `grab.drop.related.min-co-wishers`). 유사도 0.75 기준은 `grab.drop.related.similarity-min-score`로 바꾼다.
+- 판매 실적은 쓰지 않는다.
+- 응답은 사용자와 무관해 서버에서 최대 3분(`grab.drop-cache.related-ttl`) 캐시한다(GR-183 응답 캐시 재사용). 그동안 추천 DROP의 WISH 수·재고·후보 구성은 늦게 바뀔 수 있고, 판매가 시작된 후보는 응답할 때 뺀다.
+
+**응답:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "basis": "CO_WISH",
+    "drops": [
+      {
+        "dropId": 101,
+        "name": "고양이 아크릴 스탠드",
+        "brandName": "그랩 스튜디오",
+        "thumbnailUrl": "https://example.com/image.jpg",
+        "minPrice": 15000,
+        "category": { "categoryId": 8, "name": "취미·굿즈" },
+        "status": "WISH",
+        "soldOut": false,
+        "availableStock": 50,
+        "wishCount": 48,
+        "saleStartsAt": "2026-11-02T20:00:00+09:00",
+        "saleEndsAt": "2026-11-02T22:00:00+09:00"
+      }
+    ]
+  }
+}
+```
+
+- `drops[]`의 필드는 1.2 목록 항목과 같다.
+- 화면 표시: WISH 중인 상세에서는 `CO_WISH`면 "이 DROP을 WISH한 사람들이 좋아할 만한 DROP", `SIMILAR`면 "이런 DROP도 곧 열려요"로 상세 하단에 보여 준다. 품절·판매 종료 상세에서는 두 방식 모두 "비슷한 굿즈가 곧 열려요"로 품절 안내 아래에 보여 준다. 판매 중인 상세에서는 보여 주지 않는다.
+
+**오류 코드:**
+- `DROP_NOT_FOUND` — 없거나 공개되지 않은 DROP(1.3과 같음)
+
 ## 2. 판매자 DROP 관리 API
 
 > 모든 API는 `SELLER` 인증과 DROP 소유권 검증이 필요합니다.
