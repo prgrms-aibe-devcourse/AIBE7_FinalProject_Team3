@@ -13,8 +13,10 @@
 // - 재조회 응답시간: 첫 주문부터 마지막 주문까지(변경이 실제로 일어난 구간)에 시작한 요청만 API별로 집계한다.
 //
 // GR-200:
-// - 응답보다 먼저 온 알림: 주문 응답 이후 알림이 없지만 요청 시작~응답 사이에 같은 상품 알림이 있으면 유실이 아니라
-//   earlyArrival로 따로 센다(커밋은 그 구간 안에 있다). 주문 로그에 요청 시작 시각이 있을 때만 구분한다.
+// - 미확정 알림: 주문 응답 이후 알림이 없지만 요청 시작~응답 사이에 같은 상품 알림이 있으면, 그 알림이 이번 주문의 것인지
+//   같은 상품의 이전 주문 것인지 가릴 수 없다(주문과 알림을 잇는 커밋 표식이 없음). 유실로도 성공으로도 세지 않고
+//   unresolved로 따로 센다. missing은 요청 시작 이후 같은 상품 알림이 전혀 없는 쌍만이다. 주문 로그에 요청 시작 시각이
+//   있을 때만 구분한다(없으면 이전처럼 응답 이후 알림이 없으면 missing).
 // - 재고값 최신성: 재조회 시작 시각보다 STALE_MARGIN_MS 먼저 응답을 받은 주문은 이미 커밋됐다. 응답의 가용 재고가
 //   "시작 재고 − 그 주문 수"보다 크면 그 주문을 반영하지 못한 옛 값이다. 커밋됐지만 응답이 아직 안 온 주문은 세지 않으므로
 //   옛 값을 놓칠 수는 있어도 잘못 옛 값으로 세지는 않는다(주문 1건 = 수량 1, 측정 중 만료·취소 없음 전제: 결제 대기 10분).
@@ -69,7 +71,7 @@ function firstAtOrAfter(times, t) {
 const latencies = [];
 const reflects = [];
 let missing = 0;
-let earlyArrival = 0;
+let unresolved = 0;
 let reflectMissing = 0;
 let sampledOrders = 0;
 for (const [t, dropId, sentAt] of orders) {
@@ -81,7 +83,7 @@ for (const [t, dropId, sentAt] of orders) {
         const at = firstAtOrAfter(times, t);
         if (at === null || at > end) {
             const early = sentAt !== null ? firstAtOrAfter(times, sentAt) : null;
-            if (early !== null && early < t) earlyArrival++;
+            if (early !== null && early < t) unresolved++;
             else missing++;
             continue;
         }
@@ -104,9 +106,9 @@ const dist = (values) => {
 const result = {
     orders: orders.length,
     sampledOrders,
-    pairs: latencies.length + missing + earlyArrival,
+    pairs: latencies.length + missing + unresolved,
     missing,
-    earlyArrival,
+    unresolved,
     deliveryLatencyMs: dist(latencies),
 };
 if (refetchOn) {
