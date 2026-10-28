@@ -22,6 +22,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -38,6 +40,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -54,6 +57,7 @@ class SimilarSalesServiceTest {
     private DemandAnalysisService demandAnalysisService;
     private CategoryService categoryService;
     private DropEmbeddingQueryService queryEmbeddings;
+    private PlatformTransactionManager transactionManager;
     private SimilarSalesService service;
 
     @BeforeEach
@@ -62,6 +66,7 @@ class SimilarSalesServiceTest {
         demandAnalysisService = mock(DemandAnalysisService.class);
         categoryService = mock(CategoryService.class);
         queryEmbeddings = mock(DropEmbeddingQueryService.class);
+        transactionManager = mock(PlatformTransactionManager.class);
         given(repository.findSamples(any())).willReturn(List.of());
         given(repository.findEmbedding(DROP_ID)).willReturn(Optional.of(VECTOR));
         given(repository.findReferencePrice(DROP_ID)).willReturn(20000L);
@@ -72,7 +77,7 @@ class SimilarSalesServiceTest {
                 .willReturn(Optional.of(new CategoryResponse(CATEGORY_ID, "HOBBY", "취미·굿즈")));
         service = new SimilarSalesService(repository, demandAnalysisService, categoryService, queryEmbeddings,
                 new StockRecommendationProperties(new BigDecimal("0.3"), new BigDecimal("0.5"), 20, 60),
-                0.75, 3, 3, Clock.fixed(NOW, ZoneOffset.UTC));
+                transactionManager, 0.75, 3, 3, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     @Test
@@ -187,6 +192,19 @@ class SimilarSalesServiceTest {
         // 단순 평균 12000의 ±30%
         assertThat(queries.getAllValues()).filteredOn(query -> query.scope() == SellerScope.OTHERS)
                 .allMatch(query -> query.maxPrice().compareTo(new BigDecimal("15600")) == 0);
+    }
+
+    @Test
+    @DisplayName("생성 단계는 요청 임베딩을 만든 뒤에 읽기 전용 트랜잭션을 열어 외부 호출 동안 DB 커넥션을 쥐지 않는다")
+    void forForm_embedsOutsideTransaction() {
+        given(queryEmbeddings.embed(any())).willReturn(Optional.of(VECTOR));
+
+        service.forForm(SELLER_ID, new SimilarSalesRequest(CATEGORY_ID, "키링", "아크릴", null, List.of(12000L)));
+
+        InOrder order = inOrder(queryEmbeddings, transactionManager, repository);
+        order.verify(queryEmbeddings).embed(any());
+        order.verify(transactionManager).getTransaction(argThat(definition -> definition.isReadOnly()));
+        order.verify(repository, atLeastOnce()).findSamples(any());
     }
 
     @Test

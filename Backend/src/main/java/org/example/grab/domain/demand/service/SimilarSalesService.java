@@ -24,7 +24,9 @@ import org.example.grab.global.error.CommonErrorCode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -36,6 +38,7 @@ import java.util.List;
     비슷한 DROP 실적(DEMAND.md 7절, DEMAND-013). 내 지난 비슷한 DROP과 다른 판매자의 비슷한 굿즈 결과를 나란히 계산하고,
     내 비슷한 DROP이 충분하면 내 것을, 부족하면 다른 판매자 것을 기준으로 삼는다(7.2).
     임베딩은 표본 검색에만 쓰고, 지표는 SQL 집계와 결정적 계산으로만 만든다. 저장하지 않는다.
+    생성 단계의 요청 임베딩(외부 호출, 최대 수 초)은 DB 커넥션을 쥐지 않도록 트랜잭션 밖에서 만든다.
  */
 @Service
 public class SimilarSalesService {
@@ -53,6 +56,7 @@ public class SimilarSalesService {
     private final double similarityMinScore;
     private final int minOwnDrops;
     private final int maxPeerDrops;
+    private final TransactionTemplate readOnlyTransaction;
     private final Clock clock;
 
     @Autowired
@@ -62,12 +66,13 @@ public class SimilarSalesService {
             CategoryService categoryService,
             DropEmbeddingQueryService queryEmbeddings,
             StockRecommendationProperties stockProperties,
+            PlatformTransactionManager transactionManager,
             @Value("${grab.demand.similarity.min-score:0.75}") double similarityMinScore,
             @Value("${grab.demand.similar-sales.min-own-drops:3}") int minOwnDrops,
             @Value("${grab.demand.similar-sales.max-peer-drops:3}") int maxPeerDrops
     ) {
-        this(repository, demandAnalysisService, categoryService, queryEmbeddings, stockProperties, similarityMinScore,
-                minOwnDrops, maxPeerDrops, Clock.systemUTC());
+        this(repository, demandAnalysisService, categoryService, queryEmbeddings, stockProperties, transactionManager,
+                similarityMinScore, minOwnDrops, maxPeerDrops, Clock.systemUTC());
     }
 
     SimilarSalesService(
@@ -76,6 +81,7 @@ public class SimilarSalesService {
             CategoryService categoryService,
             DropEmbeddingQueryService queryEmbeddings,
             StockRecommendationProperties stockProperties,
+            PlatformTransactionManager transactionManager,
             double similarityMinScore,
             int minOwnDrops,
             int maxPeerDrops,
@@ -86,6 +92,8 @@ public class SimilarSalesService {
         this.categoryService = categoryService;
         this.queryEmbeddings = queryEmbeddings;
         this.stockProperties = stockProperties;
+        this.readOnlyTransaction = new TransactionTemplate(transactionManager);
+        this.readOnlyTransaction.setReadOnly(true);
         this.similarityMinScore = similarityMinScore;
         this.minOwnDrops = minOwnDrops;
         this.maxPeerDrops = maxPeerDrops;
@@ -101,8 +109,10 @@ public class SimilarSalesService {
                 repository.findReferencePrice(dropId)));
     }
 
-    // 생성 단계(7.5). 카테고리 검증은 재고 추천과 같다(5.5)
-    @Transactional(readOnly = true)
+    /*
+        생성 단계(7.5). 카테고리 검증은 재고 추천과 같다(5.5).
+        카테고리 확인·요청 임베딩은 트랜잭션 없이 하고, 표본 조회·계산만 읽기 전용 트랜잭션에서 한다.
+     */
     public SimilarSalesResponse forForm(long sellerId, SimilarSalesRequest request) {
         if (!categoryService.isActive(request.categoryId())) {
             throw new BusinessException(
@@ -118,7 +128,8 @@ public class SimilarSalesService {
                                 .toList()))
                 .orElse(null);
         long referencePrice = Math.round(request.unitPrices().stream().mapToLong(Long::longValue).average().orElse(0));
-        return calculate(new Target(sellerId, request.categoryId(), NO_DROP, queryVector, referencePrice));
+        Target target = new Target(sellerId, request.categoryId(), NO_DROP, queryVector, referencePrice);
+        return readOnlyTransaction.execute(status -> calculate(target));
     }
 
     private record Target(long sellerId, long categoryId, long excludedDropId, String queryVector,
