@@ -146,7 +146,16 @@ function handleFrame(conn, frame) {
 function markDirty(conn, reason) {
     const key = conn.refetch;
     if (!key.dirty) key.dirtySince = Date.now();
-    key.dirty ??= reason;
+    if (reason === 'signal') {
+        key.dirty ??= reason;
+    } else {
+        // 주기 재동기화처럼 바로 필요한 사유는 알림 분산 대기 중인 예약을 당긴다(프론트 refreshDelay와 같은 규칙).
+        if (key.timer && key.dirty === 'signal') {
+            clearTimeout(key.timer);
+            key.timer = null;
+        }
+        key.dirty = reason;
+    }
     if (key.running || key.timer || conn.aborted) return;
     const throttle = Math.max(0, key.lastStart + REFRESH_MIN_INTERVAL_MS - Date.now());
     const budget = Math.max(0, key.dirtySince + REFRESH_MIN_INTERVAL_MS - Date.now());
