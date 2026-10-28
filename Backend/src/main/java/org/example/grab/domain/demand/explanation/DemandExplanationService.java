@@ -7,11 +7,13 @@ import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import org.example.grab.domain.demand.dto.DemandAnalysisResponse;
 import org.example.grab.domain.demand.dto.DemandCalculateRequest;
+import org.example.grab.domain.demand.dto.SimilarSalesResponse;
 import org.example.grab.domain.demand.error.DemandErrorCode;
 import org.example.grab.domain.demand.explanation.DemandExplanationClient.Generation;
 import org.example.grab.domain.demand.repository.DemandExplanationRepository;
 import org.example.grab.domain.demand.repository.DemandExplanationRepository.StoredExplanation;
 import org.example.grab.domain.demand.service.DemandAnalysisService;
+import org.example.grab.domain.demand.service.SimilarSalesService;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.ratelimit.DailyRequestLimitRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,6 +46,7 @@ import java.util.concurrent.TimeoutException;
       형식·수치 검증에 실패하면 DISCARDED, 통과하면 GENERATED. 재시도하지 않는다.
     - GENERATED·DISCARDED만 저장한다. FAILED는 남기지 않아 다음 요청에서 다시 시도한다.
     - LLM 응답을 기다리는 동안 DB 트랜잭션을 잡지 않는다(분석 계산과 저장은 각각 짧게 끝난다).
+    - 비슷한 DROP 실적(DEMAND.md 7.4)을 저장된 임베딩으로 찾아 입력에 넣는다(GR-169). 외부 호출 없이 DB에서만 조회한다.
  */
 @Slf4j
 @Service
@@ -54,6 +57,7 @@ public class DemandExplanationService {
     static final String LIMIT_SCOPE = "demand:explanation";
 
     private final DemandAnalysisService demandAnalysisService;
+    private final SimilarSalesService similarSalesService;
     private final DemandExplanationClient client;
     private final DemandExplanationRepository explanationRepository;
     private final DailyRequestLimitRepository limitRepository;
@@ -66,6 +70,7 @@ public class DemandExplanationService {
     @Autowired
     public DemandExplanationService(
             DemandAnalysisService demandAnalysisService,
+            SimilarSalesService similarSalesService,
             DemandExplanationClient client,
             DemandExplanationRepository explanationRepository,
             DailyRequestLimitRepository limitRepository,
@@ -74,12 +79,13 @@ public class DemandExplanationService {
             @Qualifier(DemandExplanationConfig.DEMAND_EXPLANATION_TASK_EXECUTOR) TaskExecutor executor,
             MeterRegistry meterRegistry
     ) {
-        this(demandAnalysisService, client, explanationRepository, limitRepository, properties, objectMapper,
+        this(demandAnalysisService, similarSalesService, client, explanationRepository, limitRepository, properties, objectMapper,
                 executor, meterRegistry, Clock.systemUTC());
     }
 
     DemandExplanationService(
             DemandAnalysisService demandAnalysisService,
+            SimilarSalesService similarSalesService,
             DemandExplanationClient client,
             DemandExplanationRepository explanationRepository,
             DailyRequestLimitRepository limitRepository,
@@ -90,6 +96,7 @@ public class DemandExplanationService {
             Clock clock
     ) {
         this.demandAnalysisService = demandAnalysisService;
+        this.similarSalesService = similarSalesService;
         this.client = client;
         this.explanationRepository = explanationRepository;
         this.limitRepository = limitRepository;
@@ -106,7 +113,9 @@ public class DemandExplanationService {
         if (!client.available()) {
             return DemandExplanationResponse.of(ExplanationStatus.DISABLED);
         }
-        String input = DemandExplanationPrompt.input(analysis, objectMapper);
+        // 판매자 화면의 비슷한 DROP 실적과 같은 값이다
+        SimilarSalesResponse similarSales = similarSalesService.forWishDrop(sellerId, dropId);
+        String input = DemandExplanationPrompt.input(analysis, similarSales, objectMapper);
         String inputHash = inputHash(input);
         Optional<StoredExplanation> stored = explanationRepository.find(dropId, inputHash);
         if (stored.isPresent()) {

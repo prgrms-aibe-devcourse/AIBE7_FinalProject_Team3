@@ -94,4 +94,25 @@ class DemandExplanationValidatorTest {
                 "{\"summary\":\"250mm 옵션을 권장합니다.\"}", input, OBJECT_MAPPER))
                 .isEmpty();
     }
+
+    @Test
+    @DisplayName("비슷한 DROP 실적(GR-169)의 매진 비율·시간·구간을 쓴 설명은 통과하고, 입력에 없는 매진 시간을 쓰면 버린다")
+    void validate_checksSimilarSalesNumbers() {
+        String input = """
+                {"similarSales":{"basis":"OTHERS","reason":"OWN_FEW",
+                  "own":{"selection":"SIMILAR","sampleDropCount":2,"soldOutPercent":50,"medianSellOutMinutes":12},
+                  "others":{"selection":"SIMILAR","scope":"ALL_SELLERS","sampleDropCountBand":"10_TO_19",
+                            "soldOutPercent":40,"medianSellOutMinutes":15,"sellThroughPercent":81}}}
+                """;
+
+        assertThat(DemandExplanationValidator.validate(
+                "{\"summary\":\"비슷한 굿즈 10~19개 중 40%가 매진됐고, 매진까지 보통 15분 걸렸습니다.\"}", input, OBJECT_MAPPER))
+                .isPresent();
+        assertThat(DemandExplanationValidator.validate(
+                "{\"summary\":\"내 비슷한 DROP 2개 중 50%가 12분 만에 매진됐습니다.\"}", input, OBJECT_MAPPER))
+                .isPresent();
+        assertThat(DemandExplanationValidator.validate(
+                "{\"summary\":\"비슷한 굿즈는 보통 25분 만에 매진됐습니다.\"}", input, OBJECT_MAPPER))
+                .isEmpty();
+    }
 }

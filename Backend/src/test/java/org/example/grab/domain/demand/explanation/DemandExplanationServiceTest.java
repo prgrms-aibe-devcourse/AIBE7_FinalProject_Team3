@@ -9,6 +9,7 @@ import org.example.grab.domain.demand.explanation.DemandExplanationClient.Genera
 import org.example.grab.domain.demand.repository.DemandExplanationRepository;
 import org.example.grab.domain.demand.repository.DemandExplanationRepository.StoredExplanation;
 import org.example.grab.domain.demand.service.DemandAnalysisService;
+import org.example.grab.domain.demand.service.SimilarSalesService;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.ratelimit.DailyRequestLimitRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,6 +58,7 @@ class DemandExplanationServiceTest {
     private final ObjectMapper objectMapper = JsonMapper.builder().build();
     private final DemandAnalysisResponse analysis = DemandExplanationPromptTest.analysis();
     private DemandAnalysisService analysisService;
+    private SimilarSalesService similarSalesService;
     private DemandExplanationClient client;
     private DemandExplanationRepository repository;
     private DailyRequestLimitRepository limitRepository;
@@ -67,15 +69,17 @@ class DemandExplanationServiceTest {
     @BeforeEach
     void setUp() {
         analysisService = mock(DemandAnalysisService.class);
+        similarSalesService = mock(SimilarSalesService.class);
         client = mock(DemandExplanationClient.class);
         repository = mock(DemandExplanationRepository.class);
         limitRepository = mock(DailyRequestLimitRepository.class);
         meterRegistry = new SimpleMeterRegistry();
         given(analysisService.analyze(SELLER_ID, DROP_ID, REQUEST)).willReturn(analysis);
+        given(similarSalesService.forWishDrop(SELLER_ID, DROP_ID)).willReturn(DemandExplanationPromptTest.similarSales());
         given(client.available()).willReturn(true);
         given(repository.find(anyLong(), anyString())).willReturn(Optional.empty());
         given(limitRepository.increment(anyString(), anyLong(), any())).willReturn(1L);
-        input = DemandExplanationPrompt.input(analysis, objectMapper);
+        input = DemandExplanationPrompt.input(analysis, DemandExplanationPromptTest.similarSales(), objectMapper);
         inputHash = DemandExplanationService.inputHash(input);
     }
 
@@ -204,7 +208,7 @@ class DemandExplanationServiceTest {
     }
 
     private DemandExplanationService service(TaskExecutor executor, Duration timeout) {
-        return new DemandExplanationService(analysisService, client, repository, limitRepository,
+        return new DemandExplanationService(analysisService, similarSalesService, client, repository, limitRepository,
                 new DemandExplanationProperties(timeout, timeout.dividedBy(2), 1024, 0, 30), objectMapper, executor, meterRegistry,
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }

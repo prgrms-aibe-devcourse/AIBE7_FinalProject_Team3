@@ -5,6 +5,9 @@ import org.example.grab.domain.demand.dto.DemandAnalysisResponse.Assumption;
 import org.example.grab.domain.demand.dto.DemandAnalysisResponse.MarketConversion;
 import org.example.grab.domain.demand.dto.DemandAnalysisResponse.OwnConversion;
 import org.example.grab.domain.demand.dto.DemandAnalysisResponse.Plan;
+import org.example.grab.domain.demand.dto.SimilarSalesResponse;
+import org.example.grab.domain.demand.dto.SimilarSalesResponse.OthersSimilarSales;
+import org.example.grab.domain.demand.dto.SimilarSalesResponse.OwnSimilarSales;
 import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
@@ -18,11 +21,14 @@ import java.util.Map;
     입력에는 저장된 계산 결과의 집계값·코드값만 넣는다. 상품명·카테고리명·옵션 표시명처럼 판매자가 입력한 텍스트,
     회원 정보, 다른 판매자의 개별 데이터는 넣지 않는다. 옵션은 배분 순서 번호로만 전달하고 화면이 표시명과 짝짓는다.
     비율은 화면과 같은 정수 %로 바꿔 넣어 설명의 숫자를 입력값과 그대로 대조할 수 있게 한다.
+    비슷한 DROP 실적(DEMAND.md 7절)은 임베딩으로 고른 종료 DROP의 집계값을 근거로 넣는다(GR-169, 검색 결과로 설명을 보강).
+    다른 판매자 실적은 보호 단위를 넘을 때만 구간·반올림 값으로 넣는다.
     프롬프트나 입력 형식을 바꾸면 VERSION을 올린다(평가 기록·demand_explanations.prompt_version과 짝을 맞추고, 입력 해시가 바뀌어 저장된 설명을 다시 쓰지 않게 한다).
  */
 public final class DemandExplanationPrompt {
 
-    public static final String VERSION = "v1";
+    // v2: 비슷한 DROP 실적(similarSales) 입력 추가(GR-169)
+    public static final String VERSION = "v2";
 
     // 예상 범위는 전환율의 95% 구간으로 정한다(DEMAND.md 1.4). 설명에서 이 숫자를 쓸 수 있게 입력에 함께 넣는다
     private static final int RANGE_CONFIDENCE_PERCENT = 95;
@@ -46,15 +52,24 @@ public final class DemandExplanationPrompt {
             - plan.options: option 번호별 현재 수량과 추천 수량
             - dataGaps: NO_ACTIVE_WISH(활성 WISH 없음), NO_CONVERSION_SAMPLE(비교할 종료 DROP 부족), SMALL_CONVERSION_SAMPLE(표본이 적어 범위가 넓음)
             - excludesBuyersWithoutWish: true면 WISH 없이 구매한 사용자는 전환율에 포함하지 않았다는 뜻이다
+            - similarSales: 같은 카테고리에서 상품 내용이 비슷한 종료 DROP의 실제 판매 결과. own은 내 지난 DROP, others는 다른 판매자들의 집계다.
+              selection이 SIMILAR면 상품 내용이 비슷한 DROP, ALL이면 내 같은 카테고리 종료 DROP 전체, CATEGORY면 같은 카테고리 종료 DROP 전체다.
+              others.scope가 NEW_SELLERS면 판매 이력이 적은 판매자들만 모은 것이다.
+              sampleDropCount: 내 표본 DROP 수, sampleDropCountBand: 다른 판매자 표본 DROP 수 구간, soldOutPercent: 매진된 DROP 비율(%),
+              medianSellOutMinutes: 매진까지 걸린 시간의 중간값(분), sellThroughPercent: 판매율(%), soldPerWish: 판매 시작 시점 WISH 1명당 판매량.
+              basis는 판매자 화면에서 기준으로 보여 준 쪽(OWN 내 실적, OTHERS 다른 판매자, null이면 기준 없음)이고,
+              reason은 OWN_ENOUGH(내 비슷한 DROP이 충분), OWN_FEW(내 비슷한 DROP이 적어 참고용), OWN_NOT_SIMILAR(내 비슷한 DROP 없음), FIRST_SALE(첫 판매)이다.
+              own·others가 null이면 비교할 자료가 없거나 부족한 것이다
 
             규칙
             1. 숫자는 입력에 있는 값만 그대로 쓴다. 새로 계산하거나 더하고 빼거나 단위를 바꾸지 않는다(시간을 일로 바꾸지 않는다).
-               WISH 수는 "명", 수량은 "개", 시간은 "시간"을 붙인다.
+               WISH 수는 "명", 수량은 "개", 시간은 "시간", medianSellOutMinutes는 "분"을 붙인다.
             2. 전환율·구간은 "30%"처럼 입력의 % 값 그대로 쓴다.
             3. expected는 "예상 판매량", recommended는 "준비 권장 수량"으로 구분해 부른다.
             4. 옵션은 "옵션 1"처럼 번호로만 부른다.
             5. 재고·가격·판매 일정을 바꾸라고 지시하지 않는다. 판단 근거와 위험만 설명한다.
             6. 한국어 존댓말로 쓰고 각 문장은 120자를 넘기지 않는다.
+            7. similarSales는 과거 결과를 근거로만 쓴다. 이번 DROP도 같은 결과가 난다고 단정하지 않고, 다른 판매자 개인을 가리키지 않는다.
 
             출력은 아래 형식의 JSON 객체 하나만 쓴다.
             {"summary": "한 문장 요약", "reasons": ["근거 1~3개"], "risks": ["위험 0~3개"], "dataGaps": ["dataGaps가 있을 때 그 의미, 없으면 빈 배열"], "notRecommended": ["권장하지 않는 선택 0~2개"]}
@@ -65,11 +80,12 @@ public final class DemandExplanationPrompt {
     private DemandExplanationPrompt() {
     }
 
-    public static String input(DemandAnalysisResponse analysis, ObjectMapper objectMapper) {
-        return objectMapper.writeValueAsString(inputTree(analysis));
+    public static String input(DemandAnalysisResponse analysis, SimilarSalesResponse similarSales,
+                               ObjectMapper objectMapper) {
+        return objectMapper.writeValueAsString(inputTree(analysis, similarSales));
     }
 
-    static Map<String, Object> inputTree(DemandAnalysisResponse analysis) {
+    static Map<String, Object> inputTree(DemandAnalysisResponse analysis, SimilarSalesResponse similarSales) {
         Map<String, Object> input = new LinkedHashMap<>();
         input.put("activeWishCount", analysis.demand().activeWishCount());
         input.put("hoursUntilSaleStart", analysis.demand().hoursUntilSaleStart());
@@ -80,6 +96,7 @@ public final class DemandExplanationPrompt {
         input.put("conversion", conversion);
         input.put("assumptions", assumptions(analysis.assumptions()));
         input.put("plan", plan(analysis.plan()));
+        input.put("similarSales", similarSales(similarSales));
         input.put("dataGaps", analysis.dataGaps().stream().map(Enum::name).toList());
         input.put("excludesBuyersWithoutWish", true);
         return input;
@@ -138,6 +155,50 @@ public final class DemandExplanationPrompt {
             options.add(option);
         }
         value.put("options", options);
+        return value;
+    }
+
+    private static Map<String, Object> similarSales(SimilarSalesResponse similarSales) {
+        Map<String, Object> value = new LinkedHashMap<>();
+        value.put("basis", similarSales.basis() == null ? null : similarSales.basis().name());
+        value.put("reason", similarSales.reason().name());
+        value.put("own", ownSales(similarSales.own()));
+        value.put("others", othersSales(similarSales.others()));
+        return value;
+    }
+
+    private static Map<String, Object> ownSales(OwnSimilarSales own) {
+        if (own == null) {
+            return null;
+        }
+        Map<String, Object> value = new LinkedHashMap<>();
+        value.put("selection", own.selection().name());
+        value.put("sampleDropCount", own.dropCount());
+        value.putAll(salesResult(own.soldOutRate(), own.medianSellOutMinutes(), own.sellThroughRate(), own.soldPerWish()));
+        return value;
+    }
+
+    // 보호 단위에 못 미치면(dropCountBand NONE) 지표가 없으므로 넣지 않는다
+    private static Map<String, Object> othersSales(OthersSimilarSales others) {
+        if (others == null || !others.available()) {
+            return null;
+        }
+        Map<String, Object> value = new LinkedHashMap<>();
+        value.put("selection", others.selection().name());
+        value.put("scope", others.scope().name());
+        value.put("sampleDropCountBand", others.dropCountBand());
+        value.putAll(salesResult(others.soldOutRate(), others.medianSellOutMinutes(), others.sellThroughRate(),
+                others.soldPerWish()));
+        return value;
+    }
+
+    private static Map<String, Object> salesResult(BigDecimal soldOutRate, Integer medianSellOutMinutes,
+                                                   BigDecimal sellThroughRate, BigDecimal soldPerWish) {
+        Map<String, Object> value = new LinkedHashMap<>();
+        value.put("soldOutPercent", percent(soldOutRate));
+        value.put("medianSellOutMinutes", medianSellOutMinutes);
+        value.put("sellThroughPercent", percent(sellThroughRate));
+        value.put("soldPerWish", soldPerWish);
         return value;
     }
 

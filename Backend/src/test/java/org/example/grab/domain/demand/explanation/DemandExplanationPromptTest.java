@@ -14,6 +14,13 @@ import org.example.grab.domain.demand.dto.DemandAnalysisResponse.Plan;
 import org.example.grab.domain.demand.dto.DemandAnalysisResponse.Suggestion;
 import org.example.grab.domain.demand.dto.DemandDataGap;
 import org.example.grab.domain.demand.dto.SampleSelection;
+import org.example.grab.domain.demand.dto.SimilarSalesResponse;
+import org.example.grab.domain.demand.dto.SimilarSalesResponse.Basis;
+import org.example.grab.domain.demand.dto.SimilarSalesResponse.OthersSimilarSales;
+import org.example.grab.domain.demand.dto.SimilarSalesResponse.OwnSimilarSales;
+import org.example.grab.domain.demand.dto.SimilarSalesResponse.Reason;
+import org.example.grab.domain.demand.dto.SimilarSalesResponse.Scope;
+import org.example.grab.domain.demand.dto.SimilarSalesResponse.Selection;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -34,7 +41,7 @@ class DemandExplanationPromptTest {
     @DisplayName("입력은 집계값·코드값만 담고 비율은 정수 %로, 옵션은 번호로 바꾼다")
     void input_containsOnlyAggregatesAndCodes() {
         // when
-        String input = DemandExplanationPrompt.input(analysis(), OBJECT_MAPPER);
+        String input = DemandExplanationPrompt.input(analysis(), similarSales(), OBJECT_MAPPER);
         JsonNode tree = OBJECT_MAPPER.readTree(input);
 
         // then: 판매자가 입력한 옵션명·DROP ID·기준 시각은 없다
@@ -63,12 +70,54 @@ class DemandExplanationPromptTest {
                         MarketConversion.unavailable(OffsetDateTime.parse("2026-10-22T00:00:00+09:00"))),
                 base.assumptions(), base.plan(), null, base.dataGaps(), base.notes());
 
-        JsonNode market = OBJECT_MAPPER.readTree(DemandExplanationPrompt.input(analysis, OBJECT_MAPPER))
+        JsonNode market = OBJECT_MAPPER.readTree(DemandExplanationPrompt.input(analysis, similarSales(), OBJECT_MAPPER))
                 .at("/conversion/market");
 
         assertThat(market.get("ratePercent").isNull()).isTrue();
         assertThat(market.get("sampleWishCountApprox").isNull()).isTrue();
         assertThat(market.get("confidence").asString()).isEqualTo("NONE");
+    }
+
+    @Test
+    @DisplayName("비슷한 DROP 실적은 기준·이유와 내·다른 판매자 집계를 정수 %·분으로 담는다(GR-169)")
+    void input_containsSimilarSales() {
+        JsonNode similar = OBJECT_MAPPER.readTree(DemandExplanationPrompt.input(analysis(), similarSales(), OBJECT_MAPPER))
+                .at("/similarSales");
+
+        assertThat(similar.get("basis").asString()).isEqualTo("OTHERS");
+        assertThat(similar.get("reason").asString()).isEqualTo("OWN_FEW");
+        assertThat(similar.at("/own/selection").asString()).isEqualTo("SIMILAR");
+        assertThat(similar.at("/own/sampleDropCount").asInt()).isEqualTo(2);
+        assertThat(similar.at("/own/soldOutPercent").decimalValue()).isEqualByComparingTo("50");
+        assertThat(similar.at("/own/medianSellOutMinutes").asInt()).isEqualTo(12);
+        assertThat(similar.at("/own/soldPerWish").isNull()).isTrue();
+        assertThat(similar.at("/others/scope").asString()).isEqualTo("ALL_SELLERS");
+        assertThat(similar.at("/others/sampleDropCountBand").asString()).isEqualTo("10_TO_19");
+        assertThat(similar.at("/others/sellThroughPercent").decimalValue()).isEqualByComparingTo("81");
+        assertThat(similar.at("/others/asOf").isMissingNode()).isTrue();
+    }
+
+    @Test
+    @DisplayName("다른 판매자 실적이 보호 단위에 못 미치거나 내 종료 DROP이 없으면 null로 둔다")
+    void input_leavesUnavailableSimilarSalesNull() {
+        SimilarSalesResponse firstSale = new SimilarSalesResponse(null, Reason.FIRST_SALE, null,
+                new OthersSimilarSales(Selection.CATEGORY, Scope.ALL_SELLERS, "NONE", null, null, null, null,
+                        OffsetDateTime.parse("2026-10-22T00:00:00+09:00")));
+
+        JsonNode similar = OBJECT_MAPPER.readTree(DemandExplanationPrompt.input(analysis(), firstSale, OBJECT_MAPPER))
+                .at("/similarSales");
+
+        assertThat(similar.get("basis").isNull()).isTrue();
+        assertThat(similar.get("own").isNull()).isTrue();
+        assertThat(similar.get("others").isNull()).isTrue();
+    }
+
+    // DemandExplanationServiceTest도 같은 비슷한 DROP 실적으로 입력을 만든다
+    static SimilarSalesResponse similarSales() {
+        return new SimilarSalesResponse(Basis.OTHERS, Reason.OWN_FEW,
+                new OwnSimilarSales(Selection.SIMILAR, 2, new BigDecimal("0.50"), 12, new BigDecimal("0.88"), null),
+                new OthersSimilarSales(Selection.SIMILAR, Scope.ALL_SELLERS, "10_TO_19", new BigDecimal("0.40"), 15,
+                        new BigDecimal("0.81"), new BigDecimal("0.35"), OffsetDateTime.parse("2026-10-22T00:00:00+09:00")));
     }
 
     // DemandExplanationServiceTest도 같은 분석 결과로 입력을 만든다
