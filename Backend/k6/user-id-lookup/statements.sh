@@ -11,6 +11,7 @@
 # 요청 간격(INTERVAL_S)은 0.5초 미만으로 둔다. HikariCP는 500ms 넘게 쉰 연결을 빌려줄 때 살아 있는지 DB에 확인해
 # 요청과 무관한 문장이 끼어든다.
 # compose.loadtest-db-nano.yaml(pg_stat_statements 로드)을 합쳐 띄우고, 공통 계정 시드와 user-id-lookup/seed.sql을 넣은 뒤 실행한다.
+# Windows Git Bash에서도 MSYS_NO_PATHCONV=1을 붙이지 않는다. 붙이면 Windows용 curl에 -o /dev/null이 그대로 넘어가 쓰기 오류(23)가 난다.
 # log_statement는 ALTER SYSTEM으로 바꾸므로(데이터 볼륨의 postgresql.auto.conf에 남는다) 바꾸기 전의 ALTER SYSTEM 값을
 # 기억했다가 끝나거나 실패하면 그 값으로 되돌린다. 되돌린 뒤 값이 처음과 다르면 실패로 알린다.
 #
@@ -20,7 +21,7 @@
 #       log-me.txt(문장 로그 발췌), postgres.log(발췌 전 postgres 로그 원본)
 set -euo pipefail
 if [ $# -lt 1 ]; then
-  sed -n '17p' "$0"
+  sed -n '18p' "$0"
   exit 1
 fi
 NAME=$1; N=${2:-100}
@@ -90,9 +91,9 @@ fi
 psql -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements" 2> /dev/null > /dev/null
 
 # 서버는 XSRF-TOKEN 쿠키에 Secure를 붙여 curl이 http로 다시 보내지 않으므로 값을 꺼내 직접 싣는다(common/lib/auth.js와 같은 이유).
-curl -sf -c "$JAR" -o /dev/null "$BASE_URL/api/v1/auth/csrf"
+curl -sSf -c "$JAR" -o /dev/null "$BASE_URL/api/v1/auth/csrf"
 XSRF=$(awk '$6 == "XSRF-TOKEN" { print $7 }' "$JAR")
-curl -sf -c "$JAR" -b "XSRF-TOKEN=$XSRF" -H "X-XSRF-TOKEN: $XSRF" -H 'Content-Type: application/json' -o /dev/null \
+curl -sSf -c "$JAR" -b "XSRF-TOKEN=$XSRF" -H "X-XSRF-TOKEN: $XSRF" -H 'Content-Type: application/json' -o /dev/null \
   -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}" "$BASE_URL/api/v1/auth/login"
 ACCESS=$(awk '$6 == "access_token" { print $7 }' "$JAR")
 if [ -z "$ACCESS" ]; then
@@ -112,7 +113,7 @@ send() {
   local target=$1 count=$2 path code
   path=$(path_of "$target")
   for _ in $(seq 1 "$count"); do
-    code=$(curl -s -o /dev/null -w '%{http_code}' -b "access_token=$ACCESS" "$BASE_URL$path")
+    code=$(curl -sS -o /dev/null -w '%{http_code}' -b "access_token=$ACCESS" "$BASE_URL$path")
     if [ "$code" != 200 ]; then
       echo "$target 응답 $code" >&2
       exit 1

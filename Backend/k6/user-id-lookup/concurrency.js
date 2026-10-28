@@ -8,7 +8,7 @@
 // Access Token TTL이 15분이라 한 번의 실행은 그 안에 끝나야 한다. 단계 합이 14분을 넘으면 시작하지 않는다.
 // 만료 등으로 401이 나오면 me_unauthorized_total로 따로 센다(0이 아니면 그 실행은 다시 한다).
 //
-// 사전 준비: compose.yaml + compose.loadtest-micro.yaml + compose.loadtest-db-nano.yaml 기동, 공통 계정 시드.
+// 사전 준비: compose.yaml + compose.loadtest-micro.yaml + compose.loadtest-db-nano.yaml 기동, 공통 계정 시드. 아래 명령은 Backend에서 실행한다.
 //   STEPS=25,50,100,200,400,800 SCRIPT=user-id-lookup/concurrency.js OUT_BASE=k6/user-id-lookup/out \
 //     k6/drop-list-scale/concurrency.sh <이름> me
 // 워밍업: 측정 조건마다 concurrency.sh 직전에 같은 요청을 VU 25로 60초 보내 JVM을 데운다(GR-181 warmup.js와 같은 이유).
