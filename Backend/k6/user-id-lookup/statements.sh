@@ -90,6 +90,16 @@ if ! psql -c "SHOW shared_preload_libraries" | grep -q pg_stat_statements; then
 fi
 psql -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements" 2> /dev/null > /dev/null
 
+# orders 결과는 측정 계정의 주문이 seed.sql의 10건일 때의 쿼리 구성이다(목록 기본 페이지 20건보다 적어 전체 개수 쿼리 없음).
+# 다른 시나리오가 같은 계정에 주문을 남겼으면 쿼리 구성이 달라지므로 시작 전에 멈춘다.
+EXPECTED_BUYER_ORDERS=10
+BUYER_ORDERS=$(psql -c "SELECT count(*) FROM orders o JOIN users u ON u.id = o.buyer_id WHERE u.email = '$EMAIL'")
+if [ "$BUYER_ORDERS" != "$EXPECTED_BUYER_ORDERS" ]; then
+  echo "$EMAIL의 주문이 ${BUYER_ORDERS}건이다(기대 ${EXPECTED_BUYER_ORDERS}건). user-id-lookup/seed.sql을 넣은 DB에서 다른 시나리오 주문 없이 잰다" >&2
+  exit 1
+fi
+echo "$BUYER_ORDERS" > "$OUT/buyer-orders.txt"
+
 # 서버는 XSRF-TOKEN 쿠키에 Secure를 붙여 curl이 http로 다시 보내지 않으므로 값을 꺼내 직접 싣는다(common/lib/auth.js와 같은 이유).
 curl -sSf -c "$JAR" -o /dev/null "$BASE_URL/api/v1/auth/csrf"
 XSRF=$(awk '$6 == "XSRF-TOKEN" { print $7 }' "$JAR")

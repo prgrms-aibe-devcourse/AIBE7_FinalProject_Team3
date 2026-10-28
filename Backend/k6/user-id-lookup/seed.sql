@@ -25,6 +25,21 @@ DELETE FROM stock_reservations
         JOIN drops d ON d.id = oi.drop_id
         WHERE d.name = 'k6 ID변환측정 상품'
     );
+-- 시드 주문을 API로 취소하거나 결제 이벤트가 쌓였으면 결제 하위 기록이 payments를 참조하므로 먼저 지운다.
+DELETE FROM payment_events
+    WHERE payment_id IN (
+        SELECT p.id FROM payments p
+        JOIN orders o ON o.id = p.order_id
+        JOIN drops d ON d.id = o.drop_id
+        WHERE d.name = 'k6 ID변환측정 상품'
+    );
+DELETE FROM payment_cancellations
+    WHERE payment_id IN (
+        SELECT p.id FROM payments p
+        JOIN orders o ON o.id = p.order_id
+        JOIN drops d ON d.id = o.drop_id
+        WHERE d.name = 'k6 ID변환측정 상품'
+    );
 DELETE FROM payments
     WHERE order_id IN (
         SELECT o.id FROM orders o JOIN drops d ON d.id = o.drop_id
@@ -33,6 +48,19 @@ DELETE FROM payments
 DELETE FROM order_items
     WHERE drop_id IN (SELECT id FROM drops WHERE name = 'k6 ID변환측정 상품');
 DELETE FROM orders
+    WHERE drop_id IN (SELECT id FROM drops WHERE name = 'k6 ID변환측정 상품');
+-- DROP 상태 전환 알림·임베딩·수요 분석 배치·찜이 이 DROP을 참조할 수 있어 DROP보다 먼저 지운다(drop-list-scale/seed.sql과 같은 대상).
+DELETE FROM drop_notifications
+    WHERE drop_id IN (SELECT id FROM drops WHERE name = 'k6 ID변환측정 상품');
+DELETE FROM drop_embeddings
+    WHERE drop_id IN (SELECT id FROM drops WHERE name = 'k6 ID변환측정 상품');
+DELETE FROM demand_analysis_snapshots
+    WHERE drop_id IN (SELECT id FROM drops WHERE name = 'k6 ID변환측정 상품');
+DELETE FROM demand_explanations
+    WHERE drop_id IN (SELECT id FROM drops WHERE name = 'k6 ID변환측정 상품');
+DELETE FROM drop_stock_recommendations
+    WHERE drop_id IN (SELECT id FROM drops WHERE name = 'k6 ID변환측정 상품');
+DELETE FROM wishes
     WHERE drop_id IN (SELECT id FROM drops WHERE name = 'k6 ID변환측정 상품');
 DELETE FROM drop_options
     WHERE drop_id IN (SELECT id FROM drops WHERE name = 'k6 ID변환측정 상품');

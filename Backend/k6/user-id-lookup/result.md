@@ -51,7 +51,7 @@ ID 변환이 커넥션 사용 시간의 절반을 차지하고, 사용자가 몰
 | backend | `compose.yaml` + `compose.loadtest-micro.yaml`: 메모리 1GiB·스왑 없음, CPU 2, `-Xmx550m -XX:+UseG1GC`, HikariCP 최대 10(기본값) |
 | postgres | `compose.loadtest-db-nano.yaml`(GR-186, 마지막에 합침): 메모리 512MiB·스왑 없음, CPU 1(가정값), `max_connections=60`, `shared_buffers=128MB`, `pg_stat_statements` |
 | DB 왕복 모사 | `drop-detail-scale/netem.sh`로 postgres 송신 지연. **판정 조건은 netem 3ms**(`SELECT 1` p50 3.200ms, 운영 EC2↔Supabase 실측 3.2~3.4ms 범위). 2.5ms(p50 2.641ms)는 참고 조건 |
-| 데이터 | 공통 계정 `k6-buyer` 1개(모든 VU가 토큰 하나 공유), `user-id-lookup/seed.sql`로 결제 완료 주문 10건(목록 기본 페이지 20건보다 적어 전체 개수 쿼리 없음) |
+| 데이터 | 공통 계정 `k6-buyer` 1개(모든 VU가 토큰 하나 공유), `user-id-lookup/seed.sql`로 결제 완료 주문 10건(목록 기본 페이지 20건보다 적어 전체 개수 쿼리 없음). **측정 전 `k6-buyer`의 전체 주문 수 10건 확인**(`seed.sql`의 `buyer_total_orders` 10, 다른 시나리오 주문 없음). 20건 이상이면 `orders`에 전체 개수 쿼리가 더해져 이 기준선과 달라지므로, `statements.sh`·`roundtrips.sh`는 10건이 아니면 시작하지 않는다 |
 | 부하 경로 | 동시 접속: k6 컨테이너 → compose 네트워크 `http://backend:8080`. 문장·왕복 수: 호스트 curl → `localhost:8080` |
 
 ### netem 값과 `SELECT 1` 왕복 (`k6/db-nano/check.sh`)

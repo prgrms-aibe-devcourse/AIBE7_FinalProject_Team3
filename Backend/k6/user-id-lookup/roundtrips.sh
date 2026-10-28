@@ -57,6 +57,17 @@ set_delay() {
   fi
 }
 
+# orders 결과는 측정 계정의 주문이 seed.sql의 10건일 때의 쿼리 구성이다(목록 기본 페이지 20건보다 적어 전체 개수 쿼리 없음).
+# 다른 시나리오가 같은 계정에 주문을 남겼으면 왕복 수가 달라지므로 시작 전에 멈춘다.
+EXPECTED_BUYER_ORDERS=10
+BUYER_ORDERS=$(docker compose exec -T postgres psql -U grab -d grab -v ON_ERROR_STOP=1 -qAt \
+  -c "SELECT count(*) FROM orders o JOIN users u ON u.id = o.buyer_id WHERE u.email = '$EMAIL'")
+if [ "$BUYER_ORDERS" != "$EXPECTED_BUYER_ORDERS" ]; then
+  echo "$EMAIL의 주문이 ${BUYER_ORDERS}건이다(기대 ${EXPECTED_BUYER_ORDERS}건). user-id-lookup/seed.sql을 넣은 DB에서 다른 시나리오 주문 없이 잰다" >&2
+  exit 1
+fi
+echo "$BUYER_ORDERS" > "$OUT/buyer-orders.txt"
+
 NETEM_CHANGED=false
 NETEM_ORIGINAL=$(current_delay) || { echo "netem 상태를 읽지 못했다" >&2; exit 1; }
 

@@ -6,7 +6,9 @@
 //
 // 공통 계정 k6-buyer 하나로 setup()에서 한 번 로그인하고 모든 VU가 그 토큰을 쓴다(GR-201 M00-02).
 // Access Token TTL이 15분이라 한 번의 실행은 그 안에 끝나야 한다. 단계 합이 14분을 넘으면 시작하지 않는다.
-// 만료 등으로 401이 나오면 me_unauthorized_total로 따로 센다(0이 아니면 그 실행은 다시 한다).
+// 만료 등으로 401이 나오면 me_unauthorized_total로 따로 센다. 1건이라도 있으면 임계값 실패로 k6가 0이 아닌 종료 코드를
+// 내고, concurrency.sh(set -e)도 멈춘다. 인증되지 않은 요청이 기준선에 섞이지 않게 하기 위해서다(실패율은 소수점 네 자리라
+// 적은 수의 401은 0.0000으로 보일 수 있다).
 //
 // 사전 준비: compose.yaml + compose.loadtest-micro.yaml + compose.loadtest-db-nano.yaml 기동, 공통 계정 시드. 아래 명령은 Backend에서 실행한다.
 //   STEPS=25,50,100,200,400,800 SCRIPT=user-id-lookup/concurrency.js OUT_BASE=k6/user-id-lookup/out \
@@ -22,7 +24,8 @@ import { Counter } from 'k6/metrics';
 import { BASE_URL, login, primeCookies } from '../common/lib/auth.js';
 
 const TARGET = __ENV.TARGET || 'me';
-const STEPS = (__ENV.STEPS || '25,50,100,200,400,800').split(',').map(Number);
+const STEPS_RAW = (__ENV.STEPS || '25,50,100,200,400,800').split(',');
+const STEPS = STEPS_RAW.map(Number);
 const STEP_S = Number(__ENV.STEP_S || 60);
 const GAP_S = Number(__ENV.GAP_S || 10);
 const THINK_S = Number(__ENV.THINK_S || 1);
@@ -33,6 +36,13 @@ const PASSWORD = __ENV.PASSWORD || 'LoadTest1234!';
 const TARGETS = { me: '/api/v1/users/me' };
 if (!TARGETS[TARGET]) {
     throw new Error(`알 수 없는 TARGET: ${TARGET}`);
+}
+
+// 단계 이름이 vu<N>이라 같은 VU가 두 번 있으면 뒤 단계가 앞 단계를 덮어쓰고, concurrency.sh는 두 단계에 같은 지표를 적는다.
+// 1 이상의 정수가 아니거나 중복이면 시작하지 않는다.
+const invalidSteps = STEPS_RAW.filter((s, i) => !/^[1-9][0-9]*$/.test(s.trim()) || STEPS.indexOf(STEPS[i]) !== i);
+if (invalidSteps.length > 0) {
+    throw new Error(`STEPS는 서로 다른 1 이상의 정수여야 한다: ${__ENV.STEPS} (문제 값: ${invalidSteps.join(',')})`);
 }
 
 // 마지막 단계가 끝나는 시각. 토큰 만료(15분)와 로그인·종료 여유를 두고 14분까지만 허용한다.
@@ -60,7 +70,7 @@ STEPS.forEach((vus, i) => {
     thresholds[`http_reqs{scenario:${name}}`] = ['count>=0'];
     thresholds[`http_req_failed{scenario:${name}}`] = ['rate<=1'];
 });
-thresholds.me_unauthorized_total = ['count>=0'];
+thresholds.me_unauthorized_total = ['count<1'];
 
 export const options = {
     scenarios,
@@ -72,6 +82,8 @@ export const options = {
 // login()은 /auth/csrf를 처음 받아야 해서 setup()의 첫 요청이어야 한다(common/lib/auth.js 주석).
 export function setup() {
     const session = login(EMAIL, PASSWORD);
+    // 401이 한 번도 없어도 요약에 0이 남도록 기록한다.
+    unauthorized.add(0);
     console.log(`K6_SCENARIO_START=${Math.floor(Date.now() / 1000)}`);
     return session;
 }
