@@ -1,5 +1,6 @@
 package org.example.grab.domain.payment.repository;
 
+import org.example.grab.support.TestcontainersConfiguration;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationInfo;
 import org.flywaydb.core.api.MigrationVersion;
@@ -32,7 +33,7 @@ class PaymentCancellationRetryMigrationTest {
     private static final OffsetDateTime UNKNOWN_RETRY_AT = OffsetDateTime.of(2026, 10, 1, 9, 5, 0, 0, ZoneOffset.UTC);
 
     @Container
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18");
+    static PostgreSQLContainer postgres = new PostgreSQLContainer(TestcontainersConfiguration.POSTGRES_IMAGE);
 
     @Test
     @DisplayName("V21 적용 후 next_retry_at이 없던 REQUESTED는 created_at + 1분이 되고, UNKNOWN 값과 끝난 취소는 그대로다")

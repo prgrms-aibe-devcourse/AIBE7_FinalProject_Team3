@@ -607,6 +607,17 @@ export interface operations {
           '*/*': components['schemas']['ApiResponseSignupResponse']
         }
       }
+      /** @description AUTH_TEMPORARILY_UNAVAILABLE(비밀번호 해시 동시 처리 상한 초과, 가입 컨텍스트 유지) */
+      503: {
+        headers: {
+          /** @description 재시도 대기 초 */
+          'Retry-After'?: number
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSignupResponse']
+        }
+      }
     }
   }
   refresh: {
@@ -785,6 +796,17 @@ export interface operations {
       /** @description ACCOUNT_DISABLED, ACCESS_DENIED(CSRF 토큰 없음·불일치) */
       403: {
         headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseLoginResponse']
+        }
+      }
+      /** @description AUTH_TEMPORARILY_UNAVAILABLE(비밀번호 해시 동시 처리 상한 초과, 쿠키 미발급) */
+      503: {
+        headers: {
+          /** @description 재시도 대기 초 */
+          'Retry-After'?: number
           [name: string]: unknown
         }
         content: {
@@ -1032,6 +1054,15 @@ export interface operations {
       /** @description INTERNAL_SERVER_ERROR */
       500: {
         headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description AUTH_TEMPORARILY_UNAVAILABLE(비밀번호 해시 동시 처리 상한 초과, 비밀번호 미변경·세션 유지) */
+      503: {
+        headers: {
+          /** @description 재시도 대기 초 */
+          'Retry-After'?: number
           [name: string]: unknown
         }
         content?: never

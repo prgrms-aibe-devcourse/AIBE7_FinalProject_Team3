@@ -22,7 +22,8 @@ jobs:
 
     services:
       postgres:
-        image: postgres:18
+        # pgvector 확장(GR-147) 포함 이미지. Testcontainers 이미지(TestcontainersConfiguration)와 같게 둔다
+        image: pgvector/pgvector:0.8.2-pg18-trixie
         env:
           POSTGRES_DB: grab
           POSTGRES_USER: grab

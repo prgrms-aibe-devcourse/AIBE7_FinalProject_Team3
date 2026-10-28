@@ -8,6 +8,7 @@ import org.example.grab.domain.order.dto.OrderCreateRequest;
 import org.example.grab.domain.order.entity.Order;
 import org.example.grab.global.idempotency.IdempotencyKey;
 import org.example.grab.global.idempotency.RequestHash;
+import org.example.grab.support.TestcontainersConfiguration;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import java.time.OffsetDateTime;
@@ -52,7 +53,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class StockStreamHttpIntegrationTest {
 
     @Container
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18");
+    static PostgreSQLContainer postgres = new PostgreSQLContainer(TestcontainersConfiguration.POSTGRES_IMAGE);
 
     @DynamicPropertySource
     static void datasourceProperties(DynamicPropertyRegistry registry) {
