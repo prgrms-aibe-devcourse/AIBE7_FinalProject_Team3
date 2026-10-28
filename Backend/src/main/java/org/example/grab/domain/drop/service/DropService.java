@@ -3,6 +3,7 @@ package org.example.grab.domain.drop.service;
 import lombok.RequiredArgsConstructor;
 import org.example.grab.domain.drop.stream.service.StockChangePublisher;
 import org.example.grab.domain.drop.stream.model.StockChange;
+import org.example.grab.domain.drop.dto.PublicDropDetailExtrasProjection;
 import org.example.grab.domain.drop.dto.PublicDropListProjection;
 import org.example.grab.domain.drop.dto.PublicDropSort;
 import org.example.grab.domain.drop.dto.SellerDropListProjection;
@@ -26,7 +27,7 @@ import org.example.grab.domain.drop.repository.DropImageRepository;
 import org.example.grab.domain.drop.repository.DropRepository;
 import org.example.grab.domain.category.service.CategoryService;
 import org.example.grab.domain.drop.event.DropCanceledEvent;
-import org.example.grab.domain.seller.service.SellerProfileService;
+import org.example.grab.domain.drop.event.DropPublishedEvent;
 import org.example.grab.domain.wish.service.WishQueryService;
 import org.example.grab.global.common.ErrorResponse;
 import org.example.grab.global.common.PageResponse;
@@ -71,7 +72,6 @@ public class DropService {
     private final DropImageRepository dropImageRepository;
     private final CategoryService categoryService;
     private final WishQueryService wishQueryService;
-    private final SellerProfileService sellerProfileService;
     private final ImageStorage imageStorage;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -105,6 +105,7 @@ public class DropService {
         drop.publish(OffsetDateTime.now(ZoneOffset.UTC));
         // 공개 이후 카테고리 활성 여부를 마지막으로 확인한다. 실패하면 트랜잭션 롤백으로 WISH 전환이 취소된다.
         validateCategory(drop.getCategoryId());
+        eventPublisher.publishEvent(new DropPublishedEvent(dropId));
         return drop;
     }
 
@@ -162,9 +163,12 @@ public class DropService {
             case WISH_COUNT -> dropRepository.findPopularWishDrops(
                     categoryId, normalizedKeyword, soldOut, OffsetDateTime.now(ZoneOffset.UTC),
                     PageRequest.of(page, size));
-            case SOLD_QUANTITY -> dropRepository.findPopularGrabDrops(
-                    categoryId, normalizedKeyword, soldOut, OffsetDateTime.now(ZoneOffset.UTC),
-                    PageRequest.of(page, size));
+            // 인기 GRAB 후보는 가용 재고가 있는 상품뿐이라 soldOut=true는 항상 빈 목록, false는 필터 없음과 같다.
+            case SOLD_QUANTITY -> Boolean.TRUE.equals(soldOut)
+                    ? Page.empty(PageRequest.of(page, size))
+                    : dropRepository.findPopularGrabDrops(
+                            categoryId, normalizedKeyword, OffsetDateTime.now(ZoneOffset.UTC),
+                            PageRequest.of(page, size));
         };
         return PageResponse.from(drops.map(PublicDropListResponse::from));
     }
@@ -185,19 +189,22 @@ public class DropService {
     /**
      * 공개 DROP 상세. 비로그인 조회이며 DRAFT는 존재를 숨겨 DROP_NOT_FOUND로 응답한다.
      * CANCELED는 0절 확정대로 200으로 보여 주고 actions가 모두 false가 된다.
-     * 브랜드는 판매자 도메인의 조회 service로 가져온다(다른 도메인 repository/entity 직접 참조 금지).
+     * SSE 알림마다 다시 불리는 경로라 DB 왕복을 줄인다(GR-184). DROP과 이미지를 한 쿼리로 읽고,
+     * 브랜드·카테고리·활성 WISH 수는 다른 도메인 service 세 번 대신 네이티브 쿼리 한 번으로 읽는다(공개 목록 쿼리와 같은 방식).
+     * 판매자·카테고리 행이 없으면 정합성이 깨진 경우라 DROP_NOT_FOUND로 숨긴다.
      * now는 actions 판정과 응답 serverTime에 같은 값을 쓴다.
      */
     public PublicDropDetailResponse findPublicDrop(Long dropId) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        Drop drop = findDrop(dropId);
+        Drop drop = dropRepository.findWithImagesById(dropId)
+                .orElseThrow(() -> new BusinessException(DropErrorCode.DROP_NOT_FOUND));
         if (!drop.isPublic()) {
             throw new BusinessException(DropErrorCode.DROP_NOT_FOUND);
         }
-        long wishCount = wishQueryService.countActiveByDropId(dropId);
-        String brandName = sellerProfileService.findBrandName(drop.getSellerId())
+        PublicDropDetailExtrasProjection extras = dropRepository.findPublicDetailExtras(dropId)
                 .orElseThrow(() -> new BusinessException(DropErrorCode.DROP_NOT_FOUND));
-        return PublicDropDetailResponse.of(drop, brandName, toCategory(drop.getCategoryId()), wishCount, now);
+        DropCategoryResponse category = new DropCategoryResponse(extras.getCategoryId(), extras.getCategoryName());
+        return PublicDropDetailResponse.of(drop, extras.getBrandName(), category, extras.getWishCount(), now);
     }
 
     /**
@@ -211,21 +218,16 @@ public class DropService {
     /**
      * 공개 재고 재조회(1.2). 공개 상세와 같은 isPublic() 기준을 적용해 DRAFT는 DROP_NOT_FOUND로 숨긴다.
      * CANCELED여도 가용 재고를 0으로 바꾸지 않는다. now는 응답 serverTime에 쓴다.
+     * SSE 알림마다 다시 불리는 경로라 DROP과 옵션을 한 쿼리로 읽는다(GR-184).
      */
     public PublicDropStockResponse findPublicStocks(Long dropId) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        Drop drop = findDrop(dropId);
+        Drop drop = dropRepository.findWithOptionsById(dropId)
+                .orElseThrow(() -> new BusinessException(DropErrorCode.DROP_NOT_FOUND));
         if (!drop.isPublic()) {
             throw new BusinessException(DropErrorCode.DROP_NOT_FOUND);
         }
         return PublicDropStockResponse.of(drop, now);
-    }
-
-    // category_id는 NOT NULL·FK라 정상 데이터에서는 항상 존재한다. 정합성이 깨진 경우 DROP_NOT_FOUND로 숨긴다.
-    private DropCategoryResponse toCategory(Long categoryId) {
-        return categoryService.findCategory(categoryId)
-                .map(category -> new DropCategoryResponse(category.categoryId(), category.name()))
-                .orElseThrow(() -> new BusinessException(DropErrorCode.DROP_NOT_FOUND));
     }
 
     // status가 없으면 공개 상태 전체, DRAFT·CANCELED는 공개 목록에 넣을 수 없으므로 거부한다.

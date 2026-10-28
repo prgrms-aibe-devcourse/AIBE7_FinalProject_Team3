@@ -64,7 +64,8 @@ test('기존 회원은 KAKAO 로그인 후 원래 화면으로 돌아가고 새�
 
   await expect(page).toHaveURL(/#\/my$/)
   await expect(toast(page)).toContainText('로그인했어요.')
-  await expect(page.getByText('KAKAO 계정')).toBeVisible()
+  await expect(page.getByRole('group', { name: '닉네임' })).toBeVisible()
+  await expect(page.getByRole('group', { name: '비밀번호' })).toHaveCount(0)
   expect(auth.state.socialStarts).toEqual(['/api/v1/auth/oauth2/kakao'])
   await expectNoSecretsInStorage(page)
 
@@ -75,7 +76,8 @@ test('기존 회원은 KAKAO 로그인 후 원래 화면으로 돌아가고 새�
   await page.goto('/#/my')
   await page.reload()
   await expect(page).toHaveURL(/#\/my$/)
-  await expect(page.getByText('KAKAO 계정')).toBeVisible()
+  await expect(page.getByRole('group', { name: '닉네임' })).toBeVisible()
+  await expect(page.getByRole('group', { name: '비밀번호' })).toHaveCount(0)
 })
 
 test('최초 GOOGLE 인증은 닉네임만 입력해 가입하고 원래 화면으로 돌아간다', async ({
@@ -128,7 +130,8 @@ test('최초 GOOGLE 인증은 닉네임만 입력해 가입하고 원래 화면�
   await submitSignup(page)
   await expect(page).toHaveURL(/#\/my$/)
   await expect(toast(page)).toContainText('회원가입이 완료됐어요.')
-  await expect(page.getByText('GOOGLE 계정')).toBeVisible()
+  await expect(page.getByRole('group', { name: '닉네임' })).toBeVisible()
+  await expect(page.getByRole('group', { name: '비밀번호' })).toHaveCount(0)
 
   const requests = auth.state.signupRequests
   expect(requests.map((request) => request.body)).toEqual([
@@ -316,21 +319,24 @@ test('가입 뒤 로그인 상태를 확인하지 못하면 가입 완료를 알
   await startFromProtectedPage(page, 'GOOGLE')
   await expect(page).toHaveURL(/#\/signup\?type=social$/)
 
-  // 가입 201 직후 users/me 재조회만 한 번 실패한다
-  await page.route(
-    '**/api/v1/users/me',
-    (route) =>
-      route.fulfill({
-        status: 500,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          success: false,
-          data: null,
-          error: { code: 'INTERNAL_SERVER_ERROR', message: 'error' },
-        }),
+  // 가입 201 직후 users/me 재조회만 한 번 실패한다. 가입 화면이 뜰 때 앱이 스스로 보내는 users/me가
+  // 이 실패를 먼저 가져가면 재조회가 성공해 /my로 가므로, 가입 요청이 처리된 뒤의 첫 조회에만 적용한다
+  let meFailed = false
+  await page.route('**/api/v1/users/me', (route) => {
+    if (meFailed || auth.state.signupRequests.length === 0) {
+      return route.fallback()
+    }
+    meFailed = true
+    return route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: false,
+        data: null,
+        error: { code: 'INTERNAL_SERVER_ERROR', message: 'error' },
       }),
-    { times: 1 },
-  )
+    })
+  })
   await nicknameInput(page).fill('새닉네임')
   await submitSignup(page)
 

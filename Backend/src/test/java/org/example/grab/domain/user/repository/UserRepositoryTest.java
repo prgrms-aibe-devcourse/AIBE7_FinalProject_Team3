@@ -6,6 +6,7 @@ import org.example.grab.domain.user.entity.AuthProvider;
 import org.example.grab.domain.user.entity.User;
 import org.example.grab.domain.user.entity.UserRole;
 import org.example.grab.domain.user.entity.UserStatus;
+import org.example.grab.support.TestcontainersConfiguration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -44,7 +45,7 @@ class  UserRepositoryTest {
 
     // Testcontainers가 관리할 컨테이너
     @Container
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18");
+    static PostgreSQLContainer postgres = new PostgreSQLContainer(TestcontainersConfiguration.POSTGRES_IMAGE);
 
     // 설정을 컨테이너 주소로 덮어씀
     @DynamicPropertySource

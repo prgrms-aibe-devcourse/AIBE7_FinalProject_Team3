@@ -5,7 +5,10 @@ import { getDropDetail, getDropStocks } from '../../../api/drop/drops'
 import { openDropStockStream } from '../../../api/drop/stockStream'
 import { serverTimeAt } from './serverTime'
 import { dropKeys } from './queryKeys'
-import { realtimeStockPolicy as policy } from './realtimeStockPolicy'
+import {
+  realtimeStockPolicy as policy,
+  refreshDelay,
+} from './realtimeStockPolicy'
 
 type RefreshKey = 'detail' | 'stocks'
 type Detail = Awaited<ReturnType<typeof getDropDetail>>
@@ -22,6 +25,9 @@ export function subscribeDropStockStream(
   const lanes = {
     detail: {
       dirty: false,
+      urgent: false,
+      jittered: false,
+      dirtySince: 0,
       running: false,
       generation: 0,
       lastStart: -Infinity,
@@ -29,6 +35,9 @@ export function subscribeDropStockStream(
     },
     stocks: {
       dirty: false,
+      urgent: false,
+      jittered: false,
+      dirtySince: 0,
       running: false,
       generation: 0,
       lastStart: -Infinity,
@@ -66,43 +75,53 @@ export function subscribeDropStockStream(
       !lane.dirty
     )
       return
-    lane.timer = globalThis.setTimeout(
-      () => {
-        lane.timer = 0
-        if (disposed || !active() || !lane.dirty) return
-        lane.dirty = false
-        lane.running = true
-        lane.lastStart = Date.now()
-        const startedGeneration = lane.generation
-        void queryClient
-          .fetchQuery({
-            queryKey: keys[key],
-            queryFn: ({ signal }) => requests[key](dropId, signal),
-          })
-          .then(
-            () => {
-              lane.running = false
-              schedule(key)
-            },
-            () => {
-              lane.running = false
-              lane.dirty = true
-              if (lane.generation > startedGeneration) schedule(key)
-            },
-          )
-      },
-      Math.max(0, lane.lastStart + policy.refreshMinIntervalMs - Date.now()),
-    )
+    lane.timer = globalThis.setTimeout(() => {
+      lane.timer = 0
+      if (disposed || !active() || !lane.dirty) return
+      lane.dirty = false
+      lane.urgent = false
+      lane.running = true
+      lane.lastStart = Date.now()
+      const startedGeneration = lane.generation
+      void queryClient
+        .fetchQuery({
+          queryKey: keys[key],
+          queryFn: ({ signal }) => requests[key](dropId, signal),
+        })
+        .then(
+          () => {
+            lane.running = false
+            schedule(key)
+          },
+          () => {
+            lane.running = false
+            lane.dirty = true
+            if (lane.generation > startedGeneration) schedule(key)
+          },
+        )
+    }, refreshDelay(lane))
+    lane.jittered = !lane.urgent
   }
 
-  const request = (key: RefreshKey) => {
-    lanes[key].generation++
-    lanes[key].dirty = true
+  // 알림으로 생긴 재조회(urgent = false)만 분산 대기를 둔다. 연결 직후 동기화·주기 재동기화·화면 복귀·수동 갱신은
+  // 바로 조회하고, 알림으로 분산 대기 중인 예약이 있으면 당긴다. 이미 예약됐거나 조회 중이면 dirty로 합친다.
+  const request = (key: RefreshKey, urgent = true) => {
+    const lane = lanes[key]
+    lane.generation++
+    if (!lane.dirty) lane.dirtySince = Date.now()
+    lane.dirty = true
+    if (urgent) {
+      lane.urgent = true
+      if (lane.timer && lane.jittered) {
+        globalThis.clearTimeout(lane.timer)
+        lane.timer = 0
+      }
+    }
     schedule(key)
   }
-  const requestBoth = () => {
-    request('detail')
-    request('stocks')
+  const requestBoth = (urgent = true) => {
+    request('detail', urgent)
+    request('stocks', urgent)
   }
 
   const stopTimers = () => {
@@ -282,9 +301,9 @@ export function subscribeDropStockStream(
           payload.changes.includes('STOCK') ||
           payload.changes.includes('STATUS')
         ) {
-          requestBoth()
+          requestBoth(false)
         } else if (payload.changes.includes('SALES')) {
-          request('stocks')
+          request('stocks', false)
         }
       } catch {
         fail()
@@ -406,7 +425,7 @@ export function subscribeDropStockStream(
     }
   }
 
-  return { dispose, refresh: requestBoth }
+  return { dispose, refresh: () => requestBoth() }
 }
 
 export function useDropStockStream(dropId: number) {

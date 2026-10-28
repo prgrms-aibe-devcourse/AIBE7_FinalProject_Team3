@@ -1,0 +1,19 @@
+# 부하테스트 전용 오버라이드. AWS t3.micro(vCPU 2개, 1GiB, 베이스라인 CPU 성능 vCPU당
+# 10%) 수준으로 제한한다. compose.loadtest-nano.yaml(t3.nano, 512MiB)과 같은 backend
+# 서비스를 겹쳐 쓰므로 둘 중 하나만 골라서 합친다:
+#   docker compose -f compose.yaml -f compose.loadtest-micro.yaml up --build
+# 평소 개발 명령(`docker compose up`)에는 영향 없음.
+services:
+  backend:
+    mem_limit: 1g
+    # 호스트 스왑에 기대지 않도록 memswap_limit을 mem_limit과 같게 고정한다(nano와 같은 이유).
+    memswap_limit: 1g
+    cpus: 2
+    environment:
+      # 힙 밖(메타스페이스·스레드 스택·GC 네이티브 구조 등) 실측 사용량이 ~410MB로
+      # 컨테이너 크기와 무관하게 거의 고정이라, 768m(1024-768=256MB 여유)로는
+      # 힙+힙 밖 합계(768+410=1178MB)가 1GiB 한도를 이미 초과한다(payment-batch-soak
+      # result.md 참고). 1024-410=614MB가 마진 0인 이론적 한계라 550m로 낮춰 여유를 둔다.
+      # JVM은 메모리·CPU가 작은 컨테이너에선 기본 컬렉터를 G1 대신 Serial 등으로 바꿀 수 있다(에르고노믹스).
+      # nano/micro 두 환경을 같은 조건으로 비교하려고 컨테이너 크기와 무관하게 G1GC로 고정한다.
+      JDK_JAVA_OPTIONS: -Xmx550m -XX:+UseG1GC

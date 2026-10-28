@@ -1,0 +1,23 @@
+# SSE 부하테스트(GR-157, k6/sse-stream) 전용 오버라이드. 스펙 파일(nano/micro) 뒤에 겹쳐 쓴다:
+#   docker compose -f compose.yaml -f compose.loadtest-micro.yaml -f compose.loadtest-sse.yaml up --build
+# 다른 시나리오의 측정 조건을 바꾸지 않도록 스펙 파일과 분리했다.
+services:
+  backend:
+    environment:
+      # 부하 발생기가 로컬 한 IP라 기본값(IP당 50 연결·60초당 75 요청)이면 51번째 연결부터 429가 난다.
+      # IP 제한을 먼저 검사하므로 IP 상한을 전체 상한보다 크게 둬야 상한+1번째 연결에서 503(전체 상한)을 볼 수 있다.
+      # IP 제한 동작 자체를 볼 때는 50/75를 넘겨 실행한다.
+      GRAB_STOCKSTREAM_MAXCONNECTIONSPERIP: ${GRAB_STOCKSTREAM_MAXCONNECTIONSPERIP:-1000}
+      GRAB_STOCKSTREAM_CONNECTRATEMAX: ${GRAB_STOCKSTREAM_CONNECTRATEMAX:-1000}
+      # 서버 전체 연결 상한(기본 1000, GR-185. 전송 큐 크기도 이 값을 따른다). GR-157 측정은 200으로 했다.
+      GRAB_STOCKSTREAM_MAXCONNECTIONS: ${GRAB_STOCKSTREAM_MAXCONNECTIONS:-1000}
+      # GR-180 Nginx 읽기 유휴 제한 검증에서 heartbeat를 늦춰 데이터 없는 구간을 만든다. 기본값은 application.yml과 같다.
+      GRAB_STOCKSTREAM_HEARTBEATINTERVAL: ${GRAB_STOCKSTREAM_HEARTBEATINTERVAL:-15s}
+      # GR-180 원인 분리용 DB 커넥션 풀 크기. 기본값은 HikariCP 기본(10)과 같다.
+      SPRING_DATASOURCE_HIKARI_MAXIMUMPOOLSIZE: ${GRAB_DB_POOL_SIZE:-10}
+      # GR-180 대기 위치 분리용 Tomcat 스레드 지표(tomcat_threads_busy/current/config_max). 기본 설정에선 노출되지 않는다.
+      SERVER_TOMCAT_MBEANREGISTRY_ENABLED: "true"
+
+  postgres:
+    # 쿼리별 호출 수 측정용(GR-157 → GR-163 비교). Prometheus 15초 스크랩으로는 쿼리 수를 잡지 못한다.
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements"]

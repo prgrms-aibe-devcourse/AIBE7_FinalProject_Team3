@@ -45,7 +45,7 @@ class SupabaseStorageClientTest {
     @DisplayName("서명 요청을 올바른 경로·인증 헤더로 보내고 uploadUrl·imageUrl을 조립한다")
     void createSignedUploadUrl() {
         // given
-        SupabaseStorageClient client = new SupabaseStorageClient(builder, properties(SECRET_KEY));
+        SupabaseStorageClient client = new SupabaseStorageClient(builder, properties(SECRET_KEY), BUCKET);
         server.expect(requestTo(BASE_URL + "/storage/v1/object/upload/sign/" + BUCKET + "/" + OBJECT_KEY))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(header("apikey", SECRET_KEY))
@@ -69,7 +69,7 @@ class SupabaseStorageClientTest {
     @DisplayName("Supabase 4xx·5xx·타임아웃은 공통 오류로 바꾸고 키·토큰을 예외 메시지에 남기지 않는다")
     void mapsFailuresToCommonError() {
         // given
-        SupabaseStorageClient client = new SupabaseStorageClient(builder, properties(SECRET_KEY));
+        SupabaseStorageClient client = new SupabaseStorageClient(builder, properties(SECRET_KEY), BUCKET);
         server.expect(requestTo(BASE_URL + "/storage/v1/object/upload/sign/" + BUCKET + "/" + OBJECT_KEY))
                 .andRespond(withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON)
                         .body("{\"message\":\"invalid\"}"));
@@ -97,7 +97,7 @@ class SupabaseStorageClientTest {
     @DisplayName("응답에 서명 URL이 없으면 공통 오류로 바꾼다")
     void rejectsMissingSignedUrl() {
         // given
-        SupabaseStorageClient client = new SupabaseStorageClient(builder, properties(SECRET_KEY));
+        SupabaseStorageClient client = new SupabaseStorageClient(builder, properties(SECRET_KEY), BUCKET);
         server.expect(requestTo(BASE_URL + "/storage/v1/object/upload/sign/" + BUCKET + "/" + OBJECT_KEY))
                 .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
 
@@ -112,7 +112,7 @@ class SupabaseStorageClientTest {
     void notConfigured() {
         // given
         SupabaseStorageClient client = new SupabaseStorageClient(builder,
-                new SupabaseStorageProperties("", " ", BUCKET, "seller-documents", Duration.ofSeconds(3), Duration.ofSeconds(5)));
+                new SupabaseStorageProperties("", " ", BUCKET, "seller-documents", "profile-images", Duration.ofSeconds(3), Duration.ofSeconds(5)), BUCKET);
 
         // when & then
         assertThatThrownBy(() -> client.createSignedUploadUrl(OBJECT_KEY))
@@ -122,6 +122,6 @@ class SupabaseStorageClientTest {
     }
 
     private static SupabaseStorageProperties properties(String secretKey) {
-        return new SupabaseStorageProperties(BASE_URL, secretKey, BUCKET, "seller-documents", Duration.ofSeconds(3), Duration.ofSeconds(5));
+        return new SupabaseStorageProperties(BASE_URL, secretKey, BUCKET, "seller-documents", "profile-images", Duration.ofSeconds(3), Duration.ofSeconds(5));
     }
 }

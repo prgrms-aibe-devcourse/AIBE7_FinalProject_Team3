@@ -35,7 +35,7 @@
 | `email`             | VARCHAR(254) | O   | UQ, 정규화 후 저장                       |
 | `password_hash`     | VARCHAR(255) | 조건부 | LOCAL 회원만 필수, Argon2id 해시 저장       |
 | `nickname`          | VARCHAR(100) | O   | 닉네임, 대소문자 무시 UQ                   |
-| `profile_image_url` | VARCHAR(500) | X   | 이미지 객체 키 또는 영속 URL                 |
+| `profile_image_url` | VARCHAR(500) | X   | 서버 발급 형식으로 검증한 본인 프로필 공개 이미지 URL 전체. 미등록·삭제 시 NULL |
 | `role`              | VARCHAR(20)  | O   | `USER`, `ADMIN`                    |
 | `status`            | VARCHAR(20)  | O   | `ACTIVE`, `SUSPENDED`, `WITHDRAWN` |
 | `provider`          | VARCHAR(20)  | O   | `LOCAL`, `KAKAO`, `GOOGLE`         |
@@ -426,6 +426,87 @@ MVP는 주문당 배송 한 건만 지원한다. 배송 상태는 `orders.status
 
 송장 등록의 멱등 키와 요청 해시는 등록 성공 후 `shipments`에 저장한다. 이 값은 주문별로 키 재사용 여부와 요청 본문 일치 여부를 확인하는 데 사용한다. 성공 전 실패한 요청은 배송 정보를 만들지 않는다.
 
+### 1.7 수요 분석 (GR-140)
+
+수요 분석 데이터(활성 WISH 수·추이·전환율)와 생성 단계 재고 추천은 저장하지 않고 조회 시 `wishes`·`orders`·`order_items`에서 계산한다. 공개 시점 재고 추천 스냅샷, 판매 시작 시점 수요 분석 스냅샷, 분석 설명(LLM), 유사 상품 검색용 임베딩만 기록한다. 판매자가 계획을 저장하거나 결정을 기록하던 `demand_plans`는 GR-175에서 삭제했다(V26). 계산식과 다른 판매자 데이터 보호 규칙은 [수요 분석 API](api-spec/DEMAND.md) 1절을 따른다.
+
+#### `demand_analysis_snapshots` (GR-175)
+
+| 컬럼 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `id` | BIGINT | O | PK |
+| `drop_id` | BIGINT | O | FK drops, UQ (DROP당 한 건) |
+| `calculation_version` | VARCHAR(20) | O | 수요 분석 계산 버전 |
+| `conversion_basis` | VARCHAR(20) | X | 계산에 쓴 전환율 기준: `OWN`, `MARKET`. 기준이 없으면 NULL |
+| `result` | JSONB | O | 판매 시작 시점에 기본 가정으로 다시 계산한 결과 스냅샷(수요 분석 API 2.1 응답 `data`와 같은 형식, 시장 평균은 보호 규칙을 적용한 값만) |
+| `active_wish_count` | INT | O | 판매 시작 시점 활성 WISH 수 |
+| `expected_total` | INT | X | 예상 주문 수량(`plan.expected`). 기준이 없으면 NULL |
+| `recommended_total` | INT | X | 추천 판매 수량(`plan.recommended`). 기준이 없으면 NULL |
+| `prepared_total` | INT | O | 판매 시작 시점 활성 옵션 준비 수량 합계 |
+| `created_at` | TIMESTAMPTZ | O | 기록 시각 |
+
+- `WISH → GRAB` 전환이 커밋된 뒤 별도 트랜잭션에서 저장한다. 실패해도 상태 전환은 그대로이고 기록만 빠진다(수요 분석 API 2.3).
+- 추가만 하고 고치지 않는다. 종료 후 실제 판매량(`drop_options.sold_quantity` 합계)과 비교해 예상 범위 적중률과 `expected` 오차를 집계한다. 범위 적중률은 `result`의 `plan.low`·`plan.high`로 계산한다.
+- 외부에 행 단위로 노출하지 않아 `public_id`를 두지 않는다.
+- 판매자가 계획을 저장하고 결정을 기록하던 `demand_plans`는 이 테이블을 만들면서 삭제했다(V26). 결정이 재고를 바꾸지 않는 기록이라 판매자에게 효과가 없었고, 생성 단계 재고 추천과 역할이 겹쳤다.
+
+#### `demand_explanations` (GR-146)
+
+| 컬럼 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `id` | BIGINT | O | PK |
+| `drop_id` | BIGINT | O | FK drops |
+| `input_hash` | VARCHAR(64) | O | 프롬프트 버전과 LLM 입력 JSON의 SHA-256 16진수. (`drop_id`, `input_hash`) UQ |
+| `status` | VARCHAR(20) | O | `GENERATED`, `DISCARDED` |
+| `explanation` | JSONB | X | 검증을 통과한 설명, `GENERATED`일 때만 값이 있음 |
+| `llm_model` | VARCHAR(100) | X | 응답에 실린 모델명 |
+| `prompt_version` | VARCHAR(20) | O | 설명 프롬프트 버전 |
+| `tokens` | INT | X | 입력·출력 토큰 합계(제공자가 알려 주지 않으면 NULL) |
+| `created_at` | TIMESTAMPTZ | O | 생성 시각 |
+
+- 분석 설명 조회(수요 분석 API 3.4)에서 LLM을 부른 결과 중 `GENERATED`·`DISCARDED`만 남긴다. `FAILED`는 남기지 않아 다음 조회에서 다시 시도한다.
+- 같은 입력이면 다시 부르지 않으려고 (`drop_id`, `input_hash`)를 UQ로 둔다. 동시에 저장하면 먼저 저장된 행이 남는다.
+- 응답 원문은 남기지 않는다. 버린 설명(`DISCARDED`)도 상태만 남겨 같은 입력으로 비용을 다시 쓰지 않게 한다.
+- 외부에 행 단위로 노출하지 않아 `public_id`를 두지 않는다.
+
+#### `drop_stock_recommendations` (GR-167)
+
+| 컬럼 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `id` | BIGINT | O | PK |
+| `drop_id` | BIGINT | O | FK drops, UQ (DROP당 한 건) |
+| `calculation_version` | VARCHAR(20) | O | 재고 추천 계산 버전(`s1`) |
+| `basis` | VARCHAR(20) | X | 추천에 쓴 기준: `OWN`, `MARKET`. 기준이 없으면 NULL |
+| `result` | JSONB | O | 공개 시점에 다시 계산한 추천 결과 스냅샷(수요 분석 API 5.5 응답 `data`와 같은 형식, 시장 평균은 보호 규칙을 적용한 값만) |
+| `recommended_total` | INT | X | 준비 권장 수량. 기준이 없으면 NULL |
+| `prepared_total` | INT | O | 공개 시점 옵션 준비 수량 합계 |
+| `prepared_quantities` | JSONB | O | 옵션별 `{ optionId, quantity, recommendedQuantity }` |
+| `applied` | BOOLEAN | O | 옵션별 준비 수량이 추천 배분과 모두 같으면 TRUE |
+| `created_at` | TIMESTAMPTZ | O | 기록 시각 |
+
+- DROP 공개가 커밋된 뒤 별도 트랜잭션에서 저장한다. 실패해도 공개는 그대로이고 기록만 빠진다(수요 분석 API 5.6).
+- 추가만 하고 고치지 않는다. 종료 후 실제 판매량(`drop_options.sold_quantity` 합계)과 비교해 추천 범위 적중률과 준비 수량 대비 판매율을 집계한다.
+- 외부에 행 단위로 노출하지 않아 `public_id`를 두지 않는다.
+
+#### `drop_embeddings` (GR-147)
+
+유사 상품 표본 선택용 DROP 임베딩이다. PostgreSQL `vector` 확장(pgvector)이 필요하다.
+
+| 컬럼 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `drop_id` | BIGINT | O | PK, FK drops |
+| `embedding` | VECTOR(768) | O | 임베딩 벡터 |
+| `model` | VARCHAR(100) | O | 임베딩 모델 |
+| `source_hash` | VARCHAR(64) | O | 임베딩 입력 텍스트의 SHA-256 16진수 |
+| `created_at` | TIMESTAMPTZ | O | 최초 생성 시각 |
+| `updated_at` | TIMESTAMPTZ | O | 최종 생성 시각 |
+
+- 입력은 공개 카탈로그 텍스트(카테고리명, 상품명, 설명 앞부분, 옵션 그룹·값)만 쓴다.
+- DROP 공개(`DRAFT → WISH`) 커밋 후 비동기로 생성한다. 실패해도 공개는 유지하고, 임베딩이 없는 DROP은 카테고리 기준 표본을 쓴다. 실패분·기존 공개 DROP·모델을 바꾼 DROP은 주기 배치로 채운다(수요 분석 API 6절).
+- 공개 후에는 상품명·설명·옵션을 바꿀 수 없어(`DROP_NOT_EDITABLE`) DROP당 한 번 생성하면 된다.
+- `source_hash`가 같으면 다시 생성하지 않는다. 모델이나 차원을 바꾸면 전체를 다시 생성한다.
+- 모델 출력 차원을 768로 지정해 저장 크기와 인덱스 비용을 줄인다.
+
 ## 2. 상태 전이
 
 ### DROP
@@ -612,13 +693,17 @@ PK와 UQ에서 자동 생성되는 인덱스는 중복 생성하지 않는다.
 | `wishes` | (`drop_id`, `canceled_at`, `id`) | 활성 WISH 조회·집계 |
 | `wishes` | (`user_id`, `activated_at`, `id`) | 소비자 마이페이지 |
 | `orders` | (`buyer_id`, `created_at`, `id`) | 소비자 주문 목록 |
-| `orders` | (`drop_id`, `status`, `id`) | 판매자 주문 목록 |
+| `orders` | (`drop_id`, `status`, `id`) | 판매자 주문 목록(상태 단건 필터) |
+| `orders` | `idx_orders_drop_created` (`drop_id`, `created_at`, `id`) | 판매자 주문 목록 정렬(`ORDER BY created_at DESC, id DESC`) |
 | `orders` | `idx_orders_payment_expiry` (`status`, `payment_expires_at`, `id`) | 결제 대기 만료 배치(`PAYMENT_PENDING AND payment_expires_at <= now`, 키셋 조회) |
+| `shipments` | `idx_shipments_stage_progress` (`delivery_stage`, `stage_updated_at`, `id`) | 배송 단계 자동 진행 배치(GR-86/172, `delivery_stage IN (...) AND stage_updated_at <= cutoff` 선점) |
 | `payments` | (`order_id`, `created_at`, `id`) | 결제 시도 이력 |
 | `payments` | (`reconciliation_status`, `updated_at`, `id`) | 결제 보정 작업, 보정 환불 대상 선점(GR-88) |
 | `payments` | `idx_payments_in_progress` (`updated_at`, `id`) `WHERE status IN ('PENDING', 'UNKNOWN')` | 진행 중 결제 정리 배치(`updated_at`이 60초 지난 진행 중 결제 선점) |
 | `payment_cancellations` | `idx_payment_cancellations_retry` (`status`, `next_retry_at`, `id`) | 결제 취소 재요청·보정 환불 배치(`REQUESTED`·`UNKNOWN` AND `next_retry_at <= now` 선점) |
 | `payment_cancellations` | `uq_payment_cancellations_compensation` (`payment_id`) `WHERE purpose = 'LATE_APPROVAL_COMPENSATION'` | 결제당 보정 환불 기록 하나, 보정 환불 기록 생성의 대상 제외 조회 |
+| `drops` | (`category_id`, `status`, `closed_at`, `id`) | 수요 분석 전환율 표본(같은 카테고리 최근 종료 DROP) |
+| `drop_embeddings` | HNSW (`embedding` `vector_cosine_ops`) | 유사 상품 표본 검색(GR-147) |
 
 인덱스는 실제 조회 쿼리와 실행 계획을 확인한 후 조정한다.
 

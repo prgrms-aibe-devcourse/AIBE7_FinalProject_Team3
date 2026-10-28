@@ -47,31 +47,31 @@ class StockStreamRegistryTest {
     }
 
     @Test
-    @DisplayName("같은 IP 21번째 연결은 429이고 다른 IP의 서버 201번째 연결은 503이다")
+    @DisplayName("같은 IP 51번째 연결은 429이고 다른 IP의 서버 1001번째 연결은 503이다")
     void enforcesDefaultConnectionBoundaries() {
         // given
         StockStreamRegistry registry = new StockStreamRegistry(defaults(), clock);
-        for (int i = 0; i < 20; i++) {
+        for (int i = 0; i < 50; i++) {
             registry.register("same", List.of(1L));
         }
 
         // when & then
         assertError(() -> registry.register("same", List.of(1L)), DropErrorCode.STOCK_STREAM_LIMIT_EXCEEDED);
-        for (int i = 0; i < 180; i++) {
+        for (int i = 0; i < 950; i++) {
             registry.register("other-" + i, List.of(1L));
         }
         assertError(() -> registry.register("last", List.of(1L)), DropErrorCode.STOCK_STREAM_UNAVAILABLE);
-        assertThat(registry.countConnections()).isEqualTo(200);
-        assertThat(registry.findSubscribers(1)).hasSize(200);
+        assertThat(registry.countConnections()).isEqualTo(1000);
+        assertThat(registry.findSubscribers(1)).hasSize(1000);
     }
 
     @Test
-    @DisplayName("첫 요청부터 60초 고정 창으로 31번째를 거부하고 만료 경계에서 새 창을 연다")
+    @DisplayName("첫 요청부터 60초 고정 창으로 76번째를 거부하고 만료 경계에서 새 창을 연다")
     void expiresFixedRequestWindow() {
         // given
         StockStreamRegistry registry = new StockStreamRegistry(defaults(), clock);
         StockStreamSubscription active = registry.register("a", List.of(1L));
-        for (int i = 0; i < 30; i++) {
+        for (int i = 0; i < 75; i++) {
             registry.recordAttempt("a");
         }
 

@@ -216,6 +216,14 @@ Set-Cookie: email_signup_token=; HttpOnly; Secure; SameSite=Lax; Path=/api/v1/au
 **요청 본문 오류:**
 - 요청 본문이 없거나 JSON 형식이 잘못되면 `INVALID_REQUEST`로 거부하고 `fieldErrors`는 빈 배열로 반환한다. 1.2.1·1.2.2에도 같게 적용한다.
 
+**비밀번호 해시 동시 처리 상한:**
+- 서버는 비밀번호 해시(Argon2id) 계산을 인스턴스마다 동시에 정해진 수까지만 실행한다. 자리가 없으면 대기 시간 동안 차례를 기다리고, 그 안에 차례가 오지 않으면 `AUTH_TEMPORARILY_UNAVAILABLE`(503)로 거부한다.
+- 거부 응답에는 `Retry-After` 헤더(초 단위)를 담는다. 동시 처리 수·대기 시간·`Retry-After`는 서버 설정값이다(기본 4건, 3초, 3초).
+- 이 거부는 요청 값이나 인증 상태와 관계없는 일시적 거부다. 같은 요청을 `Retry-After` 뒤에 다시 보낼 수 있다.
+- 1.3 로그인과 1.11 비밀번호 변경에도 같게 적용한다.
+- 회원가입에서는 이메일·닉네임 중복 확인을 마친 뒤 비밀번호를 해시하므로, 그보다 앞선 오류(`EMAIL_SIGNUP_CONTEXT_INVALID`, 요청 값 오류, `DUPLICATE_EMAIL`, `DUPLICATE_NICKNAME`)가 먼저 응답된다.
+- 거부되면 회원을 저장하지 않고 가입 컨텍스트도 소비하지 않는다. 사용자는 컨텍스트가 만료되기 전까지 다시 요청할 수 있다.
+
 **오류 코드:**
 - `EMAIL_SIGNUP_CONTEXT_INVALID`
 - `INVALID_REQUEST`
@@ -224,6 +232,7 @@ Set-Cookie: email_signup_token=; HttpOnly; Secure; SameSite=Lax; Path=/api/v1/au
 - `INVALID_PASSWORD`
 - `INVALID_NICKNAME`
 - `DUPLICATE_NICKNAME`
+- `AUTH_TEMPORARILY_UNAVAILABLE`
 
 ### 1.3 LOCAL 로그인
 
@@ -288,11 +297,17 @@ Access Token과 Refresh Token은 응답 본문에 포함하지 않는다. Access
 - 계정 상태는 비밀번호를 아는 사용자에게만 드러난다.
 - 실패 응답에는 인증 쿠키를 발급하지 않고 Refresh Token을 저장하지 않는다.
 
+**비밀번호 해시 동시 처리 상한:**
+- 1.2.3의 동시 처리 상한을 적용한다. 2·3의 비밀번호 해시 검증 차례를 대기 시간 안에 얻지 못하면 `AUTH_TEMPORARILY_UNAVAILABLE`(503)로 거부한다.
+- 회원이 있을 때와 없을 때 모두 같은 방식으로 해시 차례를 기다리고, 계정 상태는 해시 검증 뒤에 확인한다. 따라서 이 거부로 계정 존재 여부나 계정 상태가 드러나지 않는다.
+- 거부 응답에도 인증 쿠키를 발급하지 않고 Refresh Token을 저장하지 않는다.
+
 **오류 코드:**
 - `INVALID_REQUEST`
 - `VALIDATION_FAILED`
 - `INVALID_CREDENTIALS`
 - `ACCOUNT_DISABLED`
+- `AUTH_TEMPORARILY_UNAVAILABLE`
 
 ### 1.4 KAKAO·GOOGLE 소셜 로그인 시작
 
@@ -517,7 +532,7 @@ GET /api/v1/users/me
     "nickname": "드롭헌터",
     "provider": "LOCAL",
     "roles": ["USER", "SELLER"],
-    "profileImageUrl": "https://cdn.example.com/images/profile.jpg",
+    "profileImageUrl": "https://<project>.supabase.co/storage/v1/object/public/profile-images/profiles/6f1a2b3c-4d5e-4f70-8192-a3b4c5d6e7f8/1d0f9e8c-7b6a-4539-8412-6c5d4e3f2a1b.jpg",
     "createdAt": "2026-09-18T14:00:00+09:00"
   }
 }
@@ -563,7 +578,7 @@ PATCH /api/v1/users/me
     "nickname": "한정판수집가",
     "provider": "LOCAL",
     "roles": ["USER", "SELLER"],
-    "profileImageUrl": "https://cdn.example.com/images/profile.jpg",
+    "profileImageUrl": "https://<project>.supabase.co/storage/v1/object/public/profile-images/profiles/6f1a2b3c-4d5e-4f70-8192-a3b4c5d6e7f8/1d0f9e8c-7b6a-4539-8412-6c5d4e3f2a1b.jpg",
     "createdAt": "2026-09-18T14:00:00+09:00"
   }
 }
@@ -638,6 +653,10 @@ PATCH /api/v1/users/me/password
 
 현재 비밀번호 검증 후 저장 전에 다른 요청이 먼저 비밀번호를 바꿨다면 변경하지 않고 `PASSWORD_MISMATCH`(400)로 응답한다. 이 API에는 현재 비밀번호 확인 실패에 대한 별도의 횟수 제한을 두지 않는다.
 
+**비밀번호 해시 동시 처리 상한:**
+
+1.2.3의 동시 처리 상한을 적용한다. 이 API는 요청 1건에 비밀번호 해시를 두 번 계산한다(4의 현재 비밀번호 검증, 6의 새 비밀번호 해시 생성). 두 번 모두 따로 차례를 기다리며, 어느 쪽이든 대기 시간 안에 차례를 얻지 못하면 비밀번호를 변경하지 않고 `AUTH_TEMPORARILY_UNAVAILABLE`(503)로 응답한다. 인증 실패가 아니므로 로그인 세션은 그대로 유지되며, 클라이언트는 로그아웃하지 않는다.
+
 **오류 코드:**
 
 - `INVALID_REQUEST`(400): 요청 본문 형식 오류
@@ -650,6 +669,7 @@ PATCH /api/v1/users/me/password
 - `INVALID_TOKEN`(401): 만료·변조된 Access Token
 - `ACCESS_DENIED`(403): `USER` 권한 없음 또는 CSRF 토큰 누락·불일치
 - `INTERNAL_SERVER_ERROR`(500): DB 장애·비밀번호 해시 생성 실패 등 서버 오류
+- `AUTH_TEMPORARILY_UNAVAILABLE`(503): 비밀번호 해시 동시 처리 상한을 넘어 대기 시간 안에 처리하지 못함. `Retry-After` 헤더 포함
 
 ### 1.12 내 프로필 이미지 등록/수정
 
@@ -658,26 +678,64 @@ PUT /api/v1/users/me/profile-image
 ```
 
 - **인증**: 필요 (`USER`)
+- **CSRF**: `X-XSRF-TOKEN` 헤더 필요
+
+LOCAL·소셜 회원 모두 사용할 수 있다. 먼저 [이미지 업로드 API 1.2절](IMAGE_UPLOAD.md#12-내-프로필-이미지-업로드-url-발급)에서 URL을 발급받아 Supabase에 파일을 업로드한 뒤 이 API로 등록한다.
 
 **요청:**
 
 ```json
 {
-  "imageUrl": "https://cdn.example.com/images/profile-uuid.jpg"
+  "imageUrl": "https://<project>.supabase.co/storage/v1/object/public/profile-images/profiles/6f1a2b3c-4d5e-4f70-8192-a3b4c5d6e7f8/1d0f9e8c-7b6a-4539-8412-6c5d4e3f2a1b.jpg"
 }
 ```
 
-**응답:**
+**응답:** `200 OK`
 
 ```json
 {
   "success": true,
   "data": {
     "userId": "6f1a2b3c-4d5e-4f70-8192-a3b4c5d6e7f8",
-    "profileImageUrl": "https://cdn.example.com/images/profile-uuid.jpg"
+    "profileImageUrl": "https://<project>.supabase.co/storage/v1/object/public/profile-images/profiles/6f1a2b3c-4d5e-4f70-8192-a3b4c5d6e7f8/1d0f9e8c-7b6a-4539-8412-6c5d4e3f2a1b.jpg"
   }
 }
 ```
+
+- 요청 필드는 `imageUrl` 하나이며 누락·`null`·빈 문자열·공백만 있는 값은 거부한다. 앞뒤 공백을 제거하거나 URL을 가공하지 않는다.
+- URL은 현재 설정된 프로필 버킷의 공개 주소와 `profiles/{요청자 public_id}/{이미지 UUID}.{확장자}` 경로로 만든 값과 정확히 같아야 한다. 이미지 UUID는 소문자 정규형, 확장자는 `jpg`·`png`·`webp`만 허용한다. 외부 URL·타인 경로·DROP 이미지 URL·쿼리 문자열·대소문자 변형·경로 조작(`..`, 인코딩된 `/`)은 거부한다.
+- 검증은 본인 경로와 URL 형식 비교로 처리한다. 실제 발급 이력이나 저장소의 객체 존재는 조회하지 않는다. 업로드 전이나 이미 삭제된 URL을 등록하면 검증을 통과해도 깨진 이미지가 표시될 수 있다.
+- `users.profile_image_url`에는 검증한 공개 URL 전체를 그대로 저장하며, 1.9·1.10의 `profileImageUrl`에도 반영된다. 프로젝트 주소나 버킷 이름을 바꾸면 기존 데이터의 URL도 갱신해야 한다.
+- 현재와 같은 URL을 다시 등록해도 `200`으로 성공하고 파일 삭제를 요청하지 않는다.
+- 응답의 `userId`는 내부 ID가 아닌 `public_id`다. 1.10과 달리 프로필 이미지 하위 자원만 수정하므로 응답은 `{ userId, profileImageUrl }` 두 필드다. 클라이언트는 `['auth', 'me']` 캐시의 `profileImageUrl`만 갱신한다.
+
+**이전 객체 정리(1.12·1.13 공통):**
+
+- 회원 행을 `SELECT ... FOR UPDATE`로 잠그고 이전 URL 조회와 DB 변경을 같은 트랜잭션에서 처리한다.
+- 교체·삭제한 이전 파일은 DB 커밋 성공 후 삭제한다. 롤백하면 파일을 삭제하지 않는다.
+- 이전 URL이 현재 설정의 프로필 버킷과 본인 경로·UUID·허용 확장자 규칙에 맞을 때만 삭제한다. 이전 값이 `null`이거나 형식 밖이면 삭제를 요청하지 않는다.
+- 저장소 삭제가 실패해도 DB 변경과 성공 응답을 유지한다. 내부 회원 ID와 실패 사유만 WARN 로그로 남기며, 남은 파일의 자동 재시도·정리 배치는 이번 범위에 없다.
+- 삭제는 요청 스레드에서 동기로 실행하므로 성공 응답이 Supabase 삭제 응답 시간만큼 늦어질 수 있다.
+- 저장소에서 삭제해도 공개 URL이 CDN 캐시에 남아 잠시 열릴 수 있다. 2026-10-22 실제 확인에서는 약 1~2분 뒤 접근이 끊겼으며, 이는 캐시 만료 시간의 보장값이 아니다.
+
+**판정 순서:**
+
+인증·권한·CSRF 검사를 통과한 요청에 다음 순서를 적용한다.
+
+1. 요청 형식·필수값 검증 (`INVALID_REQUEST`·`VALIDATION_FAILED`, 400)
+2. 회원 잠금 조회·존재·ACTIVE 상태 확인 (`AUTHENTICATION_REQUIRED`, 401)
+3. 본인 프로필 이미지 URL 형식 확인 (`VALIDATION_FAILED`, 400, `field` = `imageUrl`)
+4. 공개 URL 저장·DB 커밋
+5. 이전 객체 정리 후 변경된 프로필 이미지 정보로 200 응답
+
+**오류 코드:**
+
+- `INVALID_REQUEST`(400): 요청 본문 형식 오류
+- `VALIDATION_FAILED`(400): `imageUrl` 누락·빈 값 또는 본인 프로필 이미지 URL 형식 불일치 (`fieldErrors`의 `field` = `imageUrl`)
+- `AUTHENTICATION_REQUIRED`(401): `access_token` 쿠키 없음, 회원 없음·정지·탈퇴
+- `INVALID_TOKEN`(401): 만료·변조된 Access Token
+- `ACCESS_DENIED`(403): `USER` 권한 없음 또는 CSRF 토큰 누락·불일치
+- `INTERNAL_SERVER_ERROR`(500): DB 장애 등 서버 오류. 커밋 후 이전 객체 삭제 실패는 이 API의 오류 응답으로 바꾸지 않는다.
 
 ### 1.13 내 프로필 이미지 삭제
 
@@ -686,8 +744,30 @@ DELETE /api/v1/users/me/profile-image
 ```
 
 - **인증**: 필요 (`USER`)
+- **CSRF**: `X-XSRF-TOKEN` 헤더 필요
+
+LOCAL·소셜 회원 모두 사용할 수 있으며 요청 본문은 없다.
 
 **응답:** `204 No Content`
+
+- `profile_image_url`을 `null`로 바꾼다. 이후 내 정보 조회의 `profileImageUrl`은 키를 생략하지 않고 `null`로 반환한다.
+- 이미지가 없어도 같은 `204`로 성공한다. 클라이언트는 성공 시 `['auth', 'me']` 캐시의 `profileImageUrl`을 `null`로 갱신한다.
+- 이전 파일의 커밋 후 삭제·실패 처리·CDN 캐시 한계는 1.12절의 공통 정리 규칙을 따른다.
+
+**판정 순서:**
+
+인증·권한·CSRF 검사를 통과한 요청에 다음 순서를 적용한다.
+
+1. 회원 잠금 조회·존재·ACTIVE 상태 확인 (`AUTHENTICATION_REQUIRED`, 401)
+2. 프로필 이미지 값을 `null`로 저장·DB 커밋
+3. 이전 객체 정리 후 본문 없이 204 응답
+
+**오류 코드:**
+
+- `AUTHENTICATION_REQUIRED`(401): `access_token` 쿠키 없음, 회원 없음·정지·탈퇴
+- `INVALID_TOKEN`(401): 만료·변조된 Access Token
+- `ACCESS_DENIED`(403): `USER` 권한 없음 또는 CSRF 토큰 누락·불일치
+- `INTERNAL_SERVER_ERROR`(500): DB 장애 등 서버 오류. 커밋 후 이전 객체 삭제 실패는 이 API의 오류 응답으로 바꾸지 않는다.
 
 ---
 

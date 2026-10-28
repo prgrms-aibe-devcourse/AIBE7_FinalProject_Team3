@@ -70,7 +70,7 @@ class OrderCreateTransactionServiceTest {
         given(inventoryRepository.findDrop(100L)).willReturn(java.util.Optional.of(
                 dropSnapshot(100L, "GRAB", "한정판", "판매자", 3000, now.minusMinutes(1), now.plusHours(1))
         ));
-        given(inventoryRepository.lockOptions(100L, List.of(1001L))).willReturn(List.of(
+        given(inventoryRepository.tryReserveOption(100L, 1001L, 2)).willReturn(java.util.Optional.of(
                 lockedOption(1001L, 129000, 10, 1, 0, 0, true, "블랙 / M")
         ));
         given(orderRepository.saveAndFlush(any(Order.class))).willAnswer(invocation -> {
@@ -86,7 +86,7 @@ class OrderCreateTransactionServiceTest {
         assertThat(order.getItemsAmount()).isEqualTo(258000);
         assertThat(order.getShippingAmount()).isEqualTo(3000);
         assertThat(order.getTotalAmount()).isEqualTo(261000);
-        verify(inventoryRepository).increaseReservedQuantity(1001L, 2);
+        verify(inventoryRepository).tryReserveOption(100L, 1001L, 2);
         verify(orderItemRepository).saveAllAndFlush(any());
         verify(stockReservationRepository).saveAll(any());
     }
@@ -99,6 +99,7 @@ class OrderCreateTransactionServiceTest {
         given(inventoryRepository.findDrop(100L)).willReturn(java.util.Optional.of(
                 dropSnapshot(100L, "GRAB", "한정판", "판매자", 3000, now.minusMinutes(1), now.plusHours(1))
         ));
+        given(inventoryRepository.tryReserveOption(100L, 1001L, 2)).willReturn(java.util.Optional.empty());
         given(inventoryRepository.lockOptions(100L, List.of(1001L))).willReturn(List.of(
                 lockedOption(1001L, 129000, 2, 1, 0, 0, true, "블랙 / M")
         ));
@@ -109,7 +110,6 @@ class OrderCreateTransactionServiceTest {
                 .satisfies(exception -> assertThat(((BusinessException) exception).getErrorCode())
                         .isEqualTo(OrderErrorCode.INSUFFICIENT_STOCK));
         verify(orderRepository, never()).saveAndFlush(any());
-        verify(inventoryRepository, never()).increaseReservedQuantity(any(), any(Integer.class));
     }
 
     @Test
@@ -136,7 +136,7 @@ class OrderCreateTransactionServiceTest {
         given(inventoryRepository.findDrop(100L)).willReturn(java.util.Optional.of(
                 dropSnapshot(100L, "WISH", "한정판", "판매자", 3000, now.minusMinutes(1), now.plusHours(1))
         ));
-        given(inventoryRepository.lockOptions(100L, List.of(1001L))).willReturn(List.of(
+        given(inventoryRepository.tryReserveOption(100L, 1001L, 1)).willReturn(java.util.Optional.of(
                 lockedOption(1001L, 129000, 10, 0, 0, 0, true, "블랙 / M")
         ));
         given(orderRepository.saveAndFlush(any(Order.class))).willAnswer(invocation -> {
@@ -150,7 +150,7 @@ class OrderCreateTransactionServiceTest {
 
         // then
         assertThat(order).isNotNull();
-        verify(inventoryRepository).increaseReservedQuantity(1001L, 1);
+        verify(inventoryRepository).tryReserveOption(100L, 1001L, 1);
     }
 
     @Test

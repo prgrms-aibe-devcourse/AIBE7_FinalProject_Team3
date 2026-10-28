@@ -44,7 +44,7 @@ describe('공개 상세 응답 → 상세 모델', () => {
       { id: '11', name: '소재', values: [{ id: '111', label: '코튼' }] },
     ])
     expect(view.skus).toEqual([
-      { id: 1001, selections: { 11: '111' }, price: 129000, stock: 8 },
+      { id: 1001, selections: { 11: '111' }, price: 129000 },
     ])
     expect(view.galleryImages).toEqual([
       { imageUrl: 'https://example.com/1.jpg', altText: '정면' },
@@ -56,15 +56,6 @@ describe('공개 상세 응답 → 상세 모델', () => {
       orderable: true,
     })
     expect(view.category).toBe('')
-  })
-
-  it('옵션 가용 재고가 없으면 stock을 비워 둔다', () => {
-    const view = toDropDetail(
-      detail({ options: [{ optionId: 5, unitPrice: 1000 }] }),
-    )
-    expect(view.skus).toEqual([
-      { id: 5, selections: {}, price: 1000, stock: undefined },
-    ])
   })
 
   it('galleryImages가 없으면 imageUrls로 대체하고 첫 이미지를 대표로 쓴다', () => {

@@ -3,6 +3,7 @@ package org.example.grab.domain.drop.controller;
 import org.example.grab.domain.drop.dto.PublicDropSort;
 import org.example.grab.domain.drop.dto.response.PublicDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.PublicDropListResponse;
+import org.example.grab.domain.drop.dto.response.RelatedDropsResponse;
 import org.example.grab.domain.drop.dto.response.PublicDropStockResponse;
 import org.example.grab.domain.drop.dto.response.common.DropCategoryResponse;
 import org.example.grab.domain.drop.dto.response.common.DropOptionGroupResponse;
@@ -11,6 +12,8 @@ import org.example.grab.domain.drop.dto.response.common.DropShippingResponse;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.domain.drop.service.DropService;
+import org.example.grab.domain.drop.service.PublicDropReadService;
+import org.example.grab.domain.drop.service.RelatedDropReadService;
 import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.GlobalExceptionHandler;
@@ -37,12 +40,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class DropControllerTest {
 
     private DropService dropService;
+    private PublicDropReadService publicDropReadService;
+    private RelatedDropReadService relatedDropReadService;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         dropService = mock(DropService.class);
-        DropController controller = new DropController(dropService);
+        publicDropReadService = mock(PublicDropReadService.class);
+        relatedDropReadService = mock(RelatedDropReadService.class);
+        DropController controller = new DropController(dropService, publicDropReadService, relatedDropReadService);
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler(new ValidationErrorCodeResolver(List.of())))
                 .build();
@@ -200,7 +207,7 @@ class DropControllerTest {
                         List.of(new DropOptionSelectionResponse(11L, 111L)), 129000L, 10, false)),
                 new PublicDropDetailResponse.Actions(false, false, true),
                 OffsetDateTime.parse("2026-09-20T01:10:00Z"));
-        given(dropService.findPublicDrop(100L)).willReturn(response);
+        given(publicDropReadService.findPublicDrop(100L)).willReturn(response);
 
         // when & then
         mockMvc.perform(get("/api/v1/drops/100"))
@@ -250,7 +257,7 @@ class DropControllerTest {
                 List.of(new PublicDropStockResponse.Option(1001L, 8, false),
                         new PublicDropStockResponse.Option(1002L, 0, true)),
                 OffsetDateTime.parse("2026-10-03T05:00:00Z"));
-        given(dropService.findPublicStocks(100L)).willReturn(response);
+        given(publicDropReadService.findPublicStocks(100L)).willReturn(response);
 
         // when & then
         mockMvc.perform(get("/api/v1/drops/100/stocks"))
@@ -273,7 +280,7 @@ class DropControllerTest {
     @Test
     @DisplayName("공개 재고 재조회: DRAFT면 404 DROP_NOT_FOUND")
     void getStocks_hidesDraft() throws Exception {
-        given(dropService.findPublicStocks(99L))
+        given(publicDropReadService.findPublicStocks(99L))
                 .willThrow(new BusinessException(DropErrorCode.DROP_NOT_FOUND));
 
         mockMvc.perform(get("/api/v1/drops/99/stocks"))
@@ -293,11 +300,32 @@ class DropControllerTest {
     @Test
     @DisplayName("서비스가 DROP_NOT_FOUND를 던지면 404")
     void returnsNotFoundForMissingDrop() throws Exception {
-        given(dropService.findPublicDrop(99L))
+        given(publicDropReadService.findPublicDrop(99L))
                 .willThrow(new BusinessException(DropErrorCode.DROP_NOT_FOUND));
 
         mockMvc.perform(get("/api/v1/drops/99"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("DROP_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("관련 DROP 추천은 추천 방식과 목록 항목 형식의 카드를 반환한다")
+    void getRelated() throws Exception {
+        // given
+        PublicDropListResponse item = new PublicDropListResponse(
+                101L, "아크릴 스탠드", "그랩 스튜디오", null, 15000L,
+                new DropCategoryResponse(8L, "취미·굿즈"),
+                DropStatus.WISH, false, 50L, 48L,
+                OffsetDateTime.parse("2026-11-02T11:00:00Z"),
+                OffsetDateTime.parse("2026-11-02T13:00:00Z"));
+        given(relatedDropReadService.findRelated(100L))
+                .willReturn(new RelatedDropsResponse(RelatedDropsResponse.RelatedBasis.CO_WISH, List.of(item)));
+
+        // when, then
+        mockMvc.perform(get("/api/v1/drops/100/related"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.basis").value("CO_WISH"))
+                .andExpect(jsonPath("$.data.drops[0].dropId").value(101))
+                .andExpect(jsonPath("$.data.drops[0].category.name").value("취미·굿즈"));
     }
 }

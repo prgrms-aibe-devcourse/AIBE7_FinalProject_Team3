@@ -215,6 +215,9 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 | `SALE_NOT_STARTED` | 409 | 판매 시작 전 |
 | `SALE_ENDED` | 409 | 판매 종료 후 |
 | `DUPLICATE_OPTION_COMBINATION` | 409 | 동일한 옵션값 조합의 SKU 중복 |
+| `AI_DRAFT_LIMIT_EXCEEDED` | 429 | 사진 기반 DROP 초안 하루 요청 한도 초과 |
+| `AI_DRAFT_FAILED` | 502 | 사진 기반 DROP 초안 생성 실패(이미지 읽기·LLM 호출·응답 형식) |
+| `AI_DRAFT_UNAVAILABLE` | 503 | 사진 기반 DROP 초안을 쓸 수 없음(LLM 미설정) |
 | `ORDER_NOT_CANCELABLE` | 409 | 취소할 수 없는 주문 |
 | `ORDER_STATUS_CONFLICT` | 409 | 주문 상태 동시 변경 충돌 |
 | `PAYMENT_ALREADY_PROCESSED` | 409 | 이미 처리된 결제 (결제 완료 주문, 진행 중인 결제가 있는 주문, 이미 처리된 `paymentKey`) |
@@ -223,11 +226,15 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 | `PAYMENT_AMOUNT_MISMATCH` | 422 | 결제 금액 불일치 |
 | `PAYMENT_EXPIRED` | 422 | 결제 유효시간 만료 |
 | `INVALID_SCHEDULE` | 422 | 판매 일정 오류 |
+| `DEMAND_ANALYSIS_UNAVAILABLE` | 409 | 수요 분석 불가 상태 (`WISH`가 아니거나 판매 시작 시각 이후) |
+| `DEMAND_EXPLANATION_LIMIT_EXCEEDED` | 429 | 수요 분석 설명 하루 요청 한도 초과 |
 | `EMAIL_VERIFICATION_ATTEMPTS_EXCEEDED` | 429 | 이메일 인증 코드 확인 시도 횟수 초과 |
 | `EMAIL_VERIFICATION_RESEND_TOO_SOON` | 429 | 이메일 인증 코드 재발송 간격 또는 발송 한도 초과 |
 | `INTERNAL_SERVER_ERROR` | 500 | 처리하지 못한 서버 오류 (Redis·DB 장애 등). 인증 실패가 아니므로 클라이언트는 로그아웃하지 않는다 |
 | `EXTERNAL_SERVICE_ERROR` | 502 | 외부 연동 서비스(스토리지 등) 호출 실패 |
 | `PAYMENT_CANCEL_FAILED` | 502 | PG가 결제 취소를 거절함 |
+| `AUTH_TEMPORARILY_UNAVAILABLE` | 503 | 비밀번호 해시 동시 처리 상한을 넘어 대기 시간 안에 처리하지 못함 (로그인·회원가입·비밀번호 변경). GR-178, Retry-After 초 단위. 인증 실패가 아니므로 클라이언트는 로그아웃하지 않는다 |
+| `ORDER_CREATION_TEMPORARILY_UNAVAILABLE` | 503 | 주문 생성 동시 처리 상한을 넘어 대기 시간 안에 처리하지 못함 (드롭 오픈 스파이크 등). GR-202, Retry-After 초 단위. 재고 부족이 아니라 서버가 바쁜 것이므로 재시도하면 될 수 있다 |
 
 소셜 로그인 콜백(MEMBER_AUTH 1.5)은 JSON 오류 응답 대신 프론트엔드 콜백 주소로 302 리다이렉트하고 `error` 쿼리에 아래 코드만 담는다.
 

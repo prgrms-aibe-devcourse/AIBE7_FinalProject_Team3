@@ -55,6 +55,20 @@ public record PublicDropDetailResponse(
     public record Actions(boolean wishable, boolean wishCancelable, boolean orderable) {
     }
 
+    /**
+     * 조회 시각에 따라 달라지는 값(actions·serverTime)만 now로 다시 계산한 사본을 만든다(GR-183).
+     * 캐시한 응답을 꺼낼 때 쓴다. 판매 시작·종료 시각이 지나도 캐시 때문에 주문 가능 여부가 늦게 바뀌지 않게 한다.
+     * 판정에 쓰는 상태·판매 시각·품절 여부는 응답에 담긴 값을 그대로 쓰고, 규칙은 Drop과 같은 정적 메서드를 공유한다.
+     */
+    public PublicDropDetailResponse at(OffsetDateTime now) {
+        boolean wishable = Drop.isWishable(status, saleStartsAt, now);
+        return new PublicDropDetailResponse(dropId, name, brandName, description, imageUrls, galleryImages, detailImages,
+                minPrice, category, status, soldOut, wishCount, wishNotice, saleStartsAt, saleEndsAt, shipping,
+                optionGroups, options,
+                new Actions(wishable, wishable, Drop.isOrderable(status, saleStartsAt, saleEndsAt, soldOut, now)),
+                now);
+    }
+
     // open-in-view=false이므로 컬렉션 접근과 DTO 변환은 서비스 트랜잭션 안에서 끝나야 한다.
     // now는 actions 판정과 serverTime에 같은 값을 쓴다.
     public static PublicDropDetailResponse of(Drop drop, String brandName, DropCategoryResponse category,

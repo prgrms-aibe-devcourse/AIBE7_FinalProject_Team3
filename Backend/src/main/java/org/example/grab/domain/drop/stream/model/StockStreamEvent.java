@@ -22,7 +22,7 @@ public final class StockStreamEvent {
     }
 
     public enum CloseReason {
-        RECONNECT_REQUIRED(true), SUBSCRIPTION_INVALIDATED(false);
+        RECONNECT_REQUIRED(true);
 
         private final boolean reconnect;
 

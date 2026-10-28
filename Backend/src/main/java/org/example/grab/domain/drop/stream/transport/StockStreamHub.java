@@ -9,7 +9,6 @@ import org.example.grab.domain.drop.stream.model.StockChange;
 import org.example.grab.domain.drop.stream.model.StockStreamEvent;
 import org.example.grab.domain.drop.stream.model.StockStreamEvent.CloseReason;
 import org.example.grab.domain.drop.stream.model.StockStreamSubscription;
-import org.example.grab.domain.drop.stream.service.PublicDropSubscriptionService;
 import org.example.grab.domain.drop.stream.service.StockStreamRegistry;
 import org.example.grab.global.error.BusinessException;
 import org.springframework.http.MediaType;
@@ -43,7 +42,6 @@ public class StockStreamHub implements SmartLifecycle {
 
     private final StockStreamProperties properties;
     private final StockStreamRegistry registry;
-    private final PublicDropSubscriptionService publicDrops;
     private final ThreadPoolExecutor sender;
     private final ScheduledThreadPoolExecutor scheduler;
     private final Map<UUID, Connection> connections = new ConcurrentHashMap<>();
@@ -58,10 +56,9 @@ public class StockStreamHub implements SmartLifecycle {
     private ScheduledFuture<?> pump;
 
     public StockStreamHub(StockStreamProperties properties, StockStreamRegistry registry,
-            PublicDropSubscriptionService publicDrops, StockStreamExecutors executors) {
+            StockStreamExecutors executors) {
         this.properties = properties;
         this.registry = registry;
-        this.publicDrops = publicDrops;
         this.sender = executors.sender();
         this.scheduler = executors.scheduler();
     }
@@ -170,10 +167,6 @@ public class StockStreamHub implements SmartLifecycle {
         }
     }
 
-    public void invalidate(UUID id) {
-        requestClose(id, CloseReason.SUBSCRIPTION_INVALIDATED);
-    }
-
     private void requestClose(UUID id, CloseReason reason) {
         Connection connection = connections.get(id);
         if (connection != null) {
@@ -274,15 +267,7 @@ public class StockStreamHub implements SmartLifecycle {
                 write(connection, SseEmitter.event().name("stream-closed").data(closeReason.event(), MediaType.APPLICATION_JSON));
                 dispose(connection);
             } else if (!changes.isEmpty()) {
-                try {
-                    publicDrops.validatePublicDrops(connection.subscription.dropIds());
-                } catch (BusinessException error) {
-                    if (error.getErrorCode() == DropErrorCode.DROP_NOT_FOUND) {
-                        requestClose(connection.subscription.id(), CloseReason.SUBSCRIPTION_INVALIDATED);
-                        return;
-                    }
-                    throw error;
-                }
+                // 공개 → DRAFT 전이·물리 삭제가 없어 구독 시점 검증으로 충분하다. 비공개 전이가 생기면 커밋 후 이벤트로 해당 상품 구독을 종료한다(REALTIME_STOCK 8절, GR-163).
                 for (StockStreamEvent.Changed change : changes) {
                     write(connection, SseEmitter.event().name("drop-changed").data(change, MediaType.APPLICATION_JSON));
                 }

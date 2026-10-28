@@ -19,11 +19,12 @@ grab:
       # 테스트 전용 이메일 인증 HMAC 키. 운영·개발 환경에서 절대 사용하지 않는다.
       # 디코딩하면 "grab-test-only-email-verification-secret"(40바이트)이다.
       hmac-secret: Z3JhYi10ZXN0LW9ubHktZW1haWwtdmVyaWZpY2F0aW9uLXNlY3JldA==
-  # DROP 이미지 imageUrl 검증(GR-51)이 공개 URL 접두사를 만들 때 쓰는 테스트 값.
+  # DROP 이미지(GR-51)·프로필 이미지(GR-130) imageUrl 검증이 공개 URL 접두사를 만들 때 쓰는 테스트 값.
   storage:
     supabase:
       url: https://project.supabase.co
-      bucket: drop-images
+      drop-images-bucket: drop-images
+      profile-images-bucket: profile-images
   # 테스트 전용 서류 암호화 마스터키(GR-91). 디코딩하면 "grab-test-only-doc-encrypt-key32"(32바이트)다.
   seller:
     document-encryption:

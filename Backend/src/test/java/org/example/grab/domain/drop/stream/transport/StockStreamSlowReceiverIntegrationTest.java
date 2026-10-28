@@ -3,6 +3,7 @@ package org.example.grab.domain.drop.stream.transport;
 import org.example.grab.domain.drop.stream.model.StockChange;
 import org.example.grab.domain.drop.stream.config.StockStreamExecutors;
 import org.example.grab.domain.drop.stream.service.StockStreamRegistry;
+import org.example.grab.support.TestcontainersConfiguration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class StockStreamSlowReceiverIntegrationTest {
 
     @Container
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18");
+    static PostgreSQLContainer postgres = new PostgreSQLContainer(TestcontainersConfiguration.POSTGRES_IMAGE);
 
     @DynamicPropertySource
     static void datasourceProperties(DynamicPropertyRegistry registry) {

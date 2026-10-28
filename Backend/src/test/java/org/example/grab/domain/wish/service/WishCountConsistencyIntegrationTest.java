@@ -7,6 +7,7 @@ import org.example.grab.domain.drop.dto.response.PublicDropListResponse;
 import org.example.grab.domain.drop.repository.DropRepository;
 import org.example.grab.domain.drop.service.DropService;
 import org.example.grab.domain.wish.repository.WishRepository;
+import org.example.grab.support.TestcontainersConfiguration;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.AfterEach;
@@ -36,7 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class WishCountConsistencyIntegrationTest {
 
     @Container
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18");
+    static PostgreSQLContainer postgres = new PostgreSQLContainer(TestcontainersConfiguration.POSTGRES_IMAGE);
 
     @DynamicPropertySource
     static void datasourceProperties(DynamicPropertyRegistry registry) {

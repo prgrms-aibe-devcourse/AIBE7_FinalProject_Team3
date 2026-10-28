@@ -1,10 +1,12 @@
 package org.example.grab.domain.drop.repository;
 
+import org.example.grab.domain.drop.dto.PublicDropDetailExtrasProjection;
 import org.example.grab.domain.drop.dto.PublicDropListProjection;
 import org.example.grab.domain.drop.dto.SellerDropListProjection;
 import org.example.grab.domain.drop.entity.Drop;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -17,6 +19,7 @@ import org.springframework.data.repository.query.Param;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.LongSupplier;
 
 public interface DropRepository extends JpaRepository<Drop, Long> {
 
@@ -25,6 +28,30 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
 
     @EntityGraph(attributePaths = "options")
     Optional<Drop> findWithOptionsById(Long id);
+
+    /*
+     * 공개 상세(GR-184). DROP과 이미지를 한 쿼리로 가져와 이미지 컬렉션 조회 왕복을 줄인다.
+     * 옵션·옵션 그룹은 List라 함께 fetch join하면 MultipleBagFetchException이 나므로 기존 @BatchSize 지연 로딩에 맡긴다.
+     */
+    @EntityGraph(attributePaths = "images")
+    Optional<Drop> findWithImagesById(Long id);
+
+    /*
+     * 공개 상세의 브랜드·카테고리·활성 WISH 수(GR-184). 판매자·카테고리·WISH 도메인 service로 따로 조회하던 세 값을
+     * 한 쿼리로 모아 요청당 DB 왕복을 줄인다. 공개 목록 쿼리(PUBLIC_DROP_SELECT)와 같이 다른 도메인의 엔티티·repository가 아니라
+     * 테이블을 네이티브로 읽는다. 기존 조회와 같은 값을 낸다: 브랜드는 sellers PK, 카테고리는 활성 여부와 무관한 PK,
+     * WISH 수는 canceled_at IS NULL인 행 수다. 판매자·카테고리 행이 없으면 빈 결과다(호출자가 DROP_NOT_FOUND로 숨긴다).
+     */
+    @Query(value = """
+            SELECT s.brand_name AS "brandName", c.id AS "categoryId", c.name AS "categoryName",
+                   (SELECT COUNT(*) FROM wishes w
+                     WHERE w.drop_id = d.id AND w.canceled_at IS NULL) AS "wishCount"
+            FROM drops d
+            JOIN sellers s ON s.id = d.seller_id
+            JOIN categories c ON c.id = d.category_id
+            WHERE d.id = :dropId
+            """, nativeQuery = true)
+    Optional<PublicDropDetailExtrasProjection> findPublicDetailExtras(@Param("dropId") Long dropId);
 
     /*
      * DROP 행의 쓰기 경로(수정·공개·취소)에서 행을 잠그고 조회한다(GR-18, GR-64 R03).
@@ -76,8 +103,14 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
      * DROP→판매자라 목록 행이 늘지 않아 다른 집계를 부풀리지 않는다.
      * 활성 WISH 집계(canceled_at IS NULL)는 WishRepository 대신 같은 쿼리 안에서 네이티브로 센다.
      * 썸네일은 GALLERY 중 순서가 가장 앞선 이미지이고 DETAIL은 쓰지 않는다(DROP.md 1.2).
-     * 가용 재고 합계식은 soldOut·availableStock SELECT와 PUBLIC_DROP_FILTERS 세 곳에 중복되므로
-     * 한쪽만 바꾸지 않도록 주의한다(활성 SKU 없으면 COALESCE로 0).
+     * 가용 재고 합계식은 soldOut·availableStock SELECT, PUBLIC_DROP_FILTERS, POPULAR_GRAB_WHERE에 중복되므로
+     * 한쪽만 바꾸지 않도록 주의한다(활성 SKU 없으면 COALESCE로 0). LATERAL 조인으로 한 번만 계산하면
+     * 필터가 없을 때도 후보 전체에 계산이 강제돼 오히려 느려진다(GR-177, k6/drop-list-scale/result.md).
+     * 지금 식은 필터가 없으면 건너뛰고 SELECT 쪽은 LIMIT 뒤 행에서만 계산된다.
+     * 전체 건수는 별도 count 쿼리 대신 COUNT(*) OVER ()로 같은 스캔에서 함께 구한다(GR-198). count 쿼리도 후보 전체를
+     * 읽었으므로 추가로 읽는 행은 없고, 요청당 후보 스캔과 DB 왕복이 하나씩 준다. 부가 집계 서브쿼리는 여전히 LIMIT 뒤
+     * 페이지 행에서만 계산된다(14개 조합 실행 계획으로 확인, k6/sse-stream/result-refetch.md). 결과 행이 없으면 건수를
+     * 얻을 수 없으므로 toPage가 범위를 넘은 페이지에서만 count 쿼리를 실행한다.
      */
     String PUBLIC_DROP_SELECT = """
             SELECT d.id AS "dropId", d.name AS "name", s.brand_name AS "brandName",
@@ -93,7 +126,8 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
                    (SELECT COALESCE(SUM(o.total_quantity - o.reserved_quantity - o.sold_quantity - o.withheld_quantity), 0)
                       FROM drop_options o WHERE o.drop_id = d.id AND o.is_active) AS "availableStock",
                    (SELECT COUNT(*) FROM wishes w
-                     WHERE w.drop_id = d.id AND w.canceled_at IS NULL) AS "wishCount"
+                     WHERE w.drop_id = d.id AND w.canceled_at IS NULL) AS "wishCount",
+                   COUNT(*) OVER () AS "totalCount"
             FROM drops d
             JOIN categories c ON c.id = d.category_id
             JOIN sellers s ON s.id = d.seller_id
@@ -106,12 +140,16 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
             """;
 
     /*
-     * categoryId·keyword·soldOut 필터. WHERE 절 뒤에 AND로 이어 붙인다.
+     * categoryId·keyword 필터. WHERE 절 뒤에 AND로 이어 붙인다.
      * PostgreSQL은 네이티브 쿼리의 null 파라미터 타입을 추론하지 못하므로 CAST로 타입을 지정한다.
      */
-    String PUBLIC_DROP_FILTERS = """
+    String CATEGORY_KEYWORD_FILTERS = """
               AND (CAST(:categoryId AS BIGINT) IS NULL OR d.category_id = :categoryId)
               AND (CAST(:keyword AS TEXT) IS NULL OR d.name ILIKE :keyword ESCAPE '\\')
+            """;
+
+    // categoryId·keyword·soldOut 필터. 인기 GRAB은 후보가 이미 가용 재고 > 0이라 soldOut 필터를 붙이지 않는다(GR-177).
+    String PUBLIC_DROP_FILTERS = CATEGORY_KEYWORD_FILTERS + """
               AND (CAST(:soldOut AS BOOLEAN) IS NULL
                    OR (SELECT COALESCE(SUM(o.total_quantity - o.reserved_quantity - o.sold_quantity - o.withheld_quantity), 0) = 0
                          FROM drop_options o WHERE o.drop_id = d.id AND o.is_active) = :soldOut)
@@ -135,23 +173,42 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
                      FROM drop_options o WHERE o.drop_id = d.id AND o.is_active) > 0
             """;
 
+    // 관련 DROP 추천(DROP.md 1.4)의 카드. 목록 항목과 같은 형식이며 순서는 호출하는 쪽이 정한다
+    @Query(value = PUBLIC_DROP_SELECT + """
+            WHERE d.id IN (:ids)
+            """, nativeQuery = true)
+    List<PublicDropListProjection> findPublicDropsByIds(@Param("ids") List<Long> ids);
+
     /*
      * 공개 DROP 목록 조회(DISC-001·002·003, STOCK-006). 날짜 정렬은 Pageable Sort로 받는다.
      * statuses는 서비스가 채워 넘기며 DRAFT·CANCELED는 들어오지 않는다. 카테고리는 INNER JOIN이다.
      */
+    default Page<PublicDropListProjection> findPublicDrops(
+            List<String> statuses, Long categoryId, String keyword, Boolean soldOut, Pageable pageable) {
+        return toPage(findPublicDropRows(statuses, categoryId, keyword, soldOut, pageable), pageable,
+                () -> countPublicDrops(statuses, categoryId, keyword, soldOut));
+    }
+
     @Query(value = PUBLIC_DROP_SELECT + """
             WHERE d.status IN (:statuses)
             """ + PUBLIC_DROP_FILTERS,
-            countQuery = PUBLIC_DROP_COUNT + """
-            WHERE d.status IN (:statuses)
-            """ + PUBLIC_DROP_FILTERS,
             nativeQuery = true)
-    Page<PublicDropListProjection> findPublicDrops(
+    List<PublicDropListProjection> findPublicDropRows(
             @Param("statuses") List<String> statuses,
             @Param("categoryId") Long categoryId,
             @Param("keyword") String keyword,
             @Param("soldOut") Boolean soldOut,
             Pageable pageable);
+
+    @Query(value = PUBLIC_DROP_COUNT + """
+            WHERE d.status IN (:statuses)
+            """ + PUBLIC_DROP_FILTERS,
+            nativeQuery = true)
+    long countPublicDrops(
+            @Param("statuses") List<String> statuses,
+            @Param("categoryId") Long categoryId,
+            @Param("keyword") String keyword,
+            @Param("soldOut") Boolean soldOut);
 
     /*
      * 인기 WISH 목록(DISC-007). 활성 WISH 수 내림차순, 동률은 published_at DESC, id DESC로 고정한다.
@@ -159,43 +216,81 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
      * 전체 후보를 DB에서 정렬한 뒤 LIMIT/OFFSET으로 자르므로 페이지가 달라도 전역 순위가 유지된다.
      * now는 서비스가 조회마다 한 번 고정해 넘기며, 상태 전환 배치 지연과 무관하게 판매 전 여부를 판정한다.
      */
+    default Page<PublicDropListProjection> findPopularWishDrops(
+            Long categoryId, String keyword, Boolean soldOut, OffsetDateTime now, Pageable pageable) {
+        return toPage(findPopularWishDropRows(categoryId, keyword, soldOut, now, pageable), pageable,
+                () -> countPopularWishDrops(categoryId, keyword, soldOut, now));
+    }
+
     @Query(value = PUBLIC_DROP_SELECT + POPULAR_WISH_WHERE + PUBLIC_DROP_FILTERS + """
             ORDER BY "wishCount" DESC, d.published_at DESC, d.id DESC
             """,
-            countQuery = PUBLIC_DROP_COUNT + POPULAR_WISH_WHERE + PUBLIC_DROP_FILTERS,
             nativeQuery = true)
-    Page<PublicDropListProjection> findPopularWishDrops(
+    List<PublicDropListProjection> findPopularWishDropRows(
             @Param("categoryId") Long categoryId,
             @Param("keyword") String keyword,
             @Param("soldOut") Boolean soldOut,
             @Param("now") OffsetDateTime now,
             Pageable pageable);
 
-    /*
-     * 인기 GRAB 목록(DISC-007). 판매 수량 내림차순, 동률은 published_at DESC, id DESC로 고정한다.
-     * 판매 수량은 결제 확정·미취소 주문(paid_at IS NOT NULL AND canceled_at IS NULL)의 order_items.quantity 합이다.
-     * 미결제·만료·취소 주문과 결제 시도 횟수는 세지 않는다. 주문은 DROP 하나에만 속하므로
-     * orders(drop_id, ...) 인덱스로 주문을 좁힌 뒤 order_items를 붙이고, 상관 서브쿼리로 DROP별 합을 구해
-     * 다중 옵션·다중 주문이 목록 행을 늘리거나 다른 집계를 부풀리지 않게 한다.
-     * 정렬·페이징·now 처리는 findPopularWishDrops와 같다.
-     */
-    @Query(value = PUBLIC_DROP_SELECT + POPULAR_GRAB_WHERE + PUBLIC_DROP_FILTERS + """
-            ORDER BY (SELECT COALESCE(SUM(oi.quantity), 0)
-                        FROM orders od
-                        JOIN order_items oi ON oi.order_id = od.id AND oi.drop_id = od.drop_id
-                       WHERE od.drop_id = d.id
-                         AND od.paid_at IS NOT NULL
-                         AND od.canceled_at IS NULL) DESC,
-                     d.published_at DESC, d.id DESC
-            """,
-            countQuery = PUBLIC_DROP_COUNT + POPULAR_GRAB_WHERE + PUBLIC_DROP_FILTERS,
-            nativeQuery = true)
-    Page<PublicDropListProjection> findPopularGrabDrops(
+    @Query(value = PUBLIC_DROP_COUNT + POPULAR_WISH_WHERE + PUBLIC_DROP_FILTERS, nativeQuery = true)
+    long countPopularWishDrops(
             @Param("categoryId") Long categoryId,
             @Param("keyword") String keyword,
             @Param("soldOut") Boolean soldOut,
+            @Param("now") OffsetDateTime now);
+
+    /*
+     * 인기 GRAB 목록(DISC-007). 판매 수량 내림차순, 동률은 published_at DESC, id DESC로 고정한다.
+     * 판매 수량은 결제 확정·미취소 주문(paid_at IS NOT NULL AND canceled_at IS NULL)의 order_items.quantity 합이다.
+     * 미결제·만료·취소 주문과 결제 시도 횟수는 세지 않는다. 이 합은 DROP의 모든 SKU(비활성 포함) sold_quantity 합과 같다.
+     * sold_quantity는 결제 확정(markPaid와 같은 트랜잭션에서 reserved → sold)과 결제 후 취소(cancel과 같은 트랜잭션에서
+     * sold 감소)에서만 바뀌기 때문이다(ERD.md 3.2·3.3). 그래서 후보마다 orders·order_items를 집계하지 않고
+     * 이미 읽는 drop_options에서 합을 구한다(GR-176). 재고 원장을 바꾸는 경로가 늘면 이 동등성을 다시 확인한다.
+     * 정렬·페이징·now 처리는 findPopularWishDrops와 같다.
+     * soldOut 필터는 받지 않는다. 후보 조건(가용 재고 > 0)과 같은 합계를 후보마다 한 번 더 계산할 뿐이라
+     * 서비스가 soldOut=true는 빈 목록으로, false는 필터 없이 처리한다(DROP.md 1.2, GR-177).
+     */
+    default Page<PublicDropListProjection> findPopularGrabDrops(
+            Long categoryId, String keyword, OffsetDateTime now, Pageable pageable) {
+        return toPage(findPopularGrabDropRows(categoryId, keyword, now, pageable), pageable,
+                () -> countPopularGrabDrops(categoryId, keyword, now));
+    }
+
+    @Query(value = PUBLIC_DROP_SELECT + POPULAR_GRAB_WHERE + CATEGORY_KEYWORD_FILTERS + """
+            ORDER BY (SELECT COALESCE(SUM(o.sold_quantity), 0)
+                        FROM drop_options o
+                       WHERE o.drop_id = d.id) DESC,
+                     d.published_at DESC, d.id DESC
+            """,
+            nativeQuery = true)
+    List<PublicDropListProjection> findPopularGrabDropRows(
+            @Param("categoryId") Long categoryId,
+            @Param("keyword") String keyword,
             @Param("now") OffsetDateTime now,
             Pageable pageable);
+
+    @Query(value = PUBLIC_DROP_COUNT + POPULAR_GRAB_WHERE + CATEGORY_KEYWORD_FILTERS, nativeQuery = true)
+    long countPopularGrabDrops(
+            @Param("categoryId") Long categoryId,
+            @Param("keyword") String keyword,
+            @Param("now") OffsetDateTime now);
+
+    /*
+     * 목록 행의 totalCount(COUNT(*) OVER ())로 Page를 만든다. 행이 없으면 건수를 얻을 수 없다.
+     * 첫 페이지가 비었으면 전체가 0건이고, 범위를 넘은 페이지만 count 쿼리로 센다(GR-198).
+     * 페이지 없이(unpaged) 조회해 비었으면 전체가 0건이다. unpaged는 getOffset()이 예외를 던지므로 먼저 확인한다.
+     */
+    private static Page<PublicDropListProjection> toPage(
+            List<PublicDropListProjection> rows, Pageable pageable, LongSupplier count) {
+        if (!rows.isEmpty()) {
+            return new PageImpl<>(rows, pageable, rows.get(0).getTotalCount());
+        }
+        if (pageable.isUnpaged() || pageable.getOffset() == 0) {
+            return new PageImpl<>(rows, pageable, 0);
+        }
+        return new PageImpl<>(rows, pageable, count.getAsLong());
+    }
 
     /*
      * 시작 배치(GR-18). 대상을 잠가 ID를 확보한 뒤 같은 트랜잭션에서 전환하고, 전환된 ID 목록을 반환한다.

@@ -2,7 +2,9 @@ package org.example.grab.domain.user.repository;
 
 import org.example.grab.domain.user.entity.AuthProvider;
 import org.example.grab.domain.user.entity.User;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -55,6 +57,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
     int updatePasswordHashIfUnchanged(@Param("userId") Long userId,
                                       @Param("readHash") String readHash,
                                       @Param("newHash") String newHash);
+
+    /*
+        내 프로필 이미지 등록·삭제(MEMBER_AUTH.md 1.12·1.13, GR-130 M00-04 5번). 이전 값을 읽고 바꾸는 동안 회원 행을 잠근다.
+        같은 회원의 두 요청이 같은 이전 값을 보고 엇갈려, 다른 요청이 막 저장한 객체를 커밋 후 지우지 않게 한다.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from User u where u.id = :id")
+    Optional<User> findByIdForUpdate(@Param("id") Long id);
 
     @Query("select u.id from User u where u.uuid = :publicId")
     Optional<Long> findIdByPublicId(@Param("publicId") UUID publicId);
