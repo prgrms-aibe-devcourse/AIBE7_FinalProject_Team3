@@ -130,7 +130,11 @@ function handleFrame(conn, frame) {
     const payload = JSON.parse(data);
     if (event === 'ready') {
         conn.readyAt = now;
-        if (REFETCH && (conn.detail || REFETCH_LIST)) startResync(conn);
+        if (REFETCH && (conn.detail || REFETCH_LIST)) {
+            // 프론트처럼 ready 직후 최신 상태로 한 번 맞추고(ready 동기화, 분산 없음) 주기 재동기화를 건다.
+            markDirty(conn, 'ready');
+            startResync(conn);
+        }
     } else if (event === 'drop-changed') {
         conn.changes.push([now, payload.dropId]);
         if (REFETCH && (conn.detail || REFETCH_LIST)) {
