@@ -97,7 +97,7 @@ class DemandExplanationServiceTest {
         verify(repository).save(eq(DROP_ID), eq(inputHash), eq("GENERATED"), contains("\"summary\""),
                 eq("gemini-2.5-flash"), eq(DemandExplanationPrompt.VERSION), eq(812), any());
         verify(limitRepository).increment(DemandExplanationService.LIMIT_SCOPE, SELLER_ID, LocalDate.of(2026, 10, 27));
-        assertThat(meterRegistry.counter("grab.demand.explanation", "outcome", "generated").count()).isEqualTo(1);
+        assertThat(meterRegistry.counter("grab.demand.explanation", "outcome", "generated", "stage", "wish").count()).isEqualTo(1);
         assertThat(meterRegistry.summary("grab.demand.explanation.tokens", "model", "gemini-2.5-flash")
                 .totalAmount()).isEqualTo(812);
     }
@@ -118,7 +118,7 @@ class DemandExplanationServiceTest {
         assertThat(response.generatedAt()).isEqualTo(storedAt);
         verify(client, never()).generate(anyString(), anyString());
         verify(limitRepository, never()).increment(anyString(), anyLong(), any());
-        assertThat(meterRegistry.counter("grab.demand.explanation", "outcome", "reused").count()).isEqualTo(1);
+        assertThat(meterRegistry.counter("grab.demand.explanation", "outcome", "reused", "stage", "wish").count()).isEqualTo(1);
     }
 
     @Test
@@ -173,7 +173,7 @@ class DemandExplanationServiceTest {
         assertThat(service(rejecting, Duration.ofSeconds(10)).explain(SELLER_ID, DROP_ID, REQUEST).status())
                 .isEqualTo(ExplanationStatus.FAILED);
         verify(repository, never()).save(anyLong(), anyString(), anyString(), any(), any(), any(), any(), any());
-        assertThat(meterRegistry.counter("grab.demand.explanation", "outcome", "failed").count()).isEqualTo(2);
+        assertThat(meterRegistry.counter("grab.demand.explanation", "outcome", "failed", "stage", "wish").count()).isEqualTo(2);
     }
 
     @Test
@@ -204,8 +204,10 @@ class DemandExplanationServiceTest {
     }
 
     private DemandExplanationService service(TaskExecutor executor, Duration timeout) {
-        return new DemandExplanationService(analysisService, client, repository, limitRepository,
-                new DemandExplanationProperties(timeout, timeout.dividedBy(2), 1024, 0, 30), objectMapper, executor, meterRegistry,
-                Clock.fixed(NOW, ZoneOffset.UTC));
+        DemandExplanationProperties properties = new DemandExplanationProperties(timeout, timeout.dividedBy(2), 1024, 0, 30);
+        DemandExplanationGenerator generator = new DemandExplanationGenerator(client, properties, objectMapper, executor,
+                meterRegistry);
+        return new DemandExplanationService(analysisService, generator, repository, limitRepository, properties,
+                objectMapper, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 }

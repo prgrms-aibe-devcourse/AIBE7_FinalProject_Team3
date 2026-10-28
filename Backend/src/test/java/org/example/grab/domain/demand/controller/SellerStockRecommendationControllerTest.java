@@ -1,7 +1,10 @@
 package org.example.grab.domain.demand.controller;
 
+import org.example.grab.domain.demand.dto.SimilarSalesRequest.OptionGroupInput;
+import org.example.grab.domain.demand.dto.StockExplanationRequest;
 import org.example.grab.domain.demand.dto.StockRecommendationRequest;
 import org.example.grab.domain.demand.dto.StockRecommendationRequest.OptionInput;
+import org.example.grab.domain.demand.explanation.StockExplanationService;
 import org.example.grab.domain.demand.service.StockRecommendationService;
 import org.example.grab.global.error.GlobalExceptionHandler;
 import org.example.grab.global.error.ValidationErrorCodeResolver;
@@ -32,16 +35,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SellerStockRecommendationControllerTest {
 
     private StockRecommendationService service;
+    private StockExplanationService explanationService;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         service = mock(StockRecommendationService.class);
+        explanationService = mock(StockExplanationService.class);
         CurrentSellerIdProvider currentSellerIdProvider = mock(CurrentSellerIdProvider.class);
         given(currentSellerIdProvider.currentSellerId()).willReturn(3L);
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
-        mockMvc = MockMvcBuilders.standaloneSetup(new SellerStockRecommendationController(service, currentSellerIdProvider))
+        mockMvc = MockMvcBuilders.standaloneSetup(new SellerStockRecommendationController(service, explanationService,
+                        currentSellerIdProvider))
                 .setControllerAdvice(new GlobalExceptionHandler(new ValidationErrorCodeResolver(List.of())))
                 .setValidator(validator)
                 .build();
@@ -77,5 +83,36 @@ class SellerStockRecommendationControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
         verify(service, never()).recommend(anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("근거 설명은 폼 입력값(상품명·설명·옵션 그룹 포함)과 로그인한 판매자로 요청한다")
+    void explain_passesFormInput() throws Exception {
+        mockMvc.perform(post("/api/v1/seller/stock-recommendations/explanation")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"categoryId\":8,\"name\":\"키링\",\"description\":\"아크릴\","
+                                + "\"optionGroups\":[{\"name\":\"색상\",\"values\":[\"블랙\"]}],"
+                                + "\"options\":[{\"unitPrice\":12000,\"quantity\":30}],\"safetyStockRate\":0.1}"))
+                .andExpect(status().isOk());
+        verify(explanationService).explain(3L, new StockExplanationRequest(8L, "키링", "아크릴",
+                List.of(new OptionGroupInput("색상", List.of("블랙"))), List.of(new OptionInput(12000L, 30)),
+                new BigDecimal("0.1")));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "{\"options\":[{\"unitPrice\":1000}]}",
+            "{\"categoryId\":8,\"options\":[]}",
+            "{\"categoryId\":8,\"options\":[{\"unitPrice\":-1}]}",
+            "{\"categoryId\":8,\"options\":[{\"unitPrice\":1000}],\"optionGroups\":[{\"name\":\"색상\"}]}"
+    })
+    @DisplayName("근거 설명도 카테고리·옵션 누락, 음수 가격, 값 없는 옵션 그룹은 VALIDATION_FAILED로 거부한다")
+    void explain_rejectsInvalidInput(String body) throws Exception {
+        mockMvc.perform(post("/api/v1/seller/stock-recommendations/explanation")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+        verify(explanationService, never()).explain(anyLong(), any());
     }
 }
