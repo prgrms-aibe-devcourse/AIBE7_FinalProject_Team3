@@ -34,6 +34,10 @@ const REFETCH = process.env.REFETCH === '1';
 // REFETCH_LIST=0이면 목록 연결은 구독·알림 수신은 그대로 두고 재조회만 하지 않는다(GR-180 목록 HTTP 영향 분리).
 const REFETCH_LIST = process.env.REFETCH_LIST !== '0';
 const REFRESH_MIN_INTERVAL_MS = 2000;
+// 알림으로 재조회를 예약할 때 대기를 max(2초 간격의 남은 시간, 0~이 값(ms) 무작위)로 한다. 0이면 명세 12절 그대로.
+// 예약은 첫 신호에만 하고 이후 신호는 dirty로 합치므로 신호마다 타이머가 미뤄지지 않고, 2초 간격 뒤에 jitter가 더 붙지 않는다.
+// 알림이 모든 연결에 거의 동시에 도착하면 재조회가 한순간에 몰리는지 확인하려는 측정용 옵션이다(GR-180 후속).
+const REFETCH_JITTER_MS = Number(process.env.REFETCH_JITTER_MS || 0);
 const RESYNC_INTERVAL_MS = 30_000;
 const RESYNC_JITTER_MS = 5000;
 const LIST_PATH = `/api/v1/drops?keyword=${encodeURIComponent(KEYWORD)}&size=24`;
@@ -128,7 +132,9 @@ function handleFrame(conn, frame) {
         if (REFETCH && (conn.detail || REFETCH_LIST)) startResync(conn);
     } else if (event === 'drop-changed') {
         conn.changes.push([now, payload.dropId]);
-        if (REFETCH && (conn.detail || REFETCH_LIST)) markDirty(conn, 'signal');
+        if (REFETCH && (conn.detail || REFETCH_LIST)) {
+            markDirty(conn, 'signal');
+        }
     } else if (event === 'stream-closed') {
         conn.closeReason = payload.reason;
         conn.closedAt = now;
@@ -140,7 +146,8 @@ function markDirty(conn, reason) {
     const key = conn.refetch;
     key.dirty ??= reason;
     if (key.running || key.timer || conn.aborted) return;
-    const wait = Math.max(0, key.lastStart + REFRESH_MIN_INTERVAL_MS - Date.now());
+    const throttle = Math.max(0, key.lastStart + REFRESH_MIN_INTERVAL_MS - Date.now());
+    const wait = reason === 'signal' && REFETCH_JITTER_MS > 0 ? Math.max(throttle, Math.random() * REFETCH_JITTER_MS) : throttle;
     key.timer = setTimeout(() => runRefetch(conn), wait);
 }
 
@@ -294,6 +301,7 @@ const summary = {
     })) : null,
     refetchList: REFETCH_LIST,
     listMix: process.env.LIST_MIX || 'sse',
+    refetchJitterMs: REFETCH_JITTER_MS,
     listQueries: LIST_QUERIES,
     initialStock,
     eventLoopDelayMs: { p99: loopDelay.percentile(99) / 1e6, max: loopDelay.max / 1e6 },
