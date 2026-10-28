@@ -53,6 +53,33 @@ public interface OrderInventoryRepository extends Repository<Order, Long> {
             """, nativeQuery = true)
     void increaseReservedQuantity(@Param("optionId") Long optionId, @Param("quantity") int quantity);
 
+    /*
+     * 주문 생성 전용(GR-202 교차영향 완화): lockOptions(읽기 잠금)로 확인하고 increaseReservedQuantity(쓰기)로
+     * 반영하던 두 왕복을, 조건부 UPDATE...RETURNING 하나로 합친다. UPDATE 자체가 그 행에 락을 걸어
+     * FOR UPDATE와 같은 역할을 하고, WHERE 절의 가용재고 조건을 만족할 때만 증가시키면서 바로 옵션 정보를 돌려받는다.
+     * 조건을 못 만족하면(없는 옵션·비활성·재고부족을 구분 못 함) 빈 결과를 돌려주고, 호출하는 쪽이
+     * lockOptions로 한 번 더 확인해 정확한 사유를 가린다 — 그 경로는 어차피 주문이 실패하는 드문 경우라 왕복이 늘어도 된다.
+     */
+    @Query(value = """
+            UPDATE drop_options o
+            SET reserved_quantity = reserved_quantity + :quantity,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE o.id = :optionId AND o.drop_id = :dropId AND o.is_active = TRUE
+              AND o.total_quantity - o.reserved_quantity - o.sold_quantity - o.withheld_quantity >= :quantity
+            RETURNING o.id AS "id", o.unit_price AS "unitPrice", o.total_quantity AS "totalQuantity",
+                      o.reserved_quantity AS "reservedQuantity", o.sold_quantity AS "soldQuantity",
+                      o.withheld_quantity AS "withheldQuantity", o.is_active AS "active",
+                      COALESCE((
+                          SELECT string_agg(v.value, ' / ' ORDER BY g.sort_order)
+                          FROM drop_option_value_maps m
+                          JOIN drop_option_groups g ON g.id = m.group_id
+                          JOIN drop_option_values v ON v.id = m.value_id
+                          WHERE m.option_id = o.id
+                      ), '기본') AS "optionName"
+            """, nativeQuery = true)
+    Optional<LockedOption> tryReserveOption(
+            @Param("dropId") Long dropId, @Param("optionId") Long optionId, @Param("quantity") int quantity);
+
     // 결제 확정 전에 옵션 행을 PK 오름차순으로 잠그고 선점 수량을 읽는다. 잠근 뒤라 확인한 수량이 확정 UPDATE까지 유지된다.
     @Query(value = """
             SELECT o.id AS "id", o.reserved_quantity AS "reservedQuantity"
