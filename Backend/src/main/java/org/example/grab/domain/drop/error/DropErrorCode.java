@@ -14,7 +14,10 @@ public enum DropErrorCode implements ErrorCode {
     GRAB_ALREADY_STARTED(HttpStatus.CONFLICT, "이미 GRAB이 시작된 DROP입니다."),
     INVALID_SCHEDULE(HttpStatus.UNPROCESSABLE_CONTENT, "판매 일정이 올바르지 않습니다."),
     INVALID_OPTION_COMBINATION(HttpStatus.UNPROCESSABLE_CONTENT, "옵션 그룹·값·SKU 조합이 올바르지 않습니다."),
-    DUPLICATE_OPTION_COMBINATION(HttpStatus.CONFLICT, "동일한 옵션값 조합의 SKU가 중복됩니다.");
+    DUPLICATE_OPTION_COMBINATION(HttpStatus.CONFLICT, "동일한 옵션값 조합의 SKU가 중복됩니다."),
+    AI_DRAFT_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "오늘 사진 초안 작성 횟수를 모두 사용했습니다."),
+    AI_DRAFT_FAILED(HttpStatus.BAD_GATEWAY, "사진으로 초안을 만들지 못했습니다."),
+    AI_DRAFT_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "사진 초안 작성을 사용할 수 없습니다.");
 
     private final HttpStatus status;
     private final String message;

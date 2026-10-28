@@ -1,0 +1,28 @@
+# 운영 DB(Supabase 무료 티어 Nano) 수준으로 postgres를 제한하는 부하테스트 오버라이드(GR-186).
+# backend 스펙 파일(nano/micro)과 겹치지 않으므로 함께 쓰고, 다른 오버라이드보다 **마지막에** 합친다.
+# command를 통째로 바꾸므로 뒤에 오는 파일이 command를 다시 정의하면 아래 설정이 사라진다:
+#   docker compose -f compose.yaml -f compose.loadtest-micro.yaml -f compose.loadtest-sse.yaml -f compose.loadtest-db-nano.yaml up -d --build
+#   Backend/k6/drop-detail-scale/netem.sh 2.5 # 측정 왕복이 운영 EC2↔Supabase 실측(3.2~3.4ms)과 맞는 값(k6/db-nano/result.md)
+#   Backend/k6/db-nano/check.sh               # 제한·왕복이 적용됐는지 확인
+#
+# Supabase 문서(Compute and Disk, 2026-10-27 확인) 기준 Nano: 공유 CPU, 메모리 최대 0.5GB,
+# 직접 연결 60, 풀러(Supavisor) 클라이언트 200. https://supabase.com/docs/guides/platform/compute-and-disk
+# 공유 CPU는 코어 수·할당 비율이 공개되지 않아 정확히 맞출 수 없다. cpus는 가정값이며 GRAB_DB_NANO_CPUS로 바꿔 민감도를 본다.
+# 평소 개발 명령(`docker compose up`)에는 영향 없음.
+services:
+  postgres:
+    mem_limit: 512m
+    # backend 스펙 파일과 같은 이유로 스왑을 막아 호스트 설정과 무관하게 512MB 한도로 돈다.
+    memswap_limit: 512m
+    # 가정값: vCPU 1개. backend(micro, vCPU 2개)보다 작게 두어 DB 쪽이 더 빠듯한 하한선 조건으로 잰다.
+    cpus: ${GRAB_DB_NANO_CPUS:-1}
+    # max_connections는 Supabase Nano 직접 연결 한도(60)에 맞춘다. shared_buffers는 기본값(128MB, 메모리의 1/4)을 명시해 기록한다.
+    # pg_stat_statements는 compose.loadtest-sse.yaml과 같은 이유(쿼리별 호출 수 측정)로 함께 켠다. 이 파일이 command를 덮어쓰기 때문이다.
+    command:
+      - postgres
+      - -c
+      - max_connections=60
+      - -c
+      - shared_buffers=128MB
+      - -c
+      - shared_preload_libraries=pg_stat_statements

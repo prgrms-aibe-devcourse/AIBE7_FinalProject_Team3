@@ -235,12 +235,24 @@ public class Drop extends BaseEntity {
         return wishabilityError(now) == null;
     }
 
+    /**
+     * 엔티티 없이 상태·판매 시작 시각만으로 WISH 가능 여부를 판정한다. 캐시한 공개 상세 응답의 actions를 조회 시각으로
+     * 다시 계산할 때 쓴다(GR-183). 규칙은 엔티티의 isWishable과 같은 메서드를 공유한다.
+     */
+    public static boolean isWishable(DropStatus status, OffsetDateTime saleStartsAt, OffsetDateTime now) {
+        return wishabilityError(status, saleStartsAt, now) == null;
+    }
+
     public boolean isPublic() {
         return status != DropStatus.DRAFT;
     }
 
     // WISH 가능 판정 규칙을 한 곳에 둔다. null이면 가능, 값이 있으면 그 오류로 거부한다.
     private ErrorCode wishabilityError(OffsetDateTime now) {
+        return wishabilityError(status, saleStartsAt, now);
+    }
+
+    private static ErrorCode wishabilityError(DropStatus status, OffsetDateTime saleStartsAt, OffsetDateTime now) {
         return switch (status) {
             // 공개 상세의 isPublic()과 같이 DRAFT의 존재를 숨긴다.
             case DRAFT -> DropErrorCode.DROP_NOT_FOUND;
@@ -257,6 +269,15 @@ public class Drop extends BaseEntity {
      * 저장 상태는 최대 폴링 주기만큼 늦을 수 있으므로 WISH·GRAB을 모두 판매 후보로 보고 서버 시각으로 확정한다.
      */
     public boolean isOrderable(OffsetDateTime now) {
+        return isOrderable(status, saleStartsAt, saleEndsAt, isSoldOut(), now);
+    }
+
+    /**
+     * 엔티티 없이 상태·판매 시각·품절 여부로 주문 가능 여부를 판정한다. 캐시한 공개 상세 응답의 actions를 조회 시각으로
+     * 다시 계산할 때 쓴다(GR-183). 규칙은 엔티티의 isOrderable과 같은 메서드를 공유한다.
+     */
+    public static boolean isOrderable(DropStatus status, OffsetDateTime saleStartsAt, OffsetDateTime saleEndsAt,
+                                      boolean soldOut, OffsetDateTime now) {
         if (status != DropStatus.WISH && status != DropStatus.GRAB) {
             return false;
         }
@@ -266,7 +287,7 @@ public class Drop extends BaseEntity {
         if (saleEndsAt != null && !now.isBefore(saleEndsAt)) {
             return false;
         }
-        return !isSoldOut();
+        return !soldOut;
     }
 
     /**

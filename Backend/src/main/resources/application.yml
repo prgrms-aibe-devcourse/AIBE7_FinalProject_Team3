@@ -2,6 +2,11 @@ spring:
   application:
     name: GRAB
 
+  # Gemini 임베딩 연결 자동 구성은 임베딩을 꺼 둬도 항상 연결을 만들고, 키가 없으면 Vertex AI로 넘어가 project-id가 없다며
+  # 기동에 실패한다. 연결은 임베딩을 켰을 때만 DropEmbeddingConfig가 등록한다(GR-147)
+  autoconfigure:
+    exclude: org.springframework.ai.model.google.genai.autoconfigure.embedding.GoogleGenAiEmbeddingConnectionAutoConfiguration
+
   # 메일 발송 설정은 별도 파일로 분리. 프로필과 무관하게 항상 불러온다
   config:
     import: classpath:application-mail.yml
@@ -41,6 +46,37 @@ spring:
     enabled: true
     locations: classpath:db/migration
 
+  # 수요 분석 설명 생성 LLM(GR-146, TECHSTACK.md 1.3). 기본값 none이면 모델 빈을 만들지 않아 키 없이도 기동하고,
+  # 설명 요청은 DISABLED로 응답한다. 켜려면 DEMAND_LLM_PROVIDER=google-genai와 GEMINI_API_KEY를 함께 넣는다.
+  # 유사 상품 검색용 DROP 임베딩(GR-147, 수요 분석 API 6절)은 DEMAND_EMBEDDING_PROVIDER=google-genai로 따로 켠다. 이미지 생성은 쓰지 않는다
+  ai:
+    model:
+      chat: ${DEMAND_LLM_PROVIDER:none}
+      embedding:
+        text: ${DEMAND_EMBEDDING_PROVIDER:none}
+      image: none
+    google:
+      genai:
+        # Gemini Developer API 키(Google AI Studio 발급). 환경변수로만 주입하고 저장소·로그에 남기지 않는다
+        api-key: ${GEMINI_API_KEY:}
+        chat:
+          options:
+            model: ${GEMINI_MODEL:gemini-2.5-flash}
+            temperature: 0.2
+        # 임베딩 연결은 HTTP 시간 제한·재시도 없음을 건 Client로 직접 등록한다(DropEmbeddingConfig)
+        embedding:
+          api-key: ${GEMINI_API_KEY:}
+          text:
+            options:
+              model: ${GEMINI_EMBEDDING_MODEL:gemini-embedding-001}
+              # drop_embeddings.embedding VECTOR(768)과 같아야 한다
+              dimensions: 768
+    # Spring AI 기본값은 실패 시 최대 10회(2초부터 5배씩 늘어나는 간격) 재시도한다. 서비스가 시간 제한으로 결과를 버려도
+    # 재시도가 뒤에서 계속 돌며 전용 풀 작업자를 몇 분씩 붙잡아 이후 요청까지 실패시켰다. 설명은 재시도하지 않으므로(DEMAND.md 3.4) 끈다
+    # (max-attempts는 첫 호출을 뺀 재시도 횟수다)
+    retry:
+      max-attempts: 0
+
   jpa:
     open-in-view: false
     hibernate:
@@ -61,13 +97,22 @@ grab:
     send-timeout: 5s
     max-pending-drops: 100
     max-drop-ids: 100
-    max-connections: 200
-    max-connections-per-ip: 20
+    # 상한·제한값 근거는 REALTIME_STOCK.md 12절(GR-185). 연결 1000개는 GR-180에서 검증한다.
+    max-connections: 1000
+    max-connections-per-ip: 50
     connect-rate-window: 60s
-    connect-rate-max: 30
+    connect-rate-max: 75
     retry-after: 60s
     # 활성 연결이 없고 요청 창이 만료되면 제거한다. 임의 IP로 추적 메모리가 무한 증가하지 않게 한다.
     max-tracked-ips: 10000
+  # GR-183 공개 DROP 상세·재고 응답 캐시. 재고·판매·상태 변경은 커밋 후 이벤트로 바로 지우고, TTL은 이벤트가 없는 값
+  # (상세의 활성 WISH 수·브랜드명)과 놓친 이벤트(blue/green 전환 중 다른 인스턴스의 커밋)의 지연 상한이다.
+  # store: memory(인스턴스 메모리, 기본) | redis(운영 Redis 왕복 105ms라 쓰지 않음) | none(캐시 안 씀)
+  drop-cache:
+    store: ${GRAB_DROP_CACHE_STORE:memory}
+    detail-ttl: 5s
+    stock-ttl: 5s
+    related-ttl: 3m
   # 메일 본문 등 서버가 만드는 링크가 가리키는 프런트엔드 주소. 기본값은 로컬 Vite 개발 서버다
   web:
     base-url: ${WEB_BASE_URL:http://localhost:5173}
@@ -76,6 +121,28 @@ grab:
     # SHIPPED 이후 배송 단계(집화완료→간선상차→간선하차→배송출발→배송완료) 자동 진행 간격(GR-86)
     stage-interval: ${GRAB_MOCK_DELIVERY_STAGE_INTERVAL:30s}
     poll-interval: ${GRAB_MOCK_DELIVERY_POLL_INTERVAL:10s}
+  # 판매자 화면이 수요 분석을 먼저 제안하는 기준(DEMAND.md 1.8)
+  demand:
+    suggestion:
+      min-active-wishes: 30
+      hours-before-start: 48
+    # DROP 임베딩(수요 분석 API 6절). 배치는 임베딩이 없거나 다른 모델로 만든 공개 DROP을 주기마다 batch-size개씩 채운다
+    embedding:
+      timeout: 10s
+      batch-size: 20
+      batch:
+        enabled: ${GRAB_DEMAND_EMBEDDING_BATCH_ENABLED:true}
+        fixed-delay: 10m
+  # 사진 기반 DROP 초안(DROP.md 2.8). 모델·키는 spring.ai.* 설정을 함께 쓰고, 꺼져 있으면 AI_DRAFT_UNAVAILABLE이다
+  drop:
+    # 관련 DROP 추천(DROP.md 1.4). 함께 WISH는 겹친 사용자가 이 수 이상인 DROP만 쓴다(WISH 내역을 짐작하지 못하게 하는 최소 단위)
+    related:
+      min-co-wishers: 3
+      # 비슷한 DROP(임베딩) 코사인 유사도 하한. 수요 분석과 같은 값에서 시작하지만 따로 조정한다
+      similarity-min-score: 0.75
+    ai-draft:
+      timeout: 20s
+      daily-limit: 20
   drop-transition:
     enabled: ${GRAB_DROP_TRANSITION_ENABLED:true}
     fixed-delay: 10s
@@ -86,6 +153,15 @@ grab:
   # 토스페이먼츠 테스트 환경(TECHSTACK.md 4.4). 시크릿 키는 환경변수로만 주입한다.
   toss:
     secret-key: ${TOSS_SECRET_KEY:}
+  payment:
+    # 부하테스트(GR-154, GR-155)에서 토스 샌드박스 대신 MockPaymentGateway를 쓸지. 운영에서는 켜지 않는다.
+    mock-gateway:
+      enabled: ${GRAB_PAYMENT_MOCK_GATEWAY_ENABLED:false}
+      # GR-155 장애 주입 비율(0~1). 전부 기본값 0이면 GR-154처럼 항상 성공하는 기존 동작과 같다.
+      confirm-failure-rate: ${GRAB_MOCK_CONFIRM_FAILURE_RATE:0}
+      confirm-unknown-rate: ${GRAB_MOCK_CONFIRM_UNKNOWN_RATE:0}
+      cancel-unknown-rate: ${GRAB_MOCK_CANCEL_UNKNOWN_RATE:0}
+      resolve-delay-seconds: ${GRAB_MOCK_RESOLVE_DELAY_SECONDS:20}
   # 국세청 사업자등록 상태조회(GR-90, SELLER-005). 서비스키가 없으면 검증을 생략하고 PENDING 접수로 넘어간다.
   nts:
     business-registration:
@@ -96,8 +172,9 @@ grab:
     supabase:
       url: ${SUPABASE_URL:}
       secret-key: ${SUPABASE_SECRET_KEY:}
-      bucket: ${SUPABASE_DROP_IMAGE_BUCKET:drop-images}
+      drop-images-bucket: ${SUPABASE_DROP_IMAGE_BUCKET:drop-images}
       documents-bucket: ${SUPABASE_SELLER_DOCUMENT_BUCKET:seller-documents}
+      profile-images-bucket: ${SUPABASE_PROFILE_IMAGE_BUCKET:profile-images}
       connect-timeout: 3s
       read-timeout: 5s
   # 판매자 서류 봉투 암호화 마스터키(GR-91). Base64 AES-256 키, 기본값 없음(KMS 연동 없음)
@@ -139,6 +216,21 @@ grab:
         email-window: 24h
         ip-max-requests: 30
         ip-window: 1h
+  # 비밀번호 해시(Argon2id) 동시 실행 상한(GR-178, NFR-014). 해시 1건이 힙 약 19MiB를 잡으므로 동시 실행 수를 묶는다.
+  # 자리가 없으면 acquire-timeout까지 기다리고, 그 안에 차례가 오지 않으면 503 AUTH_TEMPORARILY_UNAVAILABLE로 거부한다
+  password-hash:
+    max-concurrent: 4
+    acquire-timeout: 3s
+    # 거부 응답의 Retry-After 헤더 값. 1초 이상의 정수 초만 허용한다
+    retry-after: 3s
+  # 주문 생성 동시 실행 상한(GR-202). 드롭 오픈 스파이크 때 주문 생성이 몰리면 CPU가 포화돼
+  # 그 드롭과 무관한 다른 요청까지 응답이 늦어진다(교차영향 측정). 전역 상한 하나로 정해진 수만 동시 처리한다.
+  # 값은 1차 추정치라 운영 트래픽을 보며 조정이 필요하다 — HikariCP 풀 크기(기본 10)보다 넉넉히 둔다.
+  # 자리가 없으면 acquire-timeout까지 기다리고, 그 안에 차례가 오지 않으면 503 ORDER_CREATION_TEMPORARILY_UNAVAILABLE로 거부한다
+  order-creation:
+    max-concurrent: 20
+    acquire-timeout: 3s
+    retry-after: 3s
   cors:
     # Credential(쿠키) 요청을 허용할 프론트엔드 Origin(GR-44 M00-04). 기본값은 로컬 Vite 개발 서버다.
     # 여러 개는 쉼표로 구분하고 끝에 /를 붙이지 않는다. 운영을 같은 출처로 서비스하면 쓰이지 않는다
@@ -160,6 +252,8 @@ springdoc:
       packages-to-scan: org.example.grab.domain.category
     - group: dashboard
       packages-to-scan: org.example.grab.domain.dashboard
+    - group: demand
+      packages-to-scan: org.example.grab.domain.demand
     - group: drop
       packages-to-scan: org.example.grab.domain.drop
     - group: order

@@ -7,6 +7,8 @@ import org.example.grab.global.security.handler.RestAuthenticationEntryPoint;
 import org.example.grab.global.security.jwt.AccessTokenProperties;
 import org.example.grab.global.security.jwt.JwtAuthenticationFilter;
 import org.example.grab.global.security.jwt.JwtProvider;
+import org.example.grab.global.security.password.ConcurrencyLimitedPasswordEncoder;
+import org.example.grab.global.security.password.PasswordHashProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -17,7 +19,6 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.annotation.web.configurers.oauth2.client.OAuth2LoginConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.session.NullAuthenticatedSessionStrategy;
@@ -29,7 +30,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
 
 @Configuration
-@EnableConfigurationProperties({AccessTokenProperties.class, CorsProperties.class})
+@EnableConfigurationProperties({AccessTokenProperties.class, CorsProperties.class, PasswordHashProperties.class})
 public class SecurityConfig {
 
     @Bean
@@ -66,11 +67,11 @@ public class SecurityConfig {
                         // ponytail: 로컬 확인용 전 환경 개방. 운영 노출 정책은 GR-59(한재훈)에서 프로필로 제한
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**")
                         .permitAll()
-                        // 공개 카탈로그(목록·상세·재고 재조회)만 GET으로 개방한다. 상세는 한 단계 경로(*)만 열어
+                        // 공개 카탈로그(목록·상세·재고 재조회·관련 DROP 추천)만 GET으로 개방한다. 상세는 한 단계 경로(*)만 열어
                         // /api/v1/drops/{id}/wish(WISH API)와 판매자 경로는 계속 인증이 필요하다.
-                        // 재고 재조회는 /stocks만 명시해 /api/v1/drops/** 전체를 열지 않는다.
+                        // 재고 재조회(/stocks)·관련 DROP 추천(/related)만 명시해 /api/v1/drops/** 전체를 열지 않는다.
                         .requestMatchers(HttpMethod.GET, "/api/v1/categories", "/api/v1/drops", "/api/v1/drops/*",
-                                "/api/v1/drops/*/stocks", "/api/v1/drops/stock-stream")
+                                "/api/v1/drops/*/stocks", "/api/v1/drops/*/related", "/api/v1/drops/stock-stream")
                         .permitAll()
                         // CSRF 토큰 발급은 로그인 전에도 필요하다(MEMBER_AUTH 1.1)
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/csrf")
@@ -113,7 +114,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/users/me", "/api/v1/users/me/password").hasRole("USER")
                         // 내 WISH 목록은 정확한 경로의 GET에 USER 권한을 요구한다. 비로그인 401, USER 없는 계정 403.
                         .requestMatchers(HttpMethod.GET, "/api/v1/users/me/wishes").hasRole("USER")
-                        // 지금은 판매자 이미지 업로드만 있다. 회원 프로필 업로드가 생기면 이 규칙을 /api/v1/uploads/images/**로 좁히거나 경로를 나눈다.
+                        // 내 프로필 이미지 업로드 URL 발급·등록·삭제도 정확한 경로·메서드에만 USER 권한을 요구한다. CSRF 예외는 두지 않는다.
+                        // 정지·탈퇴 회원은 GET과 같이 서비스가 401로 거부한다(MEMBER_AUTH 1.12·1.13, GR-130 M00-07)
+                        .requestMatchers(HttpMethod.POST, "/api/v1/users/me/profile-image/upload-url").hasRole("USER")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/users/me/profile-image").hasRole("USER")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/users/me/profile-image").hasRole("USER")
+                        // 판매자 DROP 이미지 업로드 전용이다. 회원 프로필 업로드는 위 /users/me/profile-image 경로로 나눠 이 규칙에 걸리지 않는다(GR-130 M00-01).
                         .requestMatchers("/api/v1/uploads/**").hasRole("SELLER")
                         .anyRequest().authenticated()
                 )
@@ -167,9 +173,12 @@ public class SecurityConfig {
         값은 OWASP Password Storage Cheat Sheet의 최소 권장값(메모리 19 MiB, 반복 2, 병렬도 1)이다.
         Spring 기본값(defaultsForSpringSecurity_v5_8)은 메모리가 16 MiB라 쓰지 않는다.
         검증은 저장된 해시에 적힌 파라미터로 하므로, 값을 올려도 기존 해시는 그대로 검증된다.
+        해시 1건이 힙 약 19 MiB를 잡으므로 동시 실행 수를 묶는 인코더로 감싼다(GR-178, NFR-014).
+        반환 타입을 구체 클래스로 두어 지표 등록(PasswordHashMetricsConfig)이 거부·대기 수를 읽게 한다. 사용하는 쪽은 PasswordEncoder로 받는다.
      */
     @Bean
-    PasswordEncoder passwordEncoder() {
-        return new Argon2PasswordEncoder(16, 32, 1, 19 * 1024, 2);
+    ConcurrencyLimitedPasswordEncoder passwordEncoder(PasswordHashProperties passwordHashProperties) {
+        return new ConcurrencyLimitedPasswordEncoder(
+                new Argon2PasswordEncoder(16, 32, 1, 19 * 1024, 2), passwordHashProperties);
     }
 }

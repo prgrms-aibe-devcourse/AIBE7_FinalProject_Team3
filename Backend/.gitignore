@@ -43,4 +43,7 @@ out/
 todo
 !docs/development/TODO.md
 
+# 로그인 부하테스트에서 컨테이너 밖으로 꺼낸 GC 로그(compose.loadtest-login.yaml)
+k6/login-burst/gc-logs/
+
 *.pem

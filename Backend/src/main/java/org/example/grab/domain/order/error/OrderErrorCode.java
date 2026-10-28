@@ -13,7 +13,8 @@ public enum OrderErrorCode implements ErrorCode {
     SALE_NOT_STARTED(HttpStatus.CONFLICT, "판매가 아직 시작되지 않았습니다."),
     SALE_ENDED(HttpStatus.CONFLICT, "판매가 종료되었습니다."),
     OPTION_NOT_FOUND(HttpStatus.NOT_FOUND, "주문 옵션을 찾을 수 없습니다."),
-    INSUFFICIENT_STOCK(HttpStatus.UNPROCESSABLE_CONTENT, "옵션 재고가 부족합니다.");
+    INSUFFICIENT_STOCK(HttpStatus.UNPROCESSABLE_CONTENT, "옵션 재고가 부족합니다."),
+    ORDER_CREATION_TEMPORARILY_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "요청이 많아 잠시 처리할 수 없습니다. 잠시 후 다시 시도해 주세요.");
 
     private final HttpStatus status;
     private final String message;

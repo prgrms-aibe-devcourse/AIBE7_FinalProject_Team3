@@ -88,6 +88,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/seller/drop-drafts': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * 사진 기반 DROP 초안(AI)
+     * @description 업로드한 이미지(최대 3장)로 상품명·설명·카테고리·이미지 대체 설명 초안을 만든다. 저장하지 않으며 항목별로 검증에 실패하면 null이다
+     */
+    post: operations['draft']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/seller/drops/{dropId}': {
     parameters: {
       query?: never
@@ -204,6 +224,26 @@ export interface paths {
      * @description 활성 옵션의 현재 가용 재고를 반환한다. 표시용이며 실제 구매 가능 여부는 주문 API가 다시 판단한다
      */
     get: operations['getStocks']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/drops/{dropId}/related': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * 관련 DROP 추천
+     * @description 아직 WISH할 수 있는 DROP을 최대 4개 추천한다. 함께 WISH한 DROP(겹친 사용자 3명 이상)을 먼저 쓰고, 없으면 같은 카테고리에서 내용이 비슷한 DROP(임베딩)을 쓴다. basis로 추천 방식을 알려 준다
+     */
+    get: operations['getRelated']
     put?: never
     post?: never
     delete?: never
@@ -349,6 +389,31 @@ export interface components {
       status?: 'DRAFT' | 'WISH' | 'GRAB' | 'ENDED' | 'CANCELED'
       /** Format: date-time */
       canceledAt?: string
+    }
+    DropAiDraftImage: {
+      /** Format: uuid */
+      imageId: string
+      imageUrl: string
+    }
+    DropAiDraftRequest: {
+      images: components['schemas']['DropAiDraftImage'][]
+    }
+    ApiResponseDropAiDraftResponse: {
+      success?: boolean
+      data?: components['schemas']['DropAiDraftResponse']
+      message?: string
+    }
+    DropAiDraftImageAltText: {
+      /** Format: uuid */
+      imageId?: string
+      altText?: string
+    }
+    DropAiDraftResponse: {
+      name?: string
+      description?: string
+      /** Format: int64 */
+      categoryId?: number
+      images?: components['schemas']['DropAiDraftImageAltText'][]
     }
     ApiResponsePageResponseSellerDropListResponse: {
       success?: boolean
@@ -587,10 +652,10 @@ export interface components {
     }
     PublicDropStockOption: {
       /** Format: int64 */
-      optionId?: number
+      optionId: number
       /** Format: int32 */
-      availableStock?: number
-      soldOut?: boolean
+      availableStock: number
+      soldOut: boolean
     }
     PublicDropStockResponse: {
       /** Format: int64 */
@@ -598,6 +663,16 @@ export interface components {
       options?: components['schemas']['PublicDropStockOption'][]
       /** Format: date-time */
       serverTime?: string
+    }
+    ApiResponseRelatedDropsResponse: {
+      success?: boolean
+      data?: components['schemas']['RelatedDropsResponse']
+      message?: string
+    }
+    RelatedDropsResponse: {
+      /** @enum {string|null} */
+      basis?: 'CO_WISH' | 'SIMILAR' | null
+      drops?: components['schemas']['PublicDropListResponse'][]
     }
     ErrorDetail: {
       code?: string
@@ -936,6 +1011,84 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['ApiResponseDropCancelResponse']
+        }
+      }
+    }
+  }
+  draft: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DropAiDraftRequest']
+      }
+    }
+    responses: {
+      /** @description 초안 생성 성공 */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropAiDraftResponse']
+        }
+      }
+      /** @description INVALID_REQUEST, VALIDATION_FAILED */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropAiDraftResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropAiDraftResponse']
+        }
+      }
+      /** @description ACCESS_DENIED */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropAiDraftResponse']
+        }
+      }
+      /** @description AI_DRAFT_LIMIT_EXCEEDED */
+      429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropAiDraftResponse']
+        }
+      }
+      /** @description AI_DRAFT_FAILED */
+      502: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropAiDraftResponse']
+        }
+      }
+      /** @description AI_DRAFT_UNAVAILABLE */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDropAiDraftResponse']
         }
       }
     }
@@ -1307,6 +1460,46 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['ApiResponsePublicDropStockResponse']
+        }
+      }
+    }
+  }
+  getRelated: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        dropId: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description 조회 성공 */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseRelatedDropsResponse']
+        }
+      }
+      /** @description INVALID_REQUEST */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseRelatedDropsResponse']
+        }
+      }
+      /** @description DROP_NOT_FOUND */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseRelatedDropsResponse']
         }
       }
     }

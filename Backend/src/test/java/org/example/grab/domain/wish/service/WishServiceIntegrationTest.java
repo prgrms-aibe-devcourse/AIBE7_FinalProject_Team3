@@ -3,6 +3,7 @@ package org.example.grab.domain.wish.service;
 import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.domain.wish.dto.response.WishResponse;
 import org.example.grab.global.error.BusinessException;
+import org.example.grab.support.TestcontainersConfiguration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -34,7 +35,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class WishServiceIntegrationTest {
 
     @Container
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18");
+    static PostgreSQLContainer postgres = new PostgreSQLContainer(TestcontainersConfiguration.POSTGRES_IMAGE);
 
     @DynamicPropertySource
     static void datasourceProperties(DynamicPropertyRegistry registry) {

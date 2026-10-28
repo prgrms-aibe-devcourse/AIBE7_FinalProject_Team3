@@ -25,10 +25,10 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -59,22 +59,20 @@ public class OrderCreateTransactionService {
                 .map(OrderCreateRequest.Item::optionId)
                 .sorted()
                 .toList();
-        List<LockedOption> lockedOptions = inventoryRepository.lockOptions(drop.getId(), optionIds);
-        if (lockedOptions.size() != optionIds.size()) {
+        if (optionIds.size() != Set.copyOf(optionIds).size()) {
             throw new BusinessException(OrderErrorCode.OPTION_NOT_FOUND);
         }
-        Map<Long, LockedOption> optionsById = lockedOptions.stream()
-                .collect(Collectors.toMap(LockedOption::getId, Function.identity()));
 
+        // 옵션 행을 항상 PK 오름차순으로 잠가(= 조건부 UPDATE로 락을 걸어) 서로 다른 옵션 조합 주문 사이의 데드락을 방지한다.
+        Map<Long, LockedOption> optionsById = new LinkedHashMap<>();
         long itemsAmount = 0;
-        for (OrderCreateRequest.Item item : request.items()) {
-            LockedOption option = optionsById.get(item.optionId());
-            if (option == null || !option.isActive()) {
-                throw new BusinessException(OrderErrorCode.OPTION_NOT_FOUND);
-            }
-            if (option.getAvailableQuantity() < item.quantity()) {
-                throw new BusinessException(OrderErrorCode.INSUFFICIENT_STOCK);
-            }
+        for (Long optionId : optionIds) {
+            OrderCreateRequest.Item item = request.items().stream()
+                    .filter(i -> i.optionId().equals(optionId)).findFirst().orElseThrow();
+            LockedOption option = inventoryRepository
+                    .tryReserveOption(drop.getId(), optionId, item.quantity())
+                    .orElseGet(() -> diagnoseReserveFailure(drop.getId(), optionId, item.quantity()));
+            optionsById.put(optionId, option);
             itemsAmount = Math.addExact(itemsAmount, Math.multiplyExact(option.getUnitPrice(), item.quantity()));
         }
 
@@ -96,7 +94,6 @@ public class OrderCreateTransactionService {
         List<OrderItem> orderItems = new ArrayList<>();
         for (OrderCreateRequest.Item requestItem : request.items()) {
             LockedOption option = optionsById.get(requestItem.optionId());
-            inventoryRepository.increaseReservedQuantity(option.getId(), requestItem.quantity());
             orderItems.add(OrderItem.create(
                     order,
                     option.getId(),
@@ -111,6 +108,24 @@ public class OrderCreateTransactionService {
                 .toList());
         stockChangePublisher.publish(order.getDropId(), StockChange.STOCK);
         return order;
+    }
+
+    // tryReserveOption이 빈 결과면 원인(없는 옵션·비활성·재고부족)을 가려 정확한 에러코드를 던진다.
+    private LockedOption diagnoseReserveFailure(Long dropId, Long optionId, int quantity) {
+        List<LockedOption> found = inventoryRepository.lockOptions(dropId, List.of(optionId));
+        if (found.isEmpty()) {
+            throw new BusinessException(OrderErrorCode.OPTION_NOT_FOUND);
+        }
+        LockedOption option = found.get(0);
+        if (!option.isActive()) {
+            throw new BusinessException(OrderErrorCode.OPTION_NOT_FOUND);
+        }
+        if (option.getAvailableQuantity() < quantity) {
+            throw new BusinessException(OrderErrorCode.INSUFFICIENT_STOCK);
+        }
+        // 진단 조회 사이에 다른 트랜잭션이 재고를 반환해 조건이 다시 맞아떨어진 경우 — 매우 드물지만 그대로 재시도한다.
+        return inventoryRepository.tryReserveOption(dropId, optionId, quantity)
+                .orElseThrow(() -> new BusinessException(OrderErrorCode.INSUFFICIENT_STOCK));
     }
 
     /*

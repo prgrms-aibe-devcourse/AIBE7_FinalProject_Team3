@@ -15,6 +15,10 @@ class UserTest {
     private static final String EMAIL = "user@example.com";
     private static final String PASSWORD_HASH = "$argon2id$v=19$m=19456,t=2,p=1$c2FsdA$aGFzaA";
     private static final String NICKNAME = "홍길동";
+    private static final String PROFILE_IMAGE_URL = "https://project.supabase.co/storage/v1/object/public/profile-images/"
+            + "profiles/6f1a2b3c-4d5e-4f70-8192-a3b4c5d6e7f8/1d0f9e8c-7b6a-4539-8412-6c5d4e3f2a1b.png";
+    private static final String OTHER_PROFILE_IMAGE_URL = "https://project.supabase.co/storage/v1/object/public/profile-images/"
+            + "profiles/6f1a2b3c-4d5e-4f70-8192-a3b4c5d6e7f8/2e1f0a9d-8c7b-4a6e-9523-7d6e5f4a3b2c.webp";
 
     @Test
     @DisplayName("LOCAL 회원은 USER, ACTIVE, LOCAL 기본값으로 생성된다")
@@ -122,5 +126,47 @@ class UserTest {
         assertThatThrownBy(() -> user.changeNickname(null))
                 .isInstanceOf(NullPointerException.class);
         assertThat(user.getNickname()).isEqualTo(NICKNAME);
+    }
+
+    @Test
+    @DisplayName("프로필 이미지를 받은 URL로 등록하고 다시 바꾼다")
+    void changeProfileImageReplacesUrl() {
+        // given
+        User user = User.createLocal(EMAIL, PASSWORD_HASH, NICKNAME);
+
+        // when & then
+        user.changeProfileImage(PROFILE_IMAGE_URL);
+        assertThat(user.getProfileImageUrl()).isEqualTo(PROFILE_IMAGE_URL);
+        user.changeProfileImage(OTHER_PROFILE_IMAGE_URL);
+        assertThat(user.getProfileImageUrl()).isEqualTo(OTHER_PROFILE_IMAGE_URL);
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {" ", "\t"})
+    @DisplayName("프로필 이미지를 빈 값으로 바꿀 수 없고 기존 값이 유지된다")
+    void changeProfileImageRejectsBlank(String profileImageUrl) {
+        // given
+        User user = User.createLocal(EMAIL, PASSWORD_HASH, NICKNAME);
+        user.changeProfileImage(PROFILE_IMAGE_URL);
+
+        // when & then: 지우기는 removeProfileImage로만 한다
+        assertThatThrownBy(() -> user.changeProfileImage(profileImageUrl))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(user.getProfileImageUrl()).isEqualTo(PROFILE_IMAGE_URL);
+    }
+
+    @Test
+    @DisplayName("프로필 이미지를 지우면 null이 되고, 없을 때 지워도 null이다")
+    void removeProfileImageClearsUrl() {
+        // given
+        User user = User.createLocal(EMAIL, PASSWORD_HASH, NICKNAME);
+        user.changeProfileImage(PROFILE_IMAGE_URL);
+
+        // when & then
+        user.removeProfileImage();
+        assertThat(user.getProfileImageUrl()).isNull();
+        user.removeProfileImage();
+        assertThat(user.getProfileImageUrl()).isNull();
     }
 }

@@ -6,7 +6,7 @@
 }
 .my-columns {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   gap: 24px;
   align-items: start;
 }
@@ -15,26 +15,75 @@
   padding: 32px;
   border-top: 3px solid var(--ink);
 }
-.account-heading,
-.account-footer {
+.account-heading {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 18px;
 }
-.account-heading h2 {
-  margin: 4px 0 16px;
+.account-heading {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 24px;
+}
+.account-identity {
+  display: grid;
+  flex: 1 1 240px;
+  gap: 8px;
+  min-width: 0;
+}
+.account-identity p {
+  overflow-wrap: anywhere;
+}
+.account-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.account-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+.account-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(72px, auto));
+  margin: 0;
+  border-left: 1px solid var(--line);
+}
+.account-stats div {
+  display: grid;
+  gap: 4px;
+  padding: 0 24px;
+}
+.account-stats div + div {
+  border-left: 1px solid var(--line);
+}
+.account-stats dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+.account-stats dd {
+  min-height: 34px;
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 .account-heading strong {
   font-size: 28px;
   letter-spacing: -1px;
 }
 .account-heading p {
-  margin: 6px 0;
+  margin: 0;
   color: var(--muted);
 }
 .account-heading small,
-.account-footer p,
 .my-demo-controls small {
   color: var(--muted);
   font-size: 12px;
@@ -71,21 +120,115 @@
 .account-edit button {
   justify-self: start;
 }
-.account-footer {
+/* 계정 설정 섹션(GR-160): 행마다 제목·설명·행동, 펼친 폼은 행 아래 전체 폭 */
+.panel.account-settings {
+  margin-top: 24px;
+  padding: 12px 32px 16px;
+}
+.account-settings h2 {
+  margin: 16px 0 8px;
+}
+.settings-row {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr) auto;
+  gap: 8px 16px;
   align-items: center;
-  justify-content: flex-start;
-  flex-wrap: wrap;
-  margin-top: 22px;
-  padding-top: 18px;
+  padding: 16px 0;
   border-top: 1px solid var(--line);
 }
-.account-footer p {
-  flex: 1 1 260px;
+.settings-row h3 {
   margin: 0;
+  font-size: 14px;
 }
-.account-footer .text-link {
+.settings-row > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.settings-row .text-link {
   border: 0;
   background: none;
+}
+.settings-form {
+  grid-column: 1 / -1;
+}
+.settings-form:empty {
+  display: none;
+}
+.settings-form .account-edit {
+  margin-top: 4px;
+}
+/* 모달 안의 내 정보 폼은 한 열이고 오류는 각 입력 바로 아래에 둔다 */
+.modal .account-edit {
+  grid-template-columns: 1fr;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  background: none;
+}
+.account-field {
+  display: grid;
+  gap: 6px;
+}
+.account-field .form-error {
+  margin: 0;
+}
+.account-field > label {
+  font-size: 12px;
+  font-weight: 700;
+}
+/* 프로필 이미지 모달(GR-132): 현재 이미지·미리보기 옆에 선택·삭제 버튼, 좁으면 버튼이 아래로 내려간다 */
+.profile-image-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px 20px;
+}
+.profile-image-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.profile-image-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+/* 비밀번호 보기 버튼은 입력 안쪽 오른쪽에 겹쳐 두고 그만큼 입력 오른쪽 여백을 둔다 */
+.password-input {
+  position: relative;
+  display: grid;
+}
+.account-edit .password-input input {
+  padding-right: 52px;
+}
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+.password-toggle[aria-pressed='true'] {
+  color: var(--ink);
+}
+.account-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+.account-edit-actions button {
+  justify-self: auto;
 }
 .my-demo-controls {
   display: flex;
@@ -168,10 +311,37 @@
 }
 /* 주문 목록 응답에는 상품 이미지가 없어 이미지 열을 두지 않는다. */
 .compact-item.order {
-  grid-template-columns: minmax(0, 1fr) auto;
+  /* 행마다 별도 그리드라 배지·버튼 열 폭을 고정해 열을 맞춘다 */
+  grid-template-columns: 76px minmax(0, 1fr) auto 96px;
+  gap: 16px;
+}
+.compact-item.order > .order-status {
+  justify-self: start;
 }
 .compact-item.order > b {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.compact-item.order > a {
+  min-height: 40px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+/* 결제 대기만 라임으로 강조하고 나머지 상태는 회색 배지로 둔다(GR-160). */
+.order-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--soft);
   font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.order-status.pending {
+  background: var(--lime);
 }
 .empty-state {
   display: grid;
@@ -227,7 +397,45 @@
   padding: 0;
   background: #fff;
 }
-.account-heading p,
-.account-footer p {
+.account-heading p {
+  overflow-wrap: anywhere;
+}
+/* 판매 종료·취소 WISH의 비슷한 굿즈(GR-195). 행 아래에 전체 폭으로 펼친다. */
+.compact-item .wish-related-toggle {
+  justify-self: start;
+  padding: 0;
+  color: var(--ink);
+  font-weight: 700;
+}
+.compact-item .wish-related {
+  grid-column: 1 / -1;
+  gap: 8px;
+  padding: 12px 14px;
+  border-left: 3px solid var(--lime);
+  border-radius: 4px;
+  background: var(--soft);
+  font-size: 12px;
+}
+.wish-related p {
+  margin: 0;
+}
+.wish-related-title {
+  font-weight: 700;
+}
+.wish-related ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.wish-related li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+.wish-related li a {
+  min-width: 0;
   overflow-wrap: anywhere;
 }

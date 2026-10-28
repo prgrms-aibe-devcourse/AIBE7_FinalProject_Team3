@@ -47,6 +47,7 @@ public class OrderController {
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "OPTION_NOT_FOUND")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "DROP_NOT_ON_SALE, SALE_NOT_STARTED, SALE_ENDED, DUPLICATE_IDEMPOTENCY_KEY")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "422", description = "INSUFFICIENT_STOCK")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "503", description = "ORDER_CREATION_TEMPORARILY_UNAVAILABLE")
     @PostMapping
     public ResponseEntity<ApiResponse<OrderCreateResponse>> create(
             @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,

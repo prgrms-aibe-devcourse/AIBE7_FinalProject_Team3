@@ -4,6 +4,7 @@ import jakarta.persistence.EntityManager;
 import org.example.grab.domain.seller.entity.Seller;
 import org.example.grab.domain.seller.entity.SellerStatus;
 import org.example.grab.global.config.JpaConfig;
+import org.example.grab.support.TestcontainersConfiguration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,7 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SellerRepositoryTest {
 
     @Container
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18");
+    static PostgreSQLContainer postgres = new PostgreSQLContainer(TestcontainersConfiguration.POSTGRES_IMAGE);
 
     @DynamicPropertySource
     static void datasourceProperties(DynamicPropertyRegistry registry) {

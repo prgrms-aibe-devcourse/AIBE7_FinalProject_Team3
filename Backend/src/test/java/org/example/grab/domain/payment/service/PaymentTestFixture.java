@@ -126,6 +126,13 @@ class PaymentTestFixture {
                 """, String.class, order.getId());
     }
 
+    String releaseReason(Order order) {
+        return jdbcTemplate.queryForObject("""
+                SELECT r.release_reason FROM stock_reservations r JOIN order_items i ON i.id = r.order_item_id
+                WHERE i.order_id = ?
+                """, String.class, order.getId());
+    }
+
     Map<String, Object> quantities() {
         return jdbcTemplate.queryForMap(
                 "SELECT reserved_quantity, sold_quantity FROM drop_options WHERE id = ?", optionId);

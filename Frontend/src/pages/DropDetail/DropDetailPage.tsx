@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import axios from 'axios'
 import EmptyState from '../../components/EmptyState/EmptyState'
 import DropDetailImages from '../../features/drop/components/DropDetailImages'
+import RelatedDrops from '../../features/drop/components/RelatedDrops'
 import DropOpenCountdown from '../../features/drop/components/DropOpenCountdown'
 import DropStockQuantity from '../../features/drop/components/DropStockQuantity'
 import DropGallery from '../../features/drop/components/DropGallery'
@@ -81,12 +82,13 @@ export default function DropDetailPage({
   const refreshFailed = detailQuery.isError || stocksQuery.isError
   const refreshing = detailQuery.isFetching || stocksQuery.isFetching
   const detail = toDropDetail(detailQuery.data)
-  const stockByOption = new Map<number, number>()
-  for (const option of stocksQuery.data?.options ?? []) {
-    if (option.optionId === undefined) continue
-    if (option.availableStock !== undefined)
-      stockByOption.set(option.optionId, option.availableStock)
-  }
+  // 재고는 재조회 응답만 근거로 삼는다. 응답 전이거나 응답에 없는 SKU는 undefined('확인 중')다.
+  const stockByOption = new Map(
+    (stocksQuery.data?.options ?? []).map((option) => [
+      option.optionId,
+      option.availableStock,
+    ]),
+  )
   const totalStock =
     stocksQuery.data?.options?.length &&
     stocksQuery.data.options.every(
@@ -101,7 +103,7 @@ export default function DropDetailPage({
   const selectedSku = findMatchingSku(detail.skus, selected)
   const wished = wishes.has(detail.id)
   const selectedStock = selectedSku
-    ? (stockByOption.get(selectedSku.id) ?? selectedSku.stock)
+    ? stockByOption.get(selectedSku.id)
     : undefined
   const maxQuantity = Math.min(
     5,
@@ -342,6 +344,15 @@ export default function DropDetailPage({
         </div>
       </section>
 
+      {mode === 'closed' && (
+        <RelatedDrops
+          dropId={detail.id}
+          context="closed"
+          wishes={wishes}
+          wishReady={wishesReady}
+          onWish={(id) => void toggleWish(id)}
+        />
+      )}
       <section className="story-section">
         <h2>상품 상세 설명</h2>
         <p>{detail.description}</p>
@@ -352,6 +363,15 @@ export default function DropDetailPage({
         <p>배송비 {won(detail.shippingFee)}</p>
         <p>{detail.shippingNotice}</p>
       </section>
+      {mode === 'wish' && (
+        <RelatedDrops
+          dropId={detail.id}
+          context="wish"
+          wishes={wishes}
+          wishReady={wishesReady}
+          onWish={(id) => void toggleWish(id)}
+        />
+      )}
     </>
   )
 }

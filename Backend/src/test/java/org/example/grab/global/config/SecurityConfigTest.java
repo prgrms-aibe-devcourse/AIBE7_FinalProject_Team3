@@ -1,21 +1,27 @@
 package org.example.grab.global.config;
 
+import org.example.grab.global.security.password.PasswordHashProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /*
     GR-29 M01-02: SecurityConfig가 등록하는 비밀번호 인코더를 Spring 컨텍스트 없이 확인한다.
     빈 메서드를 직접 호출해 실제로 등록되는 파라미터를 검증한다.
+    GR-178부터 인코더는 동시 실행 상한으로 감싸져 있다. 상한 동작은 ConcurrencyLimitedPasswordEncoderTest가 보고,
+    여기서는 application.yml과 같은 설정으로 감싼 인코더가 Argon2 동작을 그대로 위임하는지 본다.
  */
 class SecurityConfigTest {
 
     private static final String PASSWORD = "Password123!";
 
-    private final PasswordEncoder encoder = new SecurityConfig().passwordEncoder();
+    private final PasswordEncoder encoder = new SecurityConfig().passwordEncoder(
+            new PasswordHashProperties(4, Duration.ofSeconds(3), Duration.ofSeconds(3)));
 
     @Test
     @DisplayName("해시는 Argon2id 형식이고 메모리 19 MiB·반복 2·병렬도 1이 적히며 원문을 포함하지 않는다")

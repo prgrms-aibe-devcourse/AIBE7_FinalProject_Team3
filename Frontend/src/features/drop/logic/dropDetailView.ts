@@ -41,7 +41,6 @@ const toSkus = (options: PublicOption[] | undefined): DetailSku[] =>
       ]),
     ),
     price: option.unitPrice ?? 0,
-    stock: option.availableStock,
   }))
 
 const toActions = (

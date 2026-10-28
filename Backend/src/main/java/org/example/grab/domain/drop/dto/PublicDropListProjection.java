@@ -34,4 +34,7 @@ public interface PublicDropListProjection {
     Long getAvailableStock();
 
     Long getWishCount();
+
+    // 필터를 통과한 전체 건수(COUNT(*) OVER ()). 페이지 응답의 totalElements에 쓴다(GR-198).
+    Long getTotalCount();
 }

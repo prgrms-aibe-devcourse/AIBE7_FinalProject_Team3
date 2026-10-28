@@ -604,3 +604,88 @@ test('판매 경계가 지난 뒤 복귀해도 같은 갱신을 후속 요청으
   dispose()
   client.clear()
 })
+
+// GR-209: 변경 알림으로 생긴 재조회는 max(최소 간격의 남은 시간, 0~1초 무작위)를 기다린다.
+async function readyAndIdle() {
+  vi.setSystemTime(new Date('2026-10-19T00:00:00Z'))
+  const context = setup()
+  context.source.emit('ready', {
+    dropIds: [100],
+    serverTime: '2026-10-19T00:00:00Z',
+  })
+  await vi.advanceTimersByTimeAsync(0)
+  await vi.advanceTimersByTimeAsync(5000)
+  context.fetchQuery.mockClear()
+  return context
+}
+
+test('변경 알림 재조회는 최소 간격이 지났으면 0~1초 중 무작위로 기다린다', async () => {
+  const { source, fetchQuery, stop } = await readyAndIdle()
+  vi.spyOn(Math, 'random').mockReturnValue(0.5)
+
+  source.emit('drop-changed', { dropId: 100, changes: ['STOCK'] })
+  await vi.advanceTimersByTimeAsync(499)
+  expect(fetchQuery).not.toHaveBeenCalled()
+  await vi.advanceTimersByTimeAsync(1)
+  expect(fetchQuery).toHaveBeenCalledTimes(2)
+  stop()
+})
+
+test('분산 대기 중 추가 알림은 예약을 미루거나 새로 만들지 않는다', async () => {
+  const { source, fetchQuery, stop } = await readyAndIdle()
+  // 상세·재고 lane이 각자 대기를 뽑는다. 첫 알림은 둘 다 0.5초, 이후 뽑힌다면 0.9초
+  vi.spyOn(Math, 'random')
+    .mockReturnValueOnce(0.5)
+    .mockReturnValueOnce(0.5)
+    .mockReturnValue(0.9)
+
+  source.emit('drop-changed', { dropId: 100, changes: ['STOCK'] })
+  await vi.advanceTimersByTimeAsync(300)
+  source.emit('drop-changed', { dropId: 100, changes: ['STOCK'] })
+  await vi.advanceTimersByTimeAsync(200)
+  expect(fetchQuery).toHaveBeenCalledTimes(2)
+  await vi.advanceTimersByTimeAsync(3000)
+  expect(fetchQuery).toHaveBeenCalledTimes(2)
+  stop()
+})
+
+test('최소 간격이 남아 있으면 간격만 기다리고 무작위 대기를 덧붙이지 않는다', async () => {
+  vi.setSystemTime(new Date('2026-10-19T00:00:00Z'))
+  const { source, fetchQuery, stop } = setup()
+  source.emit('ready', { dropIds: [100], serverTime: '2026-10-19T00:00:00Z' })
+  await vi.advanceTimersByTimeAsync(0)
+  fetchQuery.mockClear()
+  vi.spyOn(Math, 'random').mockReturnValue(0.9)
+
+  source.emit('drop-changed', { dropId: 100, changes: ['STOCK'] })
+  await vi.advanceTimersByTimeAsync(1999)
+  expect(fetchQuery).not.toHaveBeenCalled()
+  await vi.advanceTimersByTimeAsync(1)
+  expect(fetchQuery).toHaveBeenCalledTimes(2)
+  stop()
+})
+
+test('수동 갱신은 알림으로 분산 대기 중인 예약을 당겨 바로 조회한다', async () => {
+  const { source, fetchQuery, refresh, stop } = await readyAndIdle()
+  vi.spyOn(Math, 'random').mockReturnValue(0.9)
+
+  source.emit('drop-changed', { dropId: 100, changes: ['STOCK'] })
+  await vi.advanceTimersByTimeAsync(100)
+  refresh()
+  await vi.advanceTimersByTimeAsync(1)
+  expect(fetchQuery).toHaveBeenCalledTimes(2)
+  await vi.advanceTimersByTimeAsync(2000)
+  expect(fetchQuery).toHaveBeenCalledTimes(2)
+  stop()
+})
+
+test('dispose하면 분산 대기 중인 예약도 취소한다', async () => {
+  const { source, fetchQuery, stop } = await readyAndIdle()
+  vi.spyOn(Math, 'random').mockReturnValue(0.9)
+
+  source.emit('drop-changed', { dropId: 100, changes: ['STOCK'] })
+  await vi.advanceTimersByTimeAsync(100)
+  stop()
+  await vi.advanceTimersByTimeAsync(3000)
+  expect(fetchQuery).not.toHaveBeenCalled()
+})

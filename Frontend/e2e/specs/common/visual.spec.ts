@@ -1,5 +1,6 @@
 import {
   expect,
+  goToMyPage,
   loginAdmin,
   loginSeller,
   test,
@@ -82,7 +83,7 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
     await page.getByLabel('이메일').fill('grab@example.com')
     await page.getByLabel('비밀번호').fill('password1234')
     await page.getByRole('button', { name: '로그인', exact: true }).click()
-    await page.getByRole('link', { name: 'MY', exact: true }).click()
+    await goToMyPage(page)
     // WISH 패널도 로딩 상태를 role=status로 두므로 토스트만 확인하고, 목록 로딩이 끝난 뒤 촬영한다.
     await settleToast(page)
     await expect(page.getByText('매일을 담는 캔버스 토트')).toBeVisible()
@@ -169,6 +170,20 @@ test.describe('화면 기준', { tag: '@visual' }, () => {
     })
     await settleToast(page)
     await shot(page, 'seller-drop-detail')
+  })
+
+  // 판매 시작 전 WISH DROP의 수요 분석 참고 카드(GR-144). 근거와 가정을 펼친 상태로 찍는다
+  test('seller-drop-detail-demand', async ({ page }) => {
+    await loginSeller(page)
+    await page.evaluate(() => {
+      window.location.hash = '#/seller/drops/101'
+    })
+    const card = page.getByRole('region', { name: '수요 분석' })
+    await expect(card.locator('.demand-metrics')).toBeVisible()
+    await card.getByText('근거와 가정 보기').click()
+    await expect(card.getByRole('table', { name: '옵션별 배분' })).toBeVisible()
+    await settleToast(page)
+    await shot(page, 'seller-drop-detail-demand')
   })
 
   test('seller-inventory', async ({ page }) => {

@@ -17,6 +17,7 @@
 | [PAYMENT.md](PAYMENT.md) | 결제 |
 | [INVENTORY.md](INVENTORY.md) | 재고 조회 |
 | [IMAGE_UPLOAD.md](IMAGE_UPLOAD.md) | 이미지 업로드 |
+| [DEMAND.md](DEMAND.md) | 판매자 수요 분석·판매 계획 |
 
 ## 2. 전체 API 목록 요약
 
@@ -37,8 +38,11 @@
 | GET | `/api/v1/users/me` | USER | 로그인한 사용자의 회원 정보 조회 |
 | PATCH | `/api/v1/users/me` | USER | 본인 닉네임 수정 |
 | PATCH | `/api/v1/users/me/password` | USER | 본인 비밀번호 변경 |
+| POST | `/api/v1/users/me/profile-image/upload-url` | USER | 본인 프로필 이미지 업로드용 Supabase 서명 업로드 URL 발급 |
 | PUT | `/api/v1/users/me/profile-image` | USER | 본인 프로필 이미지 등록 또는 변경 |
 | DELETE | `/api/v1/users/me/profile-image` | USER | 본인 프로필 이미지 삭제 |
+
+> 프로필 이미지 업로드 URL 발급은 [IMAGE_UPLOAD.md 1.2절](IMAGE_UPLOAD.md#12-내-프로필-이미지-업로드-url-발급), 등록·삭제는 [MEMBER_AUTH.md 1.12·1.13절](MEMBER_AUTH.md#112-내-프로필-이미지-등록수정)을 따릅니다. 세 API 모두 USER 권한과 CSRF 토큰이 필요합니다.
 
 ### 2.2 판매자 등록 및 승인
 
@@ -58,9 +62,10 @@
 | GET | `/api/v1/drops` | 불필요 | 공개된 WISH·GRAB·ENDED DROP 목록 조회 |
 | GET | `/api/v1/drops/{dropId}` | 불필요 | DROP 상세, 옵션, 일정 및 배송 정보 조회 |
 | GET | `/api/v1/drops/{dropId}/stocks` | 불필요 | 옵션별 현재 가용 재고 조회 |
+| GET | `/api/v1/drops/{dropId}/related` | 불필요 | 함께 WISH한 DROP 또는 비슷한 다가오는 DROP 추천 |
 | GET | `/api/v1/drops/stock-stream?dropIds=100,101` | 불필요. 무효 쿠키는 401 | 단일·다중 상품 변경 구독. 커밋 후 도메인 자동 알림 |
 
-> GR-110에서 SSE endpoint·전송·커밋 후 도메인 변경 알림·OpenAPI 스냅샷·프론트 생성 타입을 구현했습니다. 화면 구독은 GR-111/112, Redis·프록시·운영 검증은 GR-113 범위입니다. 변경 알림 후 기존 조회 API를 재사용하는 정책과 API·복구·초기 운영 목표는 [실시간 변경 전달 계약](../REALTIME_STOCK.md)을 따릅니다. 운영 성능은 미실측입니다.
+> GR-110에서 SSE endpoint·전송·커밋 후 도메인 변경 알림·OpenAPI 스냅샷·프론트 생성 타입을 구현했습니다. 화면 구독은 GR-111/112, 프록시·운영 검증은 GR-180 범위이고 다중 서버 Redis 전달은 보류했습니다(GR-113 취소). 변경 알림 후 기존 조회 API를 재사용하는 정책과 API·복구·초기 운영 목표는 [실시간 변경 전달 계약](../REALTIME_STOCK.md)을 따릅니다. 운영 성능은 미실측입니다.
 
 **목록 API 지원 파라미터:**
 - 상태 필터: `status`
@@ -84,6 +89,7 @@
 | POST | `/api/v1/seller/drops/{dropId}/cancel` | SELLER | WISH 상태의 출시 취소 |
 | GET | `/api/v1/seller/drops/{dropId}/stocks` | SELLER | 옵션별 가용·확보·판매 재고 조회 |
 | GET | `/api/v1/seller/drops/{dropId}/wish-count` | SELLER | 해당 DROP의 활성 WISH 수 조회 |
+| POST | `/api/v1/seller/drop-drafts` | SELLER | 업로드한 사진으로 상품명·설명·카테고리·대체 설명 AI 초안 생성 (저장하지 않음) |
 
 > 모든 판매자 DROP API는 `SELLER` 권한과 리소스 소유권을 함께 검사합니다.
 
@@ -155,22 +161,37 @@
 
 > 발급된 `uploadUrl`로 클라이언트가 Supabase Storage에 이미지를 직접 업로드하고, 응답의 `{ imageId, imageUrl }`을 DROP 생성·수정 요청의 GALLERY `images` 또는 DETAIL `detailImages`에 사용합니다. DROP당 GALLERY는 최대 5개, DETAIL은 최대 15개입니다.
 
+### 2.11 판매자 수요 분석 (GR-140)
+
+| Method | Endpoint | 인증 | 용도 |
+| --- | --- | --- | --- |
+| GET | `/api/v1/seller/drops/{dropId}/demand-analysis` | SELLER | 수요 데이터와 기본 가정의 판매 계획 조회 |
+| POST | `/api/v1/seller/drops/{dropId}/demand-analysis/calculate` | SELLER | 가정을 바꿔 판매 계획 재계산 (저장하지 않음) |
+| POST | `/api/v1/seller/drops/{dropId}/demand-analysis/explanation` | SELLER | 판매자가 고른 가정의 분석을 LLM으로 설명 (요청 시에만, 같은 입력이면 저장된 설명 재사용) |
+| POST | `/api/v1/seller/stock-recommendations` | SELLER | DROP 생성 단계 재고 추천·가격대 참고 (저장하지 않음) |
+| POST | `/api/v1/seller/stock-recommendations/explanation` | SELLER | 생성 단계 재고 추천 근거를 비슷한 DROP 실적과 함께 LLM으로 설명 (요청 시에만) |
+| POST | `/api/v1/seller/similar-sales` | SELLER | 생성 단계 비슷한 DROP 실적 (저장하지 않음) |
+| GET | `/api/v1/seller/drops/{dropId}/similar-sales` | SELLER | WISH 단계 비슷한 DROP 실적 |
+
+> 계산은 서버가 하고 LLM은 계산 결과의 설명만 만듭니다. 분석과 추천은 참고용이며 재고·가격·판매 상태를 바꾸지 않습니다. 판매 계획 저장·결정 API는 GR-175에서 제거했습니다. 다른 판매자의 판매 데이터는 익명 집계값으로만 사용합니다. 구현 시 OpenAPI `demand` 그룹을 추가합니다.
+
 ---
 
 ## 3. 전체 API 간단 요약
 
 | 영역 | API 수 | 주요 용도 |
 | --- | --- | --- |
-| 회원 및 인증 | 13 | 가입, 로그인, 소셜 로그인, 토큰, 회원 정보 및 프로필 이미지 관리 |
+| 회원 및 인증 | 16 | 가입, 로그인, 소셜 로그인, 토큰, 회원 정보 및 프로필 이미지 관리 |
 | 판매자 등록 | 5 | 판매자 신청, 승인, 반려 |
-| 공개 DROP 탐색 | 5 | 카테고리, 목록, 상세, 재고 조회·변경 구독 |
-| 판매자 DROP 관리 | 8 | 생성, 수정, 공개, 취소, 통계 |
+| 공개 DROP 탐색 | 6 | 카테고리, 목록, 상세, 재고 조회·변경 구독, 관련 DROP 추천 |
+| 판매자 DROP 관리 | 9 | 생성, 수정, 공개, 취소, 통계, 사진 기반 AI 초안 |
 | WISH | 3 | 등록, 취소, 내 목록 |
 | 주문 | 4 | 주문 생성, 조회, 취소 |
 | 결제 | 3 | 토스페이먼츠 테스트 결제 승인, 웹훅 수신, 이력 조회 |
-| 배송 | 5 | 판매자 주문 조회 및 배송 상태 관리 |
+| 배송 | 7 | 판매자 주문 조회 및 배송 상태 관리 |
 | 대시보드 | 3 | 판매자 운영 통계 |
 | 이미지 | 1 | 상품 이미지 업로드 |
-| **합계** | **50** | |
+| 수요 분석 | 7 | 수요 분석·재계산·설명, 생성 단계 재고 추천·근거 설명, 비슷한 DROP 실적 |
+| **합계** | **64** | |
 
 ---

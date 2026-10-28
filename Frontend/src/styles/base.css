@@ -68,6 +68,86 @@ textarea:focus-visible,
   outline-offset: 3px;
 }
 
+.avatar {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--lime);
+  color: var(--ink);
+  font-weight: 800;
+  line-height: 1;
+}
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 모달(GR-160): 브라우저 <dialog>. 열릴 때만 짧게 움직인다(DESIGN.md 모달 예외). */
+.modal {
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+}
+.modal[open] {
+  animation: modal-rise 200ms ease-out;
+}
+.modal::backdrop {
+  background: rgb(25 27 23 / 45%);
+}
+.modal[open]::backdrop {
+  animation: modal-fade 200ms ease-out;
+}
+.modal-panel {
+  padding: 28px;
+}
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.modal-header h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.modal-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: -10px -10px 0 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+@keyframes modal-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+@keyframes modal-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes modal-sheet {
+  from {
+    transform: translateY(100%);
+  }
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -195,6 +275,66 @@ textarea:focus-visible,
   color: #fff;
   font-size: 12px;
   font-weight: 800;
+}
+/* 로그인 상태 계정 메뉴(GR-132): 44px 터치 영역 안에 36px 프로필 이미지. 흰 이미지도 헤더와 구분되게 테두리를 둔다.
+   음수 여백으로 배치상 크기는 36px로 두어 모바일 헤더 높이가 로그인 전후로 달라지지 않게 한다. */
+.account-menu {
+  position: relative;
+}
+.account-avatar {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin: -4px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+.account-avatar .avatar {
+  border: 1px solid var(--line);
+}
+/* 펼침 메뉴는 버튼 오른쪽 끝에 맞춰 아래로 띄워 헤더·페이지 배치를 밀지 않는다 */
+.account-menu-list {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  display: grid;
+  min-width: 148px;
+  margin: 0;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  list-style: none;
+}
+.account-menu-list a,
+.account-menu-list button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.account-menu-list a:hover,
+.account-menu-list button:hover:not(:disabled) {
+  background: var(--soft);
+}
+.account-menu-list button:disabled {
+  color: var(--muted);
+  cursor: default;
 }
 
 .primary-button {

@@ -1,5 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
-import { getDropDetail, getDrops, getDropStocks } from '../../../api/drop/drops'
+import {
+  getDropDetail,
+  getDrops,
+  getDropStocks,
+  getRelatedDrops,
+} from '../../../api/drop/drops'
 import type { DropListParams } from './queryKeys'
 import { dropKeys } from './queryKeys'
 
@@ -29,5 +34,16 @@ export function useDropStocks(dropId: number) {
     queryKey: dropKeys.stocks(dropId),
     queryFn: ({ signal }) => getDropStocks(dropId, signal),
     enabled: Number.isSafeInteger(dropId) && dropId > 0,
+  })
+}
+
+// 관련 DROP 추천은 상세가 WISH 중이거나 품절·종료일 때만 그려지며, 자주 바뀌지 않아 1분 동안 다시 조회하지 않는다
+export function useRelatedDrops(dropId: number) {
+  return useQuery({
+    queryKey: dropKeys.related(dropId),
+    queryFn: ({ signal }) => getRelatedDrops(dropId, signal),
+    enabled: Number.isSafeInteger(dropId) && dropId > 0,
+    staleTime: 60_000,
+    retry: false,
   })
 }

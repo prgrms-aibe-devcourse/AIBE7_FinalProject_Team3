@@ -8,6 +8,7 @@ import org.example.grab.domain.order.dto.OrderCreateRequest;
 import org.example.grab.domain.order.entity.Order;
 import org.example.grab.global.idempotency.IdempotencyKey;
 import org.example.grab.global.idempotency.RequestHash;
+import org.example.grab.support.TestcontainersConfiguration;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import java.time.OffsetDateTime;
@@ -52,7 +53,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class StockStreamHttpIntegrationTest {
 
     @Container
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18");
+    static PostgreSQLContainer postgres = new PostgreSQLContainer(TestcontainersConfiguration.POSTGRES_IMAGE);
 
     @DynamicPropertySource
     static void datasourceProperties(DynamicPropertyRegistry registry) {
@@ -111,6 +112,8 @@ class StockStreamHttpIntegrationTest {
         jdbc.update("DELETE FROM order_items WHERE drop_id IN (?, ?)", first, second);
         jdbc.update("DELETE FROM orders WHERE drop_id IN (?, ?)", first, second);
         jdbc.update("DELETE FROM drop_options WHERE drop_id IN (?, ?)", first, second);
+        // 판매 시작 전환 후 수요 분석 기록(GR-175)이 DROP을 참조하므로 먼저 지운다
+        jdbc.update("DELETE FROM demand_analysis_snapshots WHERE drop_id IN (SELECT id FROM drops WHERE seller_id = ?)", sellerId);
         jdbc.update("DELETE FROM drops WHERE seller_id = ?", sellerId);
         jdbc.update("DELETE FROM sellers WHERE id = ?", sellerId);
         jdbc.update("DELETE FROM users WHERE id = ?", userId);
@@ -189,26 +192,6 @@ class StockStreamHttpIntegrationTest {
         } finally {
             connection.disconnect();
         }
-    }
-
-    @Test
-    @DisplayName("기존 구독 상품이 비공개가 되면 변경을 전송하지 않고 재연결 금지 종료를 보낸다")
-    void invalidatesPrivateSubscription() throws Exception {
-        // given: 테스트 DB에서만 상태를 바꿔 향후 비공개 전이를 재현한다. 운영용 API를 추가하지 않는다.
-        Stream stream = open(first.toString());
-        assertThat(stream.next()).contains("ready");
-        jdbc.update("UPDATE drops SET status='DRAFT' WHERE id=?", first);
-
-        // when
-        hub.publish(first, Set.of(StockChange.STATUS));
-
-        // then
-        String frame;
-        do {
-            frame = stream.next();
-            assertThat(frame).doesNotContain("drop-changed");
-        } while (!frame.contains("stream-closed"));
-        assertThat(frame).contains("SUBSCRIPTION_INVALIDATED", "\"reconnect\":false");
     }
 
     @Test

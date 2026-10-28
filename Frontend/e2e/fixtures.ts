@@ -4,6 +4,7 @@ import { getAuth, installAuthApi } from './mock/auth'
 import { installStockStream } from './mock/stockStream'
 import { installDropImageUploads } from './mock/dropImages'
 import { installSellerDropApi } from './mock/sellerDrops'
+import { installDemandApi } from './mock/demand'
 import { installFakeToss } from './mock/toss'
 
 export type { Page }
@@ -32,6 +33,8 @@ export const test = base.extend({
     await installPublicApi(page)
     await installDropImageUploads(page)
     await installSellerDropApi(page)
+    // 수요 분석 경로만 처리하고 나머지 판매자 경로는 위 핸들러로 넘긴다(GR-168).
+    await installDemandApi(page)
     // 인증 API는 공개 API 뒤에 등록해 인증 경로만 처리하고 나머지는 위 핸들러로 넘긴다.
     installAuthApi(page)
     await provide(page)
@@ -64,3 +67,15 @@ export async function loginAdmin(page: Page) {
 }
 
 export const toast = (page: Page) => page.locator('.toast')
+
+// 로그인 상태 헤더의 프로필 이미지 버튼. 누르면 마이페이지·로그아웃 메뉴가 펼쳐진다(GR-132).
+export const accountMenuButton = (page: Page) =>
+  page.locator('.site-header').getByRole('button', { name: '계정 메뉴' })
+
+export async function goToMyPage(page: Page) {
+  await accountMenuButton(page).click()
+  await page
+    .locator('.site-header')
+    .getByRole('link', { name: '마이페이지', exact: true })
+    .click()
+}
