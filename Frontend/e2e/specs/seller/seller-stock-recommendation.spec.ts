@@ -72,3 +72,62 @@ test('재고 추천 아래에 비슷한 DROP 실적을 보여 주고 상품명�
     '비교할 판매자·DROP 수가 적어 다른 판매자 자료는 보여 주지 않아요.',
   )
 })
+
+test('근거 보기를 누르면 추천 근거 설명을 보여 주고, 입력을 바꾸면 설명을 닫는다', async ({
+  page,
+}) => {
+  await loginSeller(page)
+  await page.goto('/#/seller/drops/new')
+  const panel = page.getByRole('region', { name: '재고 추천' })
+  await page.getByLabel('카테고리').selectOption({ label: '패션' })
+  await page.getByLabel('가격', { exact: true }).fill('59000')
+  await expect(panel).toContainText('준비 권장 수량44개')
+
+  const explanation = panel.getByRole('region', { name: '추천 근거 설명' })
+  await explanation.getByRole('button', { name: '근거 보기' }).click()
+  await expect(explanation).toContainText(
+    '시장 평균 판매 실적으로 준비 권장 수량은 44개입니다.',
+  )
+  await expect(explanation).toContainText('55%가 매진됐고')
+  // 설명은 재고 칸을 바꾸지 않는다
+  await expect(page.getByLabel('재고', { exact: true })).toHaveValue('')
+
+  await page.getByLabel('재고', { exact: true }).fill('60')
+  await expect(explanation).not.toContainText('준비 권장 수량은 44개입니다.')
+  await expect(
+    explanation.getByRole('button', { name: '근거 보기' }),
+  ).toBeEnabled()
+})
+
+test('표본이 부족해 추천하지 못했으면 그 이유를 설명하고, 한도를 넘으면 안내한다', async ({
+  page,
+}) => {
+  await loginSeller(page)
+  await page.goto('/#/seller/drops/new')
+  const panel = page.getByRole('region', { name: '재고 추천' })
+  await page.getByLabel('카테고리').selectOption({ index: 2 })
+  await page.getByLabel('가격', { exact: true }).fill('12000')
+  const explanation = panel.getByRole('region', { name: '추천 근거 설명' })
+  await explanation.getByRole('button', { name: '추천하지 못한 이유' }).click()
+  await expect(explanation).toContainText(
+    '비교할 종료 DROP이 부족해 준비 권장 수량을 계산하지 않았습니다.',
+  )
+  await expect(explanation).toContainText('부족한 데이터')
+
+  await page.route(
+    '**/api/v1/seller/stock-recommendations/explanation',
+    (route) =>
+      route.fulfill({
+        status: 429,
+        json: {
+          success: false,
+          error: { code: 'DEMAND_EXPLANATION_LIMIT_EXCEEDED' },
+        },
+      }),
+  )
+  await page.getByLabel('가격', { exact: true }).fill('13000')
+  await explanation.getByRole('button', { name: '추천하지 못한 이유' }).click()
+  await expect(explanation.getByRole('alert')).toContainText(
+    '오늘 요청할 수 있는 AI 설명 횟수를 모두 썼어요.',
+  )
+})

@@ -8,6 +8,7 @@ type Analysis = components['schemas']['DemandAnalysisResponse']
 type CalculateRequest = components['schemas']['DemandCalculateRequest']
 type SimilarSalesRequest = components['schemas']['SimilarSalesRequest']
 type SimilarSales = components['schemas']['SimilarSalesResponse']
+type StockExplanationRequest = components['schemas']['StockExplanationRequest']
 
 // 판매 시작 전 WISH DROP(101)만 분석할 수 있다. 수치는 DEMAND.md 1.6 식을 그대로 따른다.
 const DEMAND_DROP_ID = 101
@@ -305,8 +306,46 @@ function similarSalesForForm(request: SimilarSalesRequest): SimilarSales {
   }
 }
 
+// 생성 단계 추천 근거 설명(DEMAND.md 8절). 카테고리 1(패션)은 시장 평균으로 추천했고, 나머지는 표본 부족이라 이유를 설명한다
+function explainStock(request: StockExplanationRequest) {
+  const recommended = request.categoryId === 1
+  return {
+    status: 'GENERATED',
+    explanation: recommended
+      ? {
+          summary: '시장 평균 판매 실적으로 준비 권장 수량은 44개입니다.',
+          reasons: [
+            '다른 판매자의 비슷한 굿즈 20개 이상 중 55%가 매진됐고, 매진까지 보통 90분 걸렸습니다.',
+          ],
+          risks: [],
+          dataGaps: [],
+          notRecommended: [],
+        }
+      : {
+          summary:
+            '비교할 종료 DROP이 부족해 준비 권장 수량을 계산하지 않았습니다.',
+          reasons: [],
+          risks: [],
+          dataGaps: ['같은 카테고리·비슷한 가격대 종료 DROP이 부족합니다.'],
+          notRecommended: [],
+        },
+    generatedAt: FIXED_NOW.toISOString(),
+  }
+}
+
 // 수요 분석 경로만 처리한다. 다른 판매자 경로는 기존 핸들러가 맡는다
 export async function installDemandApi(page: Page) {
+  await page.route(
+    '**/api/v1/seller/stock-recommendations/explanation',
+    async (route) => {
+      const request = route.request()
+      if (request.method() !== 'POST') return route.fallback()
+      return json(route, {
+        success: true,
+        data: explainStock(request.postDataJSON()),
+      })
+    },
+  )
   await page.route('**/api/v1/seller/stock-recommendations', async (route) => {
     const request = route.request()
     if (request.method() !== 'POST') return route.fallback()

@@ -1,6 +1,8 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query'
 import {
   getStockRecommendation,
+  requestStockExplanation,
+  type StockExplanationRequest,
   type StockRecommendationRequest,
 } from '../../../api/demand/stockRecommendation'
 import { demandKeys } from './queryKeys'
@@ -22,5 +24,13 @@ export function useStockRecommendation(
     enabled: !!settled && settled === serialized,
     placeholderData: keepPreviousData,
     staleTime: 60_000,
+  })
+}
+
+// "근거 보기"를 누를 때만 부른다. 입력이 바뀌었는지는 패널이 요청 값(variables)과 비교해 판단한다
+export function useStockExplanation() {
+  return useMutation({
+    mutationFn: (request: StockExplanationRequest) =>
+      requestStockExplanation(request),
   })
 }

@@ -24,6 +24,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/seller/stock-recommendations/explanation': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * 재고 추천 근거 설명
+     * @description 같은 폼 입력의 재고 추천과 비슷한 DROP 실적을 근거로 LLM 설명을 만든다. "근거 보기"를 누를 때만 부른다. 설명이 실패해도 200으로 status(GENERATED·DISCARDED·FAILED·DISABLED)를 알려 준다. 하루 한도는 수요 분석 설명과 함께 센다
+     */
+    post: operations['explainRecommendation']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/seller/similar-sales': {
     parameters: {
       query?: never
@@ -227,6 +247,34 @@ export interface components {
       name: string
       values: string[]
     }
+    StockExplanationRequest: {
+      /** Format: int64 */
+      categoryId: number
+      name?: string
+      description?: string
+      optionGroups?: components['schemas']['OptionGroupInput'][]
+      options: components['schemas']['OptionInput'][]
+      safetyStockRate?: number
+    }
+    ApiResponseDemandExplanationResponse: {
+      success?: boolean
+      data?: components['schemas']['DemandExplanationResponse']
+      message?: string
+    }
+    DemandExplanation: {
+      summary?: string
+      reasons?: string[]
+      risks?: string[]
+      dataGaps?: string[]
+      notRecommended?: string[]
+    }
+    DemandExplanationResponse: {
+      /** @enum {string} */
+      status?: 'GENERATED' | 'DISCARDED' | 'FAILED' | 'DISABLED'
+      explanation?: components['schemas']['DemandExplanation']
+      /** Format: date-time */
+      generatedAt?: string
+    }
     SimilarSalesRequest: {
       /** Format: int64 */
       categoryId: number
@@ -278,25 +326,6 @@ export interface components {
       conversionBasis?: 'OWN' | 'MARKET'
       conversionRate?: number
       safetyStockRate?: number
-    }
-    ApiResponseDemandExplanationResponse: {
-      success?: boolean
-      data?: components['schemas']['DemandExplanationResponse']
-      message?: string
-    }
-    DemandExplanation: {
-      summary?: string
-      reasons?: string[]
-      risks?: string[]
-      dataGaps?: string[]
-      notRecommended?: string[]
-    }
-    DemandExplanationResponse: {
-      /** @enum {string} */
-      status?: 'GENERATED' | 'DISCARDED' | 'FAILED' | 'DISABLED'
-      explanation?: components['schemas']['DemandExplanation']
-      /** Format: date-time */
-      generatedAt?: string
     }
     ApiResponseDemandAnalysisResponse: {
       success?: boolean
@@ -474,6 +503,66 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['ApiResponseStockRecommendationResponse']
+        }
+      }
+    }
+  }
+  explainRecommendation: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['StockExplanationRequest']
+      }
+    }
+    responses: {
+      /** @description 설명 결과(status로 성공 여부 구분) */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDemandExplanationResponse']
+        }
+      }
+      /** @description INVALID_REQUEST, VALIDATION_FAILED */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDemandExplanationResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDemandExplanationResponse']
+        }
+      }
+      /** @description ACCESS_DENIED */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDemandExplanationResponse']
+        }
+      }
+      /** @description DEMAND_EXPLANATION_LIMIT_EXCEEDED */
+      429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseDemandExplanationResponse']
         }
       }
     }

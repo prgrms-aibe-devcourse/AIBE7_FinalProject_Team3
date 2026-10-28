@@ -4,6 +4,7 @@ import {
   EXPLANATION_STATUS_TEXT,
 } from '../logic/demandView'
 import { useDemandExplanation } from '../logic/useDemand'
+import DemandExplanationBody from './DemandExplanationBody'
 
 // 판매자가 누를 때만 지금 보이는 결과(기본 가정 또는 다시 계산한 가정)를 AI로 설명한다(DEMAND.md 3.1).
 // 보이는 결과가 바뀌면 카드가 key로 이 영역을 다시 만들어 이전 설명을 지운다.
@@ -18,13 +19,6 @@ export default function DemandExplanationPanel({
 }) {
   const explanation = useDemandExplanation(dropId)
   const result = explanation.data
-  const sections = result?.explanation
-    ? ([
-        ['이유', result.explanation.reasons],
-        ['위험', result.explanation.risks],
-        ['권장하지 않는 선택', result.explanation.notRecommended],
-      ] as const)
-    : []
   return (
     <section className="demand-explanation" aria-label="AI 설명">
       <div className="demand-explanation-heading">
@@ -61,22 +55,7 @@ export default function DemandExplanationPanel({
         </p>
       )}
       {result?.explanation && !explanation.isPending && (
-        <div className="demand-explanation-body">
-          <p>{result.explanation.summary}</p>
-          {sections.map(
-            ([title, items]) =>
-              !!items?.length && (
-                <div key={title}>
-                  <h4>{title}</h4>
-                  <ul>
-                    {items.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
-              ),
-          )}
-        </div>
+        <DemandExplanationBody explanation={result.explanation} />
       )}
     </section>
   )
