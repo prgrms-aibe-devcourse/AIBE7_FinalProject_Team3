@@ -173,6 +173,34 @@ class PublicDropCacheTest {
     }
 
     @Test
+    @DisplayName("조회 함수가 Error를 던져도 기다리던 요청이 영구 대기하지 않고 같은 Error를 받는다")
+    void propagatesErrorToJoinedRequests() throws Exception {
+        // given
+        CountDownLatch release = new CountDownLatch(1);
+        AtomicInteger loads = new AtomicInteger();
+        List<Future<String>> results = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            results.add(executor.submit(() -> cache.get(KEY, DROP_ID, String.class, TTL, () -> {
+                loads.incrementAndGet();
+                await(release);
+                throw new AssertionError("loader failed");
+            })));
+        }
+        Thread.sleep(200);
+
+        // when
+        release.countDown();
+
+        // then
+        for (Future<String> result : results) {
+            assertThatThrownBy(() -> result.get(5, TimeUnit.SECONDS))
+                    .hasCauseInstanceOf(AssertionError.class);
+        }
+        assertThat(loads).hasValue(1);
+        assertThat(cache.get(KEY, DROP_ID, String.class, TTL, () -> "found")).isEqualTo("found");
+    }
+
+    @Test
     @DisplayName("TTL이 지나면 다시 읽는다")
     void expiresAfterTtl() throws Exception {
         // given
