@@ -11,6 +11,9 @@
 // 사전 준비: compose.yaml + compose.loadtest-micro.yaml + compose.loadtest-db-nano.yaml 기동, 공통 계정 시드.
 //   STEPS=25,50,100,200,400,800 SCRIPT=user-id-lookup/concurrency.js OUT_BASE=k6/user-id-lookup/out \
 //     k6/drop-list-scale/concurrency.sh <이름> me
+// 워밍업: 측정 조건마다 concurrency.sh 직전에 같은 요청을 VU 25로 60초 보내 JVM을 데운다(GR-181 warmup.js와 같은 이유).
+// 따로 스크립트를 두지 않고 이 파일을 한 단계로 실행하며 결과는 버린다. 로그인 실패 등 스크립트 오류만 종료 코드로 확인한다.
+//   (Backend/k6에서) k6 run --quiet -e STEPS=25 -e STEP_S=60 user-id-lookup/concurrency.js > /dev/null 2>&1 || echo "워밍업 실패"
 // Windows Git Bash에서는 앞에 MSYS_NO_PATHCONV=1을 붙인다. 붙이지 않으면 concurrency.sh의 docker run -w /k6가
 // Git 설치 경로(C:/Program Files/Git/k6)로 바뀌어 k6가 실행되지 않는다.
 import http from 'k6/http';
