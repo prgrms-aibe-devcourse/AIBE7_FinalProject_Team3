@@ -66,7 +66,8 @@ public class PublicDropCache {
             }
             mine.result().complete(value);
             return value;
-        } catch (RuntimeException exception) {
+        } catch (RuntimeException | Error exception) {
+            // Error도 future를 끝내야 합류해 기다리던 요청이 영구 대기하지 않는다
             mine.result().completeExceptionally(exception);
             throw exception;
         } finally {
@@ -91,6 +92,9 @@ public class PublicDropCache {
             return result.join();
         } catch (CompletionException exception) {
             if (exception.getCause() instanceof RuntimeException cause) {
+                throw cause;
+            }
+            if (exception.getCause() instanceof Error cause) {
                 throw cause;
             }
             throw exception;
