@@ -55,3 +55,45 @@
 - 주문 1000~1200건은 steady-read 수준 축소판이라, 판매자당 주문이 수만 건
   이상으로 늘어나면 `findSellerOrders`의 전체 스캔·정렬 비용이 더 커질 수 있다
   (검증 안 함).
+
+## 2026-10-27 측정: GR-191 인덱스(idx_orders_drop_created) 적용 전/후, 15만건
+
+위 "검증 안 함" 한계를 확인하려고 `k6-order-seller` 드롭에 일회성으로 주문 15만건을
+시드(이 벤치마크 전용 SQL, 측정 후 `seed.sql`로 1000건 상태 복구)하고,
+`idx_orders_drop_created`를 지웠다 만들었다 하며 전/후를 비교했다(로컬 docker compose,
+micro 제한 없음).
+
+**DB 쿼리 단(EXPLAIN ANALYZE, `findSellerOrders` 본문 쿼리, 1페이지)**:
+- 적용 전: `Parallel Seq Scan` + 외부 정렬(디스크 병합, ~17MB) — **78.1ms**
+- 적용 후: `Index Scan Backward using idx_orders_drop_created` — **0.2ms**(약 390배)
+
+**k6 HTTP 레이어(`ENABLE_BURST=false`, list VU10·detail VU10, 20초)**:
+- 적용 전: `list_read` p95 **1.08s**(avg 820ms)
+- 적용 후: `list_read` p95 **1.10s**(avg 873ms) — 사실상 변화 없음
+
+본문 쿼리는 390배 빨라졌는데 API 전체 p95는 그대로였다. 원인은 같은 리포지토리 메서드의
+`countQuery`(페이지네이션 총 개수)가 `paymentStatus` 필터가 없어도 무조건
+`LEFT JOIN LATERAL`로 결제 최신 상태를 매 행(15만건)마다 조회하기 때문 — `EXPLAIN
+ANALYZE`로 **726.8ms**(버퍼 450,594회 히트)가 나왔고, 이 count 쿼리는 drop_id로만
+필터링해 정렬이 필요 없으므로 `idx_orders_drop_created`의 영향권 밖이다.
+
+**countQuery 수정**: `LEFT JOIN LATERAL ... ON TRUE`를 `ON CAST(:paymentStatus AS
+VARCHAR) IS NOT NULL`로 바꿔, `paymentStatus`가 없을 때 LATERAL 서브쿼리 자체를
+건너뛰게 했다(`OrderRepository.findSellerOrders`). `PREPARE`/`EXECUTE`로 바인드
+파라미터 플랜을 직접 확인함:
+- `paymentStatus=NULL`: `One-Time Filter: false`로 LATERAL이 완전히 스킵됨 —
+  726.8ms → **52.9ms**(약 14배)
+- `paymentStatus='SUCCEEDED'`: 기존과 동일하게 LATERAL 실행, 결과 정확성 유지(변화 없음,
+  애초에 이 경우는 필터링에 필요한 비용이라 최적화 대상이 아님)
+- 기존 회귀 테스트(`OrderRepositoryTest#findsSellerOrdersWithLatestPaymentAndOptionalFilters`)가
+  필터 있음/없음 두 경로 모두 통과함을 확인(5개 테스트 전부 통과)
+
+**운영 DB 왕복(RTT) 반영**: 위 수치는 로컬 docker 네트워크(RTT 사실상 0)에서 잰
+DB 실행시간만이다. 운영 Supabase psql 실측 RTT(`SELECT 1` 기준 3.2~3.5ms, 3ms로
+계산)를 더하면, `findSellerOrders` 목록 조회 1페이지는 본문 쿼리·countQuery 각각
+별도 DB 호출이라 왕복 2회가 든다:
+- 적용 전: 78.1ms(본문) + 726.8ms(count) + 2×3ms(RTT) = **약 810.9ms**
+- 적용 후(인덱스+countQuery 수정 모두 반영): 0.2ms(본문) + 52.9ms(count) + 2×3ms(RTT)
+  = **약 59.1ms**
+- API 기준 개선폭은 **약 13.7배**다. "본문 쿼리만 390배"는 countQuery 병목을 가리는
+  과장된 비교였고, 실제 체감 개선은 이 13.7배가 맞다.

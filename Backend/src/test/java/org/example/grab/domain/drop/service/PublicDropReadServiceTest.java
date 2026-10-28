@@ -56,7 +56,8 @@ class PublicDropReadServiceTest {
     }
 
     private static PublicDropReadService service(DropService dropService, DropCacheProperties.Store store) {
-        DropCacheProperties properties = new DropCacheProperties(store, Duration.ofSeconds(5), Duration.ofSeconds(5));
+        DropCacheProperties properties = new DropCacheProperties(store, Duration.ofSeconds(5), Duration.ofSeconds(5),
+                Duration.ofMinutes(3));
         return new PublicDropReadService(dropService, new PublicDropCache(new InMemoryDropCacheStore()), properties);
     }
 

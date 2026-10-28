@@ -4,7 +4,10 @@ import org.example.grab.domain.drop.dto.response.PublicDropDetailResponse;
 import org.example.grab.domain.drop.dto.response.PublicDropDetailResponse.Actions;
 import org.example.grab.domain.drop.dto.response.PublicDropDetailResponse.Image;
 import org.example.grab.domain.drop.dto.response.PublicDropDetailResponse.Option;
+import org.example.grab.domain.drop.dto.response.PublicDropListResponse;
 import org.example.grab.domain.drop.dto.response.PublicDropStockResponse;
+import org.example.grab.domain.drop.dto.response.RelatedDropsResponse;
+import org.example.grab.domain.drop.dto.response.RelatedDropsResponse.RelatedBasis;
 import org.example.grab.domain.drop.dto.response.common.DropCategoryResponse;
 import org.example.grab.domain.drop.dto.response.common.DropOptionGroupResponse;
 import org.example.grab.domain.drop.dto.response.common.DropOptionSelectionResponse;
@@ -34,7 +37,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /*
- * Redis 저장소가 공개 상세·재고 응답을 JSON으로 저장했다가 같은 값으로 되돌리는지 확인한다(GR-183).
+ * Redis 저장소가 공개 상세·재고·관련 DROP 추천 응답을 JSON으로 저장했다가 같은 값으로 되돌리는지 확인한다(GR-183).
  * 앱과 같은 ObjectMapper(Jackson 자동 설정)를 쓴다.
  */
 @DataRedisTest
@@ -106,5 +109,23 @@ class RedisDropCacheStoreIntegrationTest {
                 .isEqualTo(response);
         store.evict("stock");
         assertThat(store.get("stock", PublicDropStockResponse.class)).isNull();
+    }
+
+    @Test
+    @DisplayName("관련 DROP 추천 응답(GR-195)을 저장했다가 같은 값으로 읽고, 추천 없음(basis null)도 그대로 읽는다")
+    void roundTripsRelated() {
+        // given
+        RedisDropCacheStore store = new RedisDropCacheStore(redisTemplate, objectMapper);
+        RelatedDropsResponse response = new RelatedDropsResponse(RelatedBasis.CO_WISH, List.of(
+                new PublicDropListResponse(101L, "상품", "브랜드", null, 15000L, new DropCategoryResponse(8L, "취미·굿즈"),
+                        DropStatus.WISH, false, 50L, 48L, STARTS, STARTS.plusHours(2))));
+        store.put("related", response, Duration.ofMinutes(1));
+        store.put("empty", RelatedDropsResponse.empty(), Duration.ofMinutes(1));
+
+        // when & then
+        assertThat(store.get("related", RelatedDropsResponse.class)).usingRecursiveComparison()
+                .withComparatorForType(OffsetDateTime::compareTo, OffsetDateTime.class)
+                .isEqualTo(response);
+        assertThat(store.get("empty", RelatedDropsResponse.class)).isEqualTo(RelatedDropsResponse.empty());
     }
 }

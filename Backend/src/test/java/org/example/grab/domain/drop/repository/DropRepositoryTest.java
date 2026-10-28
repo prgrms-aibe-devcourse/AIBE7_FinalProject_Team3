@@ -29,6 +29,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
@@ -523,6 +524,24 @@ class DropRepositoryTest {
         // when
         Page<PublicDropListProjection> page = dropRepository.findPublicDrops(
                 List.of("WISH"), null, "%없는 상품%", null, PageRequest.of(0, 20));
+
+        // then
+        assertThat(page.getContent()).isEmpty();
+        assertThat(page.getTotalElements()).isZero();
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("페이지 없이 조회해 결과가 없으면 count 쿼리 없이 0건이다")
+    void returnsZeroTotalForEmptyUnpagedQuery() {
+        // given
+        insertPublishedDrop(DropStatus.WISH, "스니커즈");
+        Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+        statistics.clear();
+
+        // when
+        Page<PublicDropListProjection> page = dropRepository.findPublicDrops(
+                List.of("WISH"), null, "%없는 상품%", null, Pageable.unpaged());
 
         // then
         assertThat(page.getContent()).isEmpty();

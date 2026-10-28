@@ -173,6 +173,12 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
                      FROM drop_options o WHERE o.drop_id = d.id AND o.is_active) > 0
             """;
 
+    // 관련 DROP 추천(DROP.md 1.4)의 카드. 목록 항목과 같은 형식이며 순서는 호출하는 쪽이 정한다
+    @Query(value = PUBLIC_DROP_SELECT + """
+            WHERE d.id IN (:ids)
+            """, nativeQuery = true)
+    List<PublicDropListProjection> findPublicDropsByIds(@Param("ids") List<Long> ids);
+
     /*
      * 공개 DROP 목록 조회(DISC-001·002·003, STOCK-006). 날짜 정렬은 Pageable Sort로 받는다.
      * statuses는 서비스가 채워 넘기며 DRAFT·CANCELED는 들어오지 않는다. 카테고리는 INNER JOIN이다.
@@ -273,13 +279,17 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
     /*
      * 목록 행의 totalCount(COUNT(*) OVER ())로 Page를 만든다. 행이 없으면 건수를 얻을 수 없다.
      * 첫 페이지가 비었으면 전체가 0건이고, 범위를 넘은 페이지만 count 쿼리로 센다(GR-198).
+     * 페이지 없이(unpaged) 조회해 비었으면 전체가 0건이다. unpaged는 getOffset()이 예외를 던지므로 먼저 확인한다.
      */
     private static Page<PublicDropListProjection> toPage(
             List<PublicDropListProjection> rows, Pageable pageable, LongSupplier count) {
         if (!rows.isEmpty()) {
             return new PageImpl<>(rows, pageable, rows.get(0).getTotalCount());
         }
-        return new PageImpl<>(rows, pageable, pageable.getOffset() == 0 ? 0 : count.getAsLong());
+        if (pageable.isUnpaged() || pageable.getOffset() == 0) {
+            return new PageImpl<>(rows, pageable, 0);
+        }
+        return new PageImpl<>(rows, pageable, count.getAsLong());
     }
 
     /*
