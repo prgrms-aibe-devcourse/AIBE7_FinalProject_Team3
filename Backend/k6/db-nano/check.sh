@@ -15,6 +15,8 @@ if [ -z "$PG" ]; then
   exit 1
 fi
 NETWORK=$(docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{end}}' "$PG")
+# compose가 .env의 DB_PASSWORD로 띄운 값을 그대로 쓴다. 셸 환경변수를 읽으면 .env 값과 어긋날 수 있다.
+PASSWORD=$(docker compose exec -T postgres printenv POSTGRES_PASSWORD)
 
 echo "== 자원 한도"
 docker inspect -f 'memory={{.HostConfig.Memory}} memswap={{.HostConfig.MemorySwap}} nanocpus={{.HostConfig.NanoCpus}}' "$PG"
@@ -30,7 +32,7 @@ k6/drop-detail-scale/netem.sh show
 echo "== SELECT 1 왕복 ${N}회 (ms)"
 # 첫 쿼리는 연결 직후 캐시 등으로 튀므로 버리고 나머지로 분포를 낸다.
 { echo '\timing on'; for _ in $(seq 0 "$N"); do echo 'SELECT 1;'; done; } \
-  | docker run --rm -i --network "$NETWORK" -e PGPASSWORD="${DB_PASSWORD:-grab}" postgres:18 \
+  | docker run --rm -i --network "$NETWORK" -e PGPASSWORD="$PASSWORD" postgres:18 \
       psql -h postgres -U grab -d grab -qAt \
   | awk '/^Time:/ { print $2 }' | tail -n +2 | sort -n \
   | awk '{ v[NR] = $1; s += $1 }
