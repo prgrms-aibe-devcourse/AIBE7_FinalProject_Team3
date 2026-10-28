@@ -138,6 +138,8 @@ grab:
     # 관련 DROP 추천(DROP.md 1.4). 함께 WISH는 겹친 사용자가 이 수 이상인 DROP만 쓴다(WISH 내역을 짐작하지 못하게 하는 최소 단위)
     related:
       min-co-wishers: 3
+      # 비슷한 DROP(임베딩) 코사인 유사도 하한. 수요 분석과 같은 값에서 시작하지만 따로 조정한다
+      similarity-min-score: 0.75
     ai-draft:
       timeout: 20s
       daily-limit: 20

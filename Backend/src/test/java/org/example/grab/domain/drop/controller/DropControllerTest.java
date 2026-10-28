@@ -13,7 +13,7 @@ import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.error.DropErrorCode;
 import org.example.grab.domain.drop.service.DropService;
 import org.example.grab.domain.drop.service.PublicDropReadService;
-import org.example.grab.domain.drop.service.RelatedDropService;
+import org.example.grab.domain.drop.service.RelatedDropReadService;
 import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.GlobalExceptionHandler;
@@ -41,15 +41,15 @@ class DropControllerTest {
 
     private DropService dropService;
     private PublicDropReadService publicDropReadService;
-    private RelatedDropService relatedDropService;
+    private RelatedDropReadService relatedDropReadService;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         dropService = mock(DropService.class);
         publicDropReadService = mock(PublicDropReadService.class);
-        relatedDropService = mock(RelatedDropService.class);
-        DropController controller = new DropController(dropService, publicDropReadService, relatedDropService);
+        relatedDropReadService = mock(RelatedDropReadService.class);
+        DropController controller = new DropController(dropService, publicDropReadService, relatedDropReadService);
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler(new ValidationErrorCodeResolver(List.of())))
                 .build();
@@ -318,7 +318,7 @@ class DropControllerTest {
                 DropStatus.WISH, false, 50L, 48L,
                 OffsetDateTime.parse("2026-11-02T11:00:00Z"),
                 OffsetDateTime.parse("2026-11-02T13:00:00Z"));
-        given(relatedDropService.findRelated(100L))
+        given(relatedDropReadService.findRelated(100L))
                 .willReturn(new RelatedDropsResponse(RelatedDropsResponse.RelatedBasis.CO_WISH, List.of(item)));
 
         // when, then

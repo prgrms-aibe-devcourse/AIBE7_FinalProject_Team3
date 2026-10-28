@@ -235,7 +235,7 @@ DROP 상세에서 아직 WISH할 수 있는 다른 DROP을 최대 4개 추천한
 | `SIMILAR` | 대상과 같은 카테고리이며 임베딩(수요 분석 API 6절) 코사인 유사도가 0.75 이상인 후보를 가까운 순 | `CO_WISH` 후보가 없고 대상 DROP의 임베딩이 있을 때 |
 
 - 두 방식을 한 응답에 섞지 않는다. 둘 다 없으면 `basis`는 `null`, `drops`는 빈 배열이다.
-- 겹친 사용자 수와 유사도는 응답에 넣지 않는다. 겹친 사용자 3명 기준은 특정 사용자의 WISH 내역을 짐작하지 못하게 하려는 최소 단위다(설정 `grab.drop.related.min-co-wishers`).
+- 겹친 사용자 수와 유사도는 응답에 넣지 않는다. 겹친 사용자 3명 기준은 특정 사용자의 WISH 내역을 짐작하지 못하게 하려는 최소 단위다(설정 `grab.drop.related.min-co-wishers`). 유사도 0.75 기준은 `grab.drop.related.similarity-min-score`로 바꾼다.
 - 판매 실적은 쓰지 않는다.
 - 응답은 사용자와 무관해 서버에서 최대 3분(`grab.drop-cache.related-ttl`) 캐시한다(GR-183 응답 캐시 재사용). 그동안 추천 DROP의 WISH 수·재고·후보 구성은 늦게 바뀔 수 있고, 판매가 시작된 후보는 응답할 때 뺀다.
 

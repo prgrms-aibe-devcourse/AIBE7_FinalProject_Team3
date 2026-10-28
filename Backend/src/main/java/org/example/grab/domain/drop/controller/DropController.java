@@ -11,7 +11,7 @@ import org.example.grab.domain.drop.dto.response.RelatedDropsResponse;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.domain.drop.service.DropService;
 import org.example.grab.domain.drop.service.PublicDropReadService;
-import org.example.grab.domain.drop.service.RelatedDropService;
+import org.example.grab.domain.drop.service.RelatedDropReadService;
 import org.example.grab.global.common.ApiResponse;
 import org.example.grab.global.common.PageResponse;
 import org.example.grab.global.error.BusinessException;
@@ -30,7 +30,7 @@ public class DropController {
 
     private final DropService dropService;
     private final PublicDropReadService publicDropReadService;
-    private final RelatedDropService relatedDropService;
+    private final RelatedDropReadService relatedDropReadService;
 
     /*
      * 공개 DROP 목록. page/size와 sort는 서비스 호출 전에 검증해 잘못된 요청이면 서비스를 부르지 않는다.
@@ -95,6 +95,6 @@ public class DropController {
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "DROP_NOT_FOUND")
     @GetMapping("/{dropId}/related")
     public ApiResponse<RelatedDropsResponse> getRelated(@PathVariable Long dropId) {
-        return ApiResponse.success(relatedDropService.findRelated(dropId));
+        return ApiResponse.success(relatedDropReadService.findRelated(dropId));
     }
 }
