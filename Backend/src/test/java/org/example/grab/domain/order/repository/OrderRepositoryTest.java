@@ -201,12 +201,30 @@ class OrderRepositoryTest {
                 SELECT id, 'MOCK', ?, ?, repeat('b', 64), 3500, 'SUCCEEDED', CURRENT_TIMESTAMP
                 FROM orders WHERE public_id = ?
                 """, "payment-new-" + uniqueValue, "client-new-" + uniqueValue, orderId);
+        // 결제 전(페이먼트 없음) 두 번째 주문. countQuery는 paymentStatus가 null이면 ON 조건이
+        // 거짓이 되어 LATERAL 조회를 건너뛰는데, 그래도 이 주문까지 정확히 세는지 확인하는
+        // 용도다(GR-194).
+        jdbcTemplate.queryForObject("""
+                INSERT INTO orders (
+                    order_number, buyer_id, drop_id, idempotency_key, request_hash, status,
+                    product_name_snapshot, seller_name_snapshot, items_amount, shipping_amount,
+                    total_amount, recipient_name, recipient_phone, postal_code, address_line1,
+                    payment_expires_at
+                ) VALUES (
+                    ?, ?, ?, ?, 'hash', 'PAYMENT_PENDING', '한정 상품', '판매자 브랜드', 1000, 2500, 3500,
+                    '구매자', '01000000003', '00000', '테스트 주소',
+                    CURRENT_TIMESTAMP + INTERVAL '10 minutes'
+                ) RETURNING public_id
+                """, UUID.class, "GR-TEST-PENDING-" + uniqueValue, sellerUserId, sellerDropId,
+                "key-pending-" + uniqueValue);
 
         // when
         Page<SellerOrderListProjection> filtered = orderRepository.findSellerOrders(
                 sellerId, sellerDropId, "PAID", "SUCCEEDED", PageRequest.of(0, 10));
+        // 페이지 크기(1)보다 전체 주문 수(2)가 많아야 content가 아니라 countQuery로 totalElements를
+        // 확인할 수 있다(GR-194: paymentStatus 없을 때 LATERAL을 건너뛰어도 전체 건수는 정확해야 한다).
         Page<SellerOrderListProjection> unfiltered = orderRepository.findSellerOrders(
-                sellerId, null, null, null, PageRequest.of(0, 10));
+                sellerId, null, null, null, PageRequest.of(0, 1));
 
         // then
         assertThat(filtered.getTotalElements()).isEqualTo(1);
@@ -220,8 +238,11 @@ class OrderRepositoryTest {
             // 네이티브 쿼리 프로젝션이 Instant 변환에 실패하지 않는지 확인한다(회귀 방지)
             assertThat(order.getOrderedAt()).isNotNull();
         });
+        // countQuery는 paymentStatus 필터가 없어 LATERAL을 건너뛰지만, 전체 건수(2)는 정확해야 한다.
+        assertThat(unfiltered.getTotalElements()).isEqualTo(2);
+        // created_at DESC 정렬이라 페이지 크기(1)에는 더 나중에 만든 결제 전 주문만 담긴다.
         assertThat(unfiltered.getContent()).singleElement()
-                .extracting(SellerOrderListProjection::getPaymentStatus).isEqualTo("SUCCEEDED");
+                .extracting(SellerOrderListProjection::getPaymentStatus).isNull();
 
         // 결제 취소가 진행 중이어도 최신 결제 상태와 별도 필드로 확인할 수 있다.
         jdbcTemplate.update("""

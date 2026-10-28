@@ -24,6 +24,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/seller/similar-sales': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * 생성 단계 비슷한 DROP 실적
+     * @description 폼 입력(카테고리·상품명·설명·옵션·가격)으로 비슷한 종료 DROP의 매진 비율·매진 시간·판매율·WISH 대비 판매량을 계산한다. 내 비슷한 DROP이 충분하면 내 것을, 아니면 다른 판매자 것을 기준으로 삼는다
+     */
+    post: operations['forForm']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/seller/drops/{dropId}/demand-analysis/explanation': {
     parameters: {
       query?: never
@@ -58,6 +78,26 @@ export interface paths {
      * @description 전환율 기준(OWN·MARKET) 또는 직접 입력한 전환율과 안전 재고율로 다시 계산한다. 저장하지 않는다
      */
     post: operations['calculate']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/seller/drops/{dropId}/similar-sales': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * WISH 단계 비슷한 DROP 실적
+     * @description 본인 WISH DROP의 저장된 임베딩으로 비슷한 종료 DROP의 판매 결과를 계산한다
+     */
+    get: operations['forWishDrop']
+    put?: never
+    post?: never
     delete?: never
     options?: never
     head?: never
@@ -182,6 +222,56 @@ export interface components {
       dataGaps?: (
         'NO_SALES_SAMPLE' | 'SMALL_SALES_SAMPLE' | 'FREQUENT_SOLD_OUT'
       )[]
+    }
+    OptionGroupInput: {
+      name: string
+      values: string[]
+    }
+    SimilarSalesRequest: {
+      /** Format: int64 */
+      categoryId: number
+      name?: string
+      description?: string
+      optionGroups?: components['schemas']['OptionGroupInput'][]
+      unitPrices: number[]
+    }
+    ApiResponseSimilarSalesResponse: {
+      success?: boolean
+      data?: components['schemas']['SimilarSalesResponse']
+      message?: string
+    }
+    OthersSimilarSales: {
+      /** @enum {string} */
+      selection?: 'SIMILAR' | 'ALL' | 'CATEGORY'
+      /** @enum {string} */
+      scope?: 'NEW_SELLERS' | 'ALL_SELLERS'
+      dropCountBand?: string
+      soldOutRate?: number | null
+      /** Format: int32 */
+      medianSellOutMinutes?: number | null
+      sellThroughRate?: number | null
+      soldPerWish?: number | null
+      /** Format: date-time */
+      asOf?: string
+    }
+    OwnSimilarSales: {
+      /** @enum {string} */
+      selection?: 'SIMILAR' | 'ALL' | 'CATEGORY'
+      /** Format: int32 */
+      dropCount?: number
+      soldOutRate?: number
+      /** Format: int32 */
+      medianSellOutMinutes?: number | null
+      sellThroughRate?: number
+      soldPerWish?: number | null
+    }
+    SimilarSalesResponse: {
+      /** @enum {string|null} */
+      basis?: 'OWN' | 'OTHERS' | null
+      /** @enum {string} */
+      reason?: 'OWN_ENOUGH' | 'OWN_FEW' | 'OWN_NOT_SIMILAR' | 'FIRST_SALE'
+      own?: components['schemas']['OwnSimilarSales']
+      others?: components['schemas']['OthersSimilarSales']
     }
     DemandCalculateRequest: {
       /** @enum {string} */
@@ -388,6 +478,57 @@ export interface operations {
       }
     }
   }
+  forForm: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SimilarSalesRequest']
+      }
+    }
+    responses: {
+      /** @description 계산 성공 */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSimilarSalesResponse']
+        }
+      }
+      /** @description INVALID_REQUEST, VALIDATION_FAILED */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSimilarSalesResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSimilarSalesResponse']
+        }
+      }
+      /** @description ACCESS_DENIED */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSimilarSalesResponse']
+        }
+      }
+    }
+  }
   explain: {
     parameters: {
       query?: never
@@ -535,6 +676,64 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['ApiResponseDemandAnalysisResponse']
+        }
+      }
+    }
+  }
+  forWishDrop: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        dropId: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description 계산 성공 */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSimilarSalesResponse']
+        }
+      }
+      /** @description AUTHENTICATION_REQUIRED, INVALID_TOKEN */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSimilarSalesResponse']
+        }
+      }
+      /** @description ACCESS_DENIED, DROP_ACCESS_DENIED */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSimilarSalesResponse']
+        }
+      }
+      /** @description DROP_NOT_FOUND */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSimilarSalesResponse']
+        }
+      }
+      /** @description DEMAND_ANALYSIS_UNAVAILABLE */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ApiResponseSimilarSalesResponse']
         }
       }
     }

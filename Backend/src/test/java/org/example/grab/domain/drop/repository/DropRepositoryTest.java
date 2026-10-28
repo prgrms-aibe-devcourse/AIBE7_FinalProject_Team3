@@ -29,6 +29,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
@@ -436,9 +437,9 @@ class DropRepositoryTest {
         dropRepository.findPublicDrops(List.of("WISH"), null, null, null, PageRequest.of(0, 20));
         long largeCount = statistics.getPrepareStatementCount();
 
-        // then: count·select 2문장. 데이터를 늘려도 늘지 않는다.
+        // then: 전체 건수를 COUNT(*) OVER ()로 함께 구해 select 1문장이다(GR-198). 데이터를 늘려도 늘지 않는다.
         assertThat(smallCount).isEqualTo(largeCount);
-        assertThat(largeCount).isLessThanOrEqualTo(2);
+        assertThat(largeCount).isEqualTo(1);
     }
 
     @Test
@@ -489,6 +490,90 @@ class DropRepositoryTest {
         assertThat(first.getTotalElements()).isEqualTo(3);
         assertThat(first.getTotalPages()).isEqualTo(2);
         assertThat(first.hasNext()).isTrue();
+    }
+
+    @Test
+    @DisplayName("마지막 페이지도 전체 건수를 계산하고 count 쿼리를 따로 실행하지 않는다")
+    void countsTotalOnLastPageWithoutCountQuery() {
+        // given
+        insertPublishedDrop(DropStatus.WISH, "A");
+        insertPublishedDrop(DropStatus.GRAB, "B");
+        insertPublishedDrop(DropStatus.ENDED, "C");
+        Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+        statistics.clear();
+
+        // when
+        Page<PublicDropListProjection> last = dropRepository.findPublicDrops(
+                List.of("WISH", "GRAB", "ENDED"), null, null, null, PageRequest.of(1, 2));
+
+        // then
+        assertThat(last.getContent()).hasSize(1);
+        assertThat(last.getTotalElements()).isEqualTo(3);
+        assertThat(last.hasNext()).isFalse();
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("결과가 없는 첫 페이지는 count 쿼리 없이 0건이다")
+    void returnsZeroTotalForEmptyFirstPageWithoutCountQuery() {
+        // given
+        insertPublishedDrop(DropStatus.WISH, "스니커즈");
+        Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+        statistics.clear();
+
+        // when
+        Page<PublicDropListProjection> page = dropRepository.findPublicDrops(
+                List.of("WISH"), null, "%없는 상품%", null, PageRequest.of(0, 20));
+
+        // then
+        assertThat(page.getContent()).isEmpty();
+        assertThat(page.getTotalElements()).isZero();
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("페이지 없이 조회해 결과가 없으면 count 쿼리 없이 0건이다")
+    void returnsZeroTotalForEmptyUnpagedQuery() {
+        // given
+        insertPublishedDrop(DropStatus.WISH, "스니커즈");
+        Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+        statistics.clear();
+
+        // when
+        Page<PublicDropListProjection> page = dropRepository.findPublicDrops(
+                List.of("WISH"), null, "%없는 상품%", null, Pageable.unpaged());
+
+        // then
+        assertThat(page.getContent()).isEmpty();
+        assertThat(page.getTotalElements()).isZero();
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("범위를 넘은 페이지는 행이 없어도 count 쿼리로 전체 건수를 돌려준다")
+    void countsTotalForPageBeyondRange() {
+        // given: 공개 WISH 3건 중 2건은 판매 전(인기 WISH 후보), 판매 중 1건(인기 GRAB 후보)
+        insertUpcomingWishDrop("판매 전 1", 20);
+        insertUpcomingWishDrop("판매 전 2", 10);
+        Long selling = insertSellingDrop(DropStatus.GRAB, "판매 중", 5);
+        insertOption(selling, 1000L, 5, 0, 0, 0, true, 0);
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+        // when
+        Page<PublicDropListProjection> publicPage = dropRepository.findPublicDrops(
+                List.of("WISH", "GRAB"), null, null, null, PageRequest.of(5, 2));
+        Page<PublicDropListProjection> wishPage = dropRepository.findPopularWishDrops(
+                null, null, null, now, PageRequest.of(5, 2));
+        Page<PublicDropListProjection> grabPage = dropRepository.findPopularGrabDrops(
+                null, null, now, PageRequest.of(5, 2));
+
+        // then
+        assertThat(publicPage.getContent()).isEmpty();
+        assertThat(publicPage.getTotalElements()).isEqualTo(3);
+        assertThat(wishPage.getContent()).isEmpty();
+        assertThat(wishPage.getTotalElements()).isEqualTo(2);
+        assertThat(grabPage.getContent()).isEmpty();
+        assertThat(grabPage.getTotalElements()).isEqualTo(1);
     }
 
     @Test

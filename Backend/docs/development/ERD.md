@@ -693,8 +693,10 @@ PK와 UQ에서 자동 생성되는 인덱스는 중복 생성하지 않는다.
 | `wishes` | (`drop_id`, `canceled_at`, `id`) | 활성 WISH 조회·집계 |
 | `wishes` | (`user_id`, `activated_at`, `id`) | 소비자 마이페이지 |
 | `orders` | (`buyer_id`, `created_at`, `id`) | 소비자 주문 목록 |
-| `orders` | (`drop_id`, `status`, `id`) | 판매자 주문 목록 |
+| `orders` | (`drop_id`, `status`, `id`) | 판매자 주문 목록(상태 단건 필터) |
+| `orders` | `idx_orders_drop_created` (`drop_id`, `created_at`, `id`) | 판매자 주문 목록 정렬(`ORDER BY created_at DESC, id DESC`) |
 | `orders` | `idx_orders_payment_expiry` (`status`, `payment_expires_at`, `id`) | 결제 대기 만료 배치(`PAYMENT_PENDING AND payment_expires_at <= now`, 키셋 조회) |
+| `shipments` | `idx_shipments_stage_progress` (`delivery_stage`, `stage_updated_at`, `id`) | 배송 단계 자동 진행 배치(GR-86/172, `delivery_stage IN (...) AND stage_updated_at <= cutoff` 선점) |
 | `payments` | (`order_id`, `created_at`, `id`) | 결제 시도 이력 |
 | `payments` | (`reconciliation_status`, `updated_at`, `id`) | 결제 보정 작업, 보정 환불 대상 선점(GR-88) |
 | `payments` | `idx_payments_in_progress` (`updated_at`, `id`) `WHERE status IN ('PENDING', 'UNKNOWN')` | 진행 중 결제 정리 배치(`updated_at`이 60초 지난 진행 중 결제 선점) |

@@ -67,11 +67,11 @@ public class SecurityConfig {
                         // ponytail: 로컬 확인용 전 환경 개방. 운영 노출 정책은 GR-59(한재훈)에서 프로필로 제한
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**")
                         .permitAll()
-                        // 공개 카탈로그(목록·상세·재고 재조회)만 GET으로 개방한다. 상세는 한 단계 경로(*)만 열어
+                        // 공개 카탈로그(목록·상세·재고 재조회·관련 DROP 추천)만 GET으로 개방한다. 상세는 한 단계 경로(*)만 열어
                         // /api/v1/drops/{id}/wish(WISH API)와 판매자 경로는 계속 인증이 필요하다.
-                        // 재고 재조회는 /stocks만 명시해 /api/v1/drops/** 전체를 열지 않는다.
+                        // 재고 재조회(/stocks)·관련 DROP 추천(/related)만 명시해 /api/v1/drops/** 전체를 열지 않는다.
                         .requestMatchers(HttpMethod.GET, "/api/v1/categories", "/api/v1/drops", "/api/v1/drops/*",
-                                "/api/v1/drops/*/stocks", "/api/v1/drops/stock-stream")
+                                "/api/v1/drops/*/stocks", "/api/v1/drops/*/related", "/api/v1/drops/stock-stream")
                         .permitAll()
                         // CSRF 토큰 발급은 로그인 전에도 필요하다(MEMBER_AUTH 1.1)
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/csrf")

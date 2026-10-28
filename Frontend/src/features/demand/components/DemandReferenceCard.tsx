@@ -19,6 +19,7 @@ import DemandEvidence from './DemandEvidence'
 import DemandExplanationPanel from './DemandExplanationPanel'
 import DemandOptionPlan from './DemandOptionPlan'
 import DemandPlanOverview from './DemandPlanOverview'
+import { SimilarSalesSection } from './SimilarSalesPanel'
 
 // WISH 단계 수요 분석을 판매자 DROP 상세에 참고용으로 보여 준다. 저장·결정 없이 재고도 바꾸지 않는다(GR-144, GR-175)
 export default function DemandReferenceCard({ dropId }: { dropId: number }) {
@@ -106,6 +107,7 @@ export default function DemandReferenceCard({ dropId }: { dropId: number }) {
         request={explanationRequest}
         recalculated={!!current}
       />
+      <SimilarSalesSection dropId={dropId} />
       <details className="demand-details">
         <summary>근거와 가정 보기</summary>
         <DemandOptionPlan analysis={shown} />

@@ -236,6 +236,25 @@ export async function handleDropRoute(
     else await json(route, { success: true, data: detailBody(drop, wished) })
     return true
   }
+  // 관련 DROP 추천(DROP.md 1.4). 종료 DROP 301은 함께 WISH, WISH DROP 101은 비슷한 DROP, 나머지는 추천이 없다
+  const related = path.match(/^\/api\/v1\/drops\/(\d+)\/related$/)
+  if (related) {
+    const dropId = Number(related[1])
+    const picks: Record<number, { basis: string; ids: number[] }> = {
+      301: { basis: 'CO_WISH', ids: [101, 102] },
+      101: { basis: 'SIMILAR', ids: [102, 103] },
+    }
+    const pick = picks[dropId]
+    const items = (pick?.ids ?? []).flatMap((id) => {
+      const drop = drops.find((item) => item.dropId === id)
+      return drop ? [listItem(drop, wished)] : []
+    })
+    await json(route, {
+      success: true,
+      data: { basis: pick ? pick.basis : null, drops: items },
+    })
+    return true
+  }
   const stocks = path.match(/^\/api\/v1\/drops\/(\d+)\/stocks$/)
   if (stocks) {
     const drop = drops.find((item) => item.dropId === Number(stocks[1]))

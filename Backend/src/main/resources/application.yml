@@ -112,6 +112,7 @@ grab:
     store: ${GRAB_DROP_CACHE_STORE:memory}
     detail-ttl: 5s
     stock-ttl: 5s
+    related-ttl: 3m
   # 메일 본문 등 서버가 만드는 링크가 가리키는 프런트엔드 주소. 기본값은 로컬 Vite 개발 서버다
   web:
     base-url: ${WEB_BASE_URL:http://localhost:5173}
@@ -134,6 +135,11 @@ grab:
         fixed-delay: 10m
   # 사진 기반 DROP 초안(DROP.md 2.8). 모델·키는 spring.ai.* 설정을 함께 쓰고, 꺼져 있으면 AI_DRAFT_UNAVAILABLE이다
   drop:
+    # 관련 DROP 추천(DROP.md 1.4). 함께 WISH는 겹친 사용자가 이 수 이상인 DROP만 쓴다(WISH 내역을 짐작하지 못하게 하는 최소 단위)
+    related:
+      min-co-wishers: 3
+      # 비슷한 DROP(임베딩) 코사인 유사도 하한. 수요 분석과 같은 값에서 시작하지만 따로 조정한다
+      similarity-min-score: 0.75
     ai-draft:
       timeout: 20s
       daily-limit: 20

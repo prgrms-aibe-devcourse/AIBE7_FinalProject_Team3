@@ -1028,6 +1028,57 @@
         }
       }
     },
+    "/api/v1/drops/{dropId}/related": {
+      "get": {
+        "tags": ["공개 DROP"],
+        "summary": "관련 DROP 추천",
+        "description": "아직 WISH할 수 있는 DROP을 최대 4개 추천한다. 함께 WISH한 DROP(겹친 사용자 3명 이상)을 먼저 쓰고, 없으면 같은 카테고리에서 내용이 비슷한 DROP(임베딩)을 쓴다. basis로 추천 방식을 알려 준다",
+        "operationId": "getRelated",
+        "parameters": [
+          {
+            "name": "dropId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "조회 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRelatedDropsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRelatedDropsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "DROP_NOT_FOUND",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRelatedDropsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/drops/stock-stream": {
       "get": {
         "tags": ["공개 DROP"],
@@ -2194,6 +2245,35 @@
           "serverTime": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseRelatedDropsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RelatedDropsResponse"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "RelatedDropsResponse": {
+        "type": "object",
+        "properties": {
+          "basis": {
+            "type": ["string", "null"],
+            "enum": ["CO_WISH", "SIMILAR"]
+          },
+          "drops": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicDropListResponse"
+            }
           }
         }
       },

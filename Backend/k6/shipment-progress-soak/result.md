@@ -77,3 +77,33 @@ BATCH_SIZE=5`로 `feed-shipments.sh` 실행(30회 투입, 총 150건 추가 — 
   포함하지 않는다 — 순수 `ShipmentProgressScheduler` 배치 자체만 검증했다.
 - VU 성격의 동시 요청 경쟁은 없다(단일 스케줄러 스레드, `FOR UPDATE SKIP LOCKED` 기반이라
   경쟁 자체가 설계상 발생하지 않음, GR-171과 같은 결론).
+
+## 2026-10-27 측정: GR-191 인덱스(idx_shipments_stage_progress) 적용 전/후, 30만건
+
+위 soak는 190건 규모라 `advanceStageBatch`(`ShipmentRepository`)가 받쳐주는 인덱스 없이도
+느려지지 않았다. 실제로 데이터가 쌓였을 때 체감되는지 확인하려고 전용 드롭에 shipments
+30만건(배치 대상 아닌 `OUT_FOR_DELIVERY` 29만건 + 대상 `COLLECTED`·오래된
+`stage_updated_at` 1만건)을 일회성으로 시드하고, `idx_shipments_stage_progress`를
+지웠다 만들었다 하며 `advanceStageBatch` 쿼리(LIMIT 500)를 트랜잭션 안에서
+`EXPLAIN ANALYZE` 후 `ROLLBACK`으로 비교했다(측정 후 삭제, soak 본 시나리오 데이터와는
+별개 드롭이라 영향 없음).
+
+- 적용 전: `orders`를 `status='SHIPPED'`로 찾은 뒤(Seq Scan, 30만건 중 매치 포함)
+  `shipments`도 `Seq Scan`으로 걸러 Hash Join — 캐시 워밍 후 **179~189ms**
+- 적용 후: `shipments` 쪽이 `Bitmap Index Scan using idx_shipments_stage_progress`로
+  바뀜(대상 1만건을 0.5~0.8ms에 찾음) — 캐시 워밍 후 **138~149ms**(약 25~30% 개선)
+
+개선 폭이 GR-191의 orders 인덱스만큼 극적이진 않다 — 이 쿼리는 `orders.status='SHIPPED'`
+`Seq Scan`과의 Hash Join이라, 전체 쿼리 시간의 상당 부분이 여전히 orders 쪽 스캔
+(약 90ms, 30만건 중 상태 필터)에 들어간다. 이번 시드는 테스트 드롭의 주문을 전부
+`SHIPPED`로 깔아(실제로는 있을 수 없는 비율) orders 쪽 셀렉티비티가 낮게 나온 것이라,
+운영처럼 `SHIPPED` 비율이 훨씬 낮으면 orders 쪽도 인덱스를 타 전체 개선 폭이 더 커질
+가능성이 높다(검증 안 함, 운영 분포로 추가 측정 필요).
+
+**운영 DB 왕복(RTT) 반영**: 위 수치는 로컬 docker 네트워크(RTT 사실상 0)에서 잰
+DB 실행시간만이다. `advanceStageBatch`는 스케줄러 주기당 DB 호출 1회라, 운영
+Supabase psql 실측 RTT(3ms로 계산)를 더하면:
+- 적용 전: 185ms(중간값) + 3ms(RTT) = **약 188ms**
+- 적용 후: 140ms(중간값) + 3ms(RTT) = **약 143ms**
+- 개선폭은 **약 24%**로 RTT를 더해도 비율은 거의 그대로다(쿼리 자체가 왕복 1회뿐이라
+  RTT 비중이 작음).

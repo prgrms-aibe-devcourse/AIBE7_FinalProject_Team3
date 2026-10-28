@@ -44,6 +44,11 @@ public class PublicDropCache {
         return "grab:drop:public:stock:" + dropId;
     }
 
+    // 관련 DROP 추천(GR-195). 후보 DROP의 변경으로는 지우지 않고 TTL로만 갱신한다
+    public static String relatedKey(long dropId) {
+        return "grab:drop:public:related:" + dropId;
+    }
+
     public <T> T get(String key, long dropId, Class<T> type, Duration ttl, Supplier<T> loader) {
         T cached = store.get(key, type);
         if (cached != null) {

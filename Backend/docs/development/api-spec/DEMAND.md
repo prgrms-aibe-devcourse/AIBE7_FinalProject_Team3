@@ -1,10 +1,10 @@
 # 수요 분석 API 명세
 
-> 요구사항: [REQUIREMENTS.md](../REQUIREMENTS.md) 1.13 (DEMAND-001~012), NFR-012·013
+> 요구사항: [REQUIREMENTS.md](../REQUIREMENTS.md) 1.13 (DEMAND-001~013), NFR-012·013
 > 스키마: [ERD.md](../ERD.md) 1.7 (`demand_analysis_snapshots`, `drop_stock_recommendations`, `drop_embeddings`)
 > 선정 근거: [TECHSTACK.md](../TECHSTACK.md) 1.3
 
-판매자의 WISH DROP에 대해 수요 데이터를 집계하고 판매 계획을 계산해 참고용으로 보여 준다(1~4절). DROP을 만들 때는 종료 DROP의 판매 실적으로 재고를 추천하고 가격대를 참고하게 한다(5절). 비슷한 상품 표본을 고르기 위해 공개된 DROP마다 임베딩을 만든다(6절). 계산은 서버의 결정적 함수가 하고, LLM은 계산 결과의 설명만 만든다. 제안은 참고용이며 재고·가격·판매 상태를 바꾸지 않는다. 판매자가 계획을 저장하거나 결정을 기록하지 않고(GR-175), 예측 정확도는 서버가 자동으로 남기는 기록(2.3, 5.6)으로 평가한다.
+판매자의 WISH DROP에 대해 수요 데이터를 집계하고 판매 계획을 계산해 참고용으로 보여 준다(1~4절). DROP을 만들 때는 종료 DROP의 판매 실적으로 재고를 추천하고 가격대를 참고하게 한다(5절). 비슷한 상품 표본을 고르기 위해 공개된 DROP마다 임베딩을 만든다(6절). 내 지난 비슷한 DROP과 다른 판매자의 비슷한 굿즈가 어떻게 팔렸는지(매진 비율·매진 시간 등)를 보여 준다(7절). 계산은 서버의 결정적 함수가 하고, LLM은 계산 결과의 설명만 만든다. 제안은 참고용이며 재고·가격·판매 상태를 바꾸지 않는다. 판매자가 계획을 저장하거나 결정을 기록하지 않고(GR-175), 예측 정확도는 서버가 자동으로 남기는 기록(2.3, 5.6)으로 평가한다.
 
 ## 1. 계산 규칙
 
@@ -511,3 +511,130 @@ POST /api/v1/seller/stock-recommendations
 - **주기 배치**: `DRAFT`가 아닌 DROP 중 임베딩이 없거나 `model`이 현재 모델과 다른 DROP을 `id` 순으로 한 번에 최대 N개 만든다(`grab.demand.embedding.*`, 기본 10분마다 20개). 공개 직후 생성 실패, 서버 재시작으로 빠진 DROP, GR-147 이전에 공개된 DROP, 모델 변경을 이 배치가 채운다.
 - 여러 서버가 같은 DROP을 동시에 만들어도 `drop_id` 기준으로 덮어써 결과가 같다.
 - 실패하면 WARN 로그와 지표(`grab.demand.embedding` `failed`, 4절)만 남긴다. 공개·조회·추천은 영향을 받지 않는다.
+
+## 7. 비슷한 DROP 실적 (GR-196)
+
+판매자가 DROP을 만들거나 WISH 단계에서 볼 때, **내 지난 비슷한 DROP**과 **다른 판매자의 비슷한 굿즈**가 어떻게 팔렸는지 나란히 보여 준다(DEMAND-013). 한정 판매의 수요는 판매자(팬층)가 정하므로 내 데이터가 충분하면 그것을 기준으로 삼고, 부족하면 다른 판매자 자료를 기준으로 삼는다. 어느 쪽을 기준으로 썼는지와 이유를 함께 보여 준다. 임베딩은 표본 검색에만 쓰고, 지표는 SQL로 집계하며 LLM은 쓰지 않는다. 참고용이며 재고·판매 상태를 바꾸지 않는다.
+
+### 7.1 표본
+
+후보는 `status = ENDED`이고 `close_reason`이 `TIME_EXPIRED`(기간 만료) 또는 `SOLD_OUT`(매진)이며, 대상과 같은 `category_id`이고 옵션 준비 수량 합계가 1 이상인 DROP이다. 대상 DROP은 뺀다.
+
+| 표본 | 대상 | 비슷한 DROP 선택 | 최대 |
+| --- | --- | --- | --- |
+| 내 DROP(`own`) | 본인 후보 | 임베딩 코사인 유사도가 기준(0.75) 이상, 가까운 순 | 20개 |
+| 다른 판매자(`others`) | 다른 판매자 후보 중 `closed_at`이 오늘 0시(KST) 이전(1.3) | 같은 기준, 대표 가격이 요청의 0.7~1.3배(5.1) | 20개 |
+
+- 비슷한 DROP을 고를 수 없으면(대상 임베딩이 없음, 기준을 넘는 DROP이 없음) 표본마다 넓힌다. 내 DROP은 **내 전체 종료 DROP**(최신순)으로, 다른 판매자는 **같은 카테고리 전체**(가격 조건 유지, 최신순)로 넓힌다. 응답의 `selection`으로 표시한다(`SIMILAR`, `ALL`, `CATEGORY`).
+- **첫 판매**(내 종료 DROP이 없음)이면 다른 판매자 표본을 **비슷한 단계 판매자**(종료 DROP이 3개 이하인 판매자)의 DROP으로 좁힌다. 이미 팬이 많은 판매자의 수치에 부풀려지지 않게 하려는 것이다. 보호 규칙을 못 넘으면 전체 판매자로 넓힌다(`scope`: `NEW_SELLERS`, `ALL_SELLERS`).
+- 다른 판매자 표본에는 1.3의 보호 규칙(판매자 5명·DROP 10개 이상, 기준 시점 고정, 개별 상품·수치 비노출)을 그대로 적용한다. 못 넘으면 지표를 비우고 `dropCountBand`를 `NONE`으로 둔다.
+
+### 7.2 기준 선택
+
+| 판매자 상황 | 기준(`basis`) | 이유(`reason`) |
+| --- | --- | --- |
+| 내 비슷한 DROP 3개 이상 | `OWN` | `OWN_ENOUGH` |
+| 내 비슷한 DROP 1~2개 | `OTHERS` | `OWN_FEW` |
+| 내 종료 DROP은 있지만 비슷한 것이 없음 | `OTHERS` | `OWN_NOT_SIMILAR` |
+| 내 종료 DROP이 없음(첫 판매) | `OTHERS` | `FIRST_SALE` |
+
+- 기준이 `OTHERS`인데 다른 판매자 지표가 비면(보호 단위 미달) `basis`는 `null`이다.
+- 기준이 아닌 쪽도 값이 있으면 함께 반환한다. 화면은 "참고"로 보여 준다. 내 비슷한 DROP이 1~2개일 때는 "표본이 적어 참고용"으로 표시한다.
+- "충분" 기준(3개)은 기존 신뢰도 `LOW`(3개 이상)와 맞추며 설정(`grab.demand.similar-sales.min-own-drops`)으로 바꾼다.
+
+### 7.3 지표
+
+| 지표 | 정의 |
+| --- | --- |
+| `soldOutRate` | 표본 중 `close_reason = SOLD_OUT`인 DROP의 비율 |
+| `medianSellOutMinutes` | 매진된 DROP의 `closed_at - grab_started_at`(분)의 중간값. 매진된 DROP이 없으면 `null` |
+| `sellThroughRate` | Σ판매량 ÷ Σ준비 수량 |
+| `soldPerWish` | 판매 시작 기록(`demand_analysis_snapshots`, 2.3)이 있는 DROP의 Σ판매량 ÷ Σ판매 시작 시점 WISH 수. 기록이 없거나 WISH 합이 0이면 `null` |
+
+- 내 DROP은 비율을 소수 둘째 자리, 분은 정수로 반올림하고 `dropCount`를 그대로 보여 준다.
+- 다른 판매자는 비율을 정수 %(소수 둘째 자리), 분을 5분 단위로 반올림하고 표본 수를 구간(`NONE`, `10_TO_19`, `20_PLUS`)으로만 보여 준다(1.3·5.2와 같은 보호).
+
+### 7.4 WISH 단계 조회
+
+```http
+GET /api/v1/seller/drops/{dropId}/similar-sales
+```
+
+- **인증**: `SELLER`(본인 DROP)
+- 대상은 본인의 `WISH` 상태 DROP이다. 그 DROP의 저장된 임베딩(6절)과 대표 가격으로 표본을 고른다.
+
+**응답:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "basis": "OWN",
+    "reason": "OWN_ENOUGH",
+    "own": {
+      "selection": "SIMILAR",
+      "dropCount": 4,
+      "soldOutRate": 0.75,
+      "medianSellOutMinutes": 6,
+      "sellThroughRate": 0.94,
+      "soldPerWish": 0.62
+    },
+    "others": {
+      "selection": "SIMILAR",
+      "scope": "ALL_SELLERS",
+      "dropCountBand": "10_TO_19",
+      "soldOutRate": 0.4,
+      "medianSellOutMinutes": 15,
+      "sellThroughRate": 0.81,
+      "soldPerWish": 0.35,
+      "asOf": "2026-10-27T00:00:00+09:00"
+    }
+  }
+}
+```
+
+- `own`: 내 종료 DROP이 없으면 `null`. `selection`은 `SIMILAR` 또는 `ALL`.
+- `others`: 항상 반환한다. 보호 단위 미달이면 `dropCountBand`가 `NONE`이고 지표가 `null`이다. `selection`은 `SIMILAR` 또는 `CATEGORY`.
+
+**오류 코드:**
+- `DROP_NOT_FOUND`, `DROP_ACCESS_DENIED` — 수요 분석 조회(2.1)와 같음
+- `DEMAND_ANALYSIS_UNAVAILABLE` — WISH 상태가 아님
+
+### 7.5 생성 단계 조회
+
+```http
+POST /api/v1/seller/similar-sales
+```
+
+- **인증**: `SELLER`
+- 저장하지 않는다. 저장 전 DROP에서도 쓰도록 폼 입력값을 받는다.
+
+**요청:**
+
+```json
+{
+  "categoryId": 8,
+  "name": "고양이 아크릴 키링",
+  "description": "고양이 일러스트를 담은 양면 아크릴 키링입니다.",
+  "optionGroups": [{ "name": "사이즈", "values": ["S", "M"] }],
+  "unitPrices": [12000, 14000]
+}
+```
+
+- `categoryId`: 필수, 활성 카테고리(5.5와 같은 검증).
+- `name`(200자 이하)·`description`(5,000자 이하): 둘 다 있어야 비슷한 DROP을 고른다. 없으면 7.1처럼 넓힌다.
+- `optionGroups`: 선택(5.5와 같은 한도).
+- `unitPrices`: 필수 1~100개, 각 0 이상. 단순 평균을 대표 가격으로 쓴다. 0이면 가격 조건 없이 고른다.
+- 요청 임베딩은 DROP 임베딩과 같은 형식(6.1)·같은 모델로 만들고, 같은 글이면 Redis 캐시(하루)를 다시 쓴다. 만들지 못하면(꺼짐·실패·시간 초과) 비슷한 DROP 대신 7.1처럼 넓힌다.
+
+**응답:** 7.4와 같다.
+
+**오류 코드:**
+- `VALIDATION_FAILED` — 필수값 누락, 없거나 비활성인 카테고리(`field`: `categoryId`)
+
+### 7.6 화면
+
+- WISH 단계: 판매자 DROP 상세의 수요 분석 참고 카드 안에 "비슷한 DROP 실적"으로 보여 준다.
+- 생성 단계: DROP 생성·DRAFT 편집 폼의 재고 추천 패널 아래에 보여 준다. 카테고리·상품명·설명·가격이 바뀌면 다시 조회한다(입력이 멈춘 뒤).
+- 기준 쪽을 강조하고 이유를 한 줄로 쓴다. 예: "내 비슷한 DROP 4개 기준", "내 비슷한 DROP이 2개라 다른 판매자 자료를 기준으로 했어요", "첫 판매라 처음 판매한 다른 판매자들의 비슷한 굿즈를 기준으로 했어요".
+- 예시 문구: "비슷한 굿즈 4개 중 3개가 매진됐고, 매진까지 보통 6분 걸렸어요."

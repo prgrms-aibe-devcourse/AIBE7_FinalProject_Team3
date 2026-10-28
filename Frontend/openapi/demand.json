@@ -12,6 +12,10 @@
   ],
   "tags": [
     {
+      "name": "판매자 비슷한 DROP 실적",
+      "description": "내 지난 비슷한 DROP과 다른 판매자의 비슷한 굿즈의 판매 결과. 저장하지 않는다. 403 ACCESS_DENIED는 SELLER 권한 없음"
+    },
+    {
       "name": "판매자 재고 추천",
       "description": "DROP 생성 단계의 재고 추천·가격대 참고. 저장하지 않는다. 403 ACCESS_DENIED는 SELLER 권한 없음"
     },
@@ -74,6 +78,66 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseStockRecommendationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/seller/similar-sales": {
+      "post": {
+        "tags": ["판매자 비슷한 DROP 실적"],
+        "summary": "생성 단계 비슷한 DROP 실적",
+        "description": "폼 입력(카테고리·상품명·설명·옵션·가격)으로 비슷한 종료 DROP의 매진 비율·매진 시간·판매율·WISH 대비 판매량을 계산한다. 내 비슷한 DROP이 충분하면 내 것을, 아니면 다른 판매자 것을 기준으로 삼는다",
+        "operationId": "forForm",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimilarSalesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "계산 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSimilarSalesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST, VALIDATION_FAILED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSimilarSalesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED, INVALID_TOKEN",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSimilarSalesResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSimilarSalesResponse"
                 }
               }
             }
@@ -265,6 +329,77 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseDemandAnalysisResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/seller/drops/{dropId}/similar-sales": {
+      "get": {
+        "tags": ["판매자 비슷한 DROP 실적"],
+        "summary": "WISH 단계 비슷한 DROP 실적",
+        "description": "본인 WISH DROP의 저장된 임베딩으로 비슷한 종료 DROP의 판매 결과를 계산한다",
+        "operationId": "forWishDrop",
+        "parameters": [
+          {
+            "name": "dropId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "계산 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSimilarSalesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED, INVALID_TOKEN",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSimilarSalesResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED, DROP_ACCESS_DENIED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSimilarSalesResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "DROP_NOT_FOUND",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSimilarSalesResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "DEMAND_ANALYSIS_UNAVAILABLE",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSimilarSalesResponse"
                 }
               }
             }
@@ -585,6 +720,158 @@
                 "FREQUENT_SOLD_OUT"
               ]
             }
+          }
+        }
+      },
+      "OptionGroupInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 0
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "minLength": 0
+            },
+            "maxItems": 50,
+            "minItems": 0
+          }
+        },
+        "required": ["name", "values"]
+      },
+      "SimilarSalesRequest": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 0
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 5000,
+            "minLength": 0
+          },
+          "optionGroups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OptionGroupInput"
+            },
+            "maxItems": 10,
+            "minItems": 0
+          },
+          "unitPrices": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            },
+            "maxItems": 100,
+            "minItems": 1
+          }
+        },
+        "required": ["categoryId", "unitPrices"]
+      },
+      "ApiResponseSimilarSalesResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SimilarSalesResponse"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "OthersSimilarSales": {
+        "type": "object",
+        "properties": {
+          "selection": {
+            "type": "string",
+            "enum": ["SIMILAR", "ALL", "CATEGORY"]
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["NEW_SELLERS", "ALL_SELLERS"]
+          },
+          "dropCountBand": {
+            "type": "string"
+          },
+          "soldOutRate": {
+            "type": ["number", "null"]
+          },
+          "medianSellOutMinutes": {
+            "type": ["integer", "null"],
+            "format": "int32"
+          },
+          "sellThroughRate": {
+            "type": ["number", "null"]
+          },
+          "soldPerWish": {
+            "type": ["number", "null"]
+          },
+          "asOf": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "OwnSimilarSales": {
+        "type": "object",
+        "properties": {
+          "selection": {
+            "type": "string",
+            "enum": ["SIMILAR", "ALL", "CATEGORY"]
+          },
+          "dropCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "soldOutRate": {
+            "type": "number"
+          },
+          "medianSellOutMinutes": {
+            "type": ["integer", "null"],
+            "format": "int32"
+          },
+          "sellThroughRate": {
+            "type": "number"
+          },
+          "soldPerWish": {
+            "type": ["number", "null"]
+          }
+        }
+      },
+      "SimilarSalesResponse": {
+        "type": "object",
+        "properties": {
+          "basis": {
+            "type": ["string", "null"],
+            "enum": ["OWN", "OTHERS"]
+          },
+          "reason": {
+            "type": "string",
+            "enum": ["OWN_ENOUGH", "OWN_FEW", "OWN_NOT_SIMILAR", "FIRST_SALE"]
+          },
+          "own": {
+            "type": "null",
+            "$ref": "#/components/schemas/OwnSimilarSales"
+          },
+          "others": {
+            "$ref": "#/components/schemas/OthersSimilarSales"
           }
         }
       },
