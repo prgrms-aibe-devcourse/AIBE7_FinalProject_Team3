@@ -26,6 +26,7 @@ public class OrderCreateService {
     private final OrderCreateTransactionService transactionService;
     private final OrderItemRepository orderItemRepository;
     private final OrderRequestHasher requestHasher;
+    private final OrderCreationLimiter creationLimiter;
 
     public OrderCreateResponse create(Long buyerId, String idempotencyKeyHeader, OrderCreateRequest request) {
         validateUniqueOptions(request.items());
@@ -37,7 +38,8 @@ public class OrderCreateService {
         }
 
         try {
-            return toResponse(transactionService.create(buyerId, idempotencyKey, requestHash, request));
+            return toResponse(creationLimiter.withPermit(
+                    () -> transactionService.create(buyerId, idempotencyKey, requestHash, request)));
         } catch (DataIntegrityViolationException exception) {
             return resolveConcurrentRequest(buyerId, idempotencyKey, requestHash, exception);
         }

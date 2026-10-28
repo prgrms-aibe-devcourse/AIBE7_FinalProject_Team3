@@ -223,6 +223,14 @@ grab:
     acquire-timeout: 3s
     # 거부 응답의 Retry-After 헤더 값. 1초 이상의 정수 초만 허용한다
     retry-after: 3s
+  # 주문 생성 동시 실행 상한(GR-202). 드롭 오픈 스파이크 때 주문 생성이 몰리면 CPU가 포화돼
+  # 그 드롭과 무관한 다른 요청까지 응답이 늦어진다(교차영향 측정). 전역 상한 하나로 정해진 수만 동시 처리한다.
+  # 값은 1차 추정치라 운영 트래픽을 보며 조정이 필요하다 — HikariCP 풀 크기(기본 10)보다 넉넉히 둔다.
+  # 자리가 없으면 acquire-timeout까지 기다리고, 그 안에 차례가 오지 않으면 503 ORDER_CREATION_TEMPORARILY_UNAVAILABLE로 거부한다
+  order-creation:
+    max-concurrent: 20
+    acquire-timeout: 3s
+    retry-after: 3s
   cors:
     # Credential(쿠키) 요청을 허용할 프론트엔드 Origin(GR-44 M00-04). 기본값은 로컬 Vite 개발 서버다.
     # 여러 개는 쉼표로 구분하고 끝에 /를 붙이지 않는다. 운영을 같은 출처로 서비스하면 쓰이지 않는다
