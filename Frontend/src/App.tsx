@@ -54,6 +54,13 @@ export default function App() {
     }
   }
 
+  // 운영자페이지 로그아웃. 실패를 여기서 삼키지 않고 AdminSellerApplicationsPage의
+  // 자체 logoutError 상태로 전파해, 화면에 바로 오류를 보여준다.
+  const logoutFromAdminPage = async () => {
+    await logout()
+    navigate('/wish')
+  }
+
   // 운영자는 목록·상세는 둘러볼 수 있지만 WISH·GRAB은 할 수 없다. wishesReady를 false로 둬
   // 버튼을 비활성화하고, toggleWish도 막아 다른 경로로 호출돼도 안전하다.
   const shared: SharedProps = {
@@ -143,7 +150,7 @@ export default function App() {
                 user={user}
                 authStatus={status}
                 notify={notify}
-                onLogout={logoutFromHeader}
+                onLogout={logoutFromAdminPage}
               />
             }
           />

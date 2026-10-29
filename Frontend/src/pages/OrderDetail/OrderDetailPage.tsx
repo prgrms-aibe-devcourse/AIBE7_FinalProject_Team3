@@ -347,7 +347,7 @@ export default function OrderDetailPage({ authStatus, notify }: Props) {
   const { orderId = '' } = useParams()
   const location = useLocation()
   const authenticated = authStatus === 'authenticated'
-  const orderQuery = useMyOrder(orderId, authenticated)
+  const orderQuery = useMyOrder(orderId, authenticated, true)
   const paymentsQuery = useOrderPayments(orderId, authenticated)
 
   if (authStatus === 'loading') return <AuthLoading />

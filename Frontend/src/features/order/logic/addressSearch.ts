@@ -15,6 +15,9 @@ type DaumPostcodeData = {
   address: string
   roadAddress: string
   jibunAddress: string
+  // 사용자가 결과 목록에서 도로명('R')·지번('J') 중 고른 쪽. 항상 도로명을 우선하면
+  // 사용자가 일부러 고른 지번 주소를 무시하게 된다.
+  userSelectedType: 'R' | 'J'
 }
 
 export type AddressSearchResult = {
@@ -57,9 +60,12 @@ export async function embedPostcode(
   await loadPostcodeScript()
   new window.daum!.Postcode({
     oncomplete: (data) => {
+      const preferred =
+        data.userSelectedType === 'J' ? data.jibunAddress : data.roadAddress
       onComplete({
         postalCode: data.zonecode,
-        address1: data.roadAddress || data.jibunAddress || data.address,
+        address1:
+          preferred || data.roadAddress || data.jibunAddress || data.address,
       })
     },
     width: '100%',

@@ -112,10 +112,12 @@ function AddressFields({
       onChange('address1', result.address1)
       setSearchOpen(false)
     }).catch(() => {
-      if (active)
-        setSearchError(
-          '주소 검색을 불러오지 못했어요. 잠시 후 다시 시도해주세요.',
-        )
+      if (!active) return
+      // 모달이 열린 채로는 바깥의 오류 문구가 다이얼로그에 가려 안 보인다. 닫아서 보이게 한다.
+      setSearchOpen(false)
+      setSearchError(
+        '주소 검색을 불러오지 못했어요. 잠시 후 다시 시도해주세요.',
+      )
     })
     return () => {
       active = false
