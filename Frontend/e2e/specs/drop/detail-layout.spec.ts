@@ -67,6 +67,31 @@ test('WISH는 정확한 오픈 시각을 표시하고 구매 바를 숨긴다', 
   await expect(page.locator('.detail-purchase')).toHaveCount(0)
 })
 
+test('일부 옵션 재고가 미조회이면 전체 수량도 확인 중으로 표시한다', async ({
+  page,
+}) => {
+  await page.route('**/api/v1/drops/201/stocks', (route) =>
+    route.fulfill({
+      json: {
+        success: true,
+        data: {
+          dropId: 201,
+          options: [{ optionId: 2011, availableStock: 8 }, { optionId: 2012 }],
+        },
+      },
+    }),
+  )
+  await page.goto('/#/drops/201')
+  await page.waitForLoadState('networkidle')
+  await expect(page.locator('.detail-state .detail-stock-value')).toHaveText(
+    '확인 중',
+  )
+  await expect(page.locator('.detail-state .detail-stock')).toHaveAttribute(
+    'data-low',
+    'false',
+  )
+})
+
 // GR-148: 재고는 재조회 응답만 근거로 삼는다. 응답 전에는 상세 응답의 SKU 재고로 대체하지 않는다.
 test('재고 응답 전에는 전체·옵션·선택 재고를 모두 확인 중으로 표시한다', async ({
   page,
