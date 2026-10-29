@@ -99,7 +99,7 @@ class RelatedDropReadServiceTest {
 
     private RelatedDropReadService service(Store store, Instant now) {
         DropCacheProperties properties = new DropCacheProperties(store, Duration.ofSeconds(5), Duration.ofSeconds(5),
-                Duration.ofMinutes(3));
+                Duration.ofMinutes(3), 1000);
         return new RelatedDropReadService(relatedDropService, cache, properties, Clock.fixed(now, ZoneOffset.UTC));
     }
 
