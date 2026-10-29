@@ -116,14 +116,16 @@ export default function AdminSellerApplicationsPage({
   )
   const [error, setError] = useState('')
   const [loggingOut, setLoggingOut] = useState(false)
+  const [logoutError, setLogoutError] = useState('')
 
   const logout = async () => {
     if (loggingOut) return
     setLoggingOut(true)
+    setLogoutError('')
     try {
       await onLogout()
     } catch {
-      notify('로그아웃하지 못했어요. 잠시 뒤 다시 시도해주세요.')
+      setLogoutError('로그아웃하지 못했어요. 잠시 뒤 다시 시도해주세요.')
       setLoggingOut(false)
     }
   }
@@ -379,14 +381,35 @@ export default function AdminSellerApplicationsPage({
           )}
         </section>
       </div>
-      <button
-        type="button"
-        className="secondary-button"
-        disabled={loggingOut}
-        onClick={() => void logout()}
+      <section
+        className="panel account-settings"
+        aria-labelledby="settings-title"
       >
-        {loggingOut ? '로그아웃 중…' : '로그아웃'}
-      </button>
+        <h2 id="settings-title">계정 설정</h2>
+        <div
+          className="settings-row"
+          role="group"
+          aria-labelledby="settings-logout"
+        >
+          <h3 id="settings-logout">로그아웃</h3>
+          <p>이 기기에서 로그아웃해요.</p>
+          <button
+            type="button"
+            className="text-link"
+            disabled={loggingOut}
+            onClick={() => void logout()}
+          >
+            {loggingOut ? '로그아웃 중…' : '로그아웃'}
+          </button>
+          {logoutError && (
+            <div className="settings-form">
+              <p className="form-error" role="alert">
+                {logoutError}
+              </p>
+            </div>
+          )}
+        </div>
+      </section>
     </section>
   )
 }
