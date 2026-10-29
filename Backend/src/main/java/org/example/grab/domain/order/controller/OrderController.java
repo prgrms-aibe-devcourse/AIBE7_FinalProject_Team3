@@ -43,7 +43,7 @@ public class OrderController {
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "주문 생성 성공")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "INVALID_REQUEST, INVALID_IDEMPOTENCY_KEY, VALIDATION_FAILED")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "AUTHENTICATION_REQUIRED, INVALID_TOKEN")
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "ACCESS_DENIED (CSRF 토큰 누락)")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "ACCESS_DENIED (CSRF 토큰 누락), ADMIN_ACTION_NOT_ALLOWED")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "OPTION_NOT_FOUND")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "DROP_NOT_ON_SALE, SALE_NOT_STARTED, SALE_ENDED, DUPLICATE_IDEMPOTENCY_KEY")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "422", description = "INSUFFICIENT_STOCK")
@@ -69,7 +69,7 @@ public class OrderController {
     public ApiResponse<PageResponse<MyOrderListResponse>> findMyOrders(
             @RequestParam(required = false) OrderStatus status,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
+            @RequestParam(defaultValue = "10") int size
     ) {
         if (page < 0 || size < 1 || size > 100) {
             throw new BusinessException(CommonErrorCode.INVALID_REQUEST);

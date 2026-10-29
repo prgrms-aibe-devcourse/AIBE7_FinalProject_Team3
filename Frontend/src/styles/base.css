@@ -34,6 +34,9 @@ select,
 textarea {
   max-width: 100%;
 }
+textarea {
+  resize: none;
+}
 button,
 input,
 select,

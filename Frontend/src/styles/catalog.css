@@ -134,6 +134,7 @@
   justify-content: center;
   gap: 20px;
   margin-top: 32px;
+  margin-bottom: 32px;
   font-size: 13px;
 }
 .catalog-refresh-error {

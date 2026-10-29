@@ -13,10 +13,12 @@ export type HeaderAccount = {
 export default function Header({
   authenticated,
   seller,
+  admin,
   account,
 }: {
   authenticated: boolean
   seller: boolean
+  admin: boolean
   account: HeaderAccount | null
 }) {
   const location = useLocation()
@@ -63,6 +65,7 @@ export default function Header({
             <AccountMenu
               imageUrl={account.imageUrl}
               name={account.name}
+              admin={admin}
               onLogout={account.onLogout}
             />
           ) : (

@@ -83,6 +83,10 @@ test('일부 옵션 재고가 미조회이면 전체 수량도 확인 중으로 
   )
   await page.goto('/#/drops/201')
   await page.waitForLoadState('networkidle')
+  // 응답이 온 옵션(2011)은 선택 시 그대로 보여주고, 전체 합계만 확인 중으로 둔다.
+  await page.getByLabel('착용감').selectOption('1')
+  await page.getByLabel('소매').selectOption('1')
+  await expect(page.locator('.sku-result strong')).toHaveText('재고 8개')
   await expect(page.locator('.detail-state .detail-stock-value')).toHaveText(
     '확인 중',
   )

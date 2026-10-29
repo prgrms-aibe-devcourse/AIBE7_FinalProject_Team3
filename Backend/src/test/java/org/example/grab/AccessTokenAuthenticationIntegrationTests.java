@@ -97,7 +97,7 @@ class AccessTokenAuthenticationIntegrationTests {
         mockMvc.perform(get("/api/v1/orders").cookie(new Cookie("access_token", token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
-        verify(orderQueryService).findMyOrders(eq(userId), isNull(), eq(0), eq(20));
+        verify(orderQueryService).findMyOrders(eq(userId), isNull(), eq(0), eq(10));
     }
 
     @Test
@@ -110,7 +110,7 @@ class AccessTokenAuthenticationIntegrationTests {
         mockMvc.perform(get("/api/v1/orders").cookie(new Cookie("access_token", token)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("AUTHENTICATION_REQUIRED"));
-        verify(orderQueryService, never()).findMyOrders(anyLong(), isNull(), eq(0), eq(20));
+        verify(orderQueryService, never()).findMyOrders(anyLong(), isNull(), eq(0), eq(10));
     }
 
     // S5: JWT의 SELLER는 발급 시점 값이다. 판매자 API는 요청마다 sellers.status = APPROVED를 다시 확인한다(M00-03)
@@ -124,7 +124,7 @@ class AccessTokenAuthenticationIntegrationTests {
         // when, then: 승인 상태에서는 그 판매자의 sellers.id로 조회한다
         mockMvc.perform(get("/api/v1/seller/drops").cookie(new Cookie("access_token", token)))
                 .andExpect(status().isOk());
-        verify(dropService).findSellerDrops(eq(sellerId), isNull(), eq(0), eq(20));
+        verify(dropService).findSellerDrops(eq(sellerId), isNull(), eq(0), eq(10));
 
         // given: 토큰이 만료되기 전에 승인이 취소된다
         jdbcTemplate.update("""
@@ -136,7 +136,7 @@ class AccessTokenAuthenticationIntegrationTests {
         mockMvc.perform(get("/api/v1/seller/drops").cookie(new Cookie("access_token", token)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code").value("ACCESS_DENIED"));
-        verify(dropService, times(1)).findSellerDrops(anyLong(), isNull(), eq(0), eq(20));
+        verify(dropService, times(1)).findSellerDrops(anyLong(), isNull(), eq(0), eq(10));
     }
 
     @Test
@@ -151,7 +151,7 @@ class AccessTokenAuthenticationIntegrationTests {
         mockMvc.perform(get("/api/v1/seller/drops").cookie(new Cookie("access_token", token)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code").value("ACCESS_DENIED"));
-        verify(dropService, never()).findSellerDrops(anyLong(), isNull(), eq(0), eq(20));
+        verify(dropService, never()).findSellerDrops(anyLong(), isNull(), eq(0), eq(10));
     }
 
     // ck_sellers_review: 승인 상태는 reviewed_by·reviewed_at이 필요하다
