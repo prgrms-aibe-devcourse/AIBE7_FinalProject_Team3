@@ -19,11 +19,15 @@ public record DropCacheProperties(
         @DefaultValue("memory") Store store,
         @DefaultValue("5s") Duration detailTtl,
         @DefaultValue("5s") Duration stockTtl,
-        @DefaultValue("3m") Duration relatedTtl
+        @DefaultValue("3m") Duration relatedTtl,
+        @DefaultValue("1000") long maxSize
 ) {
     public enum Store { MEMORY, REDIS, NONE }
 
     public DropCacheProperties {
+        if (maxSize < 1) {
+            throw new IllegalArgumentException("grab.drop-cache.max-size 값은 1 이상이어야 합니다.");
+        }
         if (detailTtl.isNegative() || detailTtl.isZero() || stockTtl.isNegative() || stockTtl.isZero()
                 || relatedTtl.isNegative() || relatedTtl.isZero()) {
             throw new IllegalArgumentException("grab.drop-cache의 TTL은 0보다 커야 합니다.");

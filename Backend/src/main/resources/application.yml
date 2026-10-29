@@ -113,6 +113,7 @@ grab:
     detail-ttl: 5s
     stock-ttl: 5s
     related-ttl: 3m
+    max-size: ${GRAB_DROP_CACHE_MAX_SIZE:1000}
   # 메일 본문 등 서버가 만드는 링크가 가리키는 프런트엔드 주소. 기본값은 로컬 Vite 개발 서버다
   web:
     base-url: ${WEB_BASE_URL:http://localhost:5173}
