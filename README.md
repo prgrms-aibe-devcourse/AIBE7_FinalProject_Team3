@@ -79,8 +79,6 @@ flowchart LR
 
 ## 주요 화면
 
-> 스크린샷 준비 중입니다. 아래 이미지는 실제 화면을 넣기 위한 자리 표시자입니다.
-
 | 홈 · DROP 탐색 | WISH 상세 |
 | --- | --- |
 | ![홈 · DROP 탐색](./Backend/docs/images/screenshots/home.png) | ![WISH 상세](./Backend/docs/images/screenshots/wish-detail.png) |
@@ -88,15 +86,6 @@ flowchart LR
 | ![GRAB 상세](./Backend/docs/images/screenshots/grab-detail.png) | ![주문 · 결제](./Backend/docs/images/screenshots/checkout.png) |
 | **주문 내역** | **판매자 대시보드** |
 | ![주문 내역](./Backend/docs/images/screenshots/orders.png) | ![판매자 대시보드](./Backend/docs/images/screenshots/seller-dashboard.png) |
-
-<details>
-<summary>스크린샷 교체 방법</summary>
-
-`Backend/docs/images/screenshots/`에 위 화면에 해당하는 PNG 파일을 같은 이름으로 덮어쓰면 됩니다.
-파일명은 `home.png`, `wish-detail.png`, `grab-detail.png`, `checkout.png`, `orders.png`, `seller-dashboard.png`입니다.
-교체가 끝나면 이 섹션 상단의 ‘스크린샷 준비 중’ 안내를 삭제합니다.
-
-</details>
 
 ## Tech Stack
 
@@ -114,8 +103,6 @@ flowchart LR
 ![Caffeine](https://img.shields.io/badge/Caffeine-6DB33F?style=for-the-badge)
 ![Spring AI](https://img.shields.io/badge/Spring_AI_2.0.1-6DB33F?style=for-the-badge&logo=spring&logoColor=white)
 ![Google Gemini](https://img.shields.io/badge/Google_Gemini-8E75B2?style=for-the-badge&logo=googlegemini&logoColor=white)
-
-Caffeine은 회원 ID 변환과 공개 DROP 응답 캐시에 사용합니다. Spring AI와 Google GenAI는 수요 분석 설명·상품 이미지 기반 초안 생성·유사 상품 검색용 임베딩에 사용하며, 수량 계산은 서버 로직으로 처리합니다.
 
 ### Frontend
 
@@ -148,8 +135,6 @@ Caffeine은 회원 ID 변환과 공개 DROP 응답 캐시에 사용합니다. Sp
 ![Loki](https://img.shields.io/badge/Loki-F46800?style=for-the-badge&logo=grafana&logoColor=white)
 ![Grafana Alloy](https://img.shields.io/badge/Grafana_Alloy-F46800?style=for-the-badge&logo=grafana&logoColor=white)
 
-로컬 DB는 PostgreSQL 18 + pgvector, 인증 저장소는 Redis 8을 사용합니다. 운영 구성은 Supabase Postgres·Storage, Aiven Valkey, EC2·Nginx 기반이며, 모니터링·로그 수집용 Compose에 Prometheus·Grafana·Loki·Alloy가 포함되어 있습니다. 토스페이먼츠는 테스트 환경을 사용합니다.
-
 ### Testing / Quality
 
 ![JUnit](https://img.shields.io/badge/JUnit-25A162?style=for-the-badge&logo=junit5&logoColor=white)
@@ -159,8 +144,6 @@ Caffeine은 회원 ID 변환과 공개 DROP 응답 캐시에 사용합니다. Sp
 ![ESLint](https://img.shields.io/badge/ESLint_10-4B32C3?style=for-the-badge&logo=eslint&logoColor=white)
 ![Prettier](https://img.shields.io/badge/Prettier_3-F7B93E?style=for-the-badge&logo=prettier&logoColor=white)
 ![OpenAPI TypeScript](https://img.shields.io/badge/OpenAPI_TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
-
-백엔드는 JUnit·Mockito·AssertJ·MockMvc와 Testcontainers로 검증하고, GreenMail로 메일 발송을 테스트합니다. 프론트엔드는 Vitest와 Playwright, 부하 테스트는 k6를 사용합니다. OpenAPI TypeScript로 API 타입을 생성합니다.
 
 ## 상세 문서
 
