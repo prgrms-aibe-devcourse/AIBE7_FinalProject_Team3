@@ -90,12 +90,18 @@ export default function DropDetailPage({
       option.availableStock,
     ]),
   )
-  const totalStock = stocksQuery.data?.options?.length
-    ? stocksQuery.data.options.reduce(
-        (sum, option) => sum + option.availableStock,
-        0,
-      )
-    : undefined
+  // availableStock이 없는 옵션이 섞여 있으면 합계가 NaN이 되고, DropStockQuantity가
+  // NaN !== NaN(항상 true)으로 비교해 무한 리렌더로 이어진다. 전부 확인된 경우만 합산한다.
+  const totalStock =
+    stocksQuery.data?.options?.length &&
+    stocksQuery.data.options.every(
+      (option) => option.availableStock !== undefined,
+    )
+      ? stocksQuery.data.options.reduce(
+          (sum, option) => sum + (option.availableStock ?? 0),
+          0,
+        )
+      : undefined
 
   const selectedSku = findMatchingSku(detail.skus, selected)
   const wished = wishes.has(detail.id)
