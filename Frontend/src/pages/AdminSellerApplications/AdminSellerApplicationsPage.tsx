@@ -25,9 +25,10 @@ type Props = {
   user: AuthUser | null
   authStatus: AuthStatus
   notify: (message: string) => void
+  onLogout: () => Promise<void>
 }
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 10
 const statuses: AdminApplicationStatus[] = ['PENDING', 'APPROVED', 'REJECTED']
 const statusText: Record<AdminApplicationStatus, string> = {
   PENDING: '대기',
@@ -104,6 +105,7 @@ export default function AdminSellerApplicationsPage({
   user,
   authStatus,
   notify,
+  onLogout,
 }: Props) {
   const location = useLocation()
   const [params, setParams] = useSearchParams()
@@ -113,6 +115,18 @@ export default function AdminSellerApplicationsPage({
     null,
   )
   const [error, setError] = useState('')
+  const [loggingOut, setLoggingOut] = useState(false)
+
+  const logout = async () => {
+    if (loggingOut) return
+    setLoggingOut(true)
+    try {
+      await onLogout()
+    } catch {
+      notify('로그아웃하지 못했어요. 잠시 뒤 다시 시도해주세요.')
+      setLoggingOut(false)
+    }
+  }
 
   const status =
     statuses.find((item) => item === params.get('status')) ?? 'PENDING'
@@ -365,6 +379,14 @@ export default function AdminSellerApplicationsPage({
           )}
         </section>
       </div>
+      <button
+        type="button"
+        className="secondary-button"
+        disabled={loggingOut}
+        onClick={() => void logout()}
+      >
+        {loggingOut ? '로그아웃 중…' : '로그아웃'}
+      </button>
     </section>
   )
 }
