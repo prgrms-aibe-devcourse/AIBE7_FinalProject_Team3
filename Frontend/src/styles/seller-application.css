@@ -54,9 +54,6 @@
   border-radius: 4px;
   background: #fff;
 }
-.seller-apply-form textarea {
-  resize: vertical;
-}
 .seller-document-field {
   gap: 10px;
   padding: 14px;
