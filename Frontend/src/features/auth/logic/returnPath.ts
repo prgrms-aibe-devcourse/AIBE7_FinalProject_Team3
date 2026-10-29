@@ -1,10 +1,14 @@
 // 로그인 후 돌아갈 경로. 앱 내부 경로만 허용하고 없거나 맞지 않으면 WISH로 보낸다.
 export const DEFAULT_RETURN_PATH = '/wish'
 
+// 운영자 전용 경로는 로그인 전에 "누가" 거길 보고 있었는지 모르는 채로 저장된 값이다
+// (로그아웃·세션 만료로 관리자 페이지의 !user 가드가 자기 경로를 from으로 남기는 경우,
+// GR-132). 로그인한 사람이 관리자인지 확인하기 전에 그 경로로 돌려보내면 안 되므로 제외한다.
 export function safeReturnPath(value: unknown) {
   return typeof value === 'string' &&
     value.startsWith('/') &&
-    !value.startsWith('//')
+    !value.startsWith('//') &&
+    !value.startsWith('/admin')
     ? value
     : DEFAULT_RETURN_PATH
 }
