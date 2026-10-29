@@ -1,4 +1,4 @@
-import { expect, login, test, toast } from '../../fixtures'
+import { expect, fillSearchedAddress, login, test, toast } from '../../fixtures'
 
 test.describe('상품 주문', () => {
   test('로그인 전 주문은 로그인 화면으로 보낸다', async ({ page }) => {
@@ -47,8 +47,7 @@ test.describe('상품 주문', () => {
     await expect(page.locator('.buyer-total')).toContainText('89,000원')
     await page.getByLabel('받는 분').fill('김그랩')
     await page.getByLabel('연락처').fill('01012345678')
-    await page.getByLabel('우편번호').fill('06236')
-    await page.getByLabel('기본 주소').fill('서울시 강남구')
+    await fillSearchedAddress(page)
     await page.getByRole('button', { name: '주문하기' }).click()
     await expect(toast(page)).toHaveText(
       '주문을 만들었어요. 결제를 진행해주세요.',
