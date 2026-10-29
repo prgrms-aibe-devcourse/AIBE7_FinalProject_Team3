@@ -6,4 +6,6 @@ public interface DocumentStorage {
     void store(String objectKey, byte[] data);
 
     byte[] load(String objectKey);
+
+    void delete(String objectKey);
 }

@@ -14,6 +14,7 @@ import org.example.grab.domain.seller.repository.SellerDocumentRepository;
 import org.example.grab.domain.seller.repository.SellerRepository;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
+import org.example.grab.global.storage.DocumentStorage;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -26,6 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -40,22 +42,26 @@ public class SellerApplicationService {
     private final SellerRepository sellerRepository;
     private final SellerDocumentRepository sellerDocumentRepository;
     private final BusinessRegistrationVerifier businessRegistrationVerifier;
+    private final DocumentStorage documentStorage;
     private final Clock clock;
 
     @Autowired
     public SellerApplicationService(SellerRepository sellerRepository,
                                     SellerDocumentRepository sellerDocumentRepository,
-                                    BusinessRegistrationVerifier businessRegistrationVerifier) {
-        this(sellerRepository, sellerDocumentRepository, businessRegistrationVerifier, Clock.systemUTC());
+                                    BusinessRegistrationVerifier businessRegistrationVerifier,
+                                    DocumentStorage documentStorage) {
+        this(sellerRepository, sellerDocumentRepository, businessRegistrationVerifier, documentStorage, Clock.systemUTC());
     }
 
     SellerApplicationService(SellerRepository sellerRepository,
                              SellerDocumentRepository sellerDocumentRepository,
                              BusinessRegistrationVerifier businessRegistrationVerifier,
+                             DocumentStorage documentStorage,
                              Clock clock) {
         this.sellerRepository = sellerRepository;
         this.sellerDocumentRepository = sellerDocumentRepository;
         this.businessRegistrationVerifier = businessRegistrationVerifier;
+        this.documentStorage = documentStorage;
         this.clock = clock;
     }
 
@@ -162,5 +168,23 @@ public class SellerApplicationService {
         }
 
         documents.forEach(document -> document.attachToSeller(sellerId));
+
+        purgeStaleDocuments(sellerId, documentsById.keySet());
+    }
+
+    /*
+        재신청 시 이전 신청에 붙어 있던 구 서류(반려되었던 신청의 서류)를 정리한다.
+        그대로 두면 같은 sellerId·documentType으로 서류가 여러 건 남아
+        운영자 뷰어 조회(SellerDocumentViewService)가 500으로 실패한다.
+     */
+    private void purgeStaleDocuments(Long sellerId, Set<UUID> keepIds) {
+        List<SellerDocument> staleDocuments = sellerDocumentRepository.findAllBySellerId(sellerId).stream()
+                .filter(document -> !keepIds.contains(document.getId()))
+                .toList();
+        if (staleDocuments.isEmpty()) {
+            return;
+        }
+        staleDocuments.forEach(document -> documentStorage.delete(document.getEncryptedObjectKey()));
+        sellerDocumentRepository.deleteAll(staleDocuments);
     }
 }

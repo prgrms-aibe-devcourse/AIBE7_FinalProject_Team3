@@ -47,6 +47,7 @@ class SellerApplicationServiceTest {
     private SellerRepository sellerRepository;
     private SellerDocumentRepository sellerDocumentRepository;
     private BusinessRegistrationVerifier businessRegistrationVerifier;
+    private org.example.grab.global.storage.DocumentStorage documentStorage;
     private SellerApplicationService service;
     private Long documentUploaderId;
     private Map<DocumentType, UUID> documentIds;
@@ -56,8 +57,9 @@ class SellerApplicationServiceTest {
         sellerRepository = mock(SellerRepository.class);
         sellerDocumentRepository = mock(SellerDocumentRepository.class);
         businessRegistrationVerifier = mock(BusinessRegistrationVerifier.class);
+        documentStorage = mock(org.example.grab.global.storage.DocumentStorage.class);
         Clock clock = Clock.fixed(Instant.parse("2026-10-14T00:00:00Z"), ZoneOffset.UTC);
-        service = new SellerApplicationService(sellerRepository, sellerDocumentRepository, businessRegistrationVerifier, clock);
+        service = new SellerApplicationService(sellerRepository, sellerDocumentRepository, businessRegistrationVerifier, documentStorage, clock);
         documentUploaderId = USER_ID;
         documentIds = allDocumentIds();
 
@@ -116,6 +118,24 @@ class SellerApplicationServiceTest {
 
         assertThat(response.status()).isEqualTo(SellerStatus.PENDING);
         assertThat(response.brandName()).isEqualTo("길동상점");
+    }
+
+    @Test
+    @DisplayName("재신청 시 이전 신청에 붙어 있던 구 서류는 스토리지·DB에서 모두 정리한다")
+    void purgesStaleDocumentsOnReapply() {
+        Seller rejected = Seller.apply(USER_ID, "기존", "old@example.com", BRN, null, now());
+        rejected.reject(99L, now(), "서류 미비");
+        ReflectionTestUtils.setField(rejected, "id", 5L);
+        given(sellerRepository.findByUserId(USER_ID)).willReturn(Optional.of(rejected));
+
+        SellerDocument staleDocument = usableDocument(UUID.randomUUID(), USER_ID, DocumentType.ID_CARD);
+        ReflectionTestUtils.setField(staleDocument, "sellerId", 5L);
+        given(sellerDocumentRepository.findAllBySellerId(5L)).willReturn(List.of(staleDocument));
+
+        service.apply(USER_ID, request());
+
+        org.mockito.Mockito.verify(documentStorage).delete(staleDocument.getEncryptedObjectKey());
+        org.mockito.Mockito.verify(sellerDocumentRepository).deleteAll(List.of(staleDocument));
     }
 
     @Test
