@@ -28,7 +28,7 @@ public class WishController {
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "등록 성공 또는 이미 등록됨")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "INVALID_REQUEST")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "AUTHENTICATION_REQUIRED, INVALID_TOKEN")
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "ACCESS_DENIED (CSRF 토큰 누락)")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "ACCESS_DENIED (CSRF 토큰 누락), ADMIN_ACTION_NOT_ALLOWED")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "DROP_NOT_FOUND")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "GRAB_ALREADY_STARTED, DROP_NOT_WISHABLE")
     @PutMapping
@@ -41,7 +41,7 @@ public class WishController {
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204", description = "취소 완료")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "INVALID_REQUEST")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "AUTHENTICATION_REQUIRED, INVALID_TOKEN")
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "ACCESS_DENIED (CSRF 토큰 누락)")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "ACCESS_DENIED (CSRF 토큰 누락), ADMIN_ACTION_NOT_ALLOWED")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "DROP_NOT_FOUND")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "GRAB_ALREADY_STARTED, DROP_NOT_WISHABLE")
     @DeleteMapping

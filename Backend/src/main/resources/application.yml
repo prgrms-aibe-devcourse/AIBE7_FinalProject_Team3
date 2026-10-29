@@ -113,6 +113,7 @@ grab:
     detail-ttl: 5s
     stock-ttl: 5s
     related-ttl: 3m
+    max-size: ${GRAB_DROP_CACHE_MAX_SIZE:1000}
   # 메일 본문 등 서버가 만드는 링크가 가리키는 프런트엔드 주소. 기본값은 로컬 Vite 개발 서버다
   web:
     base-url: ${WEB_BASE_URL:http://localhost:5173}
@@ -223,6 +224,10 @@ grab:
     acquire-timeout: 3s
     # 거부 응답의 Retry-After 헤더 값. 1초 이상의 정수 초만 허용한다
     retry-after: 3s
+  # 인증 요청의 회원 ID 변환(public_id → users.id) 앱 메모리 캐시(GR-211). 대응이 바뀌지 않아 만료 없이 최대 항목 수로만 제한한다.
+  # 항목 하나가 약 100바이트라 10만 개는 약 10MB다. 1 이상만 허용한다
+  user-id-cache:
+    max-size: 100000
   # 주문 생성 동시 실행 상한(GR-202). 드롭 오픈 스파이크 때 주문 생성이 몰리면 CPU가 포화돼
   # 그 드롭과 무관한 다른 요청까지 응답이 늦어진다(교차영향 측정). 전역 상한 하나로 정해진 수만 동시 처리한다.
   # 값은 1차 추정치라 운영 트래픽을 보며 조정이 필요하다 — HikariCP 풀 크기(기본 10)보다 넉넉히 둔다.

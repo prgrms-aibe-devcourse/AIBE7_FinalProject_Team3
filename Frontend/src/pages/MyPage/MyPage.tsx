@@ -19,10 +19,10 @@ import type { SharedProps } from '../../types/store'
 import { dateLabel } from '../../utils/date'
 import { won } from '../../utils/price'
 
-const WISH_PAGE_SIZE = 20
+const WISH_PAGE_SIZE = 10
 // 판매 종료·취소된 WISH는 비슷한 굿즈를 펼쳐 볼 수 있다(DROP.md 1.4)
 const CLOSED_WISH_STATUSES = new Set(['ENDED', 'CANCELED'])
-const ORDER_PAGE_SIZE = 20
+const ORDER_PAGE_SIZE = 10
 
 const WISH_STATUS_TEXT: Record<string, string> = {
   WISH: 'WISH',
@@ -79,6 +79,8 @@ export default function MyPage({
   if (!user && loggingOut) return <AuthLoading />
   if (!user)
     return <Navigate to="/login" state={{ from: location.pathname }} replace />
+  // 운영자는 마이페이지 대신 판매자 신청 심사 화면으로 보낸다.
+  if (isAdmin(user)) return <Navigate to="/admin/seller-applications" replace />
 
   const logout = async () => {
     if (loggingOut) return

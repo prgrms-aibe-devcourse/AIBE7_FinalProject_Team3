@@ -111,6 +111,7 @@ test('상세 응답의 배송지·배송 정보 null을 그대로 옮긴다', ()
     carrier: null,
     trackingNumber: null,
     deliveredAt: null,
+    deliveryStage: null,
   })
   expect(order.paymentStatus).toBeNull()
   expect(toBuyerOrderDetail({ orderId: 'id-2' }).shippingAddress).toBeNull()

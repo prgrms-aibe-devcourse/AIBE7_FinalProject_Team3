@@ -127,7 +127,7 @@ public class SellerOrderController {
             @RequestParam(required = false) OrderStatus orderStatus,
             @RequestParam(required = false) PaymentStatus paymentStatus,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "10") int size) {
         if (page < 0 || size < 1 || size > 100 || (dropId != null && dropId < 1)) {
             throw new BusinessException(CommonErrorCode.INVALID_REQUEST);
         }

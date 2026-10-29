@@ -50,7 +50,7 @@ public class AdminSellerApplicationController {
     public ApiResponse<PageResponse<AdminSellerApplicationResponse>> findApplications(
             @RequestParam(required = false) SellerStatus status,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "10") int size) {
         if (page < 0 || size < 1 || size > 100) {
             throw new BusinessException(CommonErrorCode.INVALID_REQUEST);
         }

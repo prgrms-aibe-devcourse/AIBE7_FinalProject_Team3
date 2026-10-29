@@ -15,10 +15,12 @@ import {
 } from 'react-router-dom'
 import type { PaymentRequest } from '../../api/payment/payments'
 import EmptyState from '../../components/EmptyState/EmptyState'
+import Modal from '../../components/Modal/Modal'
 import AuthLoading from '../../features/auth/components/AuthLoading'
 import type { AuthStatus } from '../../features/auth/logic/authUser'
 import { toDropDetail } from '../../features/drop/logic/dropDetailView'
 import { useDropDetail } from '../../features/drop/logic/useDrops'
+import { embedPostcode } from '../../features/order/logic/addressSearch'
 import BuyerOrderAmounts from '../../features/order/components/BuyerOrderAmounts'
 import BuyerOrderItem from '../../features/order/components/BuyerOrderItem'
 import {
@@ -79,6 +81,9 @@ function AddressFields({
   disabled: boolean
   onChange: (field: keyof ShippingAddressInput, value: string) => void
 }) {
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchError, setSearchError] = useState('')
+  const embedContainerRef = useRef<HTMLDivElement>(null)
   const field = (
     name: keyof ShippingAddressInput,
     label: string,
@@ -94,6 +99,33 @@ function AddressFields({
       />
     </label>
   )
+
+  // 모달이 열려 컨테이너가 그려진 뒤에 위젯을 심는다. 닫힐 때(선택 완료 포함) 다시 열면 새로 심도록 정리한다.
+  useEffect(() => {
+    if (!searchOpen) return
+    const container = embedContainerRef.current
+    if (!container) return
+    let active = true
+    embedPostcode(container, (result) => {
+      if (!active) return
+      onChange('postalCode', result.postalCode)
+      onChange('address1', result.address1)
+      setSearchOpen(false)
+    }).catch(() => {
+      if (!active) return
+      // 모달이 열린 채로는 바깥의 오류 문구가 다이얼로그에 가려 안 보인다. 닫아서 보이게 한다.
+      setSearchOpen(false)
+      setSearchError(
+        '주소 검색을 불러오지 못했어요. 잠시 후 다시 시도해주세요.',
+      )
+    })
+    return () => {
+      active = false
+      container.replaceChildren()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchOpen])
+
   return (
     <>
       {field('recipient', '받는 분', { required: true, maxLength: 100 })}
@@ -103,15 +135,46 @@ function AddressFields({
         pattern: '[0-9]{10,11}',
         title: '숫자 10~11자리',
       })}
-      {field('postalCode', '우편번호', {
-        required: true,
-        inputMode: 'numeric',
-        pattern: '[0-9]{5}',
-        title: '숫자 5자리',
-      })}
+      <label>
+        우편번호
+        <div className="postal-code-field">
+          <input
+            value={address.postalCode}
+            disabled={disabled}
+            required
+            inputMode="numeric"
+            pattern="[0-9]{5}"
+            title="숫자 5자리"
+            onChange={(event) => onChange('postalCode', event.target.value)}
+          />
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={disabled}
+            onClick={() => {
+              setSearchError('')
+              setSearchOpen(true)
+            }}
+          >
+            주소 검색
+          </button>
+        </div>
+        {searchError && (
+          <small className="form-error" role="alert">
+            {searchError}
+          </small>
+        )}
+      </label>
       {field('address1', '기본 주소', { required: true, maxLength: 300 })}
       {field('address2', '상세 주소', { maxLength: 300 })}
       {field('deliveryMemo', '배송 요청사항', { maxLength: 300 })}
+      <Modal
+        open={searchOpen}
+        title="주소 검색"
+        onClose={() => setSearchOpen(false)}
+      >
+        <div ref={embedContainerRef} className="postal-code-embed" />
+      </Modal>
     </>
   )
 }

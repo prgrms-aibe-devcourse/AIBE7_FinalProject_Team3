@@ -1,5 +1,6 @@
 package org.example.grab.domain.drop.cache.config;
 
+import io.micrometer.core.instrument.binder.MeterBinder;
 import org.example.grab.domain.drop.cache.service.PublicDropCache;
 import org.example.grab.domain.drop.cache.store.DropCacheStore;
 import org.example.grab.domain.drop.cache.store.InMemoryDropCacheStore;
@@ -20,7 +21,7 @@ public class DropCacheConfig {
     public DropCacheStore dropCacheStore(DropCacheProperties properties, StringRedisTemplate redisTemplate,
                                          ObjectMapper objectMapper) {
         return switch (properties.store()) {
-            case MEMORY -> new InMemoryDropCacheStore();
+            case MEMORY -> new InMemoryDropCacheStore(properties.maxSize());
             case REDIS -> new RedisDropCacheStore(redisTemplate, objectMapper);
             // 캐시를 쓰지 않는다. 항상 없음으로 응답해 매번 DB에서 조회한다.
             case NONE -> new DropCacheStore() {
@@ -37,6 +38,15 @@ public class DropCacheConfig {
                 public void evict(String key) {
                 }
             };
+        };
+    }
+
+    @Bean
+    public MeterBinder dropCacheMetrics(DropCacheStore dropCacheStore) {
+        return registry -> {
+            if (dropCacheStore instanceof InMemoryDropCacheStore memoryStore) {
+                memoryStore.bindMetrics(registry);
+            }
         };
     }
 

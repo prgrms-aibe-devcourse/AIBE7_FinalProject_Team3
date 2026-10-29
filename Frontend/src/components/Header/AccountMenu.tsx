@@ -5,13 +5,19 @@ import Avatar from '../Avatar/Avatar'
 type Props = {
   imageUrl: string | null
   name: string
+  admin: boolean
   onLogout: () => Promise<void>
 }
 
 // 로그인 상태 헤더의 프로필 이미지 버튼과 펼침 메뉴(GR-132). 마이페이지 이동과 로그아웃을 둔다.
 // 버튼이 펼침 상태(aria-expanded)를 알리는 공개(disclosure) 방식이고, 항목은 Tab으로 오간다.
 // Esc·바깥 클릭·메뉴 밖으로 포커스 이동·화면 이동·항목 선택 시 닫는다.
-export default function AccountMenu({ imageUrl, name, onLogout }: Props) {
+export default function AccountMenu({
+  imageUrl,
+  name,
+  admin,
+  onLogout,
+}: Props) {
   // 연 화면의 경로를 기억해 화면이 바뀌면(마이페이지 항목 선택 포함) 저절로 닫힌다
   const { pathname } = useLocation()
   const [openedAt, setOpenedAt] = useState<string | null>(null)
@@ -72,8 +78,11 @@ export default function AccountMenu({ imageUrl, name, onLogout }: Props) {
       {open && (
         <ul id={menuId} className="account-menu-list">
           <li>
-            <Link to="/my" onClick={() => setOpen(false)}>
-              마이페이지
+            <Link
+              to={admin ? '/admin/seller-applications' : '/my'}
+              onClick={() => setOpen(false)}
+            >
+              {admin ? '운영자페이지' : '마이페이지'}
             </Link>
           </li>
           <li>

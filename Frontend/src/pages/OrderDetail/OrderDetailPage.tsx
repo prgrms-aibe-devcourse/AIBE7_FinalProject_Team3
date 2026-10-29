@@ -5,6 +5,7 @@ import AuthLoading from '../../features/auth/components/AuthLoading'
 import type { AuthStatus } from '../../features/auth/logic/authUser'
 import BuyerOrderAmounts from '../../features/order/components/BuyerOrderAmounts'
 import BuyerOrderItem from '../../features/order/components/BuyerOrderItem'
+import DeliveryStageTimeline from '../../features/order/components/DeliveryStageTimeline'
 import {
   buyerOrderStatusText,
   canCancel,
@@ -248,6 +249,12 @@ function OrderContent({
               송장이 등록되면 택배사와 운송장번호가 표시됩니다.
             </p>
           )}
+          {order.shipping.deliveryStage && (
+            <DeliveryStageTimeline
+              stage={order.shipping.deliveryStage}
+              delivered={Boolean(order.shipping.deliveredAt)}
+            />
+          )}
         </section>
         <section className="panel buyer-panel buyer-order-cancel">
           <h2>주문 취소</h2>
@@ -340,7 +347,7 @@ export default function OrderDetailPage({ authStatus, notify }: Props) {
   const { orderId = '' } = useParams()
   const location = useLocation()
   const authenticated = authStatus === 'authenticated'
-  const orderQuery = useMyOrder(orderId, authenticated)
+  const orderQuery = useMyOrder(orderId, authenticated, true)
   const paymentsQuery = useOrderPayments(orderId, authenticated)
 
   if (authStatus === 'loading') return <AuthLoading />
@@ -352,7 +359,9 @@ export default function OrderDetailPage({ authStatus, notify }: Props) {
         <EmptyState loading title="주문을 불러오는 중이에요." variant="page" />
       </div>
     )
-  if (orderQuery.isError) {
+  // 최초 조회 실패만 전체 오류 화면으로 막는다. livePolling 중 배경 재조회 실패(isRefetchError)는
+  // 이미 보여주고 있던 주문·배송 정보가 있으니 그대로 두고 갱신 실패만 알린다.
+  if (orderQuery.isError && !orderQuery.isRefetchError) {
     // 다른 사용자의 주문과 없는 주문은 서버가 같은 404로 응답한다.
     if (isNotFoundError(orderQuery.error))
       return (
@@ -384,15 +393,24 @@ export default function OrderDetailPage({ authStatus, notify }: Props) {
       </div>
     )
   }
+  if (!orderQuery.data) return null
   return (
-    <OrderContent
-      key={orderQuery.data.id}
-      order={orderQuery.data}
-      payments={paymentsQuery.data ?? []}
-      paymentsLoading={paymentsQuery.isPending}
-      paymentsFailed={paymentsQuery.isError}
-      onRetryPayments={() => void paymentsQuery.refetch()}
-      notify={notify}
-    />
+    <>
+      {orderQuery.isRefetchError && (
+        <p className="buyer-alert" role="alert">
+          최신 주문 정보를 불러오지 못했어요. 화면은 마지막으로 불러온
+          내용이에요.
+        </p>
+      )}
+      <OrderContent
+        key={orderQuery.data.id}
+        order={orderQuery.data}
+        payments={paymentsQuery.data ?? []}
+        paymentsLoading={paymentsQuery.isPending}
+        paymentsFailed={paymentsQuery.isError}
+        onRetryPayments={() => void paymentsQuery.refetch()}
+        notify={notify}
+      />
+    </>
   )
 }

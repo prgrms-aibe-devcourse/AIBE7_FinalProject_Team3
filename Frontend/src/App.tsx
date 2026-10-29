@@ -3,7 +3,7 @@ import { Route, Routes, useNavigate } from 'react-router-dom'
 import Footer from './components/Footer/Footer'
 import Header from './components/Header/Header'
 import useAuth from './features/auth/logic/useAuth'
-import { isSeller } from './features/auth/logic/authUser'
+import { isAdmin, isSeller } from './features/auth/logic/authUser'
 import useWish from './features/wish/logic/useWish'
 import AuthCallbackPage from './pages/AuthCallback/AuthCallbackPage'
 import CheckoutPage from './pages/Checkout/CheckoutPage'
@@ -41,6 +41,7 @@ export default function App() {
   }
   const { user, status, authenticated, login, refresh, logout } = useAuth()
   const { wishes, wishesReady, toggleWish } = useWish(authenticated, notify)
+  const admin = isAdmin(user)
 
   // 헤더 계정 메뉴의 로그아웃(GR-132). 마이페이지 로그아웃과 같이 성공하면 WISH로 이동하고,
   // 실패하면 로그인 상태를 유지한 채 안내한다.
@@ -53,13 +54,23 @@ export default function App() {
     }
   }
 
+  // 운영자페이지 로그아웃. 실패를 여기서 삼키지 않고 AdminSellerApplicationsPage의
+  // 자체 logoutError 상태로 전파해, 화면에 바로 오류를 보여준다.
+  const logoutFromAdminPage = async () => {
+    await logout()
+    navigate('/wish')
+  }
+
+  // 운영자는 목록·상세는 둘러볼 수 있지만 WISH·GRAB은 할 수 없다. wishesReady를 false로 둬
+  // 버튼을 비활성화하고, toggleWish도 막아 다른 경로로 호출돼도 안전하다.
   const shared: SharedProps = {
     authenticated,
     authStatus: status,
+    admin,
     wishes,
-    wishesReady,
+    wishesReady: wishesReady && !admin,
     notify,
-    toggleWish,
+    toggleWish: admin ? async () => false : toggleWish,
   }
 
   return (
@@ -67,6 +78,7 @@ export default function App() {
       <Header
         authenticated={authenticated}
         seller={isSeller(user)}
+        admin={isAdmin(user)}
         account={
           user
             ? {
@@ -138,6 +150,7 @@ export default function App() {
                 user={user}
                 authStatus={status}
                 notify={notify}
+                onLogout={logoutFromAdminPage}
               />
             }
           />

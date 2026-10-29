@@ -32,12 +32,28 @@ export function useMyOrders(query: MyOrdersQuery, enabled = true) {
   })
 }
 
-export function useMyOrder(orderId: string, enabled = true) {
+// livePolling은 주문 상세 화면에서만 켠다. 판매자 쪽 조치로 상태가 더 바뀔 수 있는
+// PAID·PREPARING·SHIPPED 동안 10초 간격으로 다시 불러오고(SHIPPED면 배송 단계도 갱신된다),
+// 배송 완료 등 더 바뀌지 않는 상태에서는 멈춘다.
+const LIVE_POLLING_STATUSES = new Set(['PAID', 'PREPARING', 'SHIPPED'])
+
+export function useMyOrder(
+  orderId: string,
+  enabled = true,
+  livePolling = false,
+) {
   return useQuery({
     queryKey: buyerOrderKeys.detail(orderId),
     queryFn: () => getMyOrder(orderId),
     select: toBuyerOrderDetail,
     enabled,
+    refetchInterval: livePolling
+      ? (query) =>
+          query.state.data?.status &&
+          LIVE_POLLING_STATUSES.has(query.state.data.status)
+            ? 10_000
+            : false
+      : false,
   })
 }
 

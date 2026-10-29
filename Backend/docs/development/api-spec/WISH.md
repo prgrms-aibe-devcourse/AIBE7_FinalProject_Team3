@@ -9,6 +9,7 @@ PUT /api/v1/drops/{dropId}/wish
 ```
 
 - **인증**: 필요 (`USER`)
+- 운영자(`ADMIN`) 계정은 이용할 수 없습니다(`ADMIN_ACTION_NOT_ALLOWED`, 403). 운영자가 한정 수량 DROP을 선점하지 못하게 하는 정책입니다.
 
 > 동일한 요청을 반복해도 활성 WISH는 하나만 존재합니다.
 >
@@ -37,6 +38,8 @@ PUT /api/v1/drops/{dropId}/wish
 | `GRAB`, `ENDED` | `GRAB_ALREADY_STARTED` | 409 |
 | `CANCELED` | `DROP_NOT_WISHABLE` | 409 |
 
+DROP 상태와 무관하게 요청자가 `ADMIN`이면 `ADMIN_ACTION_NOT_ALLOWED`(403)를 반환합니다.
+
 > `WISH`이고 현재 시각이 `saleStartsAt` 전이면 등록할 수 있습니다.
 
 ### 1.2 WISH 취소
@@ -46,6 +49,7 @@ DELETE /api/v1/drops/{dropId}/wish
 ```
 
 - **인증**: 필요 (`USER`)
+- 운영자(`ADMIN`) 계정은 이용할 수 없습니다(`ADMIN_ACTION_NOT_ALLOWED`, 403).
 
 **응답:** `204 No Content`
 
@@ -59,6 +63,8 @@ DELETE /api/v1/drops/{dropId}/wish
 | `WISH`, 현재 시각 ≥ `saleStartsAt` | `GRAB_ALREADY_STARTED` | 409 |
 | `GRAB`, `ENDED` | `GRAB_ALREADY_STARTED` | 409 |
 | `CANCELED` | `DROP_NOT_WISHABLE` | 409 |
+
+DROP 상태와 무관하게 요청자가 `ADMIN`이면 `ADMIN_ACTION_NOT_ALLOWED`(403)를 반환합니다.
 
 > GRAB 시작 이후에는 취소할 수 없습니다. 등록과 취소의 판정 규칙은 같습니다.
 

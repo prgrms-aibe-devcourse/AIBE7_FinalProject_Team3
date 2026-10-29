@@ -117,13 +117,13 @@ class OrderControllerTest {
                         OffsetDateTime.parse("2026-09-28T12:00:00Z")
                 )),
                 0,
-                20,
+                10,
                 1,
                 1,
                 false
         );
         given(currentUserIdProvider.currentUserId()).willReturn(1L);
-        given(orderQueryService.findMyOrders(1L, OrderStatus.PAID, 0, 20)).willReturn(response);
+        given(orderQueryService.findMyOrders(1L, OrderStatus.PAID, 0, 10)).willReturn(response);
 
         // when & then
         mockMvc.perform(get("/api/v1/orders").param("status", "PAID"))
