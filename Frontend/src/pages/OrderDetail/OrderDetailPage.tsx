@@ -5,6 +5,7 @@ import AuthLoading from '../../features/auth/components/AuthLoading'
 import type { AuthStatus } from '../../features/auth/logic/authUser'
 import BuyerOrderAmounts from '../../features/order/components/BuyerOrderAmounts'
 import BuyerOrderItem from '../../features/order/components/BuyerOrderItem'
+import DeliveryStageTimeline from '../../features/order/components/DeliveryStageTimeline'
 import {
   buyerOrderStatusText,
   canCancel,
@@ -247,6 +248,12 @@ function OrderContent({
             <p className="buyer-note">
               송장이 등록되면 택배사와 운송장번호가 표시됩니다.
             </p>
+          )}
+          {order.shipping.deliveryStage && (
+            <DeliveryStageTimeline
+              stage={order.shipping.deliveryStage}
+              delivered={Boolean(order.shipping.deliveredAt)}
+            />
           )}
         </section>
         <section className="panel buyer-panel buyer-order-cancel">
