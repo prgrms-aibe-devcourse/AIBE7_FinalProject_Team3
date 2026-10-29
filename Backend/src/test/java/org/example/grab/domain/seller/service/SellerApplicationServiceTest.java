@@ -128,13 +128,19 @@ class SellerApplicationServiceTest {
         ReflectionTestUtils.setField(rejected, "id", 5L);
         given(sellerRepository.findByUserId(USER_ID)).willReturn(Optional.of(rejected));
 
-        SellerDocument staleDocument = usableDocument(UUID.randomUUID(), USER_ID, DocumentType.ID_CARD);
+        SellerDocument staleDocument = SellerDocument.upload(
+                UUID.randomUUID(), USER_ID, DocumentType.ID_CARD, "image/png", "stale-key", "dek");
         ReflectionTestUtils.setField(staleDocument, "sellerId", 5L);
-        given(sellerDocumentRepository.findAllBySellerId(5L)).willReturn(List.of(staleDocument));
+        UUID keptId = documentIds.get(DocumentType.BUSINESS_LICENSE);
+        SellerDocument keptDocument = SellerDocument.upload(
+                keptId, USER_ID, DocumentType.BUSINESS_LICENSE, "image/png", "kept-key", "dek");
+        ReflectionTestUtils.setField(keptDocument, "sellerId", 5L);
+        given(sellerDocumentRepository.findAllBySellerId(5L)).willReturn(List.of(staleDocument, keptDocument));
 
         service.apply(USER_ID, request());
 
-        org.mockito.Mockito.verify(documentStorage).delete(staleDocument.getEncryptedObjectKey());
+        org.mockito.Mockito.verify(documentStorage).delete("stale-key");
+        org.mockito.Mockito.verify(documentStorage, org.mockito.Mockito.never()).delete("kept-key");
         org.mockito.Mockito.verify(sellerDocumentRepository).deleteAll(List.of(staleDocument));
     }
 

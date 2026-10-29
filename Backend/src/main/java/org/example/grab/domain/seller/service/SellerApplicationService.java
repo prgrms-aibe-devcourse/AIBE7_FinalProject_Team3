@@ -20,6 +20,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Clock;
 import java.time.OffsetDateTime;
@@ -31,8 +33,10 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 
 // 판매자 등록 신청·재신청·내 신청 조회(GR-91, SELLER-001·SELLER-005·SELLER-006).
+@Slf4j
 @Service
 public class SellerApplicationService {
 
@@ -184,7 +188,31 @@ public class SellerApplicationService {
         if (staleDocuments.isEmpty()) {
             return;
         }
-        staleDocuments.forEach(document -> documentStorage.delete(document.getEncryptedObjectKey()));
+        List<String> staleObjectKeys = staleDocuments.stream().map(SellerDocument::getEncryptedObjectKey).toList();
         sellerDocumentRepository.deleteAll(staleDocuments);
+
+        // DB 삭제가 롤백될 수 있으니, 되돌릴 수 없는 스토리지 삭제는 커밋 후에 한다.
+        // 트랜잭션 밖(테스트 등)에서는 동기화가 없어 바로 지운다.
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    deleteFromStorage(staleObjectKeys);
+                }
+            });
+        } else {
+            deleteFromStorage(staleObjectKeys);
+        }
+    }
+
+    // 실패해도 DB 삭제는 이미 끝난 상태라 예외를 전파하지 않는다. 실패한 키는 로그로 남겨 수동 정리 대상으로 삼는다.
+    private void deleteFromStorage(List<String> objectKeys) {
+        for (String objectKey : objectKeys) {
+            try {
+                documentStorage.delete(objectKey);
+            } catch (RuntimeException e) {
+                log.warn("재신청 구 서류 스토리지 정리 실패, 수동 정리 필요: objectKey={}", objectKey, e);
+            }
+        }
     }
 }
