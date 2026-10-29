@@ -45,6 +45,8 @@
 </div>
 
 <p align="center">
+  <a href="https://pre-sigma.vercel.app/">발표자료</a>
+  ·
   <a href="./Backend/docs/README.md">프로젝트 문서</a>
   ·
   <a href="./Backend/docs/development/REQUIREMENTS.md">요구사항</a>
@@ -74,6 +76,27 @@ flowchart LR
     E --> F["결제"]
     F --> G["배송 / 수령"]
 ```
+
+## 주요 화면
+
+> 스크린샷 준비 중입니다. 아래 이미지는 실제 화면을 넣기 위한 자리 표시자입니다.
+
+| 홈 · DROP 탐색 | WISH 상세 |
+| --- | --- |
+| ![홈 · DROP 탐색](./Backend/docs/images/screenshots/home.png) | ![WISH 상세](./Backend/docs/images/screenshots/wish-detail.png) |
+| **GRAB 상세** | **주문 · 결제** |
+| ![GRAB 상세](./Backend/docs/images/screenshots/grab-detail.png) | ![주문 · 결제](./Backend/docs/images/screenshots/checkout.png) |
+| **주문 내역** | **판매자 대시보드** |
+| ![주문 내역](./Backend/docs/images/screenshots/orders.png) | ![판매자 대시보드](./Backend/docs/images/screenshots/seller-dashboard.png) |
+
+<details>
+<summary>스크린샷 교체 방법</summary>
+
+`Backend/docs/images/screenshots/`에 위 화면에 해당하는 PNG 파일을 같은 이름으로 덮어쓰면 됩니다.
+파일명은 `home.png`, `wish-detail.png`, `grab-detail.png`, `checkout.png`, `orders.png`, `seller-dashboard.png`입니다.
+교체가 끝나면 이 섹션 상단의 ‘스크린샷 준비 중’ 안내를 삭제합니다.
+
+</details>
 
 ## Tech Stack
 
