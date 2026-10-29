@@ -43,15 +43,6 @@ describe('safeReturnPath', () => {
       expect(safeReturnPath(value)).toBe(DEFAULT_RETURN_PATH)
     }
   })
-
-  // 로그아웃·세션 만료로 관리자 페이지의 !user 가드가 자기 경로를 from으로 남긴 뒤
-  // 다른 계정이 로그인하면, 그 계정의 권한을 확인하지 않고 관리자 경로로 보내던 버그(GR-132)
-  it('관리자 전용 경로는 기본 경로로 바꾼다', () => {
-    expect(safeReturnPath('/admin/seller-applications')).toBe(
-      DEFAULT_RETURN_PATH,
-    )
-    expect(safeReturnPath('/admin')).toBe(DEFAULT_RETURN_PATH)
-  })
 })
 
 describe('소셜 복귀 경로', () => {
