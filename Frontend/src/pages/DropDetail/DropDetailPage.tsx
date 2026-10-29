@@ -27,6 +27,7 @@ import NotFoundPage from '../NotFound/NotFoundPage'
 export default function DropDetailPage({
   authenticated,
   authStatus,
+  admin,
   wishes,
   wishesReady,
   toggleWish,
@@ -107,6 +108,7 @@ export default function DropDetailPage({
   )
   const orderable =
     detail.actions.orderable &&
+    !admin &&
     !!selectedSku &&
     (selectedStock ?? 0) > 0 &&
     quantity >= 1 &&
@@ -128,9 +130,11 @@ export default function DropDetailPage({
         ? '선택 옵션 품절'
         : quantity > maxQuantity
           ? '수량을 확인해주세요'
-          : authenticated
-            ? 'GRAB 하기 ↗'
-            : '로그인 후 GRAB ↗'
+          : admin
+            ? '운영자 계정은 GRAB할 수 없어요'
+            : authenticated
+              ? 'GRAB 하기 ↗'
+              : '로그인 후 GRAB ↗'
 
   const order = (event: FormEvent) => {
     event.preventDefault()

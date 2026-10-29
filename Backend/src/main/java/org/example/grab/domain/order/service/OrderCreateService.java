@@ -11,6 +11,7 @@ import org.example.grab.global.error.CommonErrorCode;
 import org.example.grab.global.idempotency.IdempotencyKey;
 import org.example.grab.global.idempotency.IdempotencyResult;
 import org.example.grab.global.idempotency.RequestHash;
+import org.example.grab.global.security.identity.CurrentUserRoleGuard;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
@@ -27,8 +28,10 @@ public class OrderCreateService {
     private final OrderItemRepository orderItemRepository;
     private final OrderRequestHasher requestHasher;
     private final OrderCreationLimiter creationLimiter;
+    private final CurrentUserRoleGuard currentUserRoleGuard;
 
     public OrderCreateResponse create(Long buyerId, String idempotencyKeyHeader, OrderCreateRequest request) {
+        currentUserRoleGuard.rejectIfAdmin();
         validateUniqueOptions(request.items());
         IdempotencyKey idempotencyKey = IdempotencyKey.from(idempotencyKeyHeader);
         RequestHash requestHash = requestHasher.hash(request);

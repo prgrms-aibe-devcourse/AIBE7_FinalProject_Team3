@@ -569,9 +569,6 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
-.form-content textarea {
-  resize: vertical;
-}
 .option-builder {
   display: grid;
   gap: 10px;

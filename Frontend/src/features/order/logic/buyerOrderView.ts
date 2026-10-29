@@ -2,6 +2,7 @@ import axios from 'axios'
 import type { getMyOrder, getMyOrders } from '../../../api/order/orders'
 import type { getOrderPayments } from '../../../api/payment/payments'
 import { apiErrorCode } from '../../auth/logic/authUser'
+import type { DeliveryStage } from './deliveryStage'
 
 type MyOrderDetail = Awaited<ReturnType<typeof getMyOrder>>
 type MyOrderSummary = NonNullable<
@@ -79,6 +80,7 @@ export type BuyerOrderDetail = {
     carrier: string | null
     trackingNumber: string | null
     deliveredAt: string | null
+    deliveryStage: DeliveryStage | null
   }
 }
 
@@ -126,6 +128,7 @@ export function toBuyerOrderDetail(order: MyOrderDetail): BuyerOrderDetail {
       carrier: order.shipping?.carrier ?? null,
       trackingNumber: order.shipping?.trackingNumber ?? null,
       deliveredAt: order.shipping?.deliveredAt ?? null,
+      deliveryStage: order.shipping?.deliveryStage ?? null,
     },
   }
 }

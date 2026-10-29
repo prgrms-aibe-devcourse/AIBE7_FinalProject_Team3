@@ -201,6 +201,7 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 | `INVALID_CREDENTIALS` | 401 | 로그인 이메일 또는 비밀번호 불일치 (계정 존재 여부를 구분하지 않음) |
 | `ACCESS_DENIED` | 403 | 권한 없음 |
 | `ACCOUNT_DISABLED` | 403 | 정지·탈퇴 등 이용할 수 없는 계정 |
+| `ADMIN_ACTION_NOT_ALLOWED` | 403 | 운영자(`ADMIN`) 계정에서 이용할 수 없는 기능 (WISH 등록·취소, 주문 생성 등) |
 | `RESOURCE_NOT_FOUND` | 404 | 리소스 없음 |
 | `ORDER_NOT_FOUND` | 404 | 주문 없음 (구매자 주문 조회에서는 다른 사용자의 주문도 포함) |
 | `DUPLICATE_IDEMPOTENCY_KEY` | 409 | 같은 멱등 키에 다른 요청 본문 사용 |

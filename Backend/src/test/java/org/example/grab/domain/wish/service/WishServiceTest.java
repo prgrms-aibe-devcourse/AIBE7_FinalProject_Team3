@@ -5,6 +5,7 @@ import org.example.grab.domain.wish.dto.response.WishResponse;
 import org.example.grab.domain.wish.entity.Wish;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
+import org.example.grab.global.security.identity.CurrentUserRoleGuard;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,6 +30,9 @@ class WishServiceTest {
 
     @Mock
     private WishTransactionService wishTransactionService;
+
+    @Mock
+    private CurrentUserRoleGuard currentUserRoleGuard;
 
     @InjectMocks
     private WishService wishService;

@@ -65,8 +65,8 @@ class DropControllerTest {
                 DropStatus.WISH, false, 24L, 152L,
                 OffsetDateTime.parse("2026-09-20T01:00:00Z"),
                 OffsetDateTime.parse("2026-09-20T03:00:00Z"));
-        given(dropService.findPublicDrops(any(), any(), any(), any(), any(), eq(0), eq(20)))
-                .willReturn(new PageResponse<>(List.of(item), 0, 20, 1, 1, false));
+        given(dropService.findPublicDrops(any(), any(), any(), any(), any(), eq(0), eq(10)))
+                .willReturn(new PageResponse<>(List.of(item), 0, 10, 1, 1, false));
 
         // when & then
         mockMvc.perform(get("/api/v1/drops"))
@@ -83,7 +83,7 @@ class DropControllerTest {
                 .andExpect(jsonPath("$.data.content[0].availableStock").value(24))
                 .andExpect(jsonPath("$.data.content[0].wishCount").value(152))
                 .andExpect(jsonPath("$.data.page").value(0))
-                .andExpect(jsonPath("$.data.size").value(20))
+                .andExpect(jsonPath("$.data.size").value(10))
                 .andExpect(jsonPath("$.data.totalElements").value(1))
                 .andExpect(jsonPath("$.data.totalPages").value(1))
                 .andExpect(jsonPath("$.data.hasNext").value(false));

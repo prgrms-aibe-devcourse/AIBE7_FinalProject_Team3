@@ -1,4 +1,5 @@
 import {
+  accountMenuButton,
   expect,
   getAuth,
   goToMyPage,
@@ -92,13 +93,35 @@ test('계정 유형에 따라 마이페이지 링크가 달라진다', async ({ 
   ).toBeVisible()
 })
 
-test('운영자 계정은 심사 링크를 본다', async ({ page }) => {
+test('운영자 계정은 운영자페이지로 바로 이동한다', async ({ page }) => {
+  await page.route('**/api/v1/admin/seller-applications*', (route) =>
+    route.fulfill({
+      json: {
+        success: true,
+        data: {
+          content: [],
+          page: 0,
+          size: 10,
+          totalElements: 0,
+          totalPages: 0,
+          hasNext: false,
+        },
+      },
+    }),
+  )
   await loginAdmin(page)
-  await goToMyPage(page)
-  await expect(page.locator('.account-badge')).toHaveText(['운영자'])
+  await accountMenuButton(page).click()
+  await page
+    .locator('.site-header')
+    .getByRole('link', { name: '운영자페이지', exact: true })
+    .click()
+  await expect(page).toHaveURL(/#\/admin\/seller-applications$/)
   await expect(
-    page.getByRole('link', { name: '판매자 신청 심사 ↗' }),
+    page.getByRole('heading', { name: '판매자 신청 심사' }),
   ).toBeVisible()
+  // /my로 직접 들어가도 운영자페이지로 보낸다
+  await page.goto('/#/my')
+  await expect(page).toHaveURL(/#\/admin\/seller-applications$/)
 })
 
 test('요청에 CSRF 헤더·쿠키가 실리고 토큰은 저장소에 없다', async ({
