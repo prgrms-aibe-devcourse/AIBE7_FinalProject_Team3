@@ -68,7 +68,7 @@ test.describe('WISH 서버 연동', () => {
     ).toHaveText('✓ WISHED')
   })
 
-  test('담은 WISH가 20건을 넘어도 카드 버튼 상태에 반영된다', async ({
+  test('담은 WISH가 10건을 넘어도 카드 버튼 상태에 반영된다', async ({
     page,
   }) => {
     await installCatalogScenario(page, 'wishes')
@@ -79,18 +79,21 @@ test.describe('WISH 서버 연동', () => {
     await expect(last.getByRole('button')).toHaveText('✓ WISHED')
   })
 
-  test('마이페이지 WISH를 20개씩 페이지로 본다', async ({ page }) => {
+  test('마이페이지 WISH를 10개씩 페이지로 본다', async ({ page }) => {
     await installCatalogScenario(page, 'wishes')
     await login(page)
     await goToMyPage(page)
     const wishPanel = page
       .locator('.panel')
       .filter({ has: page.getByRole('heading', { name: 'WISH' }) })
-    await expect(wishPanel.locator('.compact-item')).toHaveCount(20)
-    await expect(wishPanel).toContainText('1 / 2 페이지')
+    await expect(wishPanel.locator('.compact-item')).toHaveCount(10)
+    await expect(wishPanel).toContainText('1 / 3 페이지')
+    await wishPanel.getByRole('button', { name: '다음' }).click()
+    await expect(wishPanel.locator('.compact-item')).toHaveCount(10)
+    await expect(wishPanel).toContainText('2 / 3 페이지')
     await wishPanel.getByRole('button', { name: '다음' }).click()
     await expect(wishPanel.locator('.compact-item')).toHaveCount(4)
-    await expect(wishPanel).toContainText('2 / 2 페이지')
+    await expect(wishPanel).toContainText('3 / 3 페이지')
   })
 
   test('담은 WISH가 없으면 빈 상태를 보여준다', async ({ page }) => {
