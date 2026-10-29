@@ -53,8 +53,8 @@ class UserWishControllerTest {
                 "https://img/1.jpg", 129000L, DropStatus.WISH,
                 OffsetDateTime.parse("2026-09-20T14:00:00Z"),
                 OffsetDateTime.parse("2026-09-18T14:00:00Z"));
-        given(wishQueryService.findMyWishes(eq(USER_ID), eq(0), eq(20)))
-                .willReturn(new PageResponse<>(List.of(item), 0, 20, 1, 1, false));
+        given(wishQueryService.findMyWishes(eq(USER_ID), eq(0), eq(10)))
+                .willReturn(new PageResponse<>(List.of(item), 0, 10, 1, 1, false));
 
         // when & then
         mockMvc.perform(get("/api/v1/users/me/wishes"))
@@ -68,7 +68,7 @@ class UserWishControllerTest {
                 .andExpect(jsonPath("$.data.content[0].saleStartsAt").value("2026-09-20T14:00:00Z"))
                 .andExpect(jsonPath("$.data.content[0].wishedAt").value("2026-09-18T14:00:00Z"))
                 .andExpect(jsonPath("$.data.page").value(0))
-                .andExpect(jsonPath("$.data.size").value(20))
+                .andExpect(jsonPath("$.data.size").value(10))
                 .andExpect(jsonPath("$.data.totalElements").value(1))
                 .andExpect(jsonPath("$.data.hasNext").value(false));
     }

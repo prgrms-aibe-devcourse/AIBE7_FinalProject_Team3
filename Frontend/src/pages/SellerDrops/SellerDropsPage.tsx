@@ -30,7 +30,7 @@ export default function SellerDropsPage({
   const location = useLocation()
   const { status, page } = readSellerDropQuery(params)
   const query = useSellerDrops(
-    { status: status === 'ALL' ? undefined : status, page, size: 20 },
+    { status: status === 'ALL' ? undefined : status, page, size: 10 },
     authStatus === 'authenticated' && isSeller(user),
   )
   if (authStatus === 'loading') return <AuthLoading />

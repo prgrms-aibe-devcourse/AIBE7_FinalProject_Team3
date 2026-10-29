@@ -52,27 +52,27 @@ class AdminSellerApplicationControllerTest {
         AdminSellerApplicationResponse item = new AdminSellerApplicationResponse(
                 UUID.randomUUID(), UUID.randomUUID(), "길동상점", "seller@example.com", "1234567890",
                 SellerStatus.PENDING, OffsetDateTime.parse("2026-09-18T14:00:00+09:00"));
-        given(adminSellerApplicationService.findApplications(SellerStatus.PENDING, 0, 20))
-                .willReturn(new PageResponse<>(List.of(item), 0, 20, 1, 1, false));
+        given(adminSellerApplicationService.findApplications(SellerStatus.PENDING, 0, 10))
+                .willReturn(new PageResponse<>(List.of(item), 0, 10, 1, 1, false));
 
         mockMvc.perform(get("/api/v1/admin/seller-applications").param("status", "PENDING"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.content[0].brandName").value("길동상점"))
                 .andExpect(jsonPath("$.data.hasNext").value(false));
-        verify(adminSellerApplicationService).findApplications(SellerStatus.PENDING, 0, 20);
+        verify(adminSellerApplicationService).findApplications(SellerStatus.PENDING, 0, 10);
     }
 
     @Test
     @DisplayName("상태를 생략하면 전체 상태를 기본 페이지로 조회한다")
     void findApplications_withoutStatus() throws Exception {
-        given(adminSellerApplicationService.findApplications(null, 0, 20))
-                .willReturn(new PageResponse<>(List.of(), 0, 20, 0, 0, false));
+        given(adminSellerApplicationService.findApplications(null, 0, 10))
+                .willReturn(new PageResponse<>(List.of(), 0, 10, 0, 0, false));
 
         mockMvc.perform(get("/api/v1/admin/seller-applications"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content").isEmpty());
-        verify(adminSellerApplicationService).findApplications(null, 0, 20);
+        verify(adminSellerApplicationService).findApplications(null, 0, 10);
     }
 
     @Test
