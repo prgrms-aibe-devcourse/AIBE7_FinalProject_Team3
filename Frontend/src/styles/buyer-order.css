@@ -50,6 +50,12 @@
   border-radius: 4px;
   background: #fff;
 }
+/* 주소검색으로만 채워지는 필드(우편번호·기본 주소). 직접 입력을 막고 포커스 테두리도 띄우지 않는다 */
+.buyer-fields input[readonly] {
+  color: var(--muted);
+  outline: none;
+  caret-color: transparent;
+}
 .postal-code-field {
   display: flex;
   gap: 8px;

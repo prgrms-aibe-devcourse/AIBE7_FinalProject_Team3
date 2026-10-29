@@ -142,10 +142,11 @@ function AddressFields({
             value={address.postalCode}
             disabled={disabled}
             required
+            readOnly
             inputMode="numeric"
             pattern="[0-9]{5}"
             title="숫자 5자리"
-            onChange={(event) => onChange('postalCode', event.target.value)}
+            onChange={() => {}}
           />
           <button
             type="button"
@@ -165,7 +166,11 @@ function AddressFields({
           </small>
         )}
       </label>
-      {field('address1', '기본 주소', { required: true, maxLength: 300 })}
+      {field('address1', '기본 주소', {
+        required: true,
+        maxLength: 300,
+        readOnly: true,
+      })}
       {field('address2', '상세 주소', { maxLength: 300 })}
       {field('deliveryMemo', '배송 요청사항', { maxLength: 300 })}
       <Modal
