@@ -141,7 +141,6 @@ function AddressFields({
           <input
             value={address.postalCode}
             disabled={disabled}
-            required
             readOnly
             inputMode="numeric"
             pattern="[0-9]{5}"
@@ -167,7 +166,6 @@ function AddressFields({
         )}
       </label>
       {field('address1', '기본 주소', {
-        required: true,
         maxLength: 300,
         readOnly: true,
       })}
@@ -250,6 +248,12 @@ function DraftCheckout({
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (createOrder.isPending || !summary.orderable) return
+    // 우편번호·기본 주소는 readOnly라 브라우저의 required 검증이 적용되지 않는다(스펙상
+    // readonly 필드는 제약 검증에서 제외된다). 주소 검색으로 채워졌는지 직접 확인한다.
+    if (!/^\d{5}$/.test(address.postalCode) || !address.address1.trim()) {
+      setError('우편번호·기본 주소를 주소 검색으로 입력해주세요.')
+      return
+    }
     const body = toOrderCreateRequest(draft, address)
     const serialized = JSON.stringify(body)
     const key =
