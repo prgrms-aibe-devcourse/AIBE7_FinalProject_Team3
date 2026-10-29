@@ -7,6 +7,9 @@
 #    BEGIN은 집계되지만(track_utility 기본값 on) pgjdbc가 보내는 COMMIT은 집계되지 않아 트랜잭션 수만큼 더한다(아래 요약 계산 주석).
 # 2) log_statement: me만 몇 번 보내는 동안 log_statement=all을 켜고 postgres 로그를 발췌한다. ID 변환이 별도 트랜잭션
 #    (BEGIN·SELECT·COMMIT)이고 회원 조회가 또 하나의 트랜잭션인지 눈으로 확인하는 용도다. 수치는 1)을 쓴다.
+#    회원 ID 변환 캐시(GR-211) 뒤에는 예열한 계정의 요청이 캐시에 적중해 로그에 ID 변환 조회가 없다. 그래서 요청이 로그에
+#    잡혔는지는 회원 조회(users ... id=)로 확인한다. MISS_EMAIL을 주면 같은 로그 구간에서 그 계정으로 로그인해 me를 한 번 더
+#    보낸다. backend 기동 뒤 처음 요청하는 계정이면 캐시 누락 경로(ID 변환 조회)가 로그에 찍힌다. 이미 요청한 계정이면 실패한다.
 #
 # 요청 간격(INTERVAL_S)은 0.5초 미만으로 둔다. HikariCP는 500ms 넘게 쉰 연결을 빌려줄 때 살아 있는지 DB에 확인해
 # 요청과 무관한 문장이 끼어든다.
@@ -16,12 +19,13 @@
 # 기억했다가 끝나거나 실패하면 그 값으로 되돌린다. 되돌린 뒤 값이 처음과 다르면 실패로 알린다.
 #
 #   Backend/k6/user-id-lookup/statements.sh <이름> [요청 횟수]
+#   MISS_EMAIL=k6-idlookup-800@loadtest.local Backend/k6/user-id-lookup/statements.sh <이름> [요청 횟수]
 #
 # 결과: out/<이름>/statements/<대상>.tsv(쿼리별 calls·배경·요청당), summary.tsv(대상별 요청당 문장 수),
 #       log-me.txt(문장 로그 발췌), postgres.log(발췌 전 postgres 로그 원본)
 set -euo pipefail
 if [ $# -lt 1 ]; then
-  sed -n '18p' "$0"
+  sed -n '21,22p' "$0"
   exit 1
 fi
 NAME=$1; N=${2:-100}
@@ -30,6 +34,7 @@ INTERVAL_S=${INTERVAL_S:-0.1}
 LOG_REQUESTS=${LOG_REQUESTS:-3}
 EMAIL=${EMAIL:-k6-buyer@loadtest.local}
 PASSWORD=${PASSWORD:-LoadTest1234!}
+MISS_EMAIL=${MISS_EMAIL:-}
 
 # 요청 수가 0이면 측정 요청 없이 진행하고 집계에서 0으로 나누게 되므로 시작 전에 거른다.
 is_positive_int() { [[ "$1" =~ ^[1-9][0-9]*$ ]]; }
@@ -103,9 +108,19 @@ echo "$BUYER_ORDERS" > "$OUT/buyer-orders.txt"
 # 서버는 XSRF-TOKEN 쿠키에 Secure를 붙여 curl이 http로 다시 보내지 않으므로 값을 꺼내 직접 싣는다(common/lib/auth.js와 같은 이유).
 curl -sSf -c "$JAR" -o /dev/null "$BASE_URL/api/v1/auth/csrf"
 XSRF=$(awk '$6 == "XSRF-TOKEN" { print $7 }' "$JAR")
-curl -sSf -c "$JAR" -b "XSRF-TOKEN=$XSRF" -H "X-XSRF-TOKEN: $XSRF" -H 'Content-Type: application/json' -o /dev/null \
-  -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}" "$BASE_URL/api/v1/auth/login"
-ACCESS=$(awk '$6 == "access_token" { print $7 }' "$JAR")
+
+# 이메일로 로그인해 access_token 값을 출력한다. 위에서 받은 CSRF 토큰을 재사용하고 계정마다 새 쿠키 파일을 쓴다.
+# 로그인이 실패하면 빈 값을 출력하고, 호출한 쪽이 빈 값을 실패로 처리한다.
+login_access() {
+  local jar
+  jar=$(mktemp)
+  curl -sSf -c "$jar" -b "XSRF-TOKEN=$XSRF" -H "X-XSRF-TOKEN: $XSRF" -H 'Content-Type: application/json' -o /dev/null \
+    -d "{\"email\":\"$1\",\"password\":\"$PASSWORD\"}" "$BASE_URL/api/v1/auth/login" || true
+  awk '$6 == "access_token" { print $7 }' "$jar"
+  rm -f "$jar"
+}
+
+ACCESS=$(login_access "$EMAIL")
 if [ -z "$ACCESS" ]; then
   echo "로그인 응답에 access_token이 없다" >&2
   exit 1
@@ -213,13 +228,22 @@ sleep 1
 SINCE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 sleep 1
 send me "$LOG_REQUESTS"
+if [ -n "$MISS_EMAIL" ]; then
+  MISS_ACCESS=$(login_access "$MISS_EMAIL")
+  if [ -z "$MISS_ACCESS" ]; then
+    echo "$MISS_EMAIL 로그인 응답에 access_token이 없다" >&2
+    exit 1
+  fi
+  ACCESS=$MISS_ACCESS
+  send me 1
+fi
 sleep 1
 if ! restore_log; then
   exit 1
 fi
 # 요청 구간의 문장 로그만 남긴다. 줄 앞의 [pid]로 어느 커넥션(트랜잭션)에서 나갔는지 구분한다.
 # 첫 요청 앞의 빈 statement는 1초 쉰 연결을 빌릴 때 HikariCP가 보내는 연결 확인이다(요청과 무관).
-# 로그 조회 실패, 문장 로그 없음, ID 변환 조회가 요청 수보다 적게 찍힘은 트랜잭션 경계 확인 자료가 없는 것이라 실패로 끝낸다.
+# 로그 조회 실패, 문장 로그 없음, 회원 조회가 요청 수보다 적게 찍힘(MISS_EMAIL이면 ID 변환 조회 없음)은 트랜잭션 경계 확인 자료가 없는 것이라 실패로 끝낸다.
 # 문장 수(1)) 결과는 그 전에 이미 파일로 남아 있다.
 echo "log_statement 복구: $LOG_ORIGINAL"
 echo "== 요약"
@@ -234,10 +258,21 @@ if [ ! -s "$OUT/log-me.txt" ]; then
   echo "요청 구간(${SINCE} 이후) postgres 로그에 SQL 문장 로그가 없다. log_statement 적용 여부를 확인한다" >&2
   exit 1
 fi
+# 회원 조회는 캐시와 관계없이 요청마다 나간다. 요청 수보다 적으면 요청 구간이 로그에 다 잡히지 않은 것이다.
+# ID 변환 조회는 캐시 누락 때만 나가므로 수만 보여 준다. MISS_EMAIL을 줬으면 그 요청의 누락 조회가 있어야 한다.
+LOGGED_REQUESTS=$LOG_REQUESTS
+if [ -n "$MISS_EMAIL" ]; then
+  LOGGED_REQUESTS=$((LOG_REQUESTS + 1))
+fi
+MEMBERS=$(grep -a -c 'from users u1_0 where u1_0.id=' "$OUT/log-me.txt" || true)
 LOOKUPS=$(grep -a -c 'from users u1_0 where u1_0.public_id=' "$OUT/log-me.txt" || true)
-if [ "$LOOKUPS" -lt "$LOG_REQUESTS" ]; then
-  echo "로그에 ID 변환 조회가 ${LOOKUPS}번만 있다(요청 ${LOG_REQUESTS}번). 트랜잭션 경계를 확인할 수 없다" >&2
+if [ "$MEMBERS" -lt "$LOGGED_REQUESTS" ]; then
+  echo "로그에 회원 조회가 ${MEMBERS}번만 있다(요청 ${LOGGED_REQUESTS}번). 트랜잭션 경계를 확인할 수 없다" >&2
   exit 1
 fi
-echo "== log_statement 발췌: me ${LOG_REQUESTS}회(ID 변환 조회 ${LOOKUPS}번)"
+if [ -n "$MISS_EMAIL" ] && [ "$LOOKUPS" -lt 1 ]; then
+  echo "로그에 ID 변환 조회가 없다. $MISS_EMAIL이 이미 캐시에 있을 수 있다(backend 재시작 뒤나 요청한 적 없는 계정으로 다시 잰다)" >&2
+  exit 1
+fi
+echo "== log_statement 발췌: me ${LOGGED_REQUESTS}회(회원 조회 ${MEMBERS}번, ID 변환 조회 ${LOOKUPS}번)"
 cat "$OUT/log-me.txt"

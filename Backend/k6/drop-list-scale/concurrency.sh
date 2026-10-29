@@ -9,6 +9,7 @@
 #
 # 다른 시나리오가 같은 실행기를 쓸 때는 SCRIPT(k6 디렉터리 기준 스크립트 경로)와 OUT_BASE(결과 상위 폴더)를 바꾼다(GR-181 상세·재고).
 # 단계는 STEPS(기본 25,50,100,200,400,800), 단계 길이 STEP_S(기본 60초), 요청 후 대기 THINK_S(기본 1초)로 바꿀 수 있다.
+# ACCOUNTS는 user-id-lookup/concurrency.js의 로그인 계정 수(GR-211)라 그대로 넘긴다. 다른 스크립트는 읽지 않는다.
 # Prometheus 스크랩이 15초 간격이라 STEP_S를 45초보다 줄이면 HikariCP 지표가 비거나 부정확해진다.
 set -euo pipefail
 if [ $# -lt 1 ]; then
@@ -45,7 +46,7 @@ printf 'target\tvus\treqs\trps\tmed_ms\tp95_ms\tp99_ms\tfail_rate\thikari_active
 for TARGET in $TARGETS; do
   echo "== $TARGET =="
   docker run --rm -i --network backend_default -v "$PWD/k6:/k6" -w /k6 \
-    -e BASE_URL=http://backend:8080 -e TARGET="$TARGET" -e STEPS="$STEPS" -e STEP_S="$STEP_S" -e GAP_S="$GAP_S" -e THINK_S="$THINK_S" \
+    -e BASE_URL=http://backend:8080 -e TARGET="$TARGET" -e STEPS="$STEPS" -e STEP_S="$STEP_S" -e GAP_S="$GAP_S" -e THINK_S="$THINK_S" -e ACCOUNTS="${ACCOUNTS:-}" \
     grafana/k6 run --quiet --summary-export "${OUT#k6/}/$TARGET-k6.json" \
     "$SCRIPT" > "$OUT/$TARGET-stdout.txt" 2>&1
   START=$(grep -o 'K6_SCENARIO_START=[0-9]*' "$OUT/$TARGET-stdout.txt" | head -1 | cut -d= -f2)
