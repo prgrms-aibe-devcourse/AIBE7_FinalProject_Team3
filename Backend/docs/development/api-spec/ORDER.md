@@ -10,6 +10,7 @@ POST /api/v1/orders
 
 - **인증**: 필요 (`USER`)
 - **헤더**: `Idempotency-Key: {UUID}`
+- 운영자(`ADMIN`) 계정은 이용할 수 없습니다(`ADMIN_ACTION_NOT_ALLOWED`, 403). 운영자가 한정 수량 DROP을 선점하지 못하게 하는 정책입니다.
 
 **요청:**
 
@@ -71,6 +72,7 @@ POST /api/v1/orders
 ```
 
 **오류 코드:**
+- `ADMIN_ACTION_NOT_ALLOWED` — 요청자가 `ADMIN`인 경우
 - `DROP_NOT_ON_SALE` — `DRAFT`·`CANCELED`·`ENDED`이거나 없는 DROP
 - `SALE_NOT_STARTED` — 판매 시작 전
 - `SALE_ENDED` — 판매 종료 후

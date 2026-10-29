@@ -6,6 +6,7 @@ import org.example.grab.domain.wish.dto.response.WishResponse;
 import org.example.grab.domain.wish.entity.Wish;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
+import org.example.grab.global.security.identity.CurrentUserRoleGuard;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
@@ -18,12 +19,14 @@ import org.springframework.stereotype.Service;
 public class WishService {
 
     private final WishTransactionService wishTransactionService;
+    private final CurrentUserRoleGuard currentUserRoleGuard;
 
     /**
      * WISH를 등록한다. 이미 활성이면 기존 등록 시각을 그대로 반환하고(멱등),
      * 취소된 WISH면 기존 행을 재활성화한다.
      */
     public WishResponse register(Long userId, Long dropId) {
+        currentUserRoleGuard.rejectIfAdmin();
         try {
             Wish wish = wishTransactionService.register(userId, dropId);
             return toResponse(dropId, wish);
@@ -34,6 +37,7 @@ public class WishService {
 
     /** 활성 WISH가 없으면 아무 것도 하지 않는다(멱등 204). */
     public void cancel(Long userId, Long dropId) {
+        currentUserRoleGuard.rejectIfAdmin();
         wishTransactionService.cancel(userId, dropId);
     }
 
