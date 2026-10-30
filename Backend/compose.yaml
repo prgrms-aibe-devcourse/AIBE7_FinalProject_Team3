@@ -7,24 +7,16 @@ services:
     ports:
       - "8080:8080"
     environment:
+      # 데이터베이스·캐시
       DB_URL: jdbc:postgresql://postgres:5432/grab
       DB_USERNAME: grab
       DB_PASSWORD: ${DB_PASSWORD:-grab}
-      TOSS_SECRET_KEY: ${TOSS_SECRET_KEY:-}
-      # GR-154/155 부하테스트에서 토스 샌드박스 대신 MockPaymentGateway를 쓸지. 기본은 꺼짐(운영과 동일)
-      GRAB_PAYMENT_MOCK_GATEWAY_ENABLED: ${GRAB_PAYMENT_MOCK_GATEWAY_ENABLED:-false}
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-grab}
       # GR-183 공개 DROP 응답 캐시 저장소(memory | redis | none). 부하 측정에서 저장소별로 비교할 때 바꾼다
       GRAB_DROP_CACHE_STORE: ${GRAB_DROP_CACHE_STORE:-memory}
-      # GR-155 장애 주입 비율(0~1). 기본 0(장애 없음)
-      GRAB_MOCK_CONFIRM_FAILURE_RATE: ${GRAB_MOCK_CONFIRM_FAILURE_RATE:-0}
-      GRAB_MOCK_CONFIRM_UNKNOWN_RATE: ${GRAB_MOCK_CONFIRM_UNKNOWN_RATE:-0}
-      GRAB_MOCK_CANCEL_UNKNOWN_RATE: ${GRAB_MOCK_CANCEL_UNKNOWN_RATE:-0}
-      GRAB_MOCK_RESOLVE_DELAY_SECONDS: ${GRAB_MOCK_RESOLVE_DELAY_SECONDS:-20}
-      # GR-172 부하테스트에서 배송 단계 Mock 자동 진행을 쓸지. 기본은 꺼짐(운영과 동일)
-      GRAB_MOCK_DELIVERY_ENABLED: ${GRAB_MOCK_DELIVERY_ENABLED:-false}
-      GRAB_MOCK_DELIVERY_STAGE_INTERVAL: ${GRAB_MOCK_DELIVERY_STAGE_INTERVAL:-30s}
-      GRAB_MOCK_DELIVERY_POLL_INTERVAL: ${GRAB_MOCK_DELIVERY_POLL_INTERVAL:-10s}
-      DATA_GO_KR_SERVICE_KEY: ${DATA_GO_KR_SERVICE_KEY:-}
+
+      # 인증·암호화
       # 기본값을 두지 않는다. .env에 없으면 빈 값이 전달되어 backend가 기동에 실패한다
       JWT_SECRET: ${JWT_SECRET}
       # JWT_SECRET과 같이 기본값을 두지 않는다. .env에 없으면 이메일 인증 HMAC 키를 쓰는 시점에 기동에 실패한다
@@ -36,26 +28,36 @@ services:
       KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+
+      # 프론트엔드 연결
       # 소셜 로그인 결과를 받을 프론트엔드 콜백 주소. 사용자의 브라우저가 여는 주소라 외부에서 닿는 값을 넣는다
       OAUTH2_FRONTEND_CALLBACK_URL: ${OAUTH2_FRONTEND_CALLBACK_URL:-http://localhost:5173/#/auth/callback}
+      # 메일 본문 링크가 가리키는 프런트엔드 주소. 받는 사람의 브라우저가 여는 주소라 컨테이너 안이 아니라 외부에서 닿는 값을 넣는다
+      WEB_BASE_URL: ${WEB_BASE_URL:-http://localhost:5173}
+      # 쿠키를 포함한 요청을 허용할 프론트엔드 Origin. 기본값은 로컬 Vite 개발 서버다
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+
+      # 결제·사업자등록 조회
+      TOSS_SECRET_KEY: ${TOSS_SECRET_KEY:-}
+      DATA_GO_KR_SERVICE_KEY: ${DATA_GO_KR_SERVICE_KEY:-}
+
+      # 파일 저장소
       # Supabase Storage(GR-51 이미지, GR-91 서류, GR-130 프로필 이미지) 연동 설정. 비워 두면 업로드·다운로드 시 EXTERNAL_SERVICE_ERROR로 거부된다
       SUPABASE_URL: ${SUPABASE_URL:-}
       SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY:-}
       SUPABASE_DROP_IMAGE_BUCKET: ${SUPABASE_DROP_IMAGE_BUCKET:-drop-images}
       SUPABASE_SELLER_DOCUMENT_BUCKET: ${SUPABASE_SELLER_DOCUMENT_BUCKET:-seller-documents}
       SUPABASE_PROFILE_IMAGE_BUCKET: ${SUPABASE_PROFILE_IMAGE_BUCKET:-profile-images}
+
+      # AI 설명 생성·임베딩
       # 수요 분석 설명 LLM(GR-146). 비워 두면 설명 생성 없이 계산만 동작한다
       DEMAND_LLM_PROVIDER: ${DEMAND_LLM_PROVIDER:-none}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
       DEMAND_EMBEDDING_PROVIDER: ${DEMAND_EMBEDDING_PROVIDER:-none}
       GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-gemini-embedding-001}
-      # 쿠키를 포함한 요청을 허용할 프론트엔드 Origin. 기본값은 로컬 Vite 개발 서버다
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
-      REDIS_HOST: redis
-      # 메일 본문 링크가 가리키는 프런트엔드 주소. 받는 사람의 브라우저가 여는 주소라 컨테이너 안이 아니라 외부에서 닿는 값을 넣는다
-      WEB_BASE_URL: ${WEB_BASE_URL:-http://localhost:5173}
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-grab}
+
+      # 인증 메일 (기본: 로컬 Mailpit)
       # 기본값은 Mailpit이다. 컨테이너 안의 localhost는 mailpit이 아니므로 서비스 이름으로 접속한다(docs/MAIL.md)
       # .env에 값을 넣으면 Gmail 등 다른 SMTP로 바꿔 시험할 수 있다
       # :- 를 써서 .env에 빈 값으로 남은 키도 기본값으로 대체한다. 빈 문자열이 넘어가면 Spring 기본값이 적용되지 않는다
@@ -66,6 +68,8 @@ services:
       MAIL_SMTP_AUTH: ${MAIL_SMTP_AUTH:-false}
       MAIL_STARTTLS: ${MAIL_STARTTLS:-false}
       MAIL_FROM: ${MAIL_FROM:-no-reply@grab.local}
+
+      # WISH 알림 메일 (선택: Brevo)
       # WISH 판매 알림(GR-69) 전용 발송처. 위 MAIL_* (인증 코드용)과 계정을 나눠 일일 한도를 공유하지 않는다
       # HOST를 비워 두면 발송처가 등록되지 않고, 알림도 위 MAIL_* 설정(기본값 Mailpit)으로 나간다
       # PORT는 비면 기동에 실패하므로(숫자 바인딩) 기본값을 둔다
@@ -74,6 +78,19 @@ services:
       BREVO_SMTP_USERNAME: ${BREVO_SMTP_USERNAME:-}
       BREVO_SMTP_PASSWORD: ${BREVO_SMTP_PASSWORD:-}
       BREVO_MAIL_FROM: ${BREVO_MAIL_FROM:-}
+
+      # 부하테스트용 결제·배송 Mock (기본: 비활성)
+      # GR-154/155 부하테스트에서 토스 샌드박스 대신 MockPaymentGateway를 쓸지. 기본은 꺼짐(운영과 동일)
+      GRAB_PAYMENT_MOCK_GATEWAY_ENABLED: ${GRAB_PAYMENT_MOCK_GATEWAY_ENABLED:-false}
+      # GR-155 장애 주입 비율(0~1). 기본 0(장애 없음)
+      GRAB_MOCK_CONFIRM_FAILURE_RATE: ${GRAB_MOCK_CONFIRM_FAILURE_RATE:-0}
+      GRAB_MOCK_CONFIRM_UNKNOWN_RATE: ${GRAB_MOCK_CONFIRM_UNKNOWN_RATE:-0}
+      GRAB_MOCK_CANCEL_UNKNOWN_RATE: ${GRAB_MOCK_CANCEL_UNKNOWN_RATE:-0}
+      GRAB_MOCK_RESOLVE_DELAY_SECONDS: ${GRAB_MOCK_RESOLVE_DELAY_SECONDS:-20}
+      # GR-172 부하테스트에서 배송 단계 Mock 자동 진행을 쓸지. 기본은 꺼짐(운영과 동일)
+      GRAB_MOCK_DELIVERY_ENABLED: ${GRAB_MOCK_DELIVERY_ENABLED:-false}
+      GRAB_MOCK_DELIVERY_STAGE_INTERVAL: ${GRAB_MOCK_DELIVERY_STAGE_INTERVAL:-30s}
+      GRAB_MOCK_DELIVERY_POLL_INTERVAL: ${GRAB_MOCK_DELIVERY_POLL_INTERVAL:-10s}
     depends_on:
       postgres:
         condition: service_healthy
