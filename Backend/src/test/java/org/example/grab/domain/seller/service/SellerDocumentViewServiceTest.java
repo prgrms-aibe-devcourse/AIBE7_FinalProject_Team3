@@ -86,7 +86,7 @@ class SellerDocumentViewServiceTest {
         Seller seller = sellerWithId();
         UUID applicationId = seller.getUuid();
         given(sellerRepository.findByUuid(applicationId)).willReturn(Optional.of(seller));
-        given(sellerDocumentRepository.findBySellerIdAndDocumentType(SELLER_ID, DocumentType.ID_CARD))
+        given(sellerDocumentRepository.findFirstBySellerIdAndDocumentTypeOrderByCreatedAtDesc(SELLER_ID, DocumentType.ID_CARD))
                 .willReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.view(applicationId, DocumentType.ID_CARD, ADMIN_ID))
@@ -105,7 +105,7 @@ class SellerDocumentViewServiceTest {
                 "image/png", OBJECT_KEY, ENCRYPTED_DEK);
         byte[] plainImage = samplePng();
         given(sellerRepository.findByUuid(applicationId)).willReturn(Optional.of(seller));
-        given(sellerDocumentRepository.findBySellerIdAndDocumentType(SELLER_ID, DocumentType.BUSINESS_LICENSE))
+        given(sellerDocumentRepository.findFirstBySellerIdAndDocumentTypeOrderByCreatedAtDesc(SELLER_ID, DocumentType.BUSINESS_LICENSE))
                 .willReturn(Optional.of(document));
         given(documentStorage.load(OBJECT_KEY)).willReturn(CIPHERTEXT);
         given(documentEncryptionService.decrypt(CIPHERTEXT, ENCRYPTED_DEK)).willReturn(plainImage);
@@ -133,7 +133,7 @@ class SellerDocumentViewServiceTest {
                 "image/x-made-up", OBJECT_KEY, ENCRYPTED_DEK);
         byte[] plainImage = samplePng();
         given(sellerRepository.findByUuid(applicationId)).willReturn(Optional.of(seller));
-        given(sellerDocumentRepository.findBySellerIdAndDocumentType(SELLER_ID, DocumentType.BUSINESS_LICENSE))
+        given(sellerDocumentRepository.findFirstBySellerIdAndDocumentTypeOrderByCreatedAtDesc(SELLER_ID, DocumentType.BUSINESS_LICENSE))
                 .willReturn(Optional.of(document));
         given(documentStorage.load(OBJECT_KEY)).willReturn(CIPHERTEXT);
         given(documentEncryptionService.decrypt(CIPHERTEXT, ENCRYPTED_DEK)).willReturn(plainImage);

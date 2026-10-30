@@ -28,9 +28,9 @@ describe('내 WISH 전체 순회', () => {
 })
 
 describe('WISH 오류 안내', () => {
-  const axiosError = (status?: number, message?: string) => ({
+  const axiosError = (status?: number, code?: string) => ({
     isAxiosError: true,
-    response: status ? { status, data: { message } } : undefined,
+    response: status ? { status, data: { error: { code } } } : undefined,
   })
 
   const cases: [number, string | undefined, string][] = [
