@@ -105,11 +105,11 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
      * 썸네일은 GALLERY 중 순서가 가장 앞선 이미지이고 DETAIL은 쓰지 않는다(DROP.md 1.2).
      * 가용 재고 합계식은 soldOut·availableStock SELECT, PUBLIC_DROP_FILTERS, POPULAR_GRAB_WHERE에 중복되므로
      * 한쪽만 바꾸지 않도록 주의한다(활성 SKU 없으면 COALESCE로 0). LATERAL 조인으로 한 번만 계산하면
-     * 필터가 없을 때도 후보 전체에 계산이 강제돼 오히려 느려진다(GR-177, k6/drop-list-scale/result.md).
+     * 필터가 없을 때도 후보 전체에 계산이 강제돼 오히려 느려진다(GR-177, k6/scenarios/drop-list-scale/result.md).
      * 지금 식은 필터가 없으면 건너뛰고 SELECT 쪽은 LIMIT 뒤 행에서만 계산된다.
      * 전체 건수는 별도 count 쿼리 대신 COUNT(*) OVER ()로 같은 스캔에서 함께 구한다(GR-198). count 쿼리도 후보 전체를
      * 읽었으므로 추가로 읽는 행은 없고, 요청당 후보 스캔과 DB 왕복이 하나씩 준다. 부가 집계 서브쿼리는 여전히 LIMIT 뒤
-     * 페이지 행에서만 계산된다(14개 조합 실행 계획으로 확인, k6/sse-stream/result-refetch.md). 결과 행이 없으면 건수를
+     * 페이지 행에서만 계산된다(14개 조합 실행 계획으로 확인, k6/scenarios/sse-stream/result-refetch.md). 결과 행이 없으면 건수를
      * 얻을 수 없으므로 toPage가 범위를 넘은 페이지에서만 count 쿼리를 실행한다.
      */
     String PUBLIC_DROP_SELECT = """
