@@ -80,7 +80,7 @@ flowchart LR
 ## 주요 화면
 
 | 메인 페이지 | DROP 상세 |
-| --- | --- |
+| :---: | :---: |
 | ![메인 페이지](./Backend/docs/images/screenshots/메인페이지.png) | ![DROP 상세](./Backend/docs/images/screenshots/DROP%20상세.png) |
 | **회원가입 · 로그인** | **결제** |
 | ![회원가입 · 로그인](./Backend/docs/images/screenshots/회원가입%20로그인.png) | ![결제](./Backend/docs/images/screenshots/결제.png) |
