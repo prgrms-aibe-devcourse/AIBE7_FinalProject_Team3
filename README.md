@@ -47,6 +47,8 @@
 <p align="center">
   <a href="https://pre-sigma.vercel.app/">발표자료</a>
   ·
+  <a href="https://aibe7finalprojectteam3-wireframes.vercel.app/HomePage.html">와이어프레임</a>
+  ·
   <a href="./Backend/docs/README.md">프로젝트 문서</a>
   ·
   <a href="./Backend/docs/development/REQUIREMENTS.md">요구사항</a>
