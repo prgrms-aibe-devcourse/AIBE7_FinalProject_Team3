@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '../../fixtures'
+import { expect, fillSearchedAddress, test, type Page } from '../../fixtures'
 import { BUYER_ORDER_IDS } from '../../mock/api/buyerOrders'
 import { lastTossRequest, setTossScenario } from '../../mock/toss'
 
@@ -17,8 +17,7 @@ async function openCheckout(page: Page, path: string) {
 async function fillAddress(page: Page) {
   await page.getByLabel('받는 분').fill('김그랩')
   await page.getByLabel('연락처').fill('01012345678')
-  await page.getByLabel('우편번호').fill('06236')
-  await page.getByLabel('기본 주소').fill('서울시 강남구')
+  await fillSearchedAddress(page)
 }
 
 const result = (page: Page) => page.locator('.buyer-result')

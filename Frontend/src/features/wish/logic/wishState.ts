@@ -26,8 +26,9 @@ export async function loadMyWishes(
 export function wishErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const status = error.response?.status
-    const code = (error.response?.data as { message?: string } | undefined)
-      ?.message
+    const code = (
+      error.response?.data as { error?: { code?: string } } | undefined
+    )?.error?.code
     if (status === 401 || status === 403)
       return '로그인 후 WISH를 이용할 수 있어요.'
     if (code === 'GRAB_ALREADY_STARTED')
