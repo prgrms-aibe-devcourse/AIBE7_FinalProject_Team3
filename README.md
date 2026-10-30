@@ -79,13 +79,13 @@ flowchart LR
 
 ## 주요 화면
 
-| 홈 · DROP 탐색 | WISH 상세 |
+| 메인 페이지 | DROP 상세 |
 | --- | --- |
-| ![홈 · DROP 탐색](./Backend/docs/images/screenshots/home.png) | ![WISH 상세](./Backend/docs/images/screenshots/wish-detail.png) |
-| **GRAB 상세** | **주문 · 결제** |
-| ![GRAB 상세](./Backend/docs/images/screenshots/grab-detail.png) | ![주문 · 결제](./Backend/docs/images/screenshots/checkout.png) |
-| **주문 내역** | **판매자 대시보드** |
-| ![주문 내역](./Backend/docs/images/screenshots/orders.png) | ![판매자 대시보드](./Backend/docs/images/screenshots/seller-dashboard.png) |
+| ![메인 페이지](./Backend/docs/images/screenshots/메인페이지.png) | ![DROP 상세](./Backend/docs/images/screenshots/DROP%20상세.png) |
+| **회원가입 · 로그인** | **결제** |
+| ![회원가입 · 로그인](./Backend/docs/images/screenshots/회원가입%20로그인.png) | ![결제](./Backend/docs/images/screenshots/결제.png) |
+| **마이페이지** | **판매자 대시보드** |
+| ![마이페이지](./Backend/docs/images/screenshots/마이페이지.png) | ![판매자 대시보드](./Backend/docs/images/screenshots/판매자%20대시보드.png) |
 
 ## Tech Stack
 
