@@ -45,6 +45,8 @@
 </div>
 
 <p align="center">
+  <a href="https://pre-sigma.vercel.app/">발표자료</a>
+  ·
   <a href="./Backend/docs/README.md">프로젝트 문서</a>
   ·
   <a href="./Backend/docs/development/REQUIREMENTS.md">요구사항</a>
@@ -75,6 +77,16 @@ flowchart LR
     F --> G["배송 / 수령"]
 ```
 
+## 주요 화면
+
+| 메인 페이지 | DROP 상세 |
+| :---: | :---: |
+| ![메인 페이지](./Backend/docs/images/screenshots/메인페이지.png) | ![DROP 상세](./Backend/docs/images/screenshots/DROP%20상세.png) |
+| **회원가입 · 로그인** | **결제** |
+| ![회원가입 · 로그인](./Backend/docs/images/screenshots/회원가입%20로그인.png) | ![결제](./Backend/docs/images/screenshots/결제.png) |
+| **마이페이지** | **판매자 대시보드** |
+| ![마이페이지](./Backend/docs/images/screenshots/마이페이지.png) | ![판매자 대시보드](./Backend/docs/images/screenshots/판매자%20대시보드.png) |
+
 ## Tech Stack
 
 ### Backend
@@ -83,10 +95,14 @@ flowchart LR
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot_4.1.1-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)
 ![Spring Security](https://img.shields.io/badge/Spring_Security-6DB33F?style=for-the-badge&logo=springsecurity&logoColor=white)
 ![Spring Data JPA](https://img.shields.io/badge/Spring_Data_JPA-6DB33F?style=for-the-badge&logo=spring&logoColor=white)
-![Gradle](https://img.shields.io/badge/Gradle-02303A?style=for-the-badge&logo=gradle&logoColor=white)
+![Gradle](https://img.shields.io/badge/Gradle_9.7.1-02303A?style=for-the-badge&logo=gradle&logoColor=white)
 ![Flyway](https://img.shields.io/badge/Flyway-CC0200?style=for-the-badge&logo=flyway&logoColor=white)
 ![Swagger](https://img.shields.io/badge/Swagger-85EA2D?style=for-the-badge&logo=swagger&logoColor=black)
 ![JWT](https://img.shields.io/badge/JWT-000000?style=for-the-badge&logo=jsonwebtokens&logoColor=white)
+
+![Caffeine](https://img.shields.io/badge/Caffeine-6DB33F?style=for-the-badge)
+![Spring AI](https://img.shields.io/badge/Spring_AI_2.0.1-6DB33F?style=for-the-badge&logo=spring&logoColor=white)
+![Google Gemini](https://img.shields.io/badge/Google_Gemini-8E75B2?style=for-the-badge&logo=googlegemini&logoColor=white)
 
 ### Frontend
 
@@ -111,6 +127,23 @@ flowchart LR
 ![Nginx](https://img.shields.io/badge/Nginx-009639?style=for-the-badge&logo=nginx&logoColor=white)
 ![Supabase](https://img.shields.io/badge/Supabase-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white)
 ![Toss Payments](https://img.shields.io/badge/Toss_Payments-0064FF?style=for-the-badge)
+
+![pgvector](https://img.shields.io/badge/pgvector_0.8.2-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
+![Docker Compose](https://img.shields.io/badge/Docker_Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![GHCR](https://img.shields.io/badge/GHCR-181717?style=for-the-badge&logo=github&logoColor=white)
+![Valkey](https://img.shields.io/badge/Valkey-FF9900?style=for-the-badge)
+![Loki](https://img.shields.io/badge/Loki-F46800?style=for-the-badge&logo=grafana&logoColor=white)
+![Grafana Alloy](https://img.shields.io/badge/Grafana_Alloy-F46800?style=for-the-badge&logo=grafana&logoColor=white)
+
+### Testing / Quality
+
+![JUnit](https://img.shields.io/badge/JUnit-25A162?style=for-the-badge&logo=junit5&logoColor=white)
+![Testcontainers](https://img.shields.io/badge/Testcontainers-2496ED?style=for-the-badge&logo=testcontainers&logoColor=white)
+![GreenMail](https://img.shields.io/badge/GreenMail-008000?style=for-the-badge)
+![k6](https://img.shields.io/badge/k6-7D64FF?style=for-the-badge&logo=k6&logoColor=white)
+![ESLint](https://img.shields.io/badge/ESLint_10-4B32C3?style=for-the-badge&logo=eslint&logoColor=white)
+![Prettier](https://img.shields.io/badge/Prettier_3-F7B93E?style=for-the-badge&logo=prettier&logoColor=white)
+![OpenAPI TypeScript](https://img.shields.io/badge/OpenAPI_TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
 
 ## 상세 문서
 
