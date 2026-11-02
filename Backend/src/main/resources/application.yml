@@ -89,7 +89,7 @@ spring:
       max-request-size: 10MB
 
 grab:
-  # GR-110 구독 기반. SSE endpoint·전송 경로는 후속 단계에서 연결한다.
+  # 공개 재고 변경 SSE(GR-110). endpoint는 GET /api/v1/drops/stock-stream(StockStreamController), 전달 정책은 REALTIME_STOCK.md를 따른다.
   stock-stream:
     coalesce-window: 1s
     heartbeat-interval: 15s

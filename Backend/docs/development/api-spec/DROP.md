@@ -45,7 +45,7 @@ GET /api/v1/drops
 | `soldOut` | `true` \| `false` | 전체 | 품절 여부 |
 | `sort` | `publishedAt` \| `saleStartsAt` \| `createdAt` + `,asc`\|`,desc`; `wishCount,desc`; `soldQuantity,desc` | `publishedAt,desc` | 인기 정렬은 아래 상태 조합만 허용합니다. |
 | `page` | 0 이상 정수 | `0` | 페이지 번호 (0부터 시작) |
-| `size` | 1 ~ 100 | `20` | 페이지 크기 |
+| `size` | 1 ~ 100 | `10` | 페이지 크기 |
 
 **응답:**
 
@@ -73,7 +73,7 @@ GET /api/v1/drops
       }
     ],
     "page": 0,
-    "size": 20,
+    "size": 10,
     "totalElements": 1,
     "totalPages": 1,
     "hasNext": false
