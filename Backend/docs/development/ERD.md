@@ -554,7 +554,7 @@ COMMITTED → RELEASED
 1. `buyer_id + idempotency_key`로 기존 주문을 확인한다.
 2. 같은 키와 같은 `request_hash`이면 기존 주문을 반환한다.
 3. DROP 행을 `FOR SHARE`로 잠그고 상태와 판매 시간을 서버 시각으로 검증한다.
-4. 요청 옵션을 ID 오름차순으로 처리한다. 옵션마다 가용 재고 조건을 건 `UPDATE ... RETURNING` 한 번으로 행 잠금, 가용 재고 검사, `reserved_quantity` 증가를 함께 수행한다(GR-202). 갱신된 행이 없으면 `SELECT ... FOR UPDATE`로 다시 읽어 실패 사유(없는 옵션·비활성·재고 부족)를 구분한다.
+4. 요청 옵션을 ID 오름차순으로 처리한다. 옵션마다 가용 재고 조건을 건 `UPDATE ... RETURNING`으로 행 잠금, 가용 재고 검사, `reserved_quantity` 증가를 함께 수행한다(GR-202). 갱신된 행이 없으면 `SELECT ... FOR UPDATE`로 다시 읽어 실패 사유(없는 옵션·비활성·재고 부족)를 구분하고, 그 사이 재고가 반환돼 가용 재고가 충분하면 같은 조건부 UPDATE를 한 번 더 시도한다.
 5. 주문, 주문 항목, `HELD` 예약을 한 트랜잭션에서 생성한다.
 6. 옵션 하나라도 부족하면 전체 작업을 롤백한다.
 
