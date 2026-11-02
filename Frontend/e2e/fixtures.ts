@@ -6,6 +6,7 @@ import { installDropImageUploads } from './mock/dropImages'
 import { installSellerDropApi } from './mock/sellerDrops'
 import { installDemandApi } from './mock/demand'
 import { installFakeToss } from './mock/toss'
+import { installFakePostcode } from './mock/postcode'
 
 export type { Page }
 export { getAuth }
@@ -27,8 +28,9 @@ export const test = base.extend({
           ? route.fulfill({ path: PLACEHOLDER_IMAGE })
           : route.abort(),
     )
-    // 토스 결제창 스크립트만 가짜로 돌린다(위 차단보다 나중에 등록해 우선한다).
+    // 토스 결제창·우편번호 검색 스크립트만 가짜로 돌린다(위 차단보다 나중에 등록해 우선한다).
     await installFakeToss(page)
+    await installFakePostcode(page)
     // 공개 DROP API를 fixture로 고정한다. 시나리오 테스트는 뒤에서 다시 등록해 덮어쓴다.
     await installPublicApi(page)
     await installDropImageUploads(page)
@@ -67,6 +69,13 @@ export async function loginAdmin(page: Page) {
 }
 
 export const toast = (page: Page) => page.locator('.toast')
+
+// 우편번호·기본 주소는 주소 검색으로만 채워진다(readOnly). installFakePostcode가
+// 고정값(06236 / 서울시 강남구 테헤란로 152)으로 완료해준다.
+export async function fillSearchedAddress(page: Page) {
+  await page.getByRole('button', { name: '주소 검색' }).click()
+  await expect(page.getByLabel('우편번호')).toHaveValue('06236')
+}
 
 // 로그인 상태 헤더의 프로필 이미지 버튼. 누르면 마이페이지·로그아웃 메뉴가 펼쳐진다(GR-132).
 export const accountMenuButton = (page: Page) =>

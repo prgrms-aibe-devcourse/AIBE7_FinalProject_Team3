@@ -266,6 +266,11 @@ textarea:focus-visible,
   font-weight: 700;
   font-size: 13px;
 }
+.secondary-button:disabled {
+  cursor: not-allowed;
+  border-color: #dfe1dc;
+  color: #8b8e85;
+}
 .account-button {
   display: grid;
   place-items: center;
@@ -445,10 +450,18 @@ main {
   line-height: 1.7;
 }
 .text-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
   font-size: 13px;
   font-weight: 800;
   text-decoration: underline;
   text-underline-offset: 4px;
+}
+.text-link:disabled {
+  cursor: not-allowed;
+  color: var(--muted);
 }
 
 .grab-hero {

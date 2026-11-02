@@ -43,22 +43,32 @@ export default function App() {
   const { wishes, wishesReady, toggleWish } = useWish(authenticated, notify)
   const admin = isAdmin(user)
 
-  // 헤더 계정 메뉴의 로그아웃(GR-132). 마이페이지 로그아웃과 같이 성공하면 WISH로 이동하고,
-  // 실패하면 로그인 상태를 유지한 채 안내한다.
+  /*
+      로그아웃 시 인증 캐시가 비는 순간과 페이지 이동 사이에 틈이 있으면, 그 틈에
+      현재 페이지가 user=null로 한 번 더 렌더링된다. MyPage·AdminSellerApplicationsPage
+      같은 "!user → /login" 가드가 있는 페이지에 있다가 로그아웃하면, 바로 그 틈에
+      가드가 먼저 반응해 지금 있던 경로(관리자 페이지 등)를 로그인 복귀 경로(from)로
+      남기고, 이후 다른 계정으로 로그인하면 권한 확인 없이 그 경로로 돌아가 버린다(GR-132).
+      그 가드가 아예 실행되지 않도록 인증 캐시를 비우기 전에 먼저 공개 경로로 이동시킨다.
+   */
   const logoutFromHeader = async () => {
+    navigate('/wish')
     try {
       await logout()
-      navigate('/wish')
     } catch {
       notify('로그아웃하지 못했어요. 잠시 뒤 다시 시도해주세요.')
     }
   }
 
-  // 운영자페이지 로그아웃. 실패를 여기서 삼키지 않고 AdminSellerApplicationsPage의
-  // 자체 logoutError 상태로 전파해, 화면에 바로 오류를 보여준다.
+  // 운영자페이지 로그아웃. 위와 같은 이유로 먼저 이동한 뒤 로그아웃하므로, 실패해도
+  // AdminSellerApplicationsPage는 이미 언마운트돼 있다. 실패 안내는 전역 토스트로 보여준다.
   const logoutFromAdminPage = async () => {
-    await logout()
     navigate('/wish')
+    try {
+      await logout()
+    } catch {
+      notify('로그아웃하지 못했어요. 잠시 뒤 다시 시도해주세요.')
+    }
   }
 
   // 운영자는 목록·상세는 둘러볼 수 있지만 WISH·GRAB은 할 수 없다. wishesReady를 false로 둬

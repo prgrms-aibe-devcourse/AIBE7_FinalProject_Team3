@@ -94,7 +94,7 @@ GET /api/v1/orders?status=PAID&page=0&size=20
 **쿼리 파라미터:**
 - `status`: 주문 상태 (선택, 예: `PAID`)
 - `page`: 페이지 번호 (기본값 `0`)
-- `size`: 페이지 크기 (기본값 `20`, 최대 `100`)
+- `size`: 페이지 크기 (기본값 `10`, 최대 `100`)
 
 **응답:**
 
@@ -277,7 +277,7 @@ GET /api/v1/seller/orders
 - `orderStatus`: `PAID` 등
 - `paymentStatus`: `SUCCEEDED` 등
 - `page`: 페이지 번호
-- `size`: 페이지 크기
+- `size`: 페이지 크기 (기본값 `10`)
 
 > 자신이 등록한 DROP의 주문만 반환합니다. `dropId`·`orderStatus`·`paymentStatus`는 함께 지정하면 모두 충족하는 주문에 적용합니다. 판매자 종합의 주문 상태 카드는 정확한 `orderStatus`를, DROP 상세의 주문 링크는 해당 `dropId`를 전달합니다. 프론트엔드는 필터와 `page`를 URL에 남겨 직접 진입·뒤로 가기에서 복원합니다. `reconciliationRequired`는 이 목록의 `paymentStatus` 필터와 동일한 집합이 아니므로 건수에서 목록으로 연결하지 않습니다.
 
