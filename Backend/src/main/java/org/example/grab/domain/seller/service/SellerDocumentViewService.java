@@ -75,7 +75,7 @@ public class SellerDocumentViewService {
         Seller seller = sellerRepository.findByUuid(applicationId)
                 .orElseThrow(() -> new BusinessException(SellerErrorCode.SELLER_APPLICATION_NOT_FOUND));
         SellerDocument document = sellerDocumentRepository
-                .findBySellerIdAndDocumentType(seller.getId(), documentType)
+                .findFirstBySellerIdAndDocumentTypeOrderByCreatedAtDesc(seller.getId(), documentType)
                 .orElseThrow(() -> new BusinessException(SellerErrorCode.SELLER_APPLICATION_NOT_FOUND));
 
         byte[] ciphertext = documentStorage.load(document.getEncryptedObjectKey());

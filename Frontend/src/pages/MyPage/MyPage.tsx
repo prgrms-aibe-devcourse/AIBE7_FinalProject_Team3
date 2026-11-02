@@ -297,14 +297,16 @@ export default function MyPage({
                       </button>
                     )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void toggleWish(item.dropId)
-                    }}
-                  >
-                    취소
-                  </button>
+                  {!CLOSED_WISH_STATUSES.has(item.status ?? '') && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void toggleWish(item.dropId)
+                      }}
+                    >
+                      취소
+                    </button>
+                  )}
                   {relatedOpen === item.dropId && (
                     <WishRelatedDrops
                       dropId={item.dropId}

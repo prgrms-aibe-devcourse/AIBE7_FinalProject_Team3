@@ -35,6 +35,13 @@ function wishListResponse(state: ApiState, params: URLSearchParams) {
   }
 }
 
+// 실제 백엔드 오류 응답(ErrorResponse)과 같은 모양으로 만든다. 프론트는 error.code로 읽는다.
+const wishErrorBody = (code: string) => ({
+  success: false,
+  data: null,
+  error: { code, message: '', fieldErrors: [] },
+})
+
 // 등록·취소 판정은 명세(WISH.md 1.1·1.2)와 서버 시각을 따른다.
 function wishError(
   drop: FixtureDrop | undefined,
@@ -70,7 +77,7 @@ export async function handleWishRoute(
     const error = wishError(drop)
     if (route.request().method() === 'PUT') {
       if (error) {
-        await json(route, { success: false, message: error.code }, error.status)
+        await json(route, wishErrorBody(error.code), error.status)
         return true
       }
       wished.add(Number(wish[1]))
@@ -87,7 +94,7 @@ export async function handleWishRoute(
     }
     if (route.request().method() === 'DELETE') {
       if (error) {
-        await json(route, { success: false, message: error.code }, error.status)
+        await json(route, wishErrorBody(error.code), error.status)
         return true
       }
       wished.delete(Number(wish[1]))

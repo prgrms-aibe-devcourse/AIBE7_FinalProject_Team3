@@ -29,7 +29,7 @@ npm run e2e:docker -- --grep @visual   # 시각 비교 (CI와 같은 Docker 이�
 - `src/api/schema` — OpenAPI 생성 타입, `src/api/<도메인>` — 도메인별 요청·테스트, `src/api/client.ts` — 공통 클라이언트
 - 단위 테스트는 해당 기능의 `__tests__/`에 모은다(`src/features/<도메인>/__tests__/`, `src/api/<도메인>/__tests__/`). Mock 관련 테스트도 도메인의 `__tests__/`에 둔다. 공통 UI·유틸리티 테스트는 해당 소스 디렉터리의 `__tests__/`에 둔다. E2E·시각 비교와 전용 fixture는 `e2e/`에서 관리한다.
 - 라우터는 `HashRouter`다. URL은 `/#/wish` 형태다.
-- 인증 상태는 TanStack Query의 `users/me` 쿼리(`['auth', 'me']`)를 단일 근거로 삼고(`src/features/auth/logic/useAuth.ts`), WISH·주문 상태는 `App.tsx`의 `useState`에 있다. 새 전역 상태 관리 도입은 별도 합의 후 진행한다.
+- 인증 상태는 TanStack Query의 `users/me` 쿼리(`['auth', 'me']`)를 단일 근거로 삼고(`src/features/auth/logic/useAuth.ts`), WISH 목록(`useWish.ts`)과 주문 목록(`useBuyerOrders.ts`·`useSellerOrders.ts`)도 TanStack Query로 관리하며, `App.tsx`는 공유 값을 `SharedProps`로 페이지에 전달한다. 새 전역 상태 관리 도입은 별도 합의 후 진행한다.
 
 ## 기술 스택
 

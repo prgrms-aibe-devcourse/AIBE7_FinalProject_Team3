@@ -9,7 +9,7 @@
 | --- | --- | --- | --- |
 | Language | Java | 17 | 팀의 학습 경험과 라이브러리 호환성이 안정적이며 Spring Boot 4.1의 최소 요구 버전을 충족한다. |
 | Framework | Spring Boot | 4.1.x | 웹, 보안, 데이터 접근, 모니터링 환경을 일관되게 구성한다. |
-| Web | Spring MVC | Boot 관리 | REST API 구현에 사용하며 블로킹 방식의 JPA 환경에 적합하다. SSE는 GR-110에서 단일 서버·커밋 후 알림을 구현했고 프론트 연동·다중 서버는 GR-111~113에서 진행한다. |
+| Web | Spring MVC | Boot 관리 | REST API 구현에 사용하며 블로킹 방식의 JPA 환경에 적합하다. SSE는 GR-110에서 단일 서버·커밋 후 알림을, GR-111·112에서 프론트 연동을 구현했다. 다중 서버 전달(GR-113)은 단일 인스턴스 운영 결정으로 취소했다. |
 | ORM | Spring Data JPA / Hibernate | Boot 관리 | 주문·옵션·결제 도메인의 관계 매핑과 트랜잭션을 관리한다. 복잡한 조회는 DTO Projection 또는 별도 쿼리로 처리한다. |
 | Security | Spring Security | Boot 관리 | HttpOnly 쿠키 기반 JWT 인증, CSRF 보호, KAKAO·GOOGLE OpenID Connect 소셜 로그인(OAuth2 Client), Argon2id 비밀번호 해시, USER·SELLER·ADMIN 권한 및 리소스 소유권을 검증한다. |
 | Validation | Jakarta Bean Validation | Boot 관리 | 요청 DTO와 상태별 필수값을 검증한다. |
@@ -20,7 +20,7 @@
 | Scheduling | Spring `@Scheduled` + PostgreSQL 인덱스 폴링 | Boot 관리 | DROP 상태(WISH→GRAB→ENDED) 자동 전환, 결제 배치(진행 중 결제 정리·결제 대기 만료·결제 취소 재요청·보정 환불), 배송 단계 Mock 진행. 별도 스케줄러 인프라 없이 기존 DB·인덱스만 사용한다(1.1절, 1.2절). 스케줄러 스레드는 4개(`spring.task.scheduling.pool.size`)로 두어 작업끼리 서로를 기다리지 않게 한다. 기본값 1이면 결제 배치의 PG 지연이 DROP 판매 시작 전환까지 늦춘다. |
 | Cache | Caffeine | Boot 관리(3.2.x) | 인증 요청마다 하는 회원 ID 변환(public_id → `users.id`)을 인스턴스 메모리에 둔다(GR-211). GR-201 측정에서 이 변환이 요청당 DB 왕복의 절반을 차지해 운영 DB 왕복(약 3ms)에서 커넥션 풀 병목이 됐다. 대응이 바뀌지 않아 무효화가 필요 없고, 최대 항목 수로만 메모리를 제한한다. 원장은 PostgreSQL이며 캐시가 비어도 DB 조회로 다시 채운다. |
 | AI | Spring AI + Google GenAI(Gemini) | 2.0.x | 팀 합의로 도입(GR-146). WISH 단계 수요 분석 결과의 설명과 상품 사진 기반 DROP 초안(상품명·설명·카테고리·대체 설명, DROP.md 2.8)을 구조화 JSON으로 생성한다. 계산에는 쓰지 않는다. 모델명은 설정값이며 평가셋으로 비교해 정한다(1.3절, GR-146). |
-| AI Embedding | Spring AI + Google GenAI Embedding | 2.0.x | 팀 합의, GR-147에서 활성화. 유사 상품 표본 선택용 DROP 임베딩을 생성한다(1.3절, GR-147). |
+| AI Embedding | Spring AI + Google GenAI Embedding | 2.0.x | 팀 합의, GR-147에서 활성화. DROP 임베딩을 생성해 관련 DROP 추천(DROP-011)과 비슷한 DROP 실적(DEMAND-013)에 쓴다. 수요 분석 전환율 표본의 유사도 선택(DEMAND-009)은 후속 구현이다(1.3절). |
 
 ### 1.1 DROP 상태 자동 전환 선정 이유 (GR-18)
 
@@ -104,7 +104,7 @@
 | **임베딩 유사도 + SQL 집계 (GR-147)** | 내용이 비슷한 상품으로 표본을 골라 예측 오차를 줄일 수 있음 | pgvector·임베딩 API 의존, 테스트 DB 이미지 교체 필요 |
 | LLM이 표본을 직접 판단(RAG로 판매 수치 검색) | 구현이 짧음 | 정형 수치의 집계·계산을 LLM에 맡기게 되고 결과를 재현·검증할 수 없음 |
 
-표본 선택은 교체 가능한 구성 요소로 두고, 유사 상품 기준은 임베딩이 없거나 신뢰도가 `NONE`이면 카테고리 기준으로 대체한다. 두 기준의 예측 오차는 같은 평가 데이터로 비교해 기록한다.
+표본 선택은 교체 가능한 구성 요소로 두고, 유사 상품 기준은 임베딩이 없거나 신뢰도가 `NONE`이면 카테고리 기준으로 대체한다. 두 기준의 예측 오차는 같은 평가 데이터로 비교해 기록한다. 현재 전환율 표본은 카테고리 기준만 구현했고, 유사도 기준 선택과 오차 비교는 후속이다(DEMAND-009).
 
 선택 근거:
 
@@ -128,7 +128,7 @@
 | RDBMS | PostgreSQL | MVP | 회원·DROP·주문·재고·결제 데이터를 저장하는 영속 원장이다. 트랜잭션, 행 잠금, 인덱스 및 향후 pgvector 확장이 가능하다. |
 | In-memory Store | Redis | MVP | Refresh Token 해시와 이메일 인증 코드·LOCAL/소셜 가입 컨텍스트 해시를 TTL과 함께 저장한다. 주문과 재고의 최종 원장으로 사용하지 않는다. 공개 DROP 상세·재고 응답 캐시(GR-183)는 운영 Redis 왕복이 DB 조회보다 느려 앱 메모리를 기본 저장소로 쓴다. |
 | Migration | Flyway | MVP | ERD 변경 이력을 SQL 마이그레이션으로 관리하고 환경별 스키마를 일치시킨다. |
-| Vector Search | pgvector | GR-147 | 유사 상품 표본 선택용 DROP 임베딩을 PostgreSQL에 저장하고 HNSW 인덱스로 검색한다. 별도 벡터 DB 없이 기존 원장과 같은 트랜잭션·백업 범위에 둔다. |
+| Vector Search | pgvector | GR-147 | 관련 DROP 추천·비슷한 DROP 실적 검색용 DROP 임베딩을 PostgreSQL에 저장하고 HNSW 인덱스로 검색한다. 별도 벡터 DB 없이 기존 원장과 같은 트랜잭션·백업 범위에 둔다. |
 
 재고 정합성은 PostgreSQL 트랜잭션과 행 잠금으로 먼저 보장한다. Redis는 MVP에서 Refresh Token과 이메일 인증 임시 데이터(인증 코드, 가입 컨텍스트, 발송 제한 횟수) 저장에만 사용한다. 조회 캐시는 부하 테스트로 병목이 확인된 경로에만 도입한다. GR-183에서 SSE 알림마다 다시 불리는 공개 DROP 상세·재고 응답에 짧은 TTL(5초) 캐시를 도입했다. 저장소는 `grab.drop-cache.store`(memory | redis | none)로 고르며 기본값은 인스턴스 메모리다. 재고·판매·상태 변경은 커밋 후 이벤트로 바로 지운다. 캐시는 화면 조회 응답에만 쓰고 재고 차감·주문 판단은 계속 PostgreSQL 행 잠금으로 한다. 캐시를 비워도 DB 조회로 다시 만들어진다. 목록 응답 캐시는 필터 조합이 많아 보류한다. 관련 DROP 추천(GR-195)은 같은 저장소에 변경 이벤트 없이 3분 TTL로 둔다(사용자와 무관하고 몇 분 늦어도 되는 결과). 인증 요청의 회원 ID 변환(public_id → `users.id`)은 GR-211에서 Caffeine 인스턴스 메모리 캐시로 둔다. 대응이 바뀌지 않아 TTL·무효화 없이 최대 항목 수(`grab.user-id-cache.max-size`)로만 제한한다. 운영 Redis 왕복이 DB보다 느려(GR-183) Redis에 두지 않는다.
 
@@ -149,7 +149,10 @@ GR-213에서 메모리 저장소를 Caffeine으로 교체했다. 직접 만든 �
 | HTTP Client | Axios | 1.x | Credential·CSRF 헤더, 공통 오류 처리 및 쿠키 기반 토큰 재발급 흐름을 구성한다. |
 | Routing | React Router | 7.x | 소비자·판매자·관리자 라우팅과 권한별 화면을 분리한다. |
 | Server State | TanStack Query | 5.x | API 데이터 캐싱, 재조회, 로딩·오류 상태를 관리한다. |
-| Client State | React Context 또는 Zustand | 필요 시 확정 | 로그인 사용자 정보 등 작은 전역 상태만 관리한다. 서버 응답 데이터는 TanStack Query에서 관리한다. |
+| Client State | 별도 라이브러리 없음 | - | 로그인 사용자 정보와 WISH 목록은 TanStack Query 캐시(`useAuth`·`useWish`)로 관리하고, `App.tsx`가 공유 값(`SharedProps`)을 props로 전달한다. 전역 상태가 늘어나면 React Context나 Zustand 도입을 검토한다. |
+| Payment SDK | @tosspayments/tosspayments-sdk | 2.x | 토스페이먼츠 결제창을 띄워 결제 인증 결과(`paymentKey`)를 받는다. 승인은 서버가 처리한다(4.4절). |
+| API Type | openapi-typescript | 7.x | 백엔드 OpenAPI 스냅샷(`Frontend/openapi`)에서 요청·응답 타입을 생성한다. |
+| Code Quality | ESLint · Prettier · husky · lint-staged | 10.x · 3.x · 9.x · 17.x | 커밋 전에는 변경 파일을 Prettier로 정리하고(husky·lint-staged), CI에서 ESLint·Prettier 검사를 실행한다. |
 | Unit Test | Vitest | 4.x | Vite 설정을 그대로 쓰는 단위 테스트로 옵션 조합·검증 함수 같은 순수 로직을 검사한다. |
 | E2E·Visual Test | Playwright | 1.63.x | 핵심 사용자 흐름과 PC·모바일 화면 기준 스크린샷을 검사한다. 기준 이미지는 CI와 같은 Playwright Docker 이미지에서 생성·비교한다. |
 
@@ -161,9 +164,9 @@ GR-213에서 메모리 저장소를 Caffeine으로 교체했다. 직접 만든 �
 - `Backend/compose.yaml`: 백엔드, PostgreSQL, Redis, Mailpit, Prometheus, Grafana, Loki, Alloy 컨테이너 정의. Mailpit은 로컬 개발용 SMTP 서버이며 운영 발송 대상이 아니다(4.3절).
 - `.github/workflows/backend-ci.yml`: `main` 또는 `deploy` 대상 PR과 두 브랜치의 푸시에서 PostgreSQL 기반 테스트와 Docker 이미지 빌드 검증
 - `.github/workflows/frontend-ci.yml`: `main` 또는 `deploy` 대상 PR과 두 브랜치의 푸시에서 Frontend lint·Vitest·build와 Playwright E2E·시각 비교 검증. 실패 시 리포트·trace를 산출물로 보관
-- `.github/workflows/publish-backend.yml`: Backend 이미지를 빌드해 GHCR에 `latest`, 커밋 SHA 태그로 게시. 운영 기준은 `deploy` 푸시지만 현재 트리거는 `main`이므로 변경이 필요하다.
+- `.github/workflows/publish-backend.yml`: `deploy` 푸시(Backend 변경 시)에서 Backend 이미지를 빌드해 GHCR에 `latest`, 커밋 SHA 태그로 게시하고 EC2 배포를 실행한다(GR-122·123).
 
-Actuator와 Prometheus의 로컬 메트릭 수집 연결은 완료됐다. Redis 연결 설정과 Refresh Token 저장소(생성·해시·TTL·저장·조회·삭제)는 구현됐고, LOCAL 로그인 API가 Refresh Token을 저장하고 Access·Refresh Token을 HttpOnly 쿠키로 발급하며, 재발급 API가 Refresh Token Rotation(재사용 탐지 포함)으로 두 토큰을 교체한다. 로그아웃 API는 Refresh Token이 속한 세션(이미 교체된 토큰이면 사용됨 표식으로 찾은 세션)을 Redis에서 폐기하고 두 인증 쿠키를 만료시킨다. Access Token은 서버에 저장하지 않으므로 로그아웃 후에도 만료 시각까지 유효할 수 있다. 내 정보 조회 API는 회원 정보를 DB에서 읽고 `roles`는 요청 Access Token의 권한을 돌려주며, 정지·탈퇴 회원은 401로 거부한다. KAKAO·GOOGLE 소셜 로그인은 OpenID Connect로 구현됐다. 인가 요청은 로그인 왕복 동안만 서버 세션에 두고, 최초 인증은 Redis 가입 컨텍스트(15분)를 거쳐 닉네임 입력 후 회원을 만들며, 로그인 결과는 LOCAL과 같은 HttpOnly 인증 쿠키로 발급한다. 실제 제공자 왕복 확인은 남아 있다. Grafana·Loki·Alloy는 실행 틀만 마련된 상태다.
+Actuator와 Prometheus의 로컬 메트릭 수집 연결은 완료됐다. Redis 연결 설정과 Refresh Token 저장소(생성·해시·TTL·저장·조회·삭제)는 구현됐고, LOCAL 로그인 API가 Refresh Token을 저장하고 Access·Refresh Token을 HttpOnly 쿠키로 발급하며, 재발급 API가 Refresh Token Rotation(재사용 탐지 포함)으로 두 토큰을 교체한다. 로그아웃 API는 Refresh Token이 속한 세션(이미 교체된 토큰이면 사용됨 표식으로 찾은 세션)을 Redis에서 폐기하고 두 인증 쿠키를 만료시킨다. Access Token은 서버에 저장하지 않으므로 로그아웃 후에도 만료 시각까지 유효할 수 있다. 내 정보 조회 API는 회원 정보를 DB에서 읽고 `roles`는 요청 Access Token의 권한을 돌려주며, 정지·탈퇴 회원은 401로 거부한다. KAKAO·GOOGLE 소셜 로그인은 OpenID Connect로 구현됐다. 인가 요청은 로그인 왕복 동안만 서버 세션에 두고, 최초 인증은 Redis 가입 컨텍스트(15분)를 거쳐 닉네임 입력 후 회원을 만들며, 로그인 결과는 LOCAL과 같은 HttpOnly 인증 쿠키로 발급한다. 실제 제공자 왕복 확인은 남아 있다. Grafana는 Prometheus 데이터 소스와 부하테스트 대시보드(`monitoring/grafana/provisioning`)를 프로비저닝했다. Loki·Alloy는 컨테이너 정의만 있고, Alloy 설정 파일과 Grafana의 Loki 데이터 소스는 아직 없다.
 
 ### 4.2 목표 운영 구성
 
@@ -237,7 +240,7 @@ Mock 결제(`PAYMENT.md` 1.1절)는 토스페이먼츠 **테스트 환경**으�
 | EC2 자동 배포 | 완료 | GHCR 게시 후 CI가 SSH(forced command로 `deploy.sh`만 허용)로 EC2에 접속해 실행한다(GR-123). |
 | Health Check·Blue/Green | 완료 | `deploy.sh`가 Actuator Health 확인 후 Nginx upstream을 전환한다(GR-121). |
 
-현재 워크플로는 이미지 게시 파이프라인이며 운영 서버 자동 배포까지 수행하지 않는다. 단일 EC2 Blue/Green은 배포 중단 시간을 줄이는 전략일 뿐 EC2 자체 장애를 방지하는 고가용성 구성은 아니다.
+현재 워크플로는 이미지 게시와 운영 서버 배포(`deploy.sh` 실행)까지 수행한다. 단일 EC2 Blue/Green은 배포 중단 시간을 줄이는 전략일 뿐 EC2 자체 장애를 방지하는 고가용성 구성은 아니다.
 
 ### 5.2 브랜치 통합 흐름
 

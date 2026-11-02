@@ -8,7 +8,7 @@ export default function Footer() {
         <img className="footer-wordmark" src={wordmark} alt="GRAB" />
       </Link>
       <p>A small drop, a big tomorrow.</p>
-      <small>© 2026 GRAB · MVP FRONTEND DRAFT</small>
+      <small>© 2026 GRAB</small>
     </footer>
   )
 }

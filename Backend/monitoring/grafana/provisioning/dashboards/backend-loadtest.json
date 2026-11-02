@@ -200,7 +200,7 @@
     {
       "id": 10,
       "title": "JVM 메모리 합계 (확보 기준)",
-      "description": "JVM이 OS에서 확보한 힙과 힙 외 영역(Metaspace·코드 캐시 등)을 쌓아 보여준다. 여기에 JVM 밖 네이티브 메모리(스레드 스택·malloc 등, 이 대시보드에 없음)가 더해져 컨테이너 메모리가 된다. 빨간 점선은 부하테스트(compose.loadtest-micro.yaml) 컨테이너 한도 1GiB.",
+      "description": "JVM이 OS에서 확보한 힙과 힙 외 영역(Metaspace·코드 캐시 등)을 쌓아 보여준다. 여기에 JVM 밖 네이티브 메모리(스레드 스택·malloc 등, 이 대시보드에 없음)가 더해져 컨테이너 메모리가 된다. 빨간 점선은 부하테스트(k6/compose/compose.loadtest-micro.yaml) 컨테이너 한도 1GiB.",
       "type": "timeseries",
       "gridPos": {
         "h": 8,

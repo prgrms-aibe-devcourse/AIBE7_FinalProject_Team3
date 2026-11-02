@@ -63,7 +63,7 @@ jobs:
   e2e:
     name: E2E and visual regression
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     # 기준 이미지를 만든 환경과 같아야 한다. 버전은 package.json의 @playwright/test와 맞춘다.
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble
