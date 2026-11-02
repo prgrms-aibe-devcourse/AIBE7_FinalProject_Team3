@@ -9,7 +9,7 @@
 | --- | --- | --- | --- |
 | Language | Java | 17 | 팀의 학습 경험과 라이브러리 호환성이 안정적이며 Spring Boot 4.1의 최소 요구 버전을 충족한다. |
 | Framework | Spring Boot | 4.1.x | 웹, 보안, 데이터 접근, 모니터링 환경을 일관되게 구성한다. |
-| Web | Spring MVC | Boot 관리 | REST API 구현에 사용하며 블로킹 방식의 JPA 환경에 적합하다. SSE는 GR-110에서 단일 서버·커밋 후 알림을 구현했고 프론트 연동·다중 서버는 GR-111~113에서 진행한다. |
+| Web | Spring MVC | Boot 관리 | REST API 구현에 사용하며 블로킹 방식의 JPA 환경에 적합하다. SSE는 GR-110에서 단일 서버·커밋 후 알림을, GR-111·112에서 프론트 연동을 구현했다. 다중 서버 전달(GR-113)은 단일 인스턴스 운영 결정으로 취소했다. |
 | ORM | Spring Data JPA / Hibernate | Boot 관리 | 주문·옵션·결제 도메인의 관계 매핑과 트랜잭션을 관리한다. 복잡한 조회는 DTO Projection 또는 별도 쿼리로 처리한다. |
 | Security | Spring Security | Boot 관리 | HttpOnly 쿠키 기반 JWT 인증, CSRF 보호, KAKAO·GOOGLE OpenID Connect 소셜 로그인(OAuth2 Client), Argon2id 비밀번호 해시, USER·SELLER·ADMIN 권한 및 리소스 소유권을 검증한다. |
 | Validation | Jakarta Bean Validation | Boot 관리 | 요청 DTO와 상태별 필수값을 검증한다. |
@@ -149,7 +149,10 @@ GR-213에서 메모리 저장소를 Caffeine으로 교체했다. 직접 만든 �
 | HTTP Client | Axios | 1.x | Credential·CSRF 헤더, 공통 오류 처리 및 쿠키 기반 토큰 재발급 흐름을 구성한다. |
 | Routing | React Router | 7.x | 소비자·판매자·관리자 라우팅과 권한별 화면을 분리한다. |
 | Server State | TanStack Query | 5.x | API 데이터 캐싱, 재조회, 로딩·오류 상태를 관리한다. |
-| Client State | React Context 또는 Zustand | 필요 시 확정 | 로그인 사용자 정보 등 작은 전역 상태만 관리한다. 서버 응답 데이터는 TanStack Query에서 관리한다. |
+| Client State | 별도 라이브러리 없음 | - | 로그인 사용자 정보와 WISH 목록은 TanStack Query 캐시(`useAuth`·`useWish`)로 관리하고, `App.tsx`가 공유 값(`SharedProps`)을 props로 전달한다. 전역 상태가 늘어나면 React Context나 Zustand 도입을 검토한다. |
+| Payment SDK | @tosspayments/tosspayments-sdk | 2.x | 토스페이먼츠 결제창을 띄워 결제 인증 결과(`paymentKey`)를 받는다. 승인은 서버가 처리한다(4.4절). |
+| API Type | openapi-typescript | 7.x | 백엔드 OpenAPI 스냅샷(`Frontend/openapi`)에서 요청·응답 타입을 생성한다. |
+| Code Quality | ESLint · Prettier · husky · lint-staged | 10.x · 3.x · 9.x · 17.x | 커밋 전에는 변경 파일을 Prettier로 정리하고(husky·lint-staged), CI에서 ESLint·Prettier 검사를 실행한다. |
 | Unit Test | Vitest | 4.x | Vite 설정을 그대로 쓰는 단위 테스트로 옵션 조합·검증 함수 같은 순수 로직을 검사한다. |
 | E2E·Visual Test | Playwright | 1.63.x | 핵심 사용자 흐름과 PC·모바일 화면 기준 스크린샷을 검사한다. 기준 이미지는 CI와 같은 Playwright Docker 이미지에서 생성·비교한다. |
 
@@ -161,9 +164,9 @@ GR-213에서 메모리 저장소를 Caffeine으로 교체했다. 직접 만든 �
 - `Backend/compose.yaml`: 백엔드, PostgreSQL, Redis, Mailpit, Prometheus, Grafana, Loki, Alloy 컨테이너 정의. Mailpit은 로컬 개발용 SMTP 서버이며 운영 발송 대상이 아니다(4.3절).
 - `.github/workflows/backend-ci.yml`: `main` 또는 `deploy` 대상 PR과 두 브랜치의 푸시에서 PostgreSQL 기반 테스트와 Docker 이미지 빌드 검증
 - `.github/workflows/frontend-ci.yml`: `main` 또는 `deploy` 대상 PR과 두 브랜치의 푸시에서 Frontend lint·Vitest·build와 Playwright E2E·시각 비교 검증. 실패 시 리포트·trace를 산출물로 보관
-- `.github/workflows/publish-backend.yml`: Backend 이미지를 빌드해 GHCR에 `latest`, 커밋 SHA 태그로 게시. 운영 기준은 `deploy` 푸시지만 현재 트리거는 `main`이므로 변경이 필요하다.
+- `.github/workflows/publish-backend.yml`: `deploy` 푸시(Backend 변경 시)에서 Backend 이미지를 빌드해 GHCR에 `latest`, 커밋 SHA 태그로 게시하고 EC2 배포를 실행한다(GR-122·123).
 
-Actuator와 Prometheus의 로컬 메트릭 수집 연결은 완료됐다. Redis 연결 설정과 Refresh Token 저장소(생성·해시·TTL·저장·조회·삭제)는 구현됐고, LOCAL 로그인 API가 Refresh Token을 저장하고 Access·Refresh Token을 HttpOnly 쿠키로 발급하며, 재발급 API가 Refresh Token Rotation(재사용 탐지 포함)으로 두 토큰을 교체한다. 로그아웃 API는 Refresh Token이 속한 세션(이미 교체된 토큰이면 사용됨 표식으로 찾은 세션)을 Redis에서 폐기하고 두 인증 쿠키를 만료시킨다. Access Token은 서버에 저장하지 않으므로 로그아웃 후에도 만료 시각까지 유효할 수 있다. 내 정보 조회 API는 회원 정보를 DB에서 읽고 `roles`는 요청 Access Token의 권한을 돌려주며, 정지·탈퇴 회원은 401로 거부한다. KAKAO·GOOGLE 소셜 로그인은 OpenID Connect로 구현됐다. 인가 요청은 로그인 왕복 동안만 서버 세션에 두고, 최초 인증은 Redis 가입 컨텍스트(15분)를 거쳐 닉네임 입력 후 회원을 만들며, 로그인 결과는 LOCAL과 같은 HttpOnly 인증 쿠키로 발급한다. 실제 제공자 왕복 확인은 남아 있다. Grafana·Loki·Alloy는 실행 틀만 마련된 상태다.
+Actuator와 Prometheus의 로컬 메트릭 수집 연결은 완료됐다. Redis 연결 설정과 Refresh Token 저장소(생성·해시·TTL·저장·조회·삭제)는 구현됐고, LOCAL 로그인 API가 Refresh Token을 저장하고 Access·Refresh Token을 HttpOnly 쿠키로 발급하며, 재발급 API가 Refresh Token Rotation(재사용 탐지 포함)으로 두 토큰을 교체한다. 로그아웃 API는 Refresh Token이 속한 세션(이미 교체된 토큰이면 사용됨 표식으로 찾은 세션)을 Redis에서 폐기하고 두 인증 쿠키를 만료시킨다. Access Token은 서버에 저장하지 않으므로 로그아웃 후에도 만료 시각까지 유효할 수 있다. 내 정보 조회 API는 회원 정보를 DB에서 읽고 `roles`는 요청 Access Token의 권한을 돌려주며, 정지·탈퇴 회원은 401로 거부한다. KAKAO·GOOGLE 소셜 로그인은 OpenID Connect로 구현됐다. 인가 요청은 로그인 왕복 동안만 서버 세션에 두고, 최초 인증은 Redis 가입 컨텍스트(15분)를 거쳐 닉네임 입력 후 회원을 만들며, 로그인 결과는 LOCAL과 같은 HttpOnly 인증 쿠키로 발급한다. 실제 제공자 왕복 확인은 남아 있다. Grafana는 Prometheus 데이터 소스와 부하테스트 대시보드(`monitoring/grafana/provisioning`)를 프로비저닝했다. Loki·Alloy는 컨테이너 정의만 있고, Alloy 설정 파일과 Grafana의 Loki 데이터 소스는 아직 없다.
 
 ### 4.2 목표 운영 구성
 
@@ -237,7 +240,7 @@ Mock 결제(`PAYMENT.md` 1.1절)는 토스페이먼츠 **테스트 환경**으�
 | EC2 자동 배포 | 완료 | GHCR 게시 후 CI가 SSH(forced command로 `deploy.sh`만 허용)로 EC2에 접속해 실행한다(GR-123). |
 | Health Check·Blue/Green | 완료 | `deploy.sh`가 Actuator Health 확인 후 Nginx upstream을 전환한다(GR-121). |
 
-현재 워크플로는 이미지 게시 파이프라인이며 운영 서버 자동 배포까지 수행하지 않는다. 단일 EC2 Blue/Green은 배포 중단 시간을 줄이는 전략일 뿐 EC2 자체 장애를 방지하는 고가용성 구성은 아니다.
+현재 워크플로는 이미지 게시와 운영 서버 배포(`deploy.sh` 실행)까지 수행한다. 단일 EC2 Blue/Green은 배포 중단 시간을 줄이는 전략일 뿐 EC2 자체 장애를 방지하는 고가용성 구성은 아니다.
 
 ### 5.2 브랜치 통합 흐름
 

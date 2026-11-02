@@ -39,7 +39,8 @@
 
 ## 주의
 
-- CI(`.github/workflows/backend-ci.yml`)는 `develop, main` 대상 푸시·PR에서 `Backend/**`가 변경됐을 때만 동작한다.
-  조건을 벗어나면 워크플로가 아예 실행되지 않으므로, 체크가 없는 것을 통과로 읽지 않는다.
-- 이미지 배포(`.github/workflows/publish-backend.yml`)는 `main` 푸시에서 동작한다.
+- Backend CI(`.github/workflows/backend-ci.yml`)는 `deploy, main` 대상 푸시·PR에서 항상 실행되지만, `Backend/**` 변경이 없으면 테스트·빌드 단계를 건너뛰고 성공으로 표시된다.
+  Frontend CI(`.github/workflows/frontend-ci.yml`)는 `Frontend/**` 변경이 있을 때만 실행된다.
+  성공 체크나 체크가 없는 것을 테스트 통과로 읽지 않는다.
+- 이미지 게시와 EC2 배포(`.github/workflows/publish-backend.yml`)는 `deploy` 푸시에서 `Backend/**`가 변경됐을 때 동작한다.
 

@@ -2,7 +2,7 @@
 
 > 상세 규칙과 요청·응답 예시는 아래 문서에서 확인합니다.
 
-실행 중인 백엔드의 OpenAPI 문서는 `/v3/api-docs`에서 전체를, `/v3/api-docs/{group}`에서 도메인별로 확인할 수 있습니다. 그룹은 `category`, `dashboard`, `drop`, `order`, `payment`, `user`, `wish`이며 컨트롤러 패키지를 기준으로 자동 구성됩니다. Swagger UI(`/swagger-ui/index.html`)에서도 그룹을 선택할 수 있습니다. 새 도메인을 만들면 `application.yml`의 `springdoc.group-configs`에 등록합니다. CSRF 토큰 발급(`auth` 패키지)은 `user` 그룹에 포함됩니다. Mock 배송 API를 활성화하면 `order` 그룹에 포함됩니다.
+실행 중인 백엔드의 OpenAPI 문서는 `/v3/api-docs`에서 전체를, `/v3/api-docs/{group}`에서 도메인별로 확인할 수 있습니다. 그룹은 `category`, `dashboard`, `demand`, `drop`, `order`, `payment`, `seller`, `user`, `wish`이며 컨트롤러 패키지를 기준으로 자동 구성됩니다. Swagger UI(`/swagger-ui/index.html`)에서도 그룹을 선택할 수 있습니다. 새 도메인을 만들면 `application.yml`의 `springdoc.group-configs`에 등록합니다. CSRF 토큰 발급(`auth` 패키지)은 `user` 그룹에 포함됩니다. Mock 배송 API를 활성화하면 `order` 그룹에 포함됩니다.
 
 ## 1. 문서 구성
 
@@ -48,11 +48,13 @@
 
 | Method | Endpoint | 인증 | 용도 |
 | --- | --- | --- | --- |
+| POST | `/api/v1/seller-documents` | USER | 판매자 신청 서류 업로드 |
 | POST | `/api/v1/seller-applications` | USER | 일반 회원이 판매자 등록 신청 |
 | GET | `/api/v1/seller-applications/me` | USER | 본인의 판매자 신청 상태 조회 |
 | GET | `/api/v1/admin/seller-applications` | ADMIN | 판매자 신청 목록을 상태별로 조회 |
 | POST | `/api/v1/admin/seller-applications/{applicationId}/approve` | ADMIN | 판매자 신청 승인 및 SELLER 기능 활성화 |
 | POST | `/api/v1/admin/seller-applications/{applicationId}/reject` | ADMIN | 판매자 신청 반려 및 사유 기록 |
+| GET | `/api/v1/admin/seller-applications/{applicationId}/documents/{documentType}/view` | ADMIN | 판매자 신청 서류 열람 (전용 뷰어) |
 
 ### 2.3 공개 DROP 탐색
 
@@ -173,7 +175,7 @@
 | POST | `/api/v1/seller/similar-sales` | SELLER | 생성 단계 비슷한 DROP 실적 (저장하지 않음) |
 | GET | `/api/v1/seller/drops/{dropId}/similar-sales` | SELLER | WISH 단계 비슷한 DROP 실적 |
 
-> 계산은 서버가 하고 LLM은 계산 결과의 설명만 만듭니다. 분석과 추천은 참고용이며 재고·가격·판매 상태를 바꾸지 않습니다. 판매 계획 저장·결정 API는 GR-175에서 제거했습니다. 다른 판매자의 판매 데이터는 익명 집계값으로만 사용합니다. 구현 시 OpenAPI `demand` 그룹을 추가합니다.
+> 계산은 서버가 하고 LLM은 계산 결과의 설명만 만듭니다. 분석과 추천은 참고용이며 재고·가격·판매 상태를 바꾸지 않습니다. 판매 계획 저장·결정 API는 GR-175에서 제거했습니다. 다른 판매자의 판매 데이터는 익명 집계값으로만 사용합니다. OpenAPI `demand` 그룹에서 확인할 수 있습니다.
 
 ---
 
@@ -182,16 +184,18 @@
 | 영역 | API 수 | 주요 용도 |
 | --- | --- | --- |
 | 회원 및 인증 | 16 | 가입, 로그인, 소셜 로그인, 토큰, 회원 정보 및 프로필 이미지 관리 |
-| 판매자 등록 | 5 | 판매자 신청, 승인, 반려 |
+| 판매자 등록 | 7 | 서류 업로드, 판매자 신청, 승인, 반려, 서류 열람 |
 | 공개 DROP 탐색 | 6 | 카테고리, 목록, 상세, 재고 조회·변경 구독, 관련 DROP 추천 |
 | 판매자 DROP 관리 | 9 | 생성, 수정, 공개, 취소, 통계, 사진 기반 AI 초안 |
 | WISH | 3 | 등록, 취소, 내 목록 |
 | 주문 | 4 | 주문 생성, 조회, 취소 |
-| 결제 | 3 | 토스페이먼츠 테스트 결제 승인, 웹훅 수신, 이력 조회 |
+| 결제 | 3 | 토스페이먼츠 테스트 결제 승인, 이력 조회, 웹훅 수신(후속 구현) |
 | 배송 | 7 | 판매자 주문 조회 및 배송 상태 관리 |
 | 대시보드 | 3 | 판매자 운영 통계 |
 | 이미지 | 1 | 상품 이미지 업로드 |
 | 수요 분석 | 7 | 수요 분석·재계산·설명, 생성 단계 재고 추천·근거 설명, 비슷한 DROP 실적 |
-| **합계** | **64** | |
+| **합계** | **66** | |
+
+> 합계에는 아직 구현하지 않은 토스페이먼츠 웹훅 1건과, 컨트롤러가 아닌 Spring Security 필터가 처리하는 소셜 로그인 콜백 1건이 포함됩니다.
 
 ---
