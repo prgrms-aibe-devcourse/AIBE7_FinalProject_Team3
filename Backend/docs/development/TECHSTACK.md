@@ -20,7 +20,7 @@
 | Scheduling | Spring `@Scheduled` + PostgreSQL 인덱스 폴링 | Boot 관리 | DROP 상태(WISH→GRAB→ENDED) 자동 전환, 결제 배치(진행 중 결제 정리·결제 대기 만료·결제 취소 재요청·보정 환불), 배송 단계 Mock 진행. 별도 스케줄러 인프라 없이 기존 DB·인덱스만 사용한다(1.1절, 1.2절). 스케줄러 스레드는 4개(`spring.task.scheduling.pool.size`)로 두어 작업끼리 서로를 기다리지 않게 한다. 기본값 1이면 결제 배치의 PG 지연이 DROP 판매 시작 전환까지 늦춘다. |
 | Cache | Caffeine | Boot 관리(3.2.x) | 인증 요청마다 하는 회원 ID 변환(public_id → `users.id`)을 인스턴스 메모리에 둔다(GR-211). GR-201 측정에서 이 변환이 요청당 DB 왕복의 절반을 차지해 운영 DB 왕복(약 3ms)에서 커넥션 풀 병목이 됐다. 대응이 바뀌지 않아 무효화가 필요 없고, 최대 항목 수로만 메모리를 제한한다. 원장은 PostgreSQL이며 캐시가 비어도 DB 조회로 다시 채운다. |
 | AI | Spring AI + Google GenAI(Gemini) | 2.0.x | 팀 합의로 도입(GR-146). WISH 단계 수요 분석 결과의 설명과 상품 사진 기반 DROP 초안(상품명·설명·카테고리·대체 설명, DROP.md 2.8)을 구조화 JSON으로 생성한다. 계산에는 쓰지 않는다. 모델명은 설정값이며 평가셋으로 비교해 정한다(1.3절, GR-146). |
-| AI Embedding | Spring AI + Google GenAI Embedding | 2.0.x | 팀 합의, GR-147에서 활성화. 유사 상품 표본 선택용 DROP 임베딩을 생성한다(1.3절, GR-147). |
+| AI Embedding | Spring AI + Google GenAI Embedding | 2.0.x | 팀 합의, GR-147에서 활성화. DROP 임베딩을 생성해 관련 DROP 추천(DROP-011)과 비슷한 DROP 실적(DEMAND-013)에 쓴다. 수요 분석 전환율 표본의 유사도 선택(DEMAND-009)은 후속 구현이다(1.3절). |
 
 ### 1.1 DROP 상태 자동 전환 선정 이유 (GR-18)
 
@@ -104,7 +104,7 @@
 | **임베딩 유사도 + SQL 집계 (GR-147)** | 내용이 비슷한 상품으로 표본을 골라 예측 오차를 줄일 수 있음 | pgvector·임베딩 API 의존, 테스트 DB 이미지 교체 필요 |
 | LLM이 표본을 직접 판단(RAG로 판매 수치 검색) | 구현이 짧음 | 정형 수치의 집계·계산을 LLM에 맡기게 되고 결과를 재현·검증할 수 없음 |
 
-표본 선택은 교체 가능한 구성 요소로 두고, 유사 상품 기준은 임베딩이 없거나 신뢰도가 `NONE`이면 카테고리 기준으로 대체한다. 두 기준의 예측 오차는 같은 평가 데이터로 비교해 기록한다.
+표본 선택은 교체 가능한 구성 요소로 두고, 유사 상품 기준은 임베딩이 없거나 신뢰도가 `NONE`이면 카테고리 기준으로 대체한다. 두 기준의 예측 오차는 같은 평가 데이터로 비교해 기록한다. 현재 전환율 표본은 카테고리 기준만 구현했고, 유사도 기준 선택과 오차 비교는 후속이다(DEMAND-009).
 
 선택 근거:
 
@@ -128,7 +128,7 @@
 | RDBMS | PostgreSQL | MVP | 회원·DROP·주문·재고·결제 데이터를 저장하는 영속 원장이다. 트랜잭션, 행 잠금, 인덱스 및 향후 pgvector 확장이 가능하다. |
 | In-memory Store | Redis | MVP | Refresh Token 해시와 이메일 인증 코드·LOCAL/소셜 가입 컨텍스트 해시를 TTL과 함께 저장한다. 주문과 재고의 최종 원장으로 사용하지 않는다. 공개 DROP 상세·재고 응답 캐시(GR-183)는 운영 Redis 왕복이 DB 조회보다 느려 앱 메모리를 기본 저장소로 쓴다. |
 | Migration | Flyway | MVP | ERD 변경 이력을 SQL 마이그레이션으로 관리하고 환경별 스키마를 일치시킨다. |
-| Vector Search | pgvector | GR-147 | 유사 상품 표본 선택용 DROP 임베딩을 PostgreSQL에 저장하고 HNSW 인덱스로 검색한다. 별도 벡터 DB 없이 기존 원장과 같은 트랜잭션·백업 범위에 둔다. |
+| Vector Search | pgvector | GR-147 | 관련 DROP 추천·비슷한 DROP 실적 검색용 DROP 임베딩을 PostgreSQL에 저장하고 HNSW 인덱스로 검색한다. 별도 벡터 DB 없이 기존 원장과 같은 트랜잭션·백업 범위에 둔다. |
 
 재고 정합성은 PostgreSQL 트랜잭션과 행 잠금으로 먼저 보장한다. Redis는 MVP에서 Refresh Token과 이메일 인증 임시 데이터(인증 코드, 가입 컨텍스트, 발송 제한 횟수) 저장에만 사용한다. 조회 캐시는 부하 테스트로 병목이 확인된 경로에만 도입한다. GR-183에서 SSE 알림마다 다시 불리는 공개 DROP 상세·재고 응답에 짧은 TTL(5초) 캐시를 도입했다. 저장소는 `grab.drop-cache.store`(memory | redis | none)로 고르며 기본값은 인스턴스 메모리다. 재고·판매·상태 변경은 커밋 후 이벤트로 바로 지운다. 캐시는 화면 조회 응답에만 쓰고 재고 차감·주문 판단은 계속 PostgreSQL 행 잠금으로 한다. 캐시를 비워도 DB 조회로 다시 만들어진다. 목록 응답 캐시는 필터 조합이 많아 보류한다. 관련 DROP 추천(GR-195)은 같은 저장소에 변경 이벤트 없이 3분 TTL로 둔다(사용자와 무관하고 몇 분 늦어도 되는 결과). 인증 요청의 회원 ID 변환(public_id → `users.id`)은 GR-211에서 Caffeine 인스턴스 메모리 캐시로 둔다. 대응이 바뀌지 않아 TTL·무효화 없이 최대 항목 수(`grab.user-id-cache.max-size`)로만 제한한다. 운영 Redis 왕복이 DB보다 느려(GR-183) Redis에 두지 않는다.
 

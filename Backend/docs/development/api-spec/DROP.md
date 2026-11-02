@@ -73,7 +73,7 @@ GET /api/v1/drops
       }
     ],
     "page": 0,
-    "size": 20,
+    "size": 10,
     "totalElements": 1,
     "totalPages": 1,
     "hasNext": false
