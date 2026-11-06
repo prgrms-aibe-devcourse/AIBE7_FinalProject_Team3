@@ -76,12 +76,12 @@ WHERE d.name LIKE 'k6 판매자대시보드 상품 %';
 
 WITH new_orders AS (
     INSERT INTO orders (
-        order_number, buyer_id, drop_id, idempotency_key, request_hash, status,
+        order_number, buyer_id, drop_id, seller_id, idempotency_key, request_hash, status,
         product_name_snapshot, seller_name_snapshot, items_amount, shipping_amount,
         total_amount, recipient_name, recipient_phone, postal_code, address_line1,
         payment_expires_at, paid_at
     )
-    SELECT 'GR173-' || d.id || '-' || gs, b.id, d.id,
+    SELECT 'GR173-' || d.id || '-' || gs, b.id, d.id, d.seller_id,
            'idem-GR173-' || d.id || '-' || gs,
            substr(md5('GR173-' || d.id || '-' || gs) || md5('GR173b-' || d.id || '-' || gs), 1, 64),
            'PAID', 'k6 판매자대시보드 상품', 'k6 대시보드 전용 브랜드', 10000, 0, 10000,

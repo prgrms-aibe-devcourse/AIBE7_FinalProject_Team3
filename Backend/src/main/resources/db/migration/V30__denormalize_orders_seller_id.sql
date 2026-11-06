@@ -12,7 +12,11 @@ SET seller_id = d.seller_id
 FROM drops d
 WHERE d.id = o.drop_id;
 
-ALTER TABLE orders ALTER COLUMN seller_id SET NOT NULL;
-
+-- NOT NULL을 걸지 않는다: 블루/그린 배포(deploy.sh) 중에는 신규 컨테이너가 이 마이그레이션을
+-- 끝내고 헬스체크를 통과하기 전까지(최대 수십 초) 구버전 컨테이너가 여전히 라이브 트래픽을
+-- 받는다. 그 구간에 NOT NULL까지 걸리면 구버전 코드(seller_id를 모르는 Order 엔티티)가
+-- INSERT INTO orders를 할 때마다 실패한다. 애플리케이션(Order 엔티티, OrderCreateTransactionService)이
+-- 항상 값을 채워 넣으므로 실질적으로는 비어있지 않지만, 배포 전환 구간의 안전을 위해 DB
+-- 제약으로는 강제하지 않는다.
 CREATE INDEX idx_orders_seller_created
     ON orders (seller_id, created_at, id);

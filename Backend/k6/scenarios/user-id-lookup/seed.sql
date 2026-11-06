@@ -106,12 +106,12 @@ SELECT id, 10000, 1000, 10, TRUE, 0 FROM drop_row;
 -- payment_expires_at은 created_at보다 뒤여야 한다(ck_orders_payment_expiry).
 WITH new_orders AS (
     INSERT INTO orders (
-        order_number, buyer_id, drop_id, idempotency_key, request_hash, status,
+        order_number, buyer_id, drop_id, seller_id, idempotency_key, request_hash, status,
         product_name_snapshot, seller_name_snapshot, items_amount, shipping_amount,
         total_amount, recipient_name, recipient_phone, postal_code, address_line1,
         payment_expires_at, paid_at, created_at, updated_at
     )
-    SELECT 'GR201-' || d.id || '-' || gs, b.id, d.id,
+    SELECT 'GR201-' || d.id || '-' || gs, b.id, d.id, d.seller_id,
            'idem-GR201-' || d.id || '-' || gs,
            substr(md5('GR201-' || d.id || '-' || gs) || md5('GR201b-' || d.id || '-' || gs), 1, 64),
            'PAID', 'k6 ID변환측정 상품', 'k6 ID변환측정 전용 브랜드', 10000, 0, 10000,

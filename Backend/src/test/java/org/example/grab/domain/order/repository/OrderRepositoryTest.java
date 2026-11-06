@@ -219,6 +219,37 @@ class OrderRepositoryTest {
                 """, UUID.class, "GR-TEST-PENDING-" + uniqueValue, sellerUserId, sellerDropId, sellerId,
                 "key-pending-" + uniqueValue);
 
+        // 다른 판매자의 주문. o.seller_id로 직접 거르는 쿼리(GR-214)가 drops 조인 없이도
+        // 판매자 간 데이터를 섞지 않는지 확인하는 용도다.
+        String otherUniqueValue = UUID.randomUUID().toString();
+        String otherSellerEmail = "other-seller-" + otherUniqueValue + "@example.com";
+        long otherSellerUserId = jdbcTemplate.queryForObject("""
+                INSERT INTO users (email, password_hash, nickname)
+                VALUES (?, 'encoded-password', '다른 판매자')
+                RETURNING id
+                """, Long.class, otherSellerEmail);
+        long otherSellerId = jdbcTemplate.queryForObject("""
+                INSERT INTO sellers (user_id, brand_name, contact_email, status, reviewed_by, reviewed_at)
+                VALUES (?, '다른 판매자 브랜드', ?, 'APPROVED', ?, CURRENT_TIMESTAMP)
+                RETURNING id
+                """, Long.class, otherSellerUserId, otherSellerEmail, otherSellerUserId);
+        long otherSellerDropId = jdbcTemplate.queryForObject("""
+                INSERT INTO drops (seller_id) VALUES (?) RETURNING id
+                """, Long.class, otherSellerId);
+        jdbcTemplate.update("""
+                INSERT INTO orders (
+                    order_number, buyer_id, drop_id, seller_id, idempotency_key, request_hash, status,
+                    product_name_snapshot, seller_name_snapshot, items_amount, shipping_amount,
+                    total_amount, recipient_name, recipient_phone, postal_code, address_line1,
+                    payment_expires_at, paid_at
+                ) VALUES (
+                    ?, ?, ?, ?, ?, 'hash', 'PAID', '다른 판매자 상품', '다른 판매자 브랜드', 1000, 2500, 3500,
+                    '구매자', '01000000004', '00000', '테스트 주소',
+                    CURRENT_TIMESTAMP + INTERVAL '10 minutes', CURRENT_TIMESTAMP
+                )
+                """, "GR-TEST-OTHER-" + otherUniqueValue, otherSellerUserId, otherSellerDropId, otherSellerId,
+                "key-other-" + otherUniqueValue);
+
         // when
         Page<SellerOrderListProjection> filtered = orderRepository.findSellerOrders(
                 sellerId, sellerDropId, "PAID", "SUCCEEDED", PageRequest.of(0, 10));
@@ -226,8 +257,15 @@ class OrderRepositoryTest {
         // 확인할 수 있다(GR-194: paymentStatus 없을 때 LATERAL을 건너뛰어도 전체 건수는 정확해야 한다).
         Page<SellerOrderListProjection> unfiltered = orderRepository.findSellerOrders(
                 sellerId, null, null, null, PageRequest.of(0, 1));
+        Page<SellerOrderListProjection> otherSellerOrders = orderRepository.findSellerOrders(
+                otherSellerId, null, null, null, PageRequest.of(0, 10));
 
         // then
+        // 다른 판매자 주문을 추가한 뒤에도 이 판매자의 전체 건수(2)는 그대로다 — 섞이지 않았다.
+        assertThat(unfiltered.getTotalElements()).isEqualTo(2);
+        assertThat(otherSellerOrders.getTotalElements()).isEqualTo(1);
+        assertThat(otherSellerOrders.getContent()).singleElement()
+                .extracting(SellerOrderListProjection::getDropId).isEqualTo(otherSellerDropId);
         assertThat(filtered.getTotalElements()).isEqualTo(1);
         assertThat(filtered.getContent()).singleElement().satisfies(order -> {
             assertThat(order.getOrderId()).isEqualTo(orderId);
@@ -239,8 +277,6 @@ class OrderRepositoryTest {
             // 네이티브 쿼리 프로젝션이 Instant 변환에 실패하지 않는지 확인한다(회귀 방지)
             assertThat(order.getOrderedAt()).isNotNull();
         });
-        // countQuery는 paymentStatus 필터가 없어 LATERAL을 건너뛰지만, 전체 건수(2)는 정확해야 한다.
-        assertThat(unfiltered.getTotalElements()).isEqualTo(2);
         // created_at DESC 정렬이라 페이지 크기(1)에는 더 나중에 만든 결제 전 주문만 담긴다.
         assertThat(unfiltered.getContent()).singleElement()
                 .extracting(SellerOrderListProjection::getPaymentStatus).isNull();

@@ -220,12 +220,13 @@ FROM drop_options o
 WHERE o.drop_id = ko.drop_id AND o.sort_order = ko.option_sort AND NOT o.is_active;
 
 INSERT INTO orders (
-    order_number, buyer_id, drop_id, idempotency_key, request_hash, status,
+    order_number, buyer_id, drop_id, seller_id, idempotency_key, request_hash, status,
     product_name_snapshot, seller_name_snapshot, items_amount, shipping_amount, total_amount,
     recipient_name, recipient_phone, postal_code, address_line1,
     payment_expires_at, paid_at, canceled_at, expired_at, cancel_reason, created_at, updated_at
 )
 SELECT 'K6S-' || ko.n || '-' || ko.j, u.id, ko.drop_id,
+       (SELECT seller_id FROM drops WHERE id = ko.drop_id),
        'k6-scale-' || ko.n || '-' || ko.j, md5(ko.n || '-' || ko.j),
        CASE WHEN ko.r < 0.5 THEN 'PAID' WHEN ko.r < 0.7 THEN 'DELIVERED'
             WHEN ko.r < 0.8 THEN 'CANCELED' ELSE 'EXPIRED' END,

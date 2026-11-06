@@ -36,6 +36,9 @@ import static org.mockito.Mockito.verify;
 class OrderCreateTransactionServiceTest {
 
     private static final ProjectionFactory PROJECTION_FACTORY = new SpelAwareProxyProjectionFactory();
+    // buyerId(1L)와 겹치지 않는 값으로 둬서, 주문의 sellerId가 buyerId가 아니라 drop.getSellerId()에서
+    // 왔는지(GR-214) 구분해서 검증할 수 있게 한다.
+    private static final long DROP_SELLER_ID = 777L;
 
     private OrderInventoryRepository inventoryRepository;
     private OrderRepository orderRepository;
@@ -86,6 +89,7 @@ class OrderCreateTransactionServiceTest {
         assertThat(order.getItemsAmount()).isEqualTo(258000);
         assertThat(order.getShippingAmount()).isEqualTo(3000);
         assertThat(order.getTotalAmount()).isEqualTo(261000);
+        assertThat(order.getSellerId()).isEqualTo(DROP_SELLER_ID);
         verify(inventoryRepository).tryReserveOption(100L, 1001L, 2);
         verify(orderItemRepository).saveAllAndFlush(any());
         verify(stockReservationRepository).saveAll(any());
@@ -216,7 +220,7 @@ class OrderCreateTransactionServiceTest {
     ) {
         return PROJECTION_FACTORY.createProjection(DropSnapshot.class, Map.of(
                 "id", id,
-                "sellerId", 1L,
+                "sellerId", DROP_SELLER_ID,
                 "status", status,
                 "productName", productName,
                 "sellerName", sellerName,

@@ -27,19 +27,19 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
     sql=$(cat <<SQL
 WITH new_orders AS (
     INSERT INTO orders (
-        order_number, buyer_id, drop_id, idempotency_key, request_hash, status,
+        order_number, buyer_id, drop_id, seller_id, idempotency_key, request_hash, status,
         product_name_snapshot, seller_name_snapshot, items_amount, shipping_amount,
         total_amount, recipient_name, recipient_phone, postal_code, address_line1,
         payment_expires_at, paid_at
     )
-    SELECT 'GR172-FEED-${RUN_ID}-${tick}-' || gs, b.id, d.id, 'idem-GR172-feed-${RUN_ID}-${tick}-' || gs,
+    SELECT 'GR172-FEED-${RUN_ID}-${tick}-' || gs, b.id, d.id, d.seller_id, 'idem-GR172-feed-${RUN_ID}-${tick}-' || gs,
            substr(md5('GR172-feed-${RUN_ID}-${tick}-' || gs) || md5(random()::text), 1, 64), 'SHIPPED',
            'k6 배송배치 롱런 상품', 'GRAB 판매자', 10000, 0, 10000,
            'k6 테스터', '01099990000', '06236', '서울시 강남구 테스트로 1',
            now() + interval '15 minutes', now() - interval '1 minute'
     FROM generate_series(1, ${BATCH_SIZE}) gs,
          (SELECT id FROM users WHERE email = 'k6-buyer@loadtest.local') b,
-         (SELECT id FROM drops WHERE name = 'k6 배송배치 롱런 상품') d
+         (SELECT id, seller_id FROM drops WHERE name = 'k6 배송배치 롱런 상품') d
     RETURNING id
 )
 INSERT INTO shipments (
