@@ -216,6 +216,7 @@ class OrderCreateTransactionServiceTest {
     ) {
         return PROJECTION_FACTORY.createProjection(DropSnapshot.class, Map.of(
                 "id", id,
+                "sellerId", 1L,
                 "status", status,
                 "productName", productName,
                 "sellerName", sellerName,

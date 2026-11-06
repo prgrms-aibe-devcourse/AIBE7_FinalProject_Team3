@@ -469,7 +469,7 @@ class SellerOrderServiceTest {
 
     private Order createOrder() {
         return Order.create(
-                "GR-DETAIL-1", 8L, 42L, "idem-detail", "a".repeat(64), "한정 상품", "판매자",
+                "GR-DETAIL-1", 8L, 42L, SELLER_ID, "idem-detail", "a".repeat(64), "한정 상품", "판매자",
                 30000, 3000,
                 ShippingAddress.of("받는 사람", "01000000000", "00000", "주소", null, null),
                 OffsetDateTime.now().plusMinutes(15));

@@ -50,6 +50,11 @@ public class Order extends UUIDEntity {
     @Column(name = "drop_id", nullable = false)
     private Long dropId;
 
+    // GR-214: 판매자 주문 목록 조회(dropId 미지정)가 drops 조인 없이 바로 인덱스를 타게 하는 비정규화 컬럼.
+    // 정합성의 근원은 drops.seller_id이고 이 컬럼은 조회 성능용 캐시라 FK를 걸지 않는다.
+    @Column(name = "seller_id", nullable = false)
+    private Long sellerId;
+
     @Column(name = "idempotency_key", nullable = false, length = 100)
     private String idempotencyKey;
 
@@ -104,6 +109,7 @@ public class Order extends UUIDEntity {
             String orderNumber,
             Long buyerId,
             Long dropId,
+            Long sellerId,
             String idempotencyKey,
             String requestHash,
             String productNameSnapshot,
@@ -119,6 +125,7 @@ public class Order extends UUIDEntity {
         this.orderNumber = Objects.requireNonNull(orderNumber);
         this.buyerId = Objects.requireNonNull(buyerId);
         this.dropId = Objects.requireNonNull(dropId);
+        this.sellerId = Objects.requireNonNull(sellerId);
         this.idempotencyKey = Objects.requireNonNull(idempotencyKey);
         this.requestHash = Objects.requireNonNull(requestHash);
         this.status = OrderStatus.PAYMENT_PENDING;
@@ -135,6 +142,7 @@ public class Order extends UUIDEntity {
             String orderNumber,
             Long buyerId,
             Long dropId,
+            Long sellerId,
             String idempotencyKey,
             String requestHash,
             String productNameSnapshot,
@@ -148,6 +156,7 @@ public class Order extends UUIDEntity {
                 orderNumber,
                 buyerId,
                 dropId,
+                sellerId,
                 idempotencyKey,
                 requestHash,
                 productNameSnapshot,

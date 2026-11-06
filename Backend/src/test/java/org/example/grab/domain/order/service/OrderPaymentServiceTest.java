@@ -67,6 +67,7 @@ class OrderPaymentServiceTest {
 
     private Long buyerId;
     private Long dropId;
+    private Long sellerId;
     private Long firstOptionId;
     private Long secondOptionId;
     private OffsetDateTime expiresAt;
@@ -78,7 +79,7 @@ class OrderPaymentServiceTest {
         buyerId = jdbcTemplate.queryForObject(
                 "INSERT INTO users (email, password_hash, nickname) VALUES (?, 'encoded', ?) RETURNING id",
                 Long.class, uniqueValue + "@example.com", "o" + uniqueValue.substring(0, 8));
-        Long sellerId = jdbcTemplate.queryForObject(
+        sellerId = jdbcTemplate.queryForObject(
                 "INSERT INTO sellers (user_id, brand_name, contact_email) VALUES (?, 'GRAB 판매자', ?) RETURNING id",
                 Long.class, buyerId, "seller-" + uniqueValue + "@example.com");
         dropId = jdbcTemplate.queryForObject(
@@ -89,7 +90,7 @@ class OrderPaymentServiceTest {
 
         expiresAt = OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(15).truncatedTo(ChronoUnit.MICROS);
         order = orderRepository.saveAndFlush(Order.create(
-                "ORD-PAY-" + uniqueValue, buyerId, dropId, "order-key-" + uniqueValue, "a".repeat(64),
+                "ORD-PAY-" + uniqueValue, buyerId, dropId, sellerId, "order-key-" + uniqueValue, "a".repeat(64),
                 "한정판 후드", "GRAB 판매자", 45000, 3000,
                 ShippingAddress.of("홍길동", "010-1234-5678", "06236", "서울시 강남구", "101호", null),
                 expiresAt));
@@ -351,7 +352,7 @@ class OrderPaymentServiceTest {
     private Long insertOrderExpiringAt(OffsetDateTime paymentExpiresAt) {
         String uniqueValue = UUID.randomUUID().toString();
         Order saved = orderRepository.saveAndFlush(Order.create(
-                "ORD-EXP-" + uniqueValue, buyerId, dropId, "order-key-" + uniqueValue, "a".repeat(64),
+                "ORD-EXP-" + uniqueValue, buyerId, dropId, sellerId, "order-key-" + uniqueValue, "a".repeat(64),
                 "한정판 후드", "GRAB 판매자", 45000, 3000,
                 ShippingAddress.of("홍길동", "010-1234-5678", "06236", "서울시 강남구", "101호", null),
                 expiresAt));

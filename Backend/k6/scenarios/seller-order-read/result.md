@@ -97,3 +97,81 @@ DB 실행시간만이다. 운영 Supabase psql 실측 RTT(`SELECT 1` 기준 3.2~
   = **약 59.1ms**
 - API 기준 개선폭은 **약 13.7배**다. "본문 쿼리만 390배"는 countQuery 병목을 가리는
   과장된 비교였고, 실제 체감 개선은 이 13.7배가 맞다.
+
+**이 59.1ms 추정은 틀렸다 — `dropId`를 리터럴로 넘긴 EXPLAIN만 쟀고, k6로 실제 HTTP
+p95를 재측정한 적이 없었다.** 아래 GR-214 절 참고.
+
+## 2026-11-06 측정: GR-214 — `dropId` 미지정(판매자 전체 조회) 경로는 전혀 다른 쿼리였다
+
+GR-191/GR-194가 "13.7배 개선"이라고 결론낸 측정은 전부 `WHERE drop_id = <리터럴>`
+조건의 EXPLAIN이었다. 그런데 `list_read`가 실제로 호출하는
+`/api/v1/seller/orders?page=&size=`(이 시나리오 코드 자체가 처음부터 `dropId`를
+넘기지 않는다)는 `orders`에 `seller_id`가 없어 `JOIN drops d ON d.id=o.drop_id
+AND d.seller_id=:sellerId`를 거쳐야 했고, 그 순간 `idx_orders_drop_created`의
+"Index Scan Backward + LIMIT" 효과가 사라져 판매자의 주문 전체(15만건)를 스캔하며
+LATERAL을 15만 번 실행했다(EXPLAIN 기준 414.7ms, 본문 쿼리만).
+
+k6로 실측(수정 전, 15만건, `ENABLE_BURST=false`, list VU10 + detail VU10, 60s):
+**`list_read` p95 1.1~1.3s** — GR-191이 추정한 59.1ms와 무관했고, 인덱스 적용 전
+추정치(810.9ms)보다도 나빴다.
+
+**수정(GR-214)**: `orders`에 `seller_id` 컬럼을 비정규화로 추가(V30 마이그레이션,
+`drops.seller_id`로 백필, FK 없음) + `idx_orders_seller_created(seller_id,
+created_at, id)` 인덱스. `findSellerOrders`를 `JOIN drops` 대신
+`WHERE o.seller_id=:sellerId`로 변경해 `dropId` 유무와 무관하게 항상 이 인덱스를
+타게 했다.
+
+**DB 쿼리 단(EXPLAIN ANALYZE, 15만건, seller_id=3)**:
+- 본문 쿼리: `Index Only Scan Backward using idx_orders_seller_created` + LIMIT 20,
+  **0.159ms**(LATERAL도 20행에만 실행)
+- countQuery: 여전히 `seller_id` 전체(15만건)를 스캔해 COUNT(*)해야 해서
+  **41.5~49.9ms**(캐시 warm/cold 큰 차이 없음) — 이건 페이지네이션 총 건수 집계의
+  본질적 비용이라 GR-214 범위에서 더 줄이지 않았다.
+
+**k6 HTTP 레이어(수정 후, 15만건, 조건 동일)**:
+- `list_read`: avg 456.38ms, med 379.32ms, p90 787.9ms, **p95 832.27ms**
+- `detail_read`: avg 8.61ms, p95 15.12ms(영향 없음)
+- 수정 전 대비 **약 35~40% 개선**(1.1~1.3s → 832ms)이지만, DB 쿼리 단 합계(0.16ms +
+  50ms ≈ 50ms)보다 훨씬 크다 — 커넥션 획득·트랜잭션 경계·직렬화 등 애플리케이션
+  오버헤드가 섞여 있는데, VU1 순차 호출(동시성 없음)에서도 바닥값이 ~208ms로
+  일정해 동시성 경합은 아니다. 같은 코드로 1000건 규모를 재보면 이 바닥값이
+  사라진다(`list_read` p95 17.65ms, VU20) — 그래서 150,000건 규모의 판매자에게만
+  나타나는, `seller_id` COUNT(*) 전체 스캔 비용과 연동된 현상으로 보였다.
+
+### 832ms 중 서버는 76ms만 쓴다 — 나머지는 로컬 측정 환경의 아티팩트였다
+
+위 832ms가 서버/DB 문제인지 측정 환경 문제인지 가리려고, `LOGGING_LEVEL_ORG_HIBERNATE_SQL=DEBUG`·
+`LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB=DEBUG`·`LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY=DEBUG`로
+띄운 디버그용 backend 컨테이너에 같은 VU10(list)+VU10(detail) 부하를 걸고, 애플리케이션 로그에서
+`listOrders`로 매핑된 시각부터 응답을 쓰기 시작한 시각까지(= 보안 필터 통과 이후 핸들러
+실행 전체, DB 쿼리 포함)를 직접 계산했다(204건 샘플):
+
+- **p50 41ms, p90 58ms, p95 76ms, max 151ms**
+
+이건 EXPLAIN으로 추정한 "본문 0.16ms + count 41.5~49.9ms"와 정확히 들어맞는다. 즉 **서버가
+실제로 쓰는 시간은 10개 동시 요청 상태에서도 p95 76ms로 이미 빠르다.** k6가 측정한
+p95 832ms와 핸들러 p95 76ms 사이의 약 750ms 차이는 애플리케이션·DB 코드가 아니라
+**이 요청이 도달하기 전/떠난 후의 구간**(k6 ↔ 컨테이너 사이)에서 생긴다.
+
+이 측정 환경은 Windows + Docker Desktop이고, `-p 8080:8080` 포트포워딩은 WSL2를 거치는
+유저모드 프록시(vpnkit류)를 통한다. 이 프록시는 동시 연결 수가 적을 때는 문제없지만
+(health check 10~15ms, 공개 DROP 목록 30~50ms, 순차 측정에서 모두 정상) 10~20개 동시
+연결이 몰리면 지연·지터가 크게 튀는 것으로 알려진 한계가 있다. 서버 로그상 모든 요청이
+균일하게 빠른데 k6가 재는 왕복시간만 튀는 패턴이 이 프록시 병목과 일치한다. 이 포트포워딩
+계층은 로컬 Docker Desktop 전용이고 운영 EC2(Linux)에는 없으므로, 832ms는 운영 체감과
+무관한 이 로컬 측정 도구만의 잡음이다.
+
+## 결론 (최종)
+
+- **실제로 개선된 것(운영에도 그대로 적용됨)**: 쿼리 플랜 문제(O(n) 전체 스캔 + LATERAL
+  15만 번)를 확실히 해결했다 — DB 쿼리 414.7ms → **0.159ms**, 10개 동시 요청 상태의
+  서버 핸들러 처리시간 p95 **76ms**(max 151ms). 이게 GR-214의 신뢰할 수 있는 성과다.
+- **신뢰할 수 없던 숫자**: k6가 찍은 "1.1~1.3s → 832ms"는 위 서버 개선 효과 위에
+  로컬 Windows Docker Desktop 포트포워딩 프록시의 지연(~750ms)이 얹힌 값이다. 이
+  시나리오에서 k6 HTTP p95를 "운영 체감 개선폭"으로 쓰면 안 된다 — 서버 쪽 로그
+  기반 핸들러 시간(이번처럼 직접 찍거나, GR-191처럼 EXPLAIN+RTT로 환산)이 더 정확하다.
+- GR-191/GR-194가 "완료"로 표시했던 "13.7배(59.1ms)"는 `dropId` 리터럴 조회만 해당하는
+  수치였고, 실제 흔한 조회 경로(판매자 전체)는 GR-214 전까지 측정된 적도 고쳐진 적도
+  없었다는 게 이번 재측정의 핵심 교훈이다. 앞으로 이 종류의 "인덱스 추가" PR은 조회
+  조건(필터 유무)별로 실제 호출되는 쿼리 모양까지 맞춰 재측정해야 하고, k6 HTTP p95가
+  이상하게 크면 서버 쪽 핸들러 로그로 서버 문제인지 측정 환경 문제인지부터 가려야 한다.

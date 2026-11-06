@@ -116,6 +116,7 @@ class OrderPaymentStateTest {
                 "ORD-20260929-000001",
                 1L,
                 100L,
+                9L,
                 "550e8400-e29b-41d4-a716-446655440000",
                 "a".repeat(64),
                 "한정 상품",

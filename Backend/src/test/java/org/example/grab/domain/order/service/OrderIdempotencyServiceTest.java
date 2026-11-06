@@ -202,6 +202,7 @@ class OrderIdempotencyServiceTest {
                 "ORD-20260923-" + UUID.randomUUID().toString().replace("-", "").toUpperCase(),
                 buyerId,
                 dropId,
+                sellerId,
                 idempotencyKey.value(),
                 requestHash.value(),
                 "멱등 테스트 상품",

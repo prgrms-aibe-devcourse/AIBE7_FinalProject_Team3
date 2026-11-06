@@ -211,6 +211,7 @@ class OrderQueryServiceTest {
                 "ORD-20260928-000001",
                 BUYER_ID,
                 42L,
+                7L,
                 "550e8400-e29b-41d4-a716-446655440000",
                 "a".repeat(64),
                 "한정 상품",

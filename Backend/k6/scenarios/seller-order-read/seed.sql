@@ -75,12 +75,12 @@ SELECT id, 10000, 500000, TRUE, 0 FROM drop_row;
 
 WITH new_orders AS (
     INSERT INTO orders (
-        order_number, buyer_id, drop_id, idempotency_key, request_hash, status,
+        order_number, buyer_id, drop_id, seller_id, idempotency_key, request_hash, status,
         product_name_snapshot, seller_name_snapshot, items_amount, shipping_amount,
         total_amount, recipient_name, recipient_phone, postal_code, address_line1,
         payment_expires_at, paid_at
     )
-    SELECT 'GR174-' || d.id || '-' || gs, b.id, d.id,
+    SELECT 'GR174-' || d.id || '-' || gs, b.id, d.id, d.seller_id,
            'idem-GR174-' || d.id || '-' || gs,
            substr(md5('GR174-' || d.id || '-' || gs) || md5('GR174b-' || d.id || '-' || gs), 1, 64),
            'PAID', 'k6 판매자주문조회 상품', 'k6 주문조회 전용 브랜드', 10000, 0, 10000,

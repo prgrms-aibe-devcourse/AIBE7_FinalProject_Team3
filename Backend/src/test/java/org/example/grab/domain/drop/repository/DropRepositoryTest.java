@@ -1257,11 +1257,11 @@ class DropRepositoryTest {
         String suffix = UUID.randomUUID().toString();
         return jdbcTemplate.queryForObject(
                 """
-                INSERT INTO orders (order_number, buyer_id, drop_id, idempotency_key, request_hash, status,
+                INSERT INTO orders (order_number, buyer_id, drop_id, seller_id, idempotency_key, request_hash, status,
                                     product_name_snapshot, seller_name_snapshot, items_amount, shipping_amount,
                                     total_amount, recipient_name, recipient_phone, postal_code, address_line1,
                                     payment_expires_at, paid_at, canceled_at, expired_at, cancel_reason)
-                VALUES (?, ?, ?, ?, 'hash', ?, '상품', '브랜드', 1000, 0, 1000,
+                VALUES (?, ?, ?, (SELECT seller_id FROM drops WHERE id = ?), ?, 'hash', ?, '상품', '브랜드', 1000, 0, 1000,
                         '수령인', '01000000000', '00000', '주소', CURRENT_TIMESTAMP + INTERVAL '10 minutes',
                         CASE WHEN ? IN ('PAID', 'PREPARING', 'SHIPPED', 'DELIVERED') THEN CURRENT_TIMESTAMP END,
                         CASE WHEN ? = 'CANCELED' THEN CURRENT_TIMESTAMP END,
@@ -1269,7 +1269,7 @@ class DropRepositoryTest {
                         CASE WHEN ? = 'CANCELED' THEN '테스트 취소' END)
                 RETURNING id
                 """,
-                Long.class, "ORDER-" + suffix, buyerId, dropId, suffix, status,
+                Long.class, "ORDER-" + suffix, buyerId, dropId, dropId, suffix, status,
                 status, status, status, status);
     }
 

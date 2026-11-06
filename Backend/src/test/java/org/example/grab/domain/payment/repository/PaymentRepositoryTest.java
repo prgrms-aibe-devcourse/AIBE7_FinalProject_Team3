@@ -76,17 +76,18 @@ class PaymentRepositoryTest {
         );
         orderId = jdbcTemplate.queryForObject(
                 """
-                INSERT INTO orders (order_number, buyer_id, drop_id, idempotency_key, request_hash, status,
+                INSERT INTO orders (order_number, buyer_id, drop_id, seller_id, idempotency_key, request_hash, status,
                                     product_name_snapshot, seller_name_snapshot, items_amount, shipping_amount,
                                     total_amount, recipient_name, recipient_phone, postal_code, address_line1,
                                     payment_expires_at)
-                VALUES (?, ?, ?, ?, repeat('a', 64), 'PAYMENT_PENDING', '한정판 후드', 'GRAB 판매자', 30000, 3000,
+                VALUES (?, ?, ?, (SELECT seller_id FROM drops WHERE id = ?), ?, repeat('a', 64), 'PAYMENT_PENDING', '한정판 후드', 'GRAB 판매자', 30000, 3000,
                         33000, '홍길동', '010-1234-5678', '06236', '서울시 강남구', CURRENT_TIMESTAMP + INTERVAL '15 minutes')
                 RETURNING id
                 """,
                 Long.class,
                 "ORD-PAY-" + uniqueValue,
                 userId,
+                dropId,
                 dropId,
                 "order-key-" + uniqueValue
         );

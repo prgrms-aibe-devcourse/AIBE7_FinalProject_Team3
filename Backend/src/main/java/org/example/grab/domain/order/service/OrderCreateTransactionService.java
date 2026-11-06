@@ -81,6 +81,7 @@ public class OrderCreateTransactionService {
                 orderNumberGenerator.generate(),
                 buyerId,
                 drop.getId(),
+                drop.getSellerId(),
                 idempotencyKey.value(),
                 requestHash.value(),
                 drop.getProductName(),

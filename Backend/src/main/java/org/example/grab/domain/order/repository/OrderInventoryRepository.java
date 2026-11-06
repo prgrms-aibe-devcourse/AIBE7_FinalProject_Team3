@@ -15,7 +15,7 @@ import java.util.Optional;
 public interface OrderInventoryRepository extends Repository<Order, Long> {
 
     @Query(value = """
-            SELECT d.id AS "id", d.status AS "status", d.name AS "productName",
+            SELECT d.id AS "id", d.seller_id AS "sellerId", d.status AS "status", d.name AS "productName",
                    s.brand_name AS "sellerName", d.shipping_fee AS "shippingFee",
                    d.sale_starts_at AS "saleStartsAt", d.sale_ends_at AS "saleEndsAt"
             FROM drops d
@@ -125,6 +125,8 @@ public interface OrderInventoryRepository extends Repository<Order, Long> {
     interface DropSnapshot {
 
         Long getId();
+
+        Long getSellerId();
 
         String getStatus();
 

@@ -295,6 +295,7 @@ UQ(`drop_id`, `type`)가 중복 발송을 막는 토큰이다. `INSERT ... ON CO
 | `order_number` | VARCHAR(64) | O | UQ, 사용자와 PG에 전달하는 주문번호 |
 | `buyer_id` | BIGINT | O | FK users |
 | `drop_id` | BIGINT | O | FK drops, 주문당 DROP 하나 |
+| `seller_id` | BIGINT | O | `drops.seller_id` 비정규화 캐시(GR-214). FK 없음 — 정합성의 근원은 `drop_id`를 통한 `drops.seller_id`이고, 이 컬럼은 판매자 주문 목록 조회(`dropId` 미지정)가 `drops` 조인 없이 바로 정렬 인덱스를 타게 하는 용도다 |
 | `idempotency_key` | VARCHAR(100) | O | UQ(buyer_id, idempotency_key) |
 | `request_hash` | VARCHAR(64) | O | 같은 키의 다른 요청 탐지 |
 | `status` | VARCHAR(30) | O | 주문 상태 |
@@ -693,7 +694,8 @@ PK와 UQ에서 자동 생성되는 인덱스는 중복 생성하지 않는다.
 | `wishes` | (`user_id`, `activated_at`, `id`) | 소비자 마이페이지 |
 | `orders` | (`buyer_id`, `created_at`, `id`) | 소비자 주문 목록 |
 | `orders` | (`drop_id`, `status`, `id`) | 판매자 주문 목록(상태 단건 필터) |
-| `orders` | `idx_orders_drop_created` (`drop_id`, `created_at`, `id`) | 판매자 주문 목록 정렬(`ORDER BY created_at DESC, id DESC`) |
+| `orders` | `idx_orders_drop_created` (`drop_id`, `created_at`, `id`) | 판매자 주문 목록 정렬, `dropId` 지정 조회(`ORDER BY created_at DESC, id DESC`) |
+| `orders` | `idx_orders_seller_created` (`seller_id`, `created_at`, `id`) | 판매자 주문 목록 정렬, `dropId` 미지정(전체) 조회(GR-214, `seller_id`는 `drops.seller_id` 비정규화 캐시) |
 | `orders` | `idx_orders_payment_expiry` (`status`, `payment_expires_at`, `id`) | 결제 대기 만료 배치(`PAYMENT_PENDING AND payment_expires_at <= now`, 키셋 조회) |
 | `shipments` | `idx_shipments_stage_progress` (`delivery_stage`, `stage_updated_at`, `id`) | 배송 단계 자동 진행 배치(GR-86/172, `delivery_stage IN (...) AND stage_updated_at <= cutoff` 선점) |
 | `payments` | (`order_id`, `created_at`, `id`) | 결제 시도 이력 |

@@ -70,7 +70,7 @@ class PaymentTestFixture {
         String uniqueValue = UUID.randomUUID().toString();
         OffsetDateTime expiresAt = OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(15).truncatedTo(ChronoUnit.MICROS);
         Order order = orderRepository.saveAndFlush(Order.create(
-                "ORD-PAY-" + uniqueValue, buyerId, dropId, "order-key-" + uniqueValue, "a".repeat(64),
+                "ORD-PAY-" + uniqueValue, buyerId, dropId, sellerId, "order-key-" + uniqueValue, "a".repeat(64),
                 "한정판 후드", "GRAB 판매자", 30000, 3000,
                 ShippingAddress.of("홍길동", "010-1234-5678", "06236", "서울시 강남구", "101호", null),
                 expiresAt));

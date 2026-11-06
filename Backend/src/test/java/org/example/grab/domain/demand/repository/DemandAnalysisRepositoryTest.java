@@ -420,11 +420,11 @@ class DemandAnalysisRepositoryTest {
         // payment_expires_at > created_at 제약이 있어 생성 시각도 고정 시각으로 넣는다
         Long orderId = jdbcTemplate.queryForObject(
                 """
-                INSERT INTO orders (order_number, buyer_id, drop_id, idempotency_key, request_hash, status,
+                INSERT INTO orders (order_number, buyer_id, drop_id, seller_id, idempotency_key, request_hash, status,
                                     product_name_snapshot, seller_name_snapshot, items_amount, shipping_amount,
                                     total_amount, recipient_name, recipient_phone, postal_code, address_line1,
                                     payment_expires_at, paid_at, canceled_at, cancel_reason, created_at)
-                VALUES (?, ?, ?, ?, 'hash', ?, '상품', '브랜드', 1000, 0, 1000,
+                VALUES (?, ?, ?, (SELECT seller_id FROM drops WHERE id = ?), ?, 'hash', ?, '상품', '브랜드', 1000, 0, 1000,
                         '수령인', '01000000000', '00000', '주소', ?,
                         CASE WHEN ? THEN CAST(? AS TIMESTAMPTZ) ELSE NULL END,
                         CASE WHEN ? THEN CAST(? AS TIMESTAMPTZ) ELSE NULL END,
@@ -433,7 +433,7 @@ class DemandAnalysisRepositoryTest {
                 RETURNING id
                 """,
                 Long.class,
-                "ORDER-" + suffix, buyerId, dropId, suffix, status,
+                "ORDER-" + suffix, buyerId, dropId, dropId, suffix, status,
                 now.plusHours(1), paid, now, canceled, now, canceled, now);
         Long optionId = insertOption(dropId, 100, 0, true);
         jdbcTemplate.update(

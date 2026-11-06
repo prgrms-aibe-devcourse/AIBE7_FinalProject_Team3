@@ -88,7 +88,7 @@ class MockDeliveryServiceTest {
 
     private Order createOrder(OrderStatus status) {
         Order order = Order.create(
-                "GR-MOCK-1", 8L, 42L, "idem-mock", "a".repeat(64), "상품", "판매자",
+                "GR-MOCK-1", 8L, 42L, 7L, "idem-mock", "a".repeat(64), "상품", "판매자",
                 30000, 3000,
                 ShippingAddress.of("받는 사람", "01000000000", "00000", "주소", null, null),
                 OffsetDateTime.now().plusMinutes(15));

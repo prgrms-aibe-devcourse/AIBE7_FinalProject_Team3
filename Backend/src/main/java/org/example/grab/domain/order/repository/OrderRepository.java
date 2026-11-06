@@ -30,7 +30,6 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                    o.items_amount AS "itemsAmount", o.shipping_amount AS "shippingAmount",
                    o.total_amount AS "totalAmount", o.created_at AS "orderedAt"
             FROM orders o
-            JOIN drops d ON d.id = o.drop_id AND d.seller_id = :sellerId
             LEFT JOIN LATERAL (
                 SELECT p.status
                 FROM payments p
@@ -38,14 +37,14 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                 ORDER BY p.created_at DESC, p.id DESC
                 LIMIT 1
             ) payment ON TRUE
-            WHERE (CAST(:dropId AS BIGINT) IS NULL OR o.drop_id = :dropId)
+            WHERE o.seller_id = :sellerId
+              AND (CAST(:dropId AS BIGINT) IS NULL OR o.drop_id = :dropId)
               AND (CAST(:orderStatus AS VARCHAR) IS NULL OR o.status = :orderStatus)
               AND (CAST(:paymentStatus AS VARCHAR) IS NULL OR payment.status = :paymentStatus)
             ORDER BY o.created_at DESC, o.id DESC
             """, countQuery = """
             SELECT COUNT(*)
             FROM orders o
-            JOIN drops d ON d.id = o.drop_id AND d.seller_id = :sellerId
             LEFT JOIN LATERAL (
                 SELECT p.status
                 FROM payments p
@@ -53,7 +52,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                 ORDER BY p.created_at DESC, p.id DESC
                 LIMIT 1
             ) payment ON CAST(:paymentStatus AS VARCHAR) IS NOT NULL
-            WHERE (CAST(:dropId AS BIGINT) IS NULL OR o.drop_id = :dropId)
+            WHERE o.seller_id = :sellerId
+              AND (CAST(:dropId AS BIGINT) IS NULL OR o.drop_id = :dropId)
               AND (CAST(:orderStatus AS VARCHAR) IS NULL OR o.status = :orderStatus)
               AND (CAST(:paymentStatus AS VARCHAR) IS NULL OR payment.status = :paymentStatus)
             """, nativeQuery = true)

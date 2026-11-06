@@ -56,6 +56,7 @@ class OrderRepositoryTest {
     private Long buyerId;
     private Long dropId;
     private Long optionId;
+    private Long sellerId;
 
     @BeforeEach
     void setUp() {
@@ -69,7 +70,7 @@ class OrderRepositoryTest {
                 Long.class,
                 uniqueValue + "@example.com"
         );
-        Long sellerId = jdbcTemplate.queryForObject(
+        sellerId = jdbcTemplate.queryForObject(
                 """
                 INSERT INTO sellers (user_id, brand_name, contact_email)
                 VALUES (?, 'GRAB 판매자', ?)
@@ -178,16 +179,16 @@ class OrderRepositoryTest {
                 """, Long.class, sellerId);
         UUID orderId = jdbcTemplate.queryForObject("""
                 INSERT INTO orders (
-                    order_number, buyer_id, drop_id, idempotency_key, request_hash, status,
+                    order_number, buyer_id, drop_id, seller_id, idempotency_key, request_hash, status,
                     product_name_snapshot, seller_name_snapshot, items_amount, shipping_amount,
                     total_amount, recipient_name, recipient_phone, postal_code, address_line1,
                     payment_expires_at, paid_at
                 ) VALUES (
-                    ?, ?, ?, ?, 'hash', 'PAID', '한정 상품', '판매자 브랜드', 1000, 2500, 3500,
+                    ?, ?, ?, ?, ?, 'hash', 'PAID', '한정 상품', '판매자 브랜드', 1000, 2500, 3500,
                     '구매자', '01000000003', '00000', '테스트 주소',
                     CURRENT_TIMESTAMP + INTERVAL '10 minutes', CURRENT_TIMESTAMP
                 ) RETURNING public_id
-                """, UUID.class, "GR-TEST-" + uniqueValue, sellerUserId, sellerDropId,
+                """, UUID.class, "GR-TEST-" + uniqueValue, sellerUserId, sellerDropId, sellerId,
                 "key-" + uniqueValue);
         jdbcTemplate.update("""
                 INSERT INTO payments (order_id, provider, idempotency_key, client_idempotency_key, request_hash,
@@ -206,16 +207,16 @@ class OrderRepositoryTest {
         // 용도다(GR-194).
         jdbcTemplate.queryForObject("""
                 INSERT INTO orders (
-                    order_number, buyer_id, drop_id, idempotency_key, request_hash, status,
+                    order_number, buyer_id, drop_id, seller_id, idempotency_key, request_hash, status,
                     product_name_snapshot, seller_name_snapshot, items_amount, shipping_amount,
                     total_amount, recipient_name, recipient_phone, postal_code, address_line1,
                     payment_expires_at
                 ) VALUES (
-                    ?, ?, ?, ?, 'hash', 'PAYMENT_PENDING', '한정 상품', '판매자 브랜드', 1000, 2500, 3500,
+                    ?, ?, ?, ?, ?, 'hash', 'PAYMENT_PENDING', '한정 상품', '판매자 브랜드', 1000, 2500, 3500,
                     '구매자', '01000000003', '00000', '테스트 주소',
                     CURRENT_TIMESTAMP + INTERVAL '10 minutes'
                 ) RETURNING public_id
-                """, UUID.class, "GR-TEST-PENDING-" + uniqueValue, sellerUserId, sellerDropId,
+                """, UUID.class, "GR-TEST-PENDING-" + uniqueValue, sellerUserId, sellerDropId, sellerId,
                 "key-pending-" + uniqueValue);
 
         // when
@@ -322,6 +323,7 @@ class OrderRepositoryTest {
                 orderNumber + "-" + UUID.randomUUID(),
                 orderBuyerId,
                 dropId,
+                sellerId,
                 idempotencyKey,
                 "a".repeat(64),
                 "한정판 후드",
@@ -346,6 +348,7 @@ class OrderRepositoryTest {
                 "ORD-20260923-000001",
                 buyerId,
                 dropId,
+                sellerId,
                 "idem-key",
                 "a".repeat(64),
                 "한정판 후드",
