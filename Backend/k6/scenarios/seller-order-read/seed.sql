@@ -77,19 +77,23 @@ WITH new_orders AS (
     INSERT INTO orders (
         order_number, buyer_id, drop_id, seller_id, idempotency_key, request_hash, status,
         product_name_snapshot, seller_name_snapshot, items_amount, shipping_amount,
-        total_amount, recipient_name, recipient_phone, postal_code, address_line1,
-        payment_expires_at, paid_at
+        total_amount, payment_expires_at
     )
     SELECT 'GR174-' || d.id || '-' || gs, b.id, d.id, d.seller_id,
            'idem-GR174-' || d.id || '-' || gs,
            substr(md5('GR174-' || d.id || '-' || gs) || md5('GR174b-' || d.id || '-' || gs), 1, 64),
            'PAID', 'k6 판매자주문조회 상품', 'k6 주문조회 전용 브랜드', 10000, 0, 10000,
-           'k6 테스터', '01099990000', '06236', '서울시 강남구 테스트로 1',
-           now() + interval '15 minutes', now() - interval '1 hour'
+           now() + interval '15 minutes'
     FROM drops d, generate_series(1, 1000) gs,
          (SELECT id FROM users WHERE email = 'k6-buyer@loadtest.local') b
     WHERE d.name = 'k6 판매자주문조회 상품'
     RETURNING id, drop_id
+), new_shipping AS (
+    INSERT INTO order_shipping_addresses (
+        order_id, recipient_name, recipient_phone, postal_code, address_line1, created_at
+    )
+    SELECT id, 'k6 테스터', '01099990000', '06236', '서울시 강남구 테스트로 1', now() - interval '1 hour'
+    FROM new_orders
 ), order_option AS (
     SELECT o.id AS order_id, o.drop_id, op.id AS option_id
     FROM new_orders o
@@ -104,7 +108,7 @@ INSERT INTO payments (
 )
 SELECT o.id, 'MOCK', 'pay-idem-GR174-' || o.id, 'pay-client-idem-GR174-' || o.id,
        substr(md5('GR174-pay-' || o.id) || md5('GR174-pay2-' || o.id), 1, 64),
-       'mock_GR174_' || o.id, o.total_amount, 'SUCCEEDED', o.paid_at
+       'mock_GR174_' || o.id, o.total_amount, 'SUCCEEDED', now() - interval '1 hour'
 FROM orders o
 JOIN drops d ON d.id = o.drop_id
 WHERE d.name = 'k6 판매자주문조회 상품';
