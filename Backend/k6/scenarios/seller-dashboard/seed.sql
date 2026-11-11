@@ -13,6 +13,8 @@ BEGIN;
 
 DELETE FROM wishes
     WHERE drop_id IN (SELECT id FROM drops WHERE name LIKE 'k6 판매자대시보드 상품 %');
+DELETE FROM drop_embeddings
+    WHERE drop_id IN (SELECT id FROM drops WHERE name LIKE 'k6 판매자대시보드 상품 %');
 DELETE FROM payments
     WHERE order_id IN (
         SELECT o.id FROM orders o JOIN drops d ON d.id = o.drop_id
