@@ -181,15 +181,18 @@ class OrderRepositoryTest {
                 INSERT INTO orders (
                     order_number, buyer_id, drop_id, seller_id, idempotency_key, request_hash, status,
                     product_name_snapshot, seller_name_snapshot, items_amount, shipping_amount,
-                    total_amount, recipient_name, recipient_phone, postal_code, address_line1,
-                    payment_expires_at, paid_at
+                    total_amount, payment_expires_at
                 ) VALUES (
                     ?, ?, ?, ?, ?, 'hash', 'PAID', '한정 상품', '판매자 브랜드', 1000, 2500, 3500,
-                    '구매자', '01000000003', '00000', '테스트 주소',
-                    CURRENT_TIMESTAMP + INTERVAL '10 minutes', CURRENT_TIMESTAMP
+                    CURRENT_TIMESTAMP + INTERVAL '10 minutes'
                 ) RETURNING public_id
                 """, UUID.class, "GR-TEST-" + uniqueValue, sellerUserId, sellerDropId, sellerId,
                 "key-" + uniqueValue);
+        jdbcTemplate.update("""
+                INSERT INTO order_shipping_addresses (order_id, recipient_name, recipient_phone, postal_code, address_line1, created_at)
+                SELECT id, '구매자', '01000000003', '00000', '테스트 주소', CURRENT_TIMESTAMP
+                FROM orders WHERE public_id = ?
+                """, orderId);
         jdbcTemplate.update("""
                 INSERT INTO payments (order_id, provider, idempotency_key, client_idempotency_key, request_hash,
                                       amount, status, created_at)
@@ -205,19 +208,22 @@ class OrderRepositoryTest {
         // 결제 전(페이먼트 없음) 두 번째 주문. countQuery는 paymentStatus가 null이면 ON 조건이
         // 거짓이 되어 LATERAL 조회를 건너뛰는데, 그래도 이 주문까지 정확히 세는지 확인하는
         // 용도다(GR-194).
-        jdbcTemplate.queryForObject("""
+        UUID pendingOrderId = jdbcTemplate.queryForObject("""
                 INSERT INTO orders (
                     order_number, buyer_id, drop_id, seller_id, idempotency_key, request_hash, status,
                     product_name_snapshot, seller_name_snapshot, items_amount, shipping_amount,
-                    total_amount, recipient_name, recipient_phone, postal_code, address_line1,
-                    payment_expires_at
+                    total_amount, payment_expires_at
                 ) VALUES (
                     ?, ?, ?, ?, ?, 'hash', 'PAYMENT_PENDING', '한정 상품', '판매자 브랜드', 1000, 2500, 3500,
-                    '구매자', '01000000003', '00000', '테스트 주소',
                     CURRENT_TIMESTAMP + INTERVAL '10 minutes'
                 ) RETURNING public_id
                 """, UUID.class, "GR-TEST-PENDING-" + uniqueValue, sellerUserId, sellerDropId, sellerId,
                 "key-pending-" + uniqueValue);
+        jdbcTemplate.update("""
+                INSERT INTO order_shipping_addresses (order_id, recipient_name, recipient_phone, postal_code, address_line1, created_at)
+                SELECT id, '구매자', '01000000003', '00000', '테스트 주소', CURRENT_TIMESTAMP
+                FROM orders WHERE public_id = ?
+                """, pendingOrderId);
 
         // 다른 판매자의 주문. o.seller_id로 직접 거르는 쿼리(GR-214)가 drops 조인 없이도
         // 판매자 간 데이터를 섞지 않는지 확인하는 용도다.
@@ -236,19 +242,21 @@ class OrderRepositoryTest {
         long otherSellerDropId = jdbcTemplate.queryForObject("""
                 INSERT INTO drops (seller_id) VALUES (?) RETURNING id
                 """, Long.class, otherSellerId);
-        jdbcTemplate.update("""
+        Long otherOrderId = jdbcTemplate.queryForObject("""
                 INSERT INTO orders (
                     order_number, buyer_id, drop_id, seller_id, idempotency_key, request_hash, status,
                     product_name_snapshot, seller_name_snapshot, items_amount, shipping_amount,
-                    total_amount, recipient_name, recipient_phone, postal_code, address_line1,
-                    payment_expires_at, paid_at
+                    total_amount, payment_expires_at
                 ) VALUES (
                     ?, ?, ?, ?, ?, 'hash', 'PAID', '다른 판매자 상품', '다른 판매자 브랜드', 1000, 2500, 3500,
-                    '구매자', '01000000004', '00000', '테스트 주소',
-                    CURRENT_TIMESTAMP + INTERVAL '10 minutes', CURRENT_TIMESTAMP
-                )
-                """, "GR-TEST-OTHER-" + otherUniqueValue, otherSellerUserId, otherSellerDropId, otherSellerId,
+                    CURRENT_TIMESTAMP + INTERVAL '10 minutes'
+                ) RETURNING id
+                """, Long.class, "GR-TEST-OTHER-" + otherUniqueValue, otherSellerUserId, otherSellerDropId, otherSellerId,
                 "key-other-" + otherUniqueValue);
+        jdbcTemplate.update("""
+                INSERT INTO order_shipping_addresses (order_id, recipient_name, recipient_phone, postal_code, address_line1, created_at)
+                VALUES (?, '구매자', '01000000004', '00000', '테스트 주소', CURRENT_TIMESTAMP)
+                """, otherOrderId);
 
         // when
         Page<SellerOrderListProjection> filtered = orderRepository.findSellerOrders(
@@ -283,9 +291,9 @@ class OrderRepositoryTest {
 
         // 결제 취소가 진행 중이어도 최신 결제 상태와 별도 필드로 확인할 수 있다.
         jdbcTemplate.update("""
-                UPDATE orders
-                SET cancel_idempotency_key = ?, cancel_request_hash = repeat('c', 64), cancel_reason = '취소 요청'
-                WHERE public_id = ?
+                INSERT INTO order_cancellations (order_id, idempotency_key, request_hash, reason, canceled_at, created_at)
+                SELECT id, ?, repeat('c', 64), '취소 요청', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                FROM orders WHERE public_id = ?
                 """, "cancel-" + UUID.randomUUID(), orderId);
         entityManager.clear();
         var canceling = orderRepository.findSellerOrders(
@@ -293,7 +301,7 @@ class OrderRepositoryTest {
         assertThat(canceling.getContent()).singleElement()
                 .extracting(SellerOrderListProjection::getCancellationInProgress).isEqualTo(true);
         jdbcTemplate.update("""
-                UPDATE orders SET status = 'CANCELED', canceled_at = CURRENT_TIMESTAMP WHERE public_id = ?
+                UPDATE orders SET status = 'CANCELED' WHERE public_id = ?
                 """, orderId);
         entityManager.clear();
         var canceled = orderRepository.findSellerOrders(
@@ -311,7 +319,7 @@ class OrderRepositoryTest {
         Order older = orderRepository.saveAndFlush(createOrder(buyerId, "ORD-BUYER-1", "key-1", expiresAt));
         Order newer = orderRepository.saveAndFlush(createOrder(buyerId, "ORD-BUYER-2", "key-2", expiresAt));
         orderRepository.saveAndFlush(createOrder(otherBuyerId, "ORD-OTHER-1", "key-1", expiresAt));
-        jdbcTemplate.update("UPDATE orders SET status = 'PAID', paid_at = CURRENT_TIMESTAMP WHERE id = ?", older.getId());
+        jdbcTemplate.update("UPDATE orders SET status = 'PAID' WHERE id = ?", older.getId());
         entityManager.clear();
 
         // when

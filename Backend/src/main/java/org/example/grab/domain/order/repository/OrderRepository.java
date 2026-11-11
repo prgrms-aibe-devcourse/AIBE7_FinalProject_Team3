@@ -26,10 +26,11 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                    o.product_name_snapshot AS "productName", o.seller_name_snapshot AS "sellerName",
                    o.status AS "orderStatus", payment.status AS "paymentStatus",
                    o.status IN ('PAYMENT_PENDING', 'PAID', 'PREPARING')
-                       AND o.cancel_idempotency_key IS NOT NULL AS "cancellationInProgress",
+                       AND oc.idempotency_key IS NOT NULL AS "cancellationInProgress",
                    o.items_amount AS "itemsAmount", o.shipping_amount AS "shippingAmount",
                    o.total_amount AS "totalAmount", o.created_at AS "orderedAt"
             FROM orders o
+            LEFT JOIN order_cancellations oc ON oc.order_id = o.id
             LEFT JOIN LATERAL (
                 SELECT p.status
                 FROM payments p

@@ -242,7 +242,7 @@ public interface DropRepository extends JpaRepository<Drop, Long> {
 
     /*
      * 인기 GRAB 목록(DISC-007). 판매 수량 내림차순, 동률은 published_at DESC, id DESC로 고정한다.
-     * 판매 수량은 결제 확정·미취소 주문(paid_at IS NOT NULL AND canceled_at IS NULL)의 order_items.quantity 합이다.
+     * 판매 수량은 결제 확정 주문(status IN ('PAID', 'PREPARING', 'SHIPPED', 'DELIVERED'))의 order_items.quantity 합이다.
      * 미결제·만료·취소 주문과 결제 시도 횟수는 세지 않는다. 이 합은 DROP의 모든 SKU(비활성 포함) sold_quantity 합과 같다.
      * sold_quantity는 결제 확정(markPaid와 같은 트랜잭션에서 reserved → sold)과 결제 후 취소(cancel과 같은 트랜잭션에서
      * sold 감소)에서만 바뀌기 때문이다(ERD.md 3.2·3.3). 그래서 후보마다 orders·order_items를 집계하지 않고

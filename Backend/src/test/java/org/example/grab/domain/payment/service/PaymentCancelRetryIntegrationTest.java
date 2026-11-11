@@ -229,8 +229,12 @@ class PaymentCancelRetryIntegrationTest {
                 .containsEntry("status", "FAILED")
                 .containsEntry("failure_code", "NOT_CANCELABLE_PAYMENT")
                 .containsEntry("next_retry_at", null);
-        assertThat(jdbcTemplate.queryForMap(
-                "SELECT status, cancel_idempotency_key FROM orders WHERE id = ?", paid.order().getId()))
+        assertThat(jdbcTemplate.queryForMap("""
+                SELECT o.status, oc.idempotency_key AS cancel_idempotency_key
+                FROM orders o
+                LEFT JOIN order_cancellations oc ON oc.order_id = o.id
+                WHERE o.id = ?
+                """, paid.order().getId()))
                 .containsEntry("status", "PAID")
                 .containsEntry("cancel_idempotency_key", null);
         assertThat(paymentStatus(paid.paymentId())).isEqualTo("SUCCEEDED");

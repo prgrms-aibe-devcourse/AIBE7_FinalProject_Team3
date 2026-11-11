@@ -266,8 +266,12 @@ class OrderCancelServiceIntegrationTest {
     }
 
     private Map<String, Object> orderRow(Order order) {
-        return jdbcTemplate.queryForMap(
-                "SELECT status, cancel_reason, cancel_idempotency_key FROM orders WHERE id = ?", order.getId());
+        return jdbcTemplate.queryForMap("""
+                SELECT o.status, oc.reason AS cancel_reason, oc.idempotency_key AS cancel_idempotency_key
+                FROM orders o
+                LEFT JOIN order_cancellations oc ON oc.order_id = o.id
+                WHERE o.id = ?
+                """, order.getId());
     }
 
     private Map<String, Object> reservationRow(Order order) {

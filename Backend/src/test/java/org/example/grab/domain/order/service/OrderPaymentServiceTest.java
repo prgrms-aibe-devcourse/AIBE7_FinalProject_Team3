@@ -136,7 +136,6 @@ class OrderPaymentServiceTest {
                         java.util.Set.of(org.example.grab.domain.drop.stream.model.StockChange.SALES)));
         Order found = orderRepository.findById(order.getId()).orElseThrow();
         assertThat(found.getStatus()).isEqualTo(OrderStatus.PAID);
-        assertThat(found.getPaidAt()).isEqualTo(approvedAt);
         assertThat(reservations()).extracting(StockReservation::getStatus)
                 .containsOnly(ReservationStatus.COMMITTED);
         assertThat(quantities(firstOptionId)).containsEntry("reserved_quantity", 0).containsEntry("sold_quantity", 2);
@@ -151,8 +150,11 @@ class OrderPaymentServiceTest {
                 lockedOrder(), 48000, expiresAt, expiresAt);
         PaymentCompletionResult mismatch = orderPaymentService.completePayment(
                 lockedOrder(), 47000, expiresAt.minusMinutes(1), expiresAt.minusMinutes(1));
-        jdbcTemplate.update("UPDATE orders SET status = 'CANCELED', canceled_at = CURRENT_TIMESTAMP, cancel_reason = '테스트 취소' WHERE id = ?",
-                order.getId());
+        jdbcTemplate.update("UPDATE orders SET status = 'CANCELED' WHERE id = ?", order.getId());
+        jdbcTemplate.update("""
+                INSERT INTO order_cancellations (order_id, idempotency_key, request_hash, reason, canceled_at, created_at)
+                VALUES (?, 'cancel-key', 'hash', '테스트 취소', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """, order.getId());
         entityManager.clear();
         PaymentCompletionResult canceled = orderPaymentService.completePayment(
                 lockedOrder(), 48000, expiresAt.minusMinutes(1), expiresAt.minusMinutes(1));
@@ -238,7 +240,6 @@ class OrderPaymentServiceTest {
         assertThat(expired).isTrue();
         Order expiredOrder = orderRepository.findById(order.getId()).orElseThrow();
         assertThat(expiredOrder.getStatus()).isEqualTo(OrderStatus.EXPIRED);
-        assertThat(expiredOrder.getExpiredAt()).isEqualTo(expiresAt);
         assertThat(reservations()).allSatisfy(reservation -> {
             assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.RELEASED);
             assertThat(reservation.getReleaseReason()).isEqualTo(ReleaseReason.EXPIRED);
@@ -285,7 +286,6 @@ class OrderPaymentServiceTest {
         assertThat(second).isEqualTo(PaymentExpiryResult.NOT_DUE);
         Order expiredOrder = orderRepository.findById(order.getId()).orElseThrow();
         assertThat(expiredOrder.getStatus()).isEqualTo(OrderStatus.EXPIRED);
-        assertThat(expiredOrder.getExpiredAt()).isEqualTo(expiresAt);
         assertThat(reservations()).allSatisfy(reservation -> {
             assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.RELEASED);
             assertThat(reservation.getReleaseReason()).isEqualTo(ReleaseReason.EXPIRED);
@@ -303,7 +303,7 @@ class OrderPaymentServiceTest {
         Long second = insertOrderExpiringAt(base.plusMinutes(2));
         Long sameDeadline = insertOrderExpiringAt(base.plusMinutes(2));
         Long paid = insertOrderExpiringAt(base.plusMinutes(1));
-        jdbcTemplate.update("UPDATE orders SET status = 'PAID', paid_at = payment_expires_at WHERE id = ?", paid);
+        jdbcTemplate.update("UPDATE orders SET status = 'PAID' WHERE id = ?", paid);
         insertOrderExpiringAt(base.plusMinutes(10));
         OffsetDateTime now = base.plusMinutes(5);
 

@@ -362,8 +362,12 @@ class PaymentReconciliationIntegrationTest {
         given(paymentGateway.lookup("payment-unknown"))
                 .willReturn(PaymentGatewayResult.awaitingConfirmation("IN_PROGRESS"));
         payAt(now, "payment-unknown", idempotencyKey);
-        jdbcTemplate.update("UPDATE orders SET status = 'CANCELED', canceled_at = CURRENT_TIMESTAMP, cancel_reason = '테스트 취소' WHERE id = ?",
-                order.getId());
+        jdbcTemplate.update("UPDATE orders SET status = 'CANCELED' WHERE id = ?", order.getId());
+        jdbcTemplate.update("""
+                INSERT INTO order_cancellations (order_id, idempotency_key, request_hash, reason, canceled_at, created_at)
+                VALUES (?, 'cancel-key', 'hash', '테스트 취소', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT (order_id) DO NOTHING
+                """, order.getId());
 
         // when
         PaymentResponse replay = payAt(now.plusSeconds(3), "payment-unknown", idempotencyKey);
@@ -406,12 +410,16 @@ class PaymentReconciliationIntegrationTest {
         // when & then: 결제 대기인데 마감이 지남
         assertPayRejected(afterDeadline, PaymentErrorCode.PAYMENT_EXPIRED);
         // when & then: 만료 처리된 주문
-        jdbcTemplate.update("UPDATE orders SET status = 'EXPIRED', expired_at = CURRENT_TIMESTAMP WHERE id = ?",
+        jdbcTemplate.update("UPDATE orders SET status = 'EXPIRED' WHERE id = ?",
                 order.getId());
         assertPayRejected(now, PaymentErrorCode.PAYMENT_EXPIRED);
         // when & then: 취소된 주문은 마감 전후와 관계없이 상태 전이 오류
-        jdbcTemplate.update("UPDATE orders SET status = 'CANCELED', canceled_at = CURRENT_TIMESTAMP, cancel_reason = '테스트 취소' WHERE id = ?",
-                order.getId());
+        jdbcTemplate.update("UPDATE orders SET status = 'CANCELED' WHERE id = ?", order.getId());
+        jdbcTemplate.update("""
+                INSERT INTO order_cancellations (order_id, idempotency_key, request_hash, reason, canceled_at, created_at)
+                VALUES (?, 'cancel-key', 'hash', '테스트 취소', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT (order_id) DO NOTHING
+                """, order.getId());
         assertPayRejected(now, CommonErrorCode.INVALID_STATE_TRANSITION);
         assertPayRejected(afterDeadline, CommonErrorCode.INVALID_STATE_TRANSITION);
         verify(paymentGateway, never()).confirm(any());

@@ -1252,31 +1252,40 @@ class DropRepositoryTest {
                 Long.class, dropId, total, sortOrder);
     }
 
-    // 상태별 필수 시각(paid_at·canceled_at·expired_at)과 취소 사유를 제약에 맞게 채운다.
+    // 상태별 필수 시각과 취소 사유를 제약에 맞게 채운다.
     private Long insertOrder(Long dropId, String status) {
         String suffix = UUID.randomUUID().toString();
-        return jdbcTemplate.queryForObject(
+        Long orderId = jdbcTemplate.queryForObject(
                 """
                 INSERT INTO orders (order_number, buyer_id, drop_id, seller_id, idempotency_key, request_hash, status,
                                     product_name_snapshot, seller_name_snapshot, items_amount, shipping_amount,
-                                    total_amount, recipient_name, recipient_phone, postal_code, address_line1,
-                                    payment_expires_at, paid_at, canceled_at, expired_at, cancel_reason)
+                                    total_amount, payment_expires_at)
                 VALUES (?, ?, ?, (SELECT seller_id FROM drops WHERE id = ?), ?, 'hash', ?, '상품', '브랜드', 1000, 0, 1000,
-                        '수령인', '01000000000', '00000', '주소', CURRENT_TIMESTAMP + INTERVAL '10 minutes',
-                        CASE WHEN ? IN ('PAID', 'PREPARING', 'SHIPPED', 'DELIVERED') THEN CURRENT_TIMESTAMP END,
-                        CASE WHEN ? = 'CANCELED' THEN CURRENT_TIMESTAMP END,
-                        CASE WHEN ? = 'EXPIRED' THEN CURRENT_TIMESTAMP END,
-                        CASE WHEN ? = 'CANCELED' THEN '테스트 취소' END)
+                        CURRENT_TIMESTAMP + INTERVAL '10 minutes')
                 RETURNING id
                 """,
-                Long.class, "ORDER-" + suffix, buyerId, dropId, dropId, suffix, status,
-                status, status, status, status);
+                Long.class, "ORDER-" + suffix, buyerId, dropId, dropId, suffix, status);
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO order_shipping_addresses (order_id, recipient_name, recipient_phone, postal_code, address_line1, created_at)
+                VALUES (?, '수령인', '01000000000', '00000', '주소', CURRENT_TIMESTAMP)
+                """,
+                orderId);
+
+        if ("CANCELED".equals(status)) {
+            jdbcTemplate.update(
+                    """
+                    INSERT INTO order_cancellations (order_id, idempotency_key, request_hash, reason, canceled_at, created_at)
+                    VALUES (?, ?, 'hash', '테스트 취소', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    """,
+                    orderId, "cancel-" + suffix);
+        }
+        return orderId;
     }
 
     private Long insertPaidThenCanceledOrder(Long dropId) {
-        Long orderId = insertOrder(dropId, "CANCELED");
-        jdbcTemplate.update("UPDATE orders SET paid_at = CURRENT_TIMESTAMP WHERE id = ?", orderId);
-        return orderId;
+        return insertOrder(dropId, "CANCELED");
     }
 
     // 실제 결제 확정·결제 후 취소는 주문 상태와 같은 트랜잭션에서 sold_quantity를 옮긴다(OrderPaymentService).
@@ -1293,7 +1302,7 @@ class DropRepositoryTest {
                 UPDATE drop_options o
                 SET sold_quantity = o.sold_quantity + ?, total_quantity = o.total_quantity + ?
                 FROM orders od
-                WHERE o.id = ? AND od.id = ? AND od.paid_at IS NOT NULL AND od.canceled_at IS NULL
+                WHERE o.id = ? AND od.id = ? AND od.status IN ('PAID', 'PREPARING', 'SHIPPED', 'DELIVERED')
                 """,
                 quantity, quantity, optionId, orderId);
     }

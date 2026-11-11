@@ -292,7 +292,7 @@ UQ(`drop_id`, `type`)가 중복 발송을 막는 토큰이다. `INSERT ... ON CO
 | --- | --- | --- | --- |
 | `id` | BIGINT | O | PK |
 | `public_id` | UUID | O | UQ, 외부 노출 식별자 |
-| `order_number` | VARCHAR(64) | O | UQ, 사용자와 PG에 전달하는 주문번호 |
+| `order_number` | VARCHAR(64) | O | 사용자와 PG에 전달하는 주문번호 |
 | `buyer_id` | BIGINT | O | FK users |
 | `drop_id` | BIGINT | O | FK drops, 주문당 DROP 하나 |
 | `seller_id` | BIGINT | O | `drops.seller_id` 비정규화 캐시(GR-214). FK 없음 — 정합성의 근원은 `drop_id`를 통한 `drops.seller_id`이고, 이 컬럼은 판매자 주문 목록 조회(`dropId` 미지정)가 `drops` 조인 없이 바로 정렬 인덱스를 타게 하는 용도다 |
@@ -304,21 +304,35 @@ UQ(`drop_id`, `type`)가 중복 발송을 막는 토큰이다. `INSERT ... ON CO
 | `items_amount` | BIGINT | O | 상품 합계 |
 | `shipping_amount` | BIGINT | O | 배송비 |
 | `total_amount` | BIGINT | O | `items_amount + shipping_amount` |
+| `payment_expires_at` | TIMESTAMPTZ | O | 결제 마감 시각 (주문/선점 TTL) |
+
+상품 정보는 주문 시점의 값을 보존한다. 결제 확정 시각은 `payments.approved_at`, 결제 만료 시각은 `orders.updated_at`으로 관리한다. 배송지는 `order_shipping_addresses`, 소비자 취소 정보는 `order_cancellations`로 분리해 정규화한다.
+
+#### `order_shipping_addresses`
+
+| 컬럼 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `order_id` | BIGINT | O | PK, FK orders (1:1) |
 | `recipient_name` | VARCHAR(100) | O | 수령인 |
 | `recipient_phone` | VARCHAR(30) | O | 배송 연락처 |
 | `postal_code` | VARCHAR(20) | O | 우편번호 |
 | `address_line1` | VARCHAR(300) | O | 기본 주소 |
 | `address_line2` | VARCHAR(300) | X | 상세 주소 |
 | `delivery_memo` | VARCHAR(300) | X | 배송 요청사항 |
-| `payment_expires_at` | TIMESTAMPTZ | O | 결제 마감 시각 |
-| `paid_at` | TIMESTAMPTZ | X | 결제 확정 시각 |
-| `canceled_at` | TIMESTAMPTZ | X | 주문 취소 시각 |
-| `expired_at` | TIMESTAMPTZ | X | 결제 대기 만료 시각. `EXPIRED`이면 필수 |
-| `cancel_idempotency_key` | VARCHAR(100) | X | 진행 중이거나 완료된 소비자 취소 요청의 `Idempotency-Key` |
-| `cancel_request_hash` | VARCHAR(64) | X | 같은 취소 키의 다른 요청 탐지 |
-| `cancel_reason` | VARCHAR(500) | X | 소비자 취소 사유. `CANCELED`이면 필수 |
+| `created_at` | TIMESTAMPTZ | O | 생성 시각 |
 
-배송지와 상품 정보는 주문 시점의 값을 보존한다. 로그에는 주소와 전화번호 원문을 남기지 않는다.
+로그에는 주소와 전화번호 원문을 남기지 않는다.
+
+#### `order_cancellations`
+
+| 컬럼 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `order_id` | BIGINT | O | PK, FK orders (1:1) |
+| `idempotency_key` | VARCHAR(100) | O | 진행 중이거나 완료된 소비자 취소 요청의 `Idempotency-Key` |
+| `request_hash` | VARCHAR(64) | O | 같은 취소 키의 다른 요청 탐지 |
+| `reason` | VARCHAR(500) | O | 소비자 취소 사유 |
+| `canceled_at` | TIMESTAMPTZ | X | 소비자 취소 시각 (결제 후 취소 진행 중일 때는 NULL) |
+| `created_at` | TIMESTAMPTZ | O | 기록 시각 |
 
 #### `order_items`
 
@@ -693,8 +707,7 @@ PK와 UQ에서 자동 생성되는 인덱스는 중복 생성하지 않는다.
 | `wishes` | (`drop_id`, `canceled_at`, `id`) | 활성 WISH 조회·집계 |
 | `wishes` | (`user_id`, `activated_at`, `id`) | 소비자 마이페이지 |
 | `orders` | (`buyer_id`, `created_at`, `id`) | 소비자 주문 목록 |
-| `orders` | `idx_orders_drop_created` (`drop_id`, `created_at`, `id`) | 판매자 주문 목록 정렬, `dropId` 지정 조회(`ORDER BY created_at DESC, id DESC`) |
-| `orders` | `idx_orders_seller_created` (`seller_id`, `created_at`, `id`) | 판매자 주문 목록 정렬, `dropId` 미지정(전체) 조회(GR-214, `seller_id`는 `drops.seller_id` 비정규화 캐시) |
+| `orders` | `idx_orders_seller_created` (`seller_id`, `created_at`, `id`) | 판매자 주문 목록 정렬(GR-214, 전체 및 dropId 지정 조회 모두 커버). `idx_orders_drop_created`는 이 인덱스로 통합되어 제거됨 |
 | `orders` | `idx_orders_payment_expiry` (`payment_expires_at`, `id`) `WHERE status = 'PAYMENT_PENDING'` | 결제 대기 만료 배치(`PAYMENT_PENDING AND payment_expires_at <= now`, 키셋 조회). 인덱스 전수 감사(2026-11)에서 부분 인덱스로 전환 |
 | `shipments` | `idx_shipments_stage_progress` (`delivery_stage`, `stage_updated_at`, `id`) | 배송 단계 자동 진행 배치(GR-86/172, `delivery_stage IN (...) AND stage_updated_at <= cutoff` 선점) |
 | `payments` | (`reconciliation_status`, `updated_at`, `id`) | 결제 보정 작업, 보정 환불 대상 선점(GR-88) |

@@ -191,7 +191,7 @@ public class DemandAnalysisRepository {
                 FROM orders o
                 JOIN samples s ON s.id = o.drop_id
                 JOIN order_items oi ON oi.order_id = o.id
-                WHERE o.paid_at IS NOT NULL AND o.canceled_at IS NULL
+                WHERE o.status IN ('PAID', 'PREPARING', 'SHIPPED', 'DELIVERED')
                 GROUP BY o.drop_id, o.buyer_id
             )
             SELECT (SELECT COUNT(*) FROM samples) AS drop_count,

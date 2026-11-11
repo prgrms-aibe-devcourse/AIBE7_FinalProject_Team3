@@ -158,18 +158,23 @@ class ShipmentProgressServiceIntegrationTest {
 
     private Long insertShippedOrder() {
         String uniqueValue = UUID.randomUUID().toString();
-        return jdbcTemplate.queryForObject(
+        Long orderId = jdbcTemplate.queryForObject(
                 """
                 INSERT INTO orders (order_number, buyer_id, drop_id, seller_id, idempotency_key, request_hash, status,
                                      product_name_snapshot, seller_name_snapshot, items_amount, shipping_amount,
-                                     total_amount, recipient_name, recipient_phone, postal_code, address_line1,
-                                     payment_expires_at, paid_at)
+                                     total_amount, payment_expires_at)
                 VALUES (?, ?, ?, (SELECT seller_id FROM drops WHERE id = ?), ?, ?, 'SHIPPED', '테스트 상품', 'GRAB 판매자', 30000, 3000, 33000,
-                        '받는 사람', '01000000000', '00000', '주소',
-                        CURRENT_TIMESTAMP + INTERVAL '15 minutes', CURRENT_TIMESTAMP - INTERVAL '2 hours')
+                        CURRENT_TIMESTAMP + INTERVAL '15 minutes')
                 RETURNING id
                 """,
                 Long.class, "GR-" + uniqueValue, buyerId, dropId, dropId, "idem-" + uniqueValue, "a".repeat(64));
+        jdbcTemplate.update(
+                """
+                INSERT INTO order_shipping_addresses (order_id, recipient_name, recipient_phone, postal_code, address_line1, created_at)
+                VALUES (?, '받는 사람', '01000000000', '00000', '주소', CURRENT_TIMESTAMP)
+                """,
+                orderId);
+        return orderId;
     }
 
     private void insertShipment(Long orderId, String deliveryStage, OffsetDateTime stageUpdatedAt) {

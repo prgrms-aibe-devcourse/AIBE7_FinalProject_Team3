@@ -245,7 +245,7 @@ class PaymentBatchServiceIntegrationTest {
         moveOrderDeadline(second, EXPIRY_BASE.plusMinutes(2));
         moveOrderDeadline(notDue, EXPIRY_BASE.plusMinutes(10));
         moveOrderDeadline(paid, EXPIRY_BASE.plusMinutes(1));
-        jdbcTemplate.update("UPDATE orders SET status = 'PAID', paid_at = payment_expires_at WHERE id = ?",
+        jdbcTemplate.update("UPDATE orders SET status = 'PAID' WHERE id = ?",
                 paid.getId());
         OffsetDateTime expiryNow = EXPIRY_BASE.plusMinutes(5);
 

@@ -1,13 +1,15 @@
 package org.example.grab.domain.order.entity;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
-import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
@@ -26,7 +28,6 @@ import java.util.Objects;
 @Table(
         name = "orders",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uq_orders_order_number", columnNames = "order_number"),
                 @UniqueConstraint(
                         name = "uq_orders_buyer_idempotency",
                         columnNames = {"buyer_id", "idempotency_key"}
@@ -80,30 +81,14 @@ public class Order extends UUIDEntity {
     @Column(name = "total_amount", nullable = false)
     private long totalAmount;
 
-    @Embedded
-    private ShippingAddress shippingAddress;
+    @OneToOne(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private OrderShippingAddress shippingAddress;
 
     @Column(name = "payment_expires_at", nullable = false)
     private OffsetDateTime paymentExpiresAt;
 
-    @Column(name = "paid_at")
-    private OffsetDateTime paidAt;
-
-    @Column(name = "canceled_at")
-    private OffsetDateTime canceledAt;
-
-    @Column(name = "expired_at")
-    private OffsetDateTime expiredAt;
-
-    // 진행 중이거나 완료된 소비자 취소 요청의 Idempotency-Key. 결제 취소가 거절되면 비운다(ERD.md 3.3).
-    @Column(name = "cancel_idempotency_key", length = 100)
-    private String cancelIdempotencyKey;
-
-    @Column(name = "cancel_request_hash", length = 64)
-    private String cancelRequestHash;
-
-    @Column(name = "cancel_reason", length = 500)
-    private String cancelReason;
+    @OneToOne(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private OrderCancellation cancellation;
 
     private Order(
             String orderNumber,
@@ -134,7 +119,7 @@ public class Order extends UUIDEntity {
         this.itemsAmount = itemsAmount;
         this.shippingAmount = shippingAmount;
         this.totalAmount = Math.addExact(itemsAmount, shippingAmount);
-        this.shippingAddress = Objects.requireNonNull(shippingAddress);
+        this.shippingAddress = new OrderShippingAddress(this, Objects.requireNonNull(shippingAddress), OffsetDateTime.now());
         this.paymentExpiresAt = Objects.requireNonNull(paymentExpiresAt);
     }
 
@@ -168,6 +153,26 @@ public class Order extends UUIDEntity {
         );
     }
 
+    public ShippingAddress getShippingAddress() {
+        return shippingAddress != null ? shippingAddress.getAddress() : null;
+    }
+
+    public String getCancelIdempotencyKey() {
+        return cancellation != null ? cancellation.getIdempotencyKey() : null;
+    }
+
+    public String getCancelRequestHash() {
+        return cancellation != null ? cancellation.getRequestHash() : null;
+    }
+
+    public String getCancelReason() {
+        return cancellation != null ? cancellation.getReason() : null;
+    }
+
+    public OffsetDateTime getCanceledAt() {
+        return cancellation != null ? cancellation.getCanceledAt() : null;
+    }
+
     // 결제 마감 시각 정각부터 만료로 본다. 결제 확정과 만료 처리가 같은 기준을 써야 두 경로가 동시에 성공하지 않는다.
     // 결제 요청 검증(PayableOrder)도 이 메서드를 쓴다. 기준을 바꿀 때는 여기만 고친다.
     public static boolean isPaymentExpired(OffsetDateTime paymentExpiresAt, OffsetDateTime now) {
@@ -183,7 +188,6 @@ public class Order extends UUIDEntity {
             throw new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION);
         }
         this.status = OrderStatus.PAID;
-        this.paidAt = Objects.requireNonNull(paidAt);
     }
 
     public void expire(OffsetDateTime expiredAt) {
@@ -191,7 +195,6 @@ public class Order extends UUIDEntity {
             throw new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION);
         }
         this.status = OrderStatus.EXPIRED;
-        this.expiredAt = Objects.requireNonNull(expiredAt);
     }
 
     // 소비자 취소 가능 상태(ERD.md 3.3). 배송이 시작됐거나 이미 끝난 주문은 취소하지 않는다.
@@ -202,7 +205,7 @@ public class Order extends UUIDEntity {
     }
 
     public boolean hasCancelRequest() {
-        return cancelIdempotencyKey != null;
+        return cancellation != null && cancellation.getIdempotencyKey() != null;
     }
 
     /**
@@ -216,9 +219,15 @@ public class Order extends UUIDEntity {
         if (hasCancelRequest()) {
             throw new BusinessException(CommonErrorCode.ORDER_STATUS_CONFLICT);
         }
-        this.cancelIdempotencyKey = Objects.requireNonNull(idempotencyKey);
-        this.cancelRequestHash = Objects.requireNonNull(requestHash);
-        this.cancelReason = Objects.requireNonNull(reason);
+        OffsetDateTime now = OffsetDateTime.now();
+        this.cancellation = new OrderCancellation(
+                this,
+                Objects.requireNonNull(idempotencyKey),
+                Objects.requireNonNull(requestHash),
+                Objects.requireNonNull(reason),
+                null,
+                now
+        );
     }
 
     // 기록한 취소 요청대로 주문을 취소한다. 결제 후 취소는 PG 결제 취소 성공을 확인한 뒤에만 호출한다.
@@ -227,7 +236,7 @@ public class Order extends UUIDEntity {
             throw new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION);
         }
         this.status = OrderStatus.CANCELED;
-        this.canceledAt = Objects.requireNonNull(canceledAt);
+        this.cancellation.markCanceled(Objects.requireNonNull(canceledAt));
     }
 
     // PG가 결제 취소를 거절했다. 주문은 그대로 두고 새 취소 요청을 받을 수 있게 기록을 비운다.
@@ -235,9 +244,7 @@ public class Order extends UUIDEntity {
         if (status == OrderStatus.CANCELED) {
             throw new BusinessException(CommonErrorCode.INVALID_STATE_TRANSITION);
         }
-        this.cancelIdempotencyKey = null;
-        this.cancelRequestHash = null;
-        this.cancelReason = null;
+        this.cancellation = null;
     }
 
     public void prepareShipment() {

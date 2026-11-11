@@ -48,7 +48,6 @@ class OrderPaymentStateTest {
 
         // then
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
-        assertThat(order.getPaidAt()).isEqualTo(NOW);
     }
 
     @Test
@@ -62,8 +61,6 @@ class OrderPaymentStateTest {
 
         // then
         assertThat(order.getStatus()).isEqualTo(OrderStatus.EXPIRED);
-        assertThat(order.getExpiredAt()).isEqualTo(NOW);
-        assertThat(order.getPaidAt()).isNull();
     }
 
     @Test

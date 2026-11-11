@@ -126,8 +126,7 @@ public class SellerDashboardRepository {
      * DROP별 운영 지표(SELLER.md 2.2). 재고는 drop_options, 매출은 orders라서 한 번에 JOIN하면
      * 행이 곱해져 합계가 부풀므로 LATERAL로 각각 집계한 뒤 붙인다.
      * 재고 계산식은 sumStock과 같지만 여기서는 CANCELED DROP도 목록에 포함한다.
-     * 매출은 결제가 확정되고(paid_at) 취소되지 않은 주문만 센다. 상태 이름을 나열하지 않아
-     * 주문 상태가 늘어도 집계 기준이 흔들리지 않는다.
+     * 매출은 결제가 확정된 주문(status IN ('PAID', 'PREPARING', 'SHIPPED', 'DELIVERED'))만 센다.
      * soldQuantity(order_items.quantity 합)는 order_items를 orders에 직접 JOIN하면 주문당 여러
      * 품목이 있을 때 order_count·salesAmount가 행 수만큼 부풀므로, 상관 서브쿼리로 주문별 합계를
      * 구한 뒤 SUM으로 다시 더한다.
@@ -157,7 +156,7 @@ public class SellerDashboardRepository {
                            COALESCE(SUM((SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi
                                          WHERE oi.order_id = o.id)), 0) AS sold_quantity
                     FROM orders o
-                    WHERE o.drop_id = d.id AND o.paid_at IS NOT NULL AND o.canceled_at IS NULL
+                    WHERE o.drop_id = d.id AND o.status IN ('PAID', 'PREPARING', 'SHIPPED', 'DELIVERED')
                 ) ord ON TRUE
                 WHERE d.seller_id = :sellerId
                 """ + statusCondition + dropIdCondition + """

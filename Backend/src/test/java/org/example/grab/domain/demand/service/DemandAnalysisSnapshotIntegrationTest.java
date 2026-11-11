@@ -191,14 +191,19 @@ class DemandAnalysisSnapshotIntegrationTest {
                 """
                 INSERT INTO orders (order_number, buyer_id, drop_id, seller_id, idempotency_key, request_hash, status,
                                     product_name_snapshot, seller_name_snapshot, items_amount, shipping_amount,
-                                    total_amount, recipient_name, recipient_phone, postal_code, address_line1,
-                                    payment_expires_at, paid_at, created_at)
+                                    total_amount, payment_expires_at, created_at)
                 VALUES (?, ?, ?, (SELECT seller_id FROM drops WHERE id = ?), ?, 'hash', 'PAID', '상품', '브랜드', 1000, 0, 1000,
-                        '수령인', '01000000000', '00000', '주소', ?, ?, ?)
+                        ?, ?)
                 RETURNING id
                 """,
                 Long.class, "ORDER-" + suffix, buyerId, dropId, dropId, suffix,
-                createdAt.plusHours(1), createdAt.plusMinutes(5), createdAt);
+                createdAt.plusHours(1), createdAt);
+        jdbcTemplate.update(
+                """
+                INSERT INTO order_shipping_addresses (order_id, recipient_name, recipient_phone, postal_code, address_line1, created_at)
+                VALUES (?, '수령인', '01000000000', '00000', '주소', ?)
+                """,
+                orderId, createdAt);
         jdbcTemplate.update(
                 """
                 INSERT INTO order_items (order_id, drop_id, option_id, option_name_snapshot, unit_price, quantity)

@@ -211,8 +211,7 @@ class SellerDashboardRepositoryTest {
         insertOrder(dropId, "EXPIRED", now.minusDays(2));
         insertOrder(dropId, "CANCELED", now.minusDays(2));
         // 결제까지 끝난 뒤 취소된 주문도 매출에서 빠져야 한다
-        Long paidThenCanceled = insertOrder(dropId, "CANCELED", now.minusDays(2));
-        jdbcTemplate.update("UPDATE orders SET paid_at = ? WHERE id = ?", now.minusDays(2), paidThenCanceled);
+        insertOrder(dropId, "CANCELED", now.minusDays(2));
 
         Long otherDropId = insertDrop(otherSellerId, "ENDED", "다른 판매자", now.minusDays(3), now.minusDays(1));
         insertOption(otherDropId, 10, 0, 0, 0, true);
@@ -366,26 +365,35 @@ class SellerDashboardRepositoryTest {
 
     private Long insertOrder(Long dropId, String status, OffsetDateTime createdAt) {
         String suffix = UUID.randomUUID().toString();
-        return jdbcTemplate.queryForObject(
+        Long orderId = jdbcTemplate.queryForObject(
                 """
                 INSERT INTO orders (order_number, buyer_id, drop_id, seller_id, idempotency_key, request_hash, status,
                                     product_name_snapshot, seller_name_snapshot, items_amount, shipping_amount,
-                                    total_amount, recipient_name, recipient_phone, postal_code, address_line1,
-                                    payment_expires_at, paid_at, canceled_at, expired_at, cancel_reason, created_at)
+                                    total_amount, payment_expires_at, created_at)
                 VALUES (?, ?, ?, (SELECT seller_id FROM drops WHERE id = ?), ?, 'hash', ?, '상품', '브랜드', 1000, 0, 1000,
-                        '수령인', '01000000000', '00000', '주소', ?,
-                        CASE WHEN ? IN ('PAID', 'PREPARING', 'SHIPPED', 'DELIVERED') THEN ? ELSE NULL END,
-                        CASE WHEN ? = 'CANCELED' THEN ? ELSE NULL END,
-                        CASE WHEN ? = 'EXPIRED' THEN ? ELSE NULL END,
-                        CASE WHEN ? = 'CANCELED' THEN '테스트 취소' ELSE NULL END,
-                        ?)
+                        ?, ?)
                 RETURNING id
                 """,
                 Long.class,
                 "ORDER-" + suffix, buyerId, dropId, dropId, suffix, status,
-                createdAt.plusHours(1), status, createdAt, status, createdAt,
-                // EXPIRED는 expired_at이, CANCELED는 cancel_reason이 있어야 한다(V12·V13 제약)
-                status, createdAt, status, createdAt);
+                createdAt.plusHours(1), createdAt);
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO order_shipping_addresses (order_id, recipient_name, recipient_phone, postal_code, address_line1, created_at)
+                VALUES (?, '수령인', '01000000000', '00000', '주소', ?)
+                """,
+                orderId, createdAt);
+
+        if ("CANCELED".equals(status)) {
+            jdbcTemplate.update(
+                    """
+                    INSERT INTO order_cancellations (order_id, idempotency_key, request_hash, reason, canceled_at, created_at)
+                    VALUES (?, ?, 'hash', '테스트 취소', ?, ?)
+                    """,
+                    orderId, "cancel-" + suffix, createdAt, createdAt);
+        }
+        return orderId;
     }
 
     private void insertPayment(Long orderId, String status, String reconciliationStatus, OffsetDateTime createdAt) {
