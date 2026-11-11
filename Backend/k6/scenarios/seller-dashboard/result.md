@@ -35,6 +35,21 @@
 steady-read 수준(한 자릿수~20ms대)을 유지했고, 이 규모에서는 둘 다 뚜렷한 병목이
 아니다.
 
+## 2026-11-12 측정: orders 정규화(V34) 및 drops 조인 제거 최적화 (micro + db-nano)
+
+### 1. 변경 배경 및 최적화 내용
+- `orders` 테이블 정규화(V34)로 배송지(`order_shipping_addresses`) 및 취소(`order_cancellations`)를 분리하고 `paid_at` 컬럼을 제거.
+- `SellerDashboardRepository`의 집계 쿼리(`countOrdersByStatus`, `countPaymentsByStatus`, `countReconciliationRequired`)가 불필요하게 `drops` 테이블을 조인하던 것을 V30 비정규화 컬럼인 `orders.seller_id`를 직접 조회하도록 최적화.
+
+### 2. DB 쿼리 최적화 실측 (EXPLAIN ANALYZE, micro + db-nano)
+| 쿼리 대상 | 기존 쿼리 (개선 전) | 개선 후 쿼리 | 실행 시간 개선 | 플래닝 및 I/O 절감 |
+|---|---|---|---|---|
+| **주문 상태별 건수** (`countOrdersByStatus`) | `JOIN drops d ON d.id = o.drop_id AND d.seller_id = 3` | `WHERE o.seller_id = 3` | **7.58 ms ➔ 3.66 ms (2.1배 단축)** | `drops` 풀스캔 및 Hash Join 1회 제거 |
+| **결제 상태별 건수** (`countPaymentsByStatus`) | `payments p JOIN orders o JOIN drops d ...` | `payments p JOIN orders o WHERE o.seller_id = 3` | **8.40 ms ➔ 1.15 ms (7.3배 대폭 단축)** | 3-way 조인 ➔ 2-way 조인 축소, 해시 테이블 1개 제거 |
+| **미해결 보정 건수** (`countReconciliationRequired`) | `JOIN drops d ...` | `WHERE o.seller_id = 3` | **0.071 ms ➔ 0.069 ms** | 플래닝 시간 1.48ms ➔ 0.95ms (-35%), 버퍼 629 ➔ 491 블록 (-22%) |
+
+> 대시보드 요약 1회 호출 시 실행되는 핵심 집계 쿼리 합산 시간이 **16.05ms ➔ 4.88ms로 약 70% 감소**하여 DB CPU 점유율과 커넥션 점유 시간이 크게 절감되었습니다.
+
 ## 결론
 
 - **완료조건 1(시나리오 존재)**: 충족.

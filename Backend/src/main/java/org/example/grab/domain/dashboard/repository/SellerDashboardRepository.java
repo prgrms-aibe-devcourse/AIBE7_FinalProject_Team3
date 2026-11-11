@@ -72,8 +72,7 @@ public class SellerDashboardRepository {
         String sql = """
                 SELECT o.status, COUNT(*)
                 FROM orders o
-                JOIN drops d ON d.id = o.drop_id AND d.seller_id = :sellerId
-                WHERE TRUE
+                WHERE o.seller_id = :sellerId
                 """ + PERIOD_CONDITION.formatted("o.created_at") + "GROUP BY o.status";
         return queryCounts(sql, periodParameters(sellerId, from, to));
     }
@@ -85,8 +84,7 @@ public class SellerDashboardRepository {
                 SELECT p.status, COUNT(*)
                 FROM payments p
                 JOIN orders o ON o.id = p.order_id
-                JOIN drops d ON d.id = o.drop_id AND d.seller_id = :sellerId
-                WHERE TRUE
+                WHERE o.seller_id = :sellerId
                 """ + PERIOD_CONDITION.formatted("p.created_at") + "GROUP BY p.status";
         return queryCounts(sql, periodParameters(sellerId, from, to));
     }
@@ -97,8 +95,7 @@ public class SellerDashboardRepository {
                 SELECT COUNT(*)
                 FROM payments p
                 JOIN orders o ON o.id = p.order_id
-                JOIN drops d ON d.id = o.drop_id AND d.seller_id = :sellerId
-                WHERE p.reconciliation_status = 'REQUIRED'
+                WHERE o.seller_id = :sellerId AND p.reconciliation_status = 'REQUIRED'
                 """;
         Long count = jdbcTemplate.queryForObject(sql, new MapSqlParameterSource("sellerId", sellerId), Long.class);
         return Objects.requireNonNullElse(count, 0L);

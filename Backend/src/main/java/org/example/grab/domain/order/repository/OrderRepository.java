@@ -35,7 +35,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                 SELECT p.status
                 FROM payments p
                 WHERE p.order_id = o.id
-                ORDER BY p.created_at DESC, p.id DESC
+                ORDER BY p.id DESC
                 LIMIT 1
             ) payment ON TRUE
             WHERE o.seller_id = :sellerId
@@ -50,7 +50,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                 SELECT p.status
                 FROM payments p
                 WHERE p.order_id = o.id
-                ORDER BY p.created_at DESC, p.id DESC
+                ORDER BY p.id DESC
                 LIMIT 1
             ) payment ON CAST(:paymentStatus AS VARCHAR) IS NOT NULL
             WHERE o.seller_id = :sellerId

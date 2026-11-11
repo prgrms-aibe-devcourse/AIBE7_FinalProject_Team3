@@ -259,3 +259,24 @@ postgres vCPU 1개가 겹쳐 countQuery 자체가 CPU로 포화(`docker stats`�
   조건(필터 유무)별로 실제 호출되는 쿼리 모양까지 맞춰 재측정해야 하고, 가능하면
   처음부터 운영 RTT(`db-nano`)와 현실적인 데이터 규모로 재서 측정 환경 잡음과 비현실적
   규모가 섞인 숫자를 보고하지 않는다.
+
+## 2026-11-12 측정: orders 정규화(V34, 인덱스 정리) 및 LATERAL 정렬 단순화 (micro + db-nano)
+
+### 1. 변경 배경 및 최적화 내용
+- `orders` 테이블 정규화(V34):
+  - 배송지 정보(`order_shipping_addresses`)와 취소 정보(`order_cancellations`)를 1:1 분리.
+  - 미사용 중복 인덱스 `idx_orders_drop_created` 삭제 (`idx_orders_seller_created`로 일원화).
+  - 난수 기반 주문번호 제약 `uq_orders_order_number` 삭제.
+- `OrderRepository.findSellerOrders`:
+  - `LEFT JOIN order_cancellations`로 취소 진행 여부 확인.
+  - 최신 결제 상태 LATERAL 조인의 정렬 키를 `ORDER BY p.created_at DESC, p.id DESC`에서 단일 PK 정렬인 `ORDER BY p.id DESC`로 단순화하여 인메모리 퀵소트 오버헤드 절감.
+
+### 2. DB 쿼리 최적화 실측 (EXPLAIN ANALYZE, micro + db-nano)
+
+- **`findSellerOrders` 본문 쿼리**:
+  - 최신 결제 상태 LATERAL 조인의 정렬 키를 `ORDER BY p.created_at DESC, p.id DESC`에서 단일 PK 정렬인 `ORDER BY p.id DESC`로 단순화.
+  - 실행 시간: **0.74 ms ➔ 0.40 ms (약 45.9% 단축)**
+  - 플래닝 및 정렬 방식: 다중 컬럼 정렬에서 PK 단일 컬럼 정렬로 단순화되어 퀵소트 오버헤드와 버퍼 히트 감소.
+- **인덱스 정리 효과**:
+  - 미사용 인덱스 `idx_orders_drop_created` 및 난수 주문번호 유니크 제약 `uq_orders_order_number` 삭제로 `orders` 테이블 인덱스가 9개에서 7개로 감축.
+  - `idx_orders_seller_created`가 판매자/DROP 복합 조회를 온전히 인덱스 스캔으로 커버하면서, 주문 생성 등 쓰기 시 인덱스 갱신 오버헤드 절감.
