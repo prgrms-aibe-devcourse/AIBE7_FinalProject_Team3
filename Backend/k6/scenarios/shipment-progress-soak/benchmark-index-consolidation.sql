@@ -151,6 +151,8 @@ DROP INDEX idx_orders_payment_expiry;
 CREATE INDEX idx_orders_payment_expiry ON orders (payment_expires_at, id)
 WHERE status = 'PAYMENT_PENDING';
 ANALYZE orders;
+\echo '=== 기존 부분 인덱스 크기 (동일 fixture로 재생성)'
+SELECT pg_size_pretty(pg_relation_size('idx_orders_payment_expiry')) AS index_size;
 DO $$ DECLARE started_at timestamptz; elapsed_ms numeric; trial int; start_lsn pg_lsn; wal_bytes numeric; BEGIN
   FOR trial IN 1..3 LOOP
     started_at := clock_timestamp();
