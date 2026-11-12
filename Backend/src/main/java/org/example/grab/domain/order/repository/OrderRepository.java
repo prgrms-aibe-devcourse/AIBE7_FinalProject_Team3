@@ -66,6 +66,49 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             Pageable pageable);
 
     @Query(value = """
+            WITH page_orders AS MATERIALIZED (
+                SELECT o.*
+                FROM orders o
+                WHERE o.seller_id = :sellerId
+                  AND (CAST(:dropId AS BIGINT) IS NULL OR o.drop_id = :dropId)
+                  AND (CAST(:orderStatus AS VARCHAR) IS NULL OR o.status = :orderStatus)
+                ORDER BY o.created_at DESC, o.id DESC
+                LIMIT :limit OFFSET :offset
+            )
+            SELECT o.public_id AS "orderId", o.order_number AS "orderNumber", o.drop_id AS "dropId",
+                   o.product_name_snapshot AS "productName", o.seller_name_snapshot AS "sellerName",
+                   o.status AS "orderStatus", payment.status AS "paymentStatus",
+                   o.status IN ('PAYMENT_PENDING', 'PAID', 'PREPARING')
+                       AND oc.idempotency_key IS NOT NULL AS "cancellationInProgress",
+                   o.items_amount AS "itemsAmount", o.shipping_amount AS "shippingAmount",
+                   o.total_amount AS "totalAmount", o.created_at AS "orderedAt"
+            FROM page_orders o
+            LEFT JOIN order_cancellations oc ON oc.order_id = o.id
+            LEFT JOIN LATERAL (
+                SELECT p.status FROM payments p
+                WHERE p.order_id = o.id ORDER BY p.id DESC LIMIT 1
+            ) payment ON TRUE
+            ORDER BY o.created_at DESC, o.id DESC
+            """, nativeQuery = true)
+    List<SellerOrderListProjection> findSellerOrdersPage(
+            @Param("sellerId") long sellerId,
+            @Param("dropId") Long dropId,
+            @Param("orderStatus") String orderStatus,
+            @Param("limit") int limit,
+            @Param("offset") long offset);
+
+    @Query(value = """
+            SELECT COUNT(*) FROM orders o
+            WHERE o.seller_id = :sellerId
+              AND (CAST(:dropId AS BIGINT) IS NULL OR o.drop_id = :dropId)
+              AND (CAST(:orderStatus AS VARCHAR) IS NULL OR o.status = :orderStatus)
+            """, nativeQuery = true)
+    long countSellerOrders(
+            @Param("sellerId") long sellerId,
+            @Param("dropId") Long dropId,
+            @Param("orderStatus") String orderStatus);
+
+    @Query(value = """
             SELECT p.status
             FROM payments p
             WHERE p.order_id = :orderId
@@ -82,6 +125,12 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     boolean existsDrop(@Param("dropId") long dropId);
 
     Optional<Order> findByUuid(UUID uuid);
+
+    @Query(value = "SELECT o.* FROM orders o JOIN drops d ON d.id = o.drop_id "
+            + "WHERE o.public_id = :uuid AND d.seller_id = :sellerId", nativeQuery = true)
+    Optional<Order> findSellerOrderByUuid(@Param("sellerId") long sellerId, @Param("uuid") UUID uuid);
+
+    boolean existsByUuid(UUID uuid);
 
     Optional<Order> findByUuidAndBuyerId(UUID uuid, Long buyerId);
 

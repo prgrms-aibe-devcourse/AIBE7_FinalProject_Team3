@@ -1,10 +1,10 @@
 package org.example.grab.domain.dashboard.repository;
 
 import org.example.grab.domain.dashboard.dto.DropStatsProjection;
-import org.example.grab.domain.dashboard.dto.SellerDashboardSummaryResponse.StockSummary;
 import org.example.grab.domain.dashboard.dto.UpcomingDropEventType;
 import org.example.grab.domain.dashboard.dto.UpcomingDropProjection;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -15,12 +15,11 @@ import org.springframework.stereotype.Repository;
 import java.sql.Types;
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 @Repository
 @RequiredArgsConstructor
+@Slf4j
 public class SellerDashboardRepository {
 
     // dashboard 도메인이 drop 엔티티에 의존하지 않도록 JDBC로 필요한 컬럼만 조회한다
@@ -56,67 +55,41 @@ public class SellerDashboardRepository {
                 resultSet.getObject("upcomingAt", OffsetDateTime.class)));
     }
 
-    // drop 상태별 갯수 반환
-    public Map<String, Long> countDropsByStatus(long sellerId) {
+    public record SummaryMetric(String metric, String status, long value) {}
+
+    // 요약 항목은 한 요청에서 한 번만 DB 왕복한다. 기간은 주문·결제에만 적용한다.
+    public List<SummaryMetric> findSummaryMetrics(long sellerId, OffsetDateTime from, OffsetDateTime to) {
         String sql = """
-                SELECT d.status, COUNT(*)
-                FROM drops d
-                WHERE d.seller_id = :sellerId
-                GROUP BY d.status
+                WITH stock AS (
+                    SELECT COALESCE(SUM(op.total_quantity - op.reserved_quantity - op.sold_quantity - op.withheld_quantity), 0) available,
+                           COALESCE(SUM(op.reserved_quantity), 0) reserved,
+                           COALESCE(SUM(op.sold_quantity), 0) sold
+                    FROM drop_options op JOIN drops d ON d.id = op.drop_id
+                    WHERE d.seller_id = :sellerId AND d.status <> 'CANCELED'
+                ), metrics AS (
+                    SELECT 'DROP' metric, d.status, COUNT(*) value FROM drops d
+                    WHERE d.seller_id = :sellerId GROUP BY d.status
+                    UNION ALL
+                    SELECT 'ORDER', o.status, COUNT(*) FROM orders o
+                    WHERE o.seller_id = :sellerId
+                    """ + PERIOD_CONDITION.formatted("o.created_at") + "GROUP BY o.status\nUNION ALL\n" + """
+                    SELECT 'PAYMENT', p.status, COUNT(*) FROM payments p JOIN orders o ON o.id = p.order_id
+                    WHERE o.seller_id = :sellerId
+                    """ + PERIOD_CONDITION.formatted("p.created_at") + "GROUP BY p.status\nUNION ALL\n" + """
+                    SELECT 'RECONCILIATION', NULL, COUNT(*) FROM payments p JOIN orders o ON o.id = p.order_id
+                    WHERE o.seller_id = :sellerId AND p.reconciliation_status = 'REQUIRED'
+                )
+                SELECT metric, status, value FROM metrics
+                UNION ALL SELECT 'STOCK', 'AVAILABLE', available FROM stock
+                UNION ALL SELECT 'STOCK', 'RESERVED', reserved FROM stock
+                UNION ALL SELECT 'STOCK', 'SOLD', sold FROM stock
                 """;
-        return queryCounts(sql, new MapSqlParameterSource("sellerId", sellerId));
-    }
-
-    // order 상태별 갯수 반환
-    public Map<String, Long> countOrdersByStatus(long sellerId, OffsetDateTime from, OffsetDateTime to) {
-        String sql = """
-                SELECT o.status, COUNT(*)
-                FROM orders o
-                WHERE o.seller_id = :sellerId
-                """ + PERIOD_CONDITION.formatted("o.created_at") + "GROUP BY o.status";
-        return queryCounts(sql, periodParameters(sellerId, from, to));
-    }
-
-    // 결제 상태별 갯수 반환
-    // 주문이 아니라 결제 시도 건수이므로 재시도가 있으면 주문 집계보다 많다(SELLER.md 2.1).
-    public Map<String, Long> countPaymentsByStatus(long sellerId, OffsetDateTime from, OffsetDateTime to) {
-        String sql = """
-                SELECT p.status, COUNT(*)
-                FROM payments p
-                JOIN orders o ON o.id = p.order_id
-                WHERE o.seller_id = :sellerId
-                """ + PERIOD_CONDITION.formatted("p.created_at") + "GROUP BY p.status";
-        return queryCounts(sql, periodParameters(sellerId, from, to));
-    }
-
-    // 미해결 보정은 기간을 걸면 오래 방치된 건이 사라지므로 전체를 센다(SELLER.md 2.1).
-    public long countReconciliationRequired(long sellerId) {
-        String sql = """
-                SELECT COUNT(*)
-                FROM payments p
-                JOIN orders o ON o.id = p.order_id
-                WHERE o.seller_id = :sellerId AND p.reconciliation_status = 'REQUIRED'
-                """;
-        Long count = jdbcTemplate.queryForObject(sql, new MapSqlParameterSource("sellerId", sellerId), Long.class);
-        return Objects.requireNonNullElse(count, 0L);
-    }
-
-    // 가용 재고는 저장하지 않고 ERD.md 1.2절 계산식으로 구한다. 취소된 DROP은 판매분이 아니므로 제외한다.
-    public StockSummary sumStock(long sellerId) {
-        String sql = """
-                SELECT COALESCE(SUM(op.total_quantity - op.reserved_quantity
-                                    - op.sold_quantity - op.withheld_quantity), 0) AS available,
-                       COALESCE(SUM(op.reserved_quantity), 0) AS reserved,
-                       COALESCE(SUM(op.sold_quantity), 0) AS sold
-                FROM drop_options op
-                JOIN drops d ON d.id = op.drop_id AND d.seller_id = :sellerId
-                WHERE d.status <> 'CANCELED'
-                """;
-        return jdbcTemplate.queryForObject(sql, new MapSqlParameterSource("sellerId", sellerId),
-                (resultSet, rowNumber) -> new StockSummary(
-                        resultSet.getLong("available"),
-                        resultSet.getLong("reserved"),
-                        resultSet.getLong("sold")));
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("sellerId", sellerId)
+                .addValue("from", from, Types.TIMESTAMP_WITH_TIMEZONE)
+                .addValue("to", to, Types.TIMESTAMP_WITH_TIMEZONE);
+        return jdbcTemplate.query(sql, parameters, (rs, row) ->
+                new SummaryMetric(rs.getString("metric"), rs.getString("status"), rs.getLong("value")));
     }
 
     /*
@@ -132,33 +105,39 @@ public class SellerDashboardRepository {
         String statusCondition = "AND (CAST(:status AS TEXT) IS NULL OR d.status = :status)\n";
         String dropIdCondition = "AND (CAST(:dropId AS BIGINT) IS NULL OR d.id = :dropId)\n";
         String sql = """
-                SELECT d.id AS "dropId", d.name AS "name", d.status AS "status",
-                       d.sale_ends_at AS "saleEndsAt",
-                       (SELECT COUNT(*) FROM wishes w
-                         WHERE w.drop_id = d.id AND w.canceled_at IS NULL) AS "activeWishCount",
-                       st.available AS "availableStock", st.reserved AS "reservedStock",
-                       st.sold AS "soldStock",
-                       ord.order_count AS "orderCount", ord.sold_quantity AS "soldQuantity",
-                       ord.sales_amount AS "salesAmount"
-                FROM drops d
-                LEFT JOIN LATERAL (
-                    SELECT COALESCE(SUM(op.total_quantity - op.reserved_quantity
-                                        - op.sold_quantity - op.withheld_quantity), 0) AS available,
-                           COALESCE(SUM(op.reserved_quantity), 0) AS reserved,
-                           COALESCE(SUM(op.sold_quantity), 0) AS sold
-                    FROM drop_options op WHERE op.drop_id = d.id
-                ) st ON TRUE
-                LEFT JOIN LATERAL (
-                    SELECT COUNT(*) AS order_count, COALESCE(SUM(o.total_amount), 0) AS sales_amount,
-                           COALESCE(SUM((SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi
-                                         WHERE oi.order_id = o.id)), 0) AS sold_quantity
-                    FROM orders o
-                    WHERE o.drop_id = d.id AND o.status IN ('PAID', 'PREPARING', 'SHIPPED', 'DELIVERED')
-                ) ord ON TRUE
-                WHERE d.seller_id = :sellerId
-                """ + statusCondition + dropIdCondition + """
+                WITH page_drops AS MATERIALIZED (
+                    SELECT d.id, d.name, d.status, d.sale_ends_at
+                    FROM drops d WHERE d.seller_id = :sellerId
+                    """ + statusCondition + dropIdCondition + """
+                    ORDER BY d.id DESC LIMIT :size OFFSET :offset
+                ), active_wishes AS (
+                    SELECT w.drop_id, COUNT(*) active_count FROM wishes w
+                    JOIN page_drops d ON d.id = w.drop_id WHERE w.canceled_at IS NULL GROUP BY w.drop_id
+                ), stock AS (
+                    SELECT op.drop_id,
+                           COALESCE(SUM(op.total_quantity - op.reserved_quantity - op.sold_quantity - op.withheld_quantity), 0) available,
+                           COALESCE(SUM(op.reserved_quantity), 0) reserved,
+                           COALESCE(SUM(op.sold_quantity), 0) sold
+                    FROM drop_options op JOIN page_drops d ON d.id = op.drop_id GROUP BY op.drop_id
+                ), paid_orders AS MATERIALIZED (
+                    SELECT o.id, o.drop_id, o.total_amount FROM orders o JOIN page_drops d ON d.id = o.drop_id
+                    WHERE o.status IN ('PAID', 'PREPARING', 'SHIPPED', 'DELIVERED')
+                ), item_totals AS (
+                    SELECT oi.order_id, SUM(oi.quantity) quantity FROM order_items oi
+                    JOIN paid_orders o ON o.id = oi.order_id GROUP BY oi.order_id
+                ), order_stats AS (
+                    SELECT o.drop_id, COUNT(*) order_count, SUM(o.total_amount) sales_amount,
+                           SUM(COALESCE(i.quantity, 0)) sold_quantity
+                    FROM paid_orders o LEFT JOIN item_totals i ON i.order_id = o.id GROUP BY o.drop_id
+                )
+                SELECT d.id AS "dropId", d.name AS "name", d.status AS "status", d.sale_ends_at AS "saleEndsAt",
+                       COALESCE(w.active_count, 0) AS "activeWishCount",
+                       COALESCE(st.available, 0) AS "availableStock", COALESCE(st.reserved, 0) AS "reservedStock",
+                       COALESCE(st.sold, 0) AS "soldStock", COALESCE(ord.order_count, 0) AS "orderCount",
+                       COALESCE(ord.sold_quantity, 0) AS "soldQuantity", COALESCE(ord.sales_amount, 0) AS "salesAmount"
+                FROM page_drops d LEFT JOIN active_wishes w ON w.drop_id = d.id
+                LEFT JOIN stock st ON st.drop_id = d.id LEFT JOIN order_stats ord ON ord.drop_id = d.id
                 ORDER BY d.id DESC
-                LIMIT :size OFFSET :offset
                 """;
         MapSqlParameterSource parameters = new MapSqlParameterSource()
                 .addValue("sellerId", sellerId)
@@ -166,6 +145,7 @@ public class SellerDashboardRepository {
                 .addValue("dropId", dropId, Types.BIGINT)
                 .addValue("size", pageable.getPageSize())
                 .addValue("offset", pageable.getOffset());
+        long started = System.nanoTime();
         List<DropStatsProjection> content = jdbcTemplate.query(sql, parameters,
                 (resultSet, rowNumber) -> new DropStatsProjection(
                         resultSet.getLong("dropId"),
@@ -179,28 +159,16 @@ public class SellerDashboardRepository {
                         resultSet.getLong("orderCount"),
                         resultSet.getLong("soldQuantity"),
                         resultSet.getLong("salesAmount")));
+        long contentUs = (System.nanoTime() - started) / 1_000;
         // 총 건수는 집계가 필요 없으므로 LATERAL 없이 센다.
         String countSql = "SELECT COUNT(*) FROM drops d WHERE d.seller_id = :sellerId\n"
                 + statusCondition + dropIdCondition;
+        started = System.nanoTime();
         Long total = jdbcTemplate.queryForObject(countSql, parameters, Long.class);
+        long countUs = (System.nanoTime() - started) / 1_000;
+        log.info("TEMP_DASHBOARD_SQL drop_stats_content_us={} count_us={} total_us={}", contentUs, countUs,
+                contentUs + countUs);
         return new PageImpl<>(content, pageable, Objects.requireNonNullElse(total, 0L));
     }
 
-    // SQL에 넘길 값 꾸러미 만들기
-    // MapSqlParameterSource에 NamedParameterJdbcTemplate SQL의 sellerId, from, to에 꽂을 값을 담음
-    private MapSqlParameterSource periodParameters(long sellerId, OffsetDateTime from, OffsetDateTime to) {
-        return new MapSqlParameterSource()
-                .addValue("sellerId", sellerId)
-                // null을 넘길 때 PostgreSQL이 타입을 추론하지 못하므로 타입을 함께 지정한다
-                .addValue("from", from, Types.TIMESTAMP_WITH_TIMEZONE)
-                .addValue("to", to, Types.TIMESTAMP_WITH_TIMEZONE);
-    }
-
-    // GROUP BY 결과를 Map으로 바꾸기
-    private Map<String, Long> queryCounts(String sql, MapSqlParameterSource parameters) {
-        return jdbcTemplate.query(sql, parameters,
-                        (resultSet, rowNumber) -> Map.entry(resultSet.getString(1), resultSet.getLong(2)))
-                .stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-    }
 }

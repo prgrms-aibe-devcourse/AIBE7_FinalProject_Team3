@@ -1,6 +1,7 @@
 package org.example.grab.global.security.identity;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.grab.global.error.BusinessException;
 import org.example.grab.global.error.CommonErrorCode;
 import org.example.grab.global.security.AuthRole;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class SecurityContextCurrentSellerIdProvider implements CurrentSellerIdProvider {
 
     private final SellerIdResolver sellerIdResolver;
@@ -32,8 +34,11 @@ public class SecurityContextCurrentSellerIdProvider implements CurrentSellerIdPr
         }
         if (authentication.getPrincipal() instanceof AuthenticatedUser authenticatedUser) {
             // 토큰의 SELLER는 발급 시점 값이다. 그 뒤 승인이 취소됐으면 조회 결과가 없어 바로 막힌다
-            return sellerIdResolver.resolveApproved(authenticatedUser.publicId())
+            long started = System.nanoTime();
+            var sellerId = sellerIdResolver.resolveApproved(authenticatedUser.publicId())
                     .orElseThrow(() -> new BusinessException(CommonErrorCode.ACCESS_DENIED));
+            log.info("TEMP_DASHBOARD_AUTH seller_lookup_us={}", (System.nanoTime() - started) / 1_000);
+            return sellerId;
         }
         throw new BusinessException(CommonErrorCode.AUTHENTICATION_REQUIRED);
     }

@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.PageImpl;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -43,11 +44,12 @@ public class SellerOrderService {
     private final ShipmentRequestHasher shipmentRequestHasher;
 
     public SellerOrderDetailResponse findOrder(long sellerId, UUID orderId) {
-        Order order = orderRepository.findByUuid(orderId)
-                .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
-        if (!orderRepository.ownsDrop(sellerId, order.getDropId())) {
-            throw new BusinessException(OrderErrorCode.ORDER_ACCESS_DENIED);
-        }
+        Order order = orderRepository.findSellerOrderByUuid(sellerId, orderId).orElseGet(() -> {
+            if (orderRepository.existsByUuid(orderId)) {
+                throw new BusinessException(OrderErrorCode.ORDER_ACCESS_DENIED);
+            }
+            throw new BusinessException(OrderErrorCode.ORDER_NOT_FOUND);
+        });
 
         OrderDetailReader.OrderDetail detail = orderDetailReader.read(order);
         return SellerOrderDetailResponse.from(
@@ -150,10 +152,19 @@ public class SellerOrderService {
                 throw new BusinessException(CommonErrorCode.ACCESS_DENIED);
             }
         }
-        Page<SellerOrderListResponse> orders = orderRepository.findSellerOrders(
-                sellerId, dropId, orderStatus == null ? null : orderStatus.name(),
-                paymentStatus == null ? null : paymentStatus.name(), PageRequest.of(page, size))
-                .map(SellerOrderService::toListResponse);
+        String orderStatusName = orderStatus == null ? null : orderStatus.name();
+        PageRequest pageable = PageRequest.of(page, size);
+        Page<SellerOrderListProjection> projections;
+        if (paymentStatus == null) {
+            var content = orderRepository.findSellerOrdersPage(
+                    sellerId, dropId, orderStatusName, size, pageable.getOffset());
+            projections = new PageImpl<>(content, pageable,
+                    orderRepository.countSellerOrders(sellerId, dropId, orderStatusName));
+        } else {
+            projections = orderRepository.findSellerOrders(
+                    sellerId, dropId, orderStatusName, paymentStatus.name(), pageable);
+        }
+        Page<SellerOrderListResponse> orders = projections.map(SellerOrderService::toListResponse);
         return PageResponse.from(orders);
     }
 

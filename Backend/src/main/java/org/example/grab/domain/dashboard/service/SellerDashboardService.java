@@ -9,6 +9,7 @@ import org.example.grab.domain.dashboard.repository.SellerDashboardRepository;
 import org.example.grab.domain.drop.entity.DropStatus;
 import org.example.grab.global.common.PageResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,9 +17,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class SellerDashboardService {
 
     private final SellerDashboardRepository sellerDashboardRepository;
@@ -45,11 +49,30 @@ public class SellerDashboardService {
 
     @Transactional(readOnly = true)
     public SellerDashboardSummaryResponse findSummary(long sellerId, OffsetDateTime from, OffsetDateTime to) {
-        return SellerDashboardSummaryResponse.of(
-                sellerDashboardRepository.countDropsByStatus(sellerId),
-                sellerDashboardRepository.countOrdersByStatus(sellerId, from, to),
-                sellerDashboardRepository.countPaymentsByStatus(sellerId, from, to),
-                sellerDashboardRepository.countReconciliationRequired(sellerId),
-                sellerDashboardRepository.sumStock(sellerId));
+        long started = System.nanoTime();
+        var metrics = sellerDashboardRepository.findSummaryMetrics(sellerId, from, to);
+        long queryUs = (System.nanoTime() - started) / 1_000;
+        Map<String, Long> drops = new HashMap<>(), orders = new HashMap<>(), payments = new HashMap<>();
+        long reconciliation = 0, available = 0, reserved = 0, sold = 0;
+        for (var metric : metrics) {
+            switch (metric.metric()) {
+                case "DROP" -> drops.put(metric.status(), metric.value());
+                case "ORDER" -> orders.put(metric.status(), metric.value());
+                case "PAYMENT" -> payments.put(metric.status(), metric.value());
+                case "RECONCILIATION" -> reconciliation = metric.value();
+                case "STOCK" -> {
+                    switch (metric.status()) {
+                        case "AVAILABLE" -> available = metric.value();
+                        case "RESERVED" -> reserved = metric.value();
+                        case "SOLD" -> sold = metric.value();
+                        default -> throw new IllegalStateException("Unknown stock metric: " + metric.status());
+                    }
+                }
+                default -> throw new IllegalStateException("Unknown dashboard metric: " + metric.metric());
+            }
+        }
+        log.info("TEMP_DASHBOARD_SQL summary_query_us={}", queryUs);
+        var stock = new SellerDashboardSummaryResponse.StockSummary(available, reserved, sold);
+        return SellerDashboardSummaryResponse.of(drops, orders, payments, reconciliation, stock);
     }
 }

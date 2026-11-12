@@ -60,8 +60,7 @@ class SellerOrderServiceTest {
         UUID orderId = UUID.randomUUID();
         Order order = createOrder();
         OrderItem item = OrderItem.create(order, 11L, "검정 / L", 15000, 2);
-        when(orderRepository.findByUuid(orderId)).thenReturn(Optional.of(order));
-        when(orderRepository.ownsDrop(SELLER_ID, 42L)).thenReturn(true);
+        when(orderRepository.findSellerOrderByUuid(SELLER_ID, orderId)).thenReturn(Optional.of(order));
         when(orderItemRepository.findAllByOrderIdOrderByIdAsc(null)).thenReturn(List.of(item));
         when(orderRepository.findLatestPaymentStatus(null)).thenReturn(Optional.of("SUCCEEDED"));
         when(shipmentRepository.findByOrderId(null)).thenReturn(Optional.empty());
@@ -78,7 +77,6 @@ class SellerOrderServiceTest {
         });
         assertThat(result.paymentStatus()).isEqualTo(PaymentStatus.SUCCEEDED);
         assertThat(result.shipping()).isEqualTo(new OrderShippingResponse(null, null, null, null, null));
-        verify(orderRepository).ownsDrop(SELLER_ID, 42L);
     }
 
     @ParameterizedTest
@@ -118,8 +116,8 @@ class SellerOrderServiceTest {
     void rejectsOrderOwnedByAnotherSeller() {
         // given
         UUID orderId = UUID.randomUUID();
-        when(orderRepository.findByUuid(orderId)).thenReturn(Optional.of(createOrder()));
-        when(orderRepository.ownsDrop(SELLER_ID, 42L)).thenReturn(false);
+        when(orderRepository.findSellerOrderByUuid(SELLER_ID, orderId)).thenReturn(Optional.empty());
+        when(orderRepository.existsByUuid(orderId)).thenReturn(true);
 
         // when
         Throwable exception = catchThrowable(() -> sellerOrderService.findOrder(SELLER_ID, orderId));
@@ -135,7 +133,8 @@ class SellerOrderServiceTest {
     void returnsNotFoundForMissingOrder() {
         // given
         UUID orderId = UUID.randomUUID();
-        when(orderRepository.findByUuid(orderId)).thenReturn(Optional.empty());
+        when(orderRepository.findSellerOrderByUuid(SELLER_ID, orderId)).thenReturn(Optional.empty());
+        when(orderRepository.existsByUuid(orderId)).thenReturn(false);
 
         // when
         Throwable exception = catchThrowable(() -> sellerOrderService.findOrder(SELLER_ID, orderId));
@@ -459,9 +458,28 @@ class SellerOrderServiceTest {
         verify(orderRepository).findSellerOrders(SELLER_ID, 42L, "PAID", "SUCCEEDED", pageRequest);
     }
 
+    @Test
+    void usesPageFirstQueryWhenPaymentStatusIsNotFiltered() {
+        var order = new SellerOrderListResponse(UUID.randomUUID(), "GR-1", 42L, "상품", "판매자",
+                "PAID", "SUCCEEDED", false, 1000, 2500, 3500,
+                OffsetDateTime.parse("2026-09-23T12:00:00Z"));
+        var pageRequest = PageRequest.of(0, 10);
+        var projection = toProjection(order);
+        when(orderRepository.findSellerOrdersPage(SELLER_ID, null, null, 10, 0))
+                .thenReturn(List.of(projection));
+        when(orderRepository.countSellerOrders(SELLER_ID, null, null)).thenReturn(1L);
+
+        var result = sellerOrderService.findOrders(SELLER_ID, null, null, null, 0, 10);
+
+        assertThat(result.content()).containsExactly(order);
+        assertThat(result.totalElements()).isEqualTo(1);
+        assertThat(result.totalPages()).isEqualTo(1);
+        verify(orderRepository).findSellerOrdersPage(SELLER_ID, null, null, 10, pageRequest.getOffset());
+        verify(orderRepository).countSellerOrders(SELLER_ID, null, null);
+    }
+
     private void givenOwnedOrderDetail(UUID orderId, Order order) {
-        when(orderRepository.findByUuid(orderId)).thenReturn(Optional.of(order));
-        when(orderRepository.ownsDrop(SELLER_ID, 42L)).thenReturn(true);
+        when(orderRepository.findSellerOrderByUuid(SELLER_ID, orderId)).thenReturn(Optional.of(order));
         when(orderItemRepository.findAllByOrderIdOrderByIdAsc(null)).thenReturn(List.of());
         when(orderRepository.findLatestPaymentStatus(null)).thenReturn(Optional.empty());
         when(shipmentRepository.findByOrderId(null)).thenReturn(Optional.empty());

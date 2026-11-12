@@ -138,6 +138,18 @@ class OrderRepositoryTest {
     }
 
     @Test
+    @DisplayName("판매자 상세 주문 조회는 DROP 소유자로 한 번에 제한한다")
+    void findSellerOrderByUuid_checksDropOwner() {
+        Order order = orderRepository.saveAndFlush(createOrder(OffsetDateTime.now().plusMinutes(15)));
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(orderRepository.findSellerOrderByUuid(sellerId, order.getUuid())).isPresent();
+        assertThat(orderRepository.findSellerOrderByUuid(sellerId + 1000, order.getUuid())).isEmpty();
+        assertThat(orderRepository.existsByUuid(order.getUuid())).isTrue();
+    }
+
+    @Test
     @DisplayName("주문 로그 표현에 배송지와 연락처 원문을 포함하지 않는다")
     void excludesPersonalInformationFromStringRepresentation() {
         // given
@@ -263,16 +275,15 @@ class OrderRepositoryTest {
                 sellerId, sellerDropId, "PAID", "SUCCEEDED", PageRequest.of(0, 10));
         // 페이지 크기(1)보다 전체 주문 수(2)가 많아야 content가 아니라 countQuery로 totalElements를
         // 확인할 수 있다(GR-194: paymentStatus 없을 때 LATERAL을 건너뛰어도 전체 건수는 정확해야 한다).
-        Page<SellerOrderListProjection> unfiltered = orderRepository.findSellerOrders(
-                sellerId, null, null, null, PageRequest.of(0, 1));
-        Page<SellerOrderListProjection> otherSellerOrders = orderRepository.findSellerOrders(
-                otherSellerId, null, null, null, PageRequest.of(0, 10));
+        var unfiltered = orderRepository.findSellerOrdersPage(sellerId, null, null, 1, 0);
+        long unfilteredTotal = orderRepository.countSellerOrders(sellerId, null, null);
+        var otherSellerOrders = orderRepository.findSellerOrdersPage(otherSellerId, null, null, 10, 0);
 
         // then
         // 다른 판매자 주문을 추가한 뒤에도 이 판매자의 전체 건수(2)는 그대로다 — 섞이지 않았다.
-        assertThat(unfiltered.getTotalElements()).isEqualTo(2);
-        assertThat(otherSellerOrders.getTotalElements()).isEqualTo(1);
-        assertThat(otherSellerOrders.getContent()).singleElement()
+        assertThat(unfilteredTotal).isEqualTo(2);
+        assertThat(otherSellerOrders).hasSize(1);
+        assertThat(otherSellerOrders).singleElement()
                 .extracting(SellerOrderListProjection::getDropId).isEqualTo(otherSellerDropId);
         assertThat(filtered.getTotalElements()).isEqualTo(1);
         assertThat(filtered.getContent()).singleElement().satisfies(order -> {
@@ -286,7 +297,7 @@ class OrderRepositoryTest {
             assertThat(order.getOrderedAt()).isNotNull();
         });
         // created_at DESC 정렬이라 페이지 크기(1)에는 더 나중에 만든 결제 전 주문만 담긴다.
-        assertThat(unfiltered.getContent()).singleElement()
+        assertThat(unfiltered).singleElement()
                 .extracting(SellerOrderListProjection::getPaymentStatus).isNull();
 
         // 결제 취소가 진행 중이어도 최신 결제 상태와 별도 필드로 확인할 수 있다.
@@ -296,6 +307,9 @@ class OrderRepositoryTest {
                 FROM orders WHERE public_id = ?
                 """, "cancel-" + UUID.randomUUID(), orderId);
         entityManager.clear();
+        var pageFirstCanceling = orderRepository.findSellerOrdersPage(sellerId, sellerDropId, "PAID", 10, 0);
+        assertThat(pageFirstCanceling).singleElement()
+                .extracting(SellerOrderListProjection::getCancellationInProgress).isEqualTo(true);
         var canceling = orderRepository.findSellerOrders(
                 sellerId, sellerDropId, "PAID", "SUCCEEDED", PageRequest.of(0, 10));
         assertThat(canceling.getContent()).singleElement()

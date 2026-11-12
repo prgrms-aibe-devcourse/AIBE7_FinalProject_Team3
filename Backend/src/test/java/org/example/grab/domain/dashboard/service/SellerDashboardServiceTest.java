@@ -142,11 +142,13 @@ class SellerDashboardServiceTest {
     @DisplayName("요약은 건수가 없는 상태도 0으로 채워 반환한다")
     void findSummary_fillsMissingStatusWithZero() {
         // given
-        given(sellerDashboardRepository.countDropsByStatus(3L)).willReturn(Map.of("WISH", 2L));
-        given(sellerDashboardRepository.countOrdersByStatus(3L, null, null)).willReturn(Map.of("PAID", 1L));
-        given(sellerDashboardRepository.countPaymentsByStatus(3L, null, null)).willReturn(Map.of());
-        given(sellerDashboardRepository.countReconciliationRequired(3L)).willReturn(1L);
-        given(sellerDashboardRepository.sumStock(3L)).willReturn(new StockSummary(10L, 2L, 3L));
+        given(sellerDashboardRepository.findSummaryMetrics(3L, null, null)).willReturn(List.of(
+                new SellerDashboardRepository.SummaryMetric("DROP", "WISH", 2L),
+                new SellerDashboardRepository.SummaryMetric("ORDER", "PAID", 1L),
+                new SellerDashboardRepository.SummaryMetric("RECONCILIATION", null, 1L),
+                new SellerDashboardRepository.SummaryMetric("STOCK", "AVAILABLE", 10L),
+                new SellerDashboardRepository.SummaryMetric("STOCK", "RESERVED", 2L),
+                new SellerDashboardRepository.SummaryMetric("STOCK", "SOLD", 3L)));
 
         // when
         SellerDashboardSummaryResponse response = sellerDashboardService.findSummary(3L, null, null);

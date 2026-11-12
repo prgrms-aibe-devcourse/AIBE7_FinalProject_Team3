@@ -1,7 +1,6 @@
 package org.example.grab.domain.dashboard.repository;
 
 import org.example.grab.domain.dashboard.dto.DropStatsProjection;
-import org.example.grab.domain.dashboard.dto.SellerDashboardSummaryResponse.StockSummary;
 import org.example.grab.domain.dashboard.dto.UpcomingDropEventType;
 import org.example.grab.domain.dashboard.dto.UpcomingDropProjection;
 import org.example.grab.support.TestcontainersConfiguration;
@@ -114,83 +113,35 @@ class SellerDashboardRepositoryTest {
     }
 
     @Test
-    @DisplayName("DROP 상태별 집계는 본인 DROP만 센다")
-    void countDropsByStatus_countsOwnDropsOnly() {
-        // given
-        insertDrop(sellerId, "WISH", "대기1", now.plusHours(1), now.plusHours(2));
-        insertDrop(sellerId, "WISH", "대기2", now.plusHours(1), now.plusHours(2));
-        insertDrop(sellerId, "GRAB", "판매중", now.minusHours(1), now.plusHours(2));
-        insertDrop(otherSellerId, "WISH", "다른 판매자", now.plusHours(1), now.plusHours(2));
-
-        // when
-        Map<String, Long> counts = sellerDashboardRepository.countDropsByStatus(sellerId);
-
-        // then
-        assertThat(counts).containsOnly(entry("WISH", 2L), entry("GRAB", 1L));
-    }
-
-    @Test
-    @DisplayName("주문 상태별 집계는 본인 주문만 주문 생성 시각 기준으로 센다")
-    void countOrdersByStatus_filtersOwnerAndPeriod() {
-        // given
+    @DisplayName("요약 지표는 한 조회에서 소유자·기간·전체 보정·재고 계약을 유지한다")
+    void findSummaryMetrics_preservesSummarySemantics() {
         Long dropId = insertDrop(sellerId, "GRAB", "판매중", now.minusDays(10), now.plusDays(10));
-        Long otherDropId = insertDrop(
-                otherSellerId, "GRAB", "다른 판매자", now.minusDays(10), now.plusDays(10));
-        insertOrder(dropId, "PAYMENT_PENDING", now);
-        insertOrder(dropId, "PAID", now.plusDays(1));
-        insertOrder(dropId, "PAID", now.minusDays(1));
-        insertOrder(otherDropId, "PAID", now);
-
-        // when
-        Map<String, Long> all = sellerDashboardRepository.countOrdersByStatus(sellerId, null, null);
-        Map<String, Long> ranged = sellerDashboardRepository.countOrdersByStatus(sellerId, now, now.plusDays(1));
-
-        // then
-        assertThat(all).containsOnly(entry("PAYMENT_PENDING", 1L), entry("PAID", 2L));
-        assertThat(ranged).containsOnly(entry("PAYMENT_PENDING", 1L), entry("PAID", 1L));
-    }
-
-    @Test
-    @DisplayName("결제 집계는 시도 건수를 세고, 보정 필요 건수는 기간과 무관하게 센다")
-    void countPayments_countsAttemptsAndReconciliation() {
-        // given
-        Long dropId = insertDrop(sellerId, "GRAB", "판매중", now.minusDays(10), now.plusDays(10));
-        Long otherDropId = insertDrop(
-                otherSellerId, "GRAB", "다른 판매자", now.minusDays(10), now.plusDays(10));
-        Long orderId = insertOrder(dropId, "PAID", now);
-        insertPayment(orderId, "FAILED", "NONE", now.minusDays(5));
-        insertPayment(orderId, "FAILED", "NONE", now);
-        insertPayment(orderId, "SUCCEEDED", "REQUIRED", now);
-        insertPayment(insertOrder(otherDropId, "PAID", now), "SUCCEEDED", "NONE", now);
-
-        // when
-        Map<String, Long> ranged = sellerDashboardRepository.countPaymentsByStatus(
-                sellerId, now.minusDays(1), now.plusDays(1));
-        long reconciliationRequired = sellerDashboardRepository.countReconciliationRequired(sellerId);
-
-        // then
-        assertThat(ranged).containsOnly(entry("FAILED", 1L), entry("SUCCEEDED", 1L));
-        assertThat(reconciliationRequired).isEqualTo(1L);
-    }
-
-    @Test
-    @DisplayName("재고 합계는 취소 DROP을 빼고 비활성 옵션은 포함해 계산식대로 센다")
-    void sumStock_excludesCanceledDropAndIncludesInactiveOption() {
-        // given
-        Long dropId = insertDrop(sellerId, "GRAB", "판매중", now.minusHours(1), now.plusHours(2));
+        Long otherDropId = insertDrop(otherSellerId, "GRAB", "다른 판매자", now.minusDays(10), now.plusDays(10));
         insertOption(dropId, 100, 10, 20, 5, true);
         insertOption(dropId, 50, 0, 0, 0, false);
         Long canceledDropId = insertDrop(sellerId, "CANCELED", "취소", now.plusHours(1), now.plusHours(2));
         insertOption(canceledDropId, 999, 0, 0, 0, true);
-        Long otherDropId = insertDrop(
-                otherSellerId, "GRAB", "다른 판매자", now.minusHours(1), now.plusHours(2));
         insertOption(otherDropId, 777, 0, 0, 0, true);
+        Long orderId = insertOrder(dropId, "PAID", now);
+        insertOrder(dropId, "PAID", now.minusDays(1));
+        insertOrder(otherDropId, "PAID", now);
+        insertPayment(orderId, "FAILED", "NONE", now.minusDays(5));
+        insertPayment(orderId, "FAILED", "NONE", now);
+        insertPayment(orderId, "SUCCEEDED", "REQUIRED", now);
 
-        // when
-        StockSummary summary = sellerDashboardRepository.sumStock(sellerId);
-
-        // then
-        assertThat(summary).isEqualTo(new StockSummary(115L, 10L, 20L));
+        var all = sellerDashboardRepository.findSummaryMetrics(sellerId, null, null);
+        var ranged = sellerDashboardRepository.findSummaryMetrics(sellerId, now.minusDays(1), now);
+        assertThat(all).contains(new SellerDashboardRepository.SummaryMetric("DROP", "GRAB", 1L),
+                new SellerDashboardRepository.SummaryMetric("DROP", "CANCELED", 1L),
+                new SellerDashboardRepository.SummaryMetric("ORDER", "PAID", 2L),
+                new SellerDashboardRepository.SummaryMetric("RECONCILIATION", null, 1L),
+                new SellerDashboardRepository.SummaryMetric("STOCK", "AVAILABLE", 115L),
+                new SellerDashboardRepository.SummaryMetric("STOCK", "RESERVED", 10L),
+                new SellerDashboardRepository.SummaryMetric("STOCK", "SOLD", 20L));
+        assertThat(ranged).contains(new SellerDashboardRepository.SummaryMetric("ORDER", "PAID", 2L),
+                new SellerDashboardRepository.SummaryMetric("PAYMENT", "FAILED", 1L),
+                new SellerDashboardRepository.SummaryMetric("PAYMENT", "SUCCEEDED", 1L),
+                new SellerDashboardRepository.SummaryMetric("RECONCILIATION", null, 1L));
     }
     @Test
     @DisplayName("DROP별 통계는 본인 DROP만 취소 WISH를 뺀 수와 재고·매출 집계로 반환한다")
