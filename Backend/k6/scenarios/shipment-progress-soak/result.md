@@ -8,7 +8,8 @@
 ## 사전 준비
 
 ```
-GRAB_MOCK_DELIVERY_ENABLED=true docker compose -f compose.yaml -f k6/compose/compose.loadtest-micro.yaml up --build
+GRAB_MOCK_DELIVERY_ENABLED=true docker compose -f compose.yaml -f k6/compose/compose.loadtest-micro.yaml -f k6/compose/compose.loadtest-db-nano.yaml up --build -d
+bash k6/scenarios/drop-detail-scale/netem.sh 2.8
 docker compose exec -T postgres psql -U grab -d grab -f - < k6/common/accounts-seed.sql   # 최초 1회
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U grab -d grab -f - < k6/scenarios/shipment-progress-soak/seed.sql
 ```
@@ -208,3 +209,68 @@ GR-191의 "25~30% 개선" 주장은 비현실적 규모(30만건, SHIPPED 97%)�
    보는 배치)는 **테스트 데이터를 드롭 1개에 몰아넣으면 안 된다** — `(drop_id, ...)`가
    선두인 기존 인덱스가 우연히 유리해져서, 새로 추가한 인덱스의 진짜 효과가 가려진다.
    여러 드롭(또는 여러 판매자)에 분산해야 실제 운영과 같은 플랜이 나온다.
+
+## 2026-11-12 재측정 — V34 정규화 후 현재 인덱스 구성
+
+`seed.sql`과 `feed-shipments.sh`의 주문 입력을 V34 스키마에 맞췄다. 배송지는 이제
+`order_shipping_addresses`에 넣고, 제거된 `orders.recipient_*`, `paid_at` 컬럼은 쓰지 않는다.
+V34 DB에서 backend micro(2 vCPU·1GiB) + DB nano(1 vCPU·512MiB) + RTT 2.8ms 조건으로
+15분 soak를 수행했다. 배치 주기 10초, 단계 간격 30초, 40건 초기 seed에 더해 30초마다
+5건씩 30회 투입(150건)이었다.
+
+- feeder 성공 30회, 실패 0회. 종료 시 누적 190건 모두 `DELIVERED`.
+- `verify.sql`: 지연된 단계 0건, OUT_FOR_DELIVERY 정체 0건, 주문/배송 완료 불일치 0건.
+- 60초 간격 표본: backend 메모리 531–550MiB, Hikari active 0·pending 0.
+
+같은 제한 환경에서 `benchmark-v34.sql`로 기존 DB 행을 포함한 주문 20,198건,
+배송 18,000건을 측정했다. 테스트 주문 18,000건은 1,000개 DROP에 분산했고 상태는
+DELIVERED 16,790·SHIPPED 1,400·PAID 2,000·EXPIRED 8이었다. 실행 계획 측정용 데이터와
+UPDATE는 트랜잭션 후 전부 롤백했다.
+
+| 배치 쿼리 | 반복 실행시간(ms) | 중앙값 |
+|---|---:|---:|
+| `advanceStageBatch` UPDATE | 20.709 / 16.650 / 15.667 | 16.650 |
+| 배송완료 후보 잠금 SELECT | 9.304 / 11.185 / 9.448 | 9.448 |
+
+현재 계획은 `orders.status='SHIPPED'`에서 **Seq Scan**을 사용해 20,198건 중 1,400건을 찾았다.
+`shipments`의 단계 전진 후보는 `idx_shipments_stage_progress` Bitmap Index Scan으로 800건을 찾았다.
+배송완료 후보 쿼리는 높은 OUT_FOR_DELIVERY 비율 때문에 `shipments`와 `orders` 양쪽 모두 Seq Scan이었다.
+
+2026-11-06 측정의 `advanceStageBatch` 11.1ms와 비교하면 현재 중앙값은 약 50% 높다. 이 차이를
+orders 정규화만의 영향으로 볼 수 없다. V32에서 `idx_orders_status_id`를 삭제한 뒤 V33에서
+`idx_orders_payment_expiry`가 `status='PAYMENT_PENDING'` 부분 인덱스로 바뀌어, 현재 `SHIPPED`
+조회가 그 인덱스를 쓸 수 없다. 이번 재측정에서 확인한 현재 병목은 `orders.status` Seq Scan이다.
+
+## 2026-11-12 인덱스 통합 검증 (V35)
+
+orders 인덱스 수를 늘리지 않도록 결제 만료용 부분 인덱스를
+`(status, payment_expires_at, id) WHERE status IN ('PAYMENT_PENDING', 'SHIPPED')`로 교체했다.
+같은 micro + DB nano + RTT 2.8ms 환경에서 기존 인덱스와 후보를 한 트랜잭션 안에서 비교하고
+마지막에 롤백했다. 실행계획 비교에는 기존 주문 2,198건과 fixture 주문 19,500건(배송 18,000건,
+PAID 쓰기 측정 1,000건, 만료 결제 500건)이 포함됐다.
+
+- 인덱스 크기: 기존 40KB → 후보 96KB (**+56KB**, 주문 총 21,698건 기준). 두 번째 인덱스를
+  추가하지 않고 기존 인덱스를 교체한다.
+- `advanceStageBatch`: 기존 `orders` Seq Scan에서 후보 Bitmap Index Scan으로 바뀌어 주문 버퍼
+  사용이 833에서 63으로 감소했다. 전체 UPDATE 실행시간은 반복에 따라 흔들려 개선폭으로 단정하지 않는다.
+- 완료 후보 조회: `orders` Seq Scan이 Bitmap Index Scan으로 바뀌고 주문 버퍼가 833에서 63으로
+  감소했다. 배송 단계 비율이 높은 fixture에서는 `shipments` Seq Scan은 그대로 남는다.
+- 결제 만료 조회는 계속 Index Only Scan을 사용했다. 단일 측정은 기존 0.262ms, 후보 0.311ms로
+  0.049ms 차이였고, 반복 p95 비교는 하지 않았다.
+- 쓰기 WAL 중앙값: SHIPPED 주문 500건 삽입은 428,216 → 481,280 bytes (**+12%**), PAID→SHIPPED
+  1,000건 변경은 909,480 → 1,043,392 bytes (**+15%**). 시간 측정은 호스트 시계 변동과 표본 편차가
+  있어 비용 판단에는 WAL 차이를 사용했다.
+- SQL 왕복 p95(`measure-index-p95.sh`, backend micro + DB nano + RTT 2.8ms, 각 조건 40회 × 2회):
+
+  | 배치 SQL | 기존 p50/p95 (ms) | 후보 p50/p95 (ms) | 관찰 |
+  |---|---:|---:|---|
+  | 단계 전진 UPDATE | 20.908/28.329, 21.211/28.389 | 20.242/28.569, 20.007/29.547 | p50은 조금 낮았지만 p95 개선은 확인 못함 |
+  | 완료 대상 잠금 SELECT | 14.195/18.259, 16.326/24.343 | 13.069/16.568, 13.198/17.129 | 두 회차 모두 후보 p95가 낮음 |
+
+  5회 워밍업 후 40회씩 측정하고 조건 사이에 `VACUUM (ANALYZE)`를 실행했다. 배송 스케줄러에는
+  HTTP API가 없어 이 값은 DB SQL 왕복 p95이며 API 응답 p95가 아니다. 단계 전진 p95는 그대로라서
+  이 인덱스만으로 전체 배송 배치 p95가 개선됐다고 볼 수 없다.
+
+인덱스 유지 비용은 늘지만, 총 인덱스 수는 그대로이며 두 배송 조회에서 `orders` 전체 스캔을
+피한다. 결제 만료 조회는 인덱스 경로를 유지한다. 이 수치는 제한된 로컬 fixture의 SQL 비교라
+운영 데이터 분포의 성능을 보증하지 않는다.

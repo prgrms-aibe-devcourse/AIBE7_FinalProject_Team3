@@ -34,17 +34,21 @@ WHERE s.contact_email = 'k6-seller@loadtest.local' AND c.code = 'FASHION';
 INSERT INTO orders (
     order_number, buyer_id, drop_id, seller_id, idempotency_key, request_hash, status,
     product_name_snapshot, seller_name_snapshot, items_amount, shipping_amount,
-    total_amount, recipient_name, recipient_phone, postal_code, address_line1,
-    payment_expires_at, paid_at
+    total_amount, payment_expires_at
 )
 SELECT 'GR172-SEED-' || gs, b.id, d.id, d.seller_id, 'idem-GR172-seed-' || gs,
        substr(md5('GR172-seed-' || gs) || md5('GR172-seed2-' || gs), 1, 64), 'SHIPPED',
        'k6 배송배치 롱런 상품', 'GRAB 판매자', 10000, 0, 10000,
-       'k6 테스터', '01099990000', '06236', '서울시 강남구 테스트로 1',
-       now() + interval '15 minutes', now() - interval '3 hours'
+       now() + interval '15 minutes'
 FROM generate_series(1, 40) gs,
      (SELECT id FROM users WHERE email = 'k6-buyer@loadtest.local') b,
      (SELECT id, seller_id FROM drops WHERE name = 'k6 배송배치 롱런 상품') d;
+
+INSERT INTO order_shipping_addresses (order_id, recipient_name, recipient_phone, postal_code, address_line1)
+SELECT o.id, 'k6 테스터', '01099990000', '06236', '서울시 강남구 테스트로 1'
+FROM orders o
+JOIN drops d ON d.id = o.drop_id
+WHERE d.name = 'k6 배송배치 롱런 상품' AND o.order_number LIKE 'GR172-SEED-%';
 
 INSERT INTO shipments (
     order_id, carrier_code, tracking_number, idempotency_key, request_hash,

@@ -29,18 +29,21 @@ WITH new_orders AS (
     INSERT INTO orders (
         order_number, buyer_id, drop_id, seller_id, idempotency_key, request_hash, status,
         product_name_snapshot, seller_name_snapshot, items_amount, shipping_amount,
-        total_amount, recipient_name, recipient_phone, postal_code, address_line1,
-        payment_expires_at, paid_at
+        total_amount, payment_expires_at
     )
     SELECT 'GR172-FEED-${RUN_ID}-${tick}-' || gs, b.id, d.id, d.seller_id, 'idem-GR172-feed-${RUN_ID}-${tick}-' || gs,
            substr(md5('GR172-feed-${RUN_ID}-${tick}-' || gs) || md5(random()::text), 1, 64), 'SHIPPED',
            'k6 배송배치 롱런 상품', 'GRAB 판매자', 10000, 0, 10000,
-           'k6 테스터', '01099990000', '06236', '서울시 강남구 테스트로 1',
-           now() + interval '15 minutes', now() - interval '1 minute'
+           now() + interval '15 minutes'
     FROM generate_series(1, ${BATCH_SIZE}) gs,
          (SELECT id FROM users WHERE email = 'k6-buyer@loadtest.local') b,
          (SELECT id, seller_id FROM drops WHERE name = 'k6 배송배치 롱런 상품') d
     RETURNING id
+), new_addresses AS (
+    INSERT INTO order_shipping_addresses (order_id, recipient_name, recipient_phone, postal_code, address_line1)
+    SELECT id, 'k6 테스터', '01099990000', '06236', '서울시 강남구 테스트로 1'
+    FROM new_orders
+    RETURNING order_id
 )
 INSERT INTO shipments (
     order_id, carrier_code, tracking_number, idempotency_key, request_hash,
@@ -49,7 +52,7 @@ INSERT INTO shipments (
 SELECT id, 'CJ대한통운', 'TRACK-GR172-FEED-${RUN_ID}-${tick}-' || id, 'ship-idem-GR172-feed-${RUN_ID}-${tick}-' || id,
        substr(md5('GR172-ship-feed-${RUN_ID}-${tick}-' || id) || md5(random()::text), 1, 64),
        now(), 'COLLECTED', now()
-FROM new_orders;
+FROM new_orders o JOIN new_addresses a ON a.order_id = o.id;
 SQL
 )
     # 장시간 무인 실행 중 일시적인 docker/psql 실패로 전체 soak가 중간에 멈추면 안 되므로,
