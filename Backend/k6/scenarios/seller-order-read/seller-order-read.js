@@ -23,7 +23,9 @@ const DURATION = __ENV.DURATION || '30s';
 const LIST_VUS = Number(__ENV.LIST_VUS || 10);
 const DETAIL_VUS = Number(__ENV.DETAIL_VUS || 10);
 const PAGE_SIZE = 20;
-const TOTAL_PAGES = 50; // seed.sql 기준 주문 1000건 / size 20
+const TOTAL_PAGES = Number(__ENV.TOTAL_PAGES || 1000);
+const LIST_DROP_ID = __ENV.LIST_DROP_ID || '';
+const SELLER_EMAIL = __ENV.SELLER_EMAIL || 'k6-order-seller@loadtest.local';
 const ENABLE_BURST = (__ENV.ENABLE_BURST || 'true') !== 'false';
 const BURST_RATE = Number(__ENV.BURST_RATE || 20); // 초당 신규 주문 수
 const BURST_START = __ENV.BURST_START || '10s';
@@ -73,7 +75,7 @@ export function setup() {
     if (!dropId || !optionId) {
         throw new Error('DROP_ID, OPTION_ID 환경변수가 필요합니다. 이 폴더의 seed.sql 실행 결과를 확인하세요.');
     }
-    const sellerSession = login('k6-order-seller@loadtest.local', 'LoadTest1234!');
+    const sellerSession = login(SELLER_EMAIL, 'LoadTest1234!');
     // login()을 두 번 연달아 부르면 첫 로그인이 남긴 XSRF-TOKEN 쿠키 때문에 두 번째
     // /auth/csrf가 새 쿠키를 안 내려준다(common/lib/auth.js 주석 참고) — 비워주고 호출한다.
     http.cookieJar().clear(BASE_URL);
@@ -98,7 +100,8 @@ export function setup() {
 export function listRead(data) {
     primeCookies(data.sellerSession);
     const page = Math.floor(Math.random() * TOTAL_PAGES);
-    const res = http.get(`${BASE_URL}/api/v1/seller/orders?page=${page}&size=${PAGE_SIZE}`, {
+    const dropFilter = LIST_DROP_ID ? `&dropId=${LIST_DROP_ID}` : '';
+    const res = http.get(`${BASE_URL}/api/v1/seller/orders?page=${page}&size=${PAGE_SIZE}${dropFilter}`, {
         headers: authHeaders(data.sellerSession),
     });
     check(res, { '목록 200': (r) => r.status === 200 });

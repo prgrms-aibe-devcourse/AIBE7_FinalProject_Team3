@@ -20,7 +20,8 @@ const DURATION = __ENV.DURATION || '30s';
 const SUMMARY_VUS = Number(__ENV.SUMMARY_VUS || 10);
 const DROP_STATS_VUS = Number(__ENV.DROP_STATS_VUS || 10);
 const PAGE_SIZE = 20;
-const TOTAL_PAGES = 10; // seed.sql 기준 DROP 200개 / size 20
+const TOTAL_PAGES = Number(__ENV.TOTAL_PAGES || 10);
+const SELLER_EMAIL = __ENV.SELLER_EMAIL || 'k6-dashboard-seller@loadtest.local';
 
 export const options = {
     scenarios: {
@@ -47,7 +48,7 @@ export const options = {
 };
 
 export function setup() {
-    const session = login('k6-dashboard-seller@loadtest.local', 'LoadTest1234!');
+    const session = login(SELLER_EMAIL, 'LoadTest1234!');
     return { session };
 }
 
