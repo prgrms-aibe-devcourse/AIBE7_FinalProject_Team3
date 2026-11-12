@@ -245,7 +245,7 @@ POST /api/v1/orders/{orderId}/cancel
 - 같은 `Idempotency-Key`와 같은 본문이 다시 오면 최초 취소 결과를 반환한다. 결제 취소 결과를 확인 중(`UNKNOWN`)이면 같은 서버 멱등 키로 토스 결제 취소를 다시 요청해 확정한 뒤 응답한다.
 - 같은 `Idempotency-Key`에 다른 본문이 오면 `DUPLICATE_IDEMPOTENCY_KEY`로 거부한다.
 - 결제 취소를 진행·확인 중인 주문에 다른 `Idempotency-Key`로 요청하면 `ORDER_STATUS_CONFLICT`로 거부한다.
-- 취소 요청 키와 요청 해시는 `orders.cancel_idempotency_key`, `orders.cancel_request_hash`에 저장하며 키 범위는 주문별이다. 토스 결제 취소 요청에는 서버가 만든 UUID(`payment_cancellations.idempotency_key`)를 쓴다.
+- 취소 요청 키와 요청 해시는 `order_cancellations.idempotency_key`, `order_cancellations.request_hash`에 저장하며 키 범위는 주문별이다. 토스 결제 취소 요청에는 서버가 만든 UUID(`payment_cancellations.idempotency_key`)를 쓴다.
 
 **오류 코드:**
 

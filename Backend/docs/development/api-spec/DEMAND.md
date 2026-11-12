@@ -49,7 +49,7 @@
 
 ### 1.4 전환율
 
-- 표본 DROP마다 `wishers` = 활성 WISH 수, `converted` = 그중 해당 DROP에 결제 확정(`paid_at` 있음)·미취소(`canceled_at` 없음) 주문이 한 건 이상 있는 사용자 수, `quantity` = 그 주문들의 `order_items.quantity` 합계.
+- 표본 DROP마다 `wishers` = 활성 WISH 수, `converted` = 그중 해당 DROP에 결제가 확정된 주문(`orders.status IN ('PAID', 'PREPARING', 'SHIPPED', 'DELIVERED')`)이 한 건 이상 있는 사용자 수, `quantity` = 그 주문들의 `order_items.quantity` 합계.
 - 기준(`OWN`, `MARKET`)마다 `conversionRate` = Σ`converted` / Σ`wishers`, `avgQuantityPerBuyer` = Σ`quantity` / Σ`converted` (Σ`converted`가 0이면 1)를 따로 계산한다. 내 실적의 전환율은 소수 둘째 자리, 구매자당 평균 수량은 소수 첫째 자리로 반올림한 값을 계산과 응답에 쓴다. 시장 평균(1.3)과 같은 정밀도라 두 기준을 나란히 비교할 수 있고, 응답에 보이는 값으로 계산하므로 판매자가 화면 수치로 검산한 결과와 LLM 설명의 수치 검증(3절) 대상이 계산 결과와 일치한다.
 - WISH 없이 구매한 사용자는 포함하지 않는다. 예상 수량이 실제보다 낮게 나올 수 있다는 점을 응답의 `notes`에 표시한다.
 

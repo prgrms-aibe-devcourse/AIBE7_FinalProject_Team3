@@ -278,7 +278,7 @@ UUID 형식이 아닌 값이 경로 변수로 들어오면 `RESOURCE_NOT_FOUND`(
 >
 > 결제 요청의 클라이언트 `Idempotency-Key`와 요청 해시는 `payments.client_idempotency_key`, `payments.request_hash`에 저장하며, 키 범위는 주문별입니다.
 >
-> 주문 취소 요청의 `Idempotency-Key`와 요청 해시는 `orders.cancel_idempotency_key`, `orders.cancel_request_hash`에 저장하며, 키 범위는 주문별입니다.
+> 주문 취소 요청의 `Idempotency-Key`와 요청 해시는 `order_cancellations.idempotency_key`, `order_cancellations.request_hash`에 저장하며, 키 범위는 주문별입니다.
 
 ---
 

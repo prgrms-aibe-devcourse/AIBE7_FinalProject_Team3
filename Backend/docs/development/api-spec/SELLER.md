@@ -323,7 +323,7 @@ GET /api/v1/seller/dashboard/drops?status=ENDED&page=0&size=20
 이 목록은 `CANCELED` DROP도 반환하지만 2.1 `stockSummary`는 제외하므로, 취소된 DROP이 있으면 목록의 재고 합계가 요약보다 큽니다.
 
 - `saleEndsAt`은 아직 공개하지 않은 `DRAFT`에서는 `null`일 수 있습니다.
-- `orderCount`·`salesAmount`는 결제가 확정되고(`paid_at`) 취소되지 않은(`canceled_at`이 없는) 주문만 집계합니다.
+- `orderCount`·`salesAmount`는 결제가 확정된 주문(`orders.status IN ('PAID', 'PREPARING', 'SHIPPED', 'DELIVERED')`)만 집계합니다.
 - `soldQuantity`는 같은 주문들의 `order_items.quantity` 합계입니다. 재고의 `soldStock`과는 다른 실적 지표이며 주문 건수와도 구분합니다.
 - `salesAmount`는 배송비를 포함한 `total_amount`의 누적 합계입니다. 기간 필터와 전체 합계 필드는 제공하지 않으므로 현재 페이지의 합계를 전체 매출로 표시하지 않습니다.
 - 미결제·만료·취소 주문을 제외하고 기간 필터도 없으므로, `orderCount`의 합계는 2.1 `orderCounts`의 합계보다 작습니다.
