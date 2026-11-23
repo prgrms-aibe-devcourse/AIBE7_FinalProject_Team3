@@ -73,6 +73,9 @@ class OrderCreateTransactionServiceTest {
         given(inventoryRepository.findDrop(100L)).willReturn(java.util.Optional.of(
                 dropSnapshot(100L, "GRAB", "한정판", "판매자", 3000, now.minusMinutes(1), now.plusHours(1))
         ));
+        given(inventoryRepository.findOptionSnapshots(100L, List.of(1001L))).willReturn(List.of(
+                lockedOption(1001L, 129000, 10, 1, 0, 0, true, "블랙 / M")
+        ));
         given(inventoryRepository.tryReserveOption(100L, 1001L, 2)).willReturn(java.util.Optional.of(
                 lockedOption(1001L, 129000, 10, 1, 0, 0, true, "블랙 / M")
         ));
@@ -96,13 +99,21 @@ class OrderCreateTransactionServiceTest {
     }
 
     @Test
-    @DisplayName("옵션 하나라도 재고가 부족하면 주문과 선점을 수행하지 않는다")
+    @DisplayName("옵션 하나라도 재고가 부족하면 재고 부족 예외를 던지고 알림을 발행하지 않는다")
     void rejectsInsufficientStock() {
         // given
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         given(inventoryRepository.findDrop(100L)).willReturn(java.util.Optional.of(
                 dropSnapshot(100L, "GRAB", "한정판", "판매자", 3000, now.minusMinutes(1), now.plusHours(1))
         ));
+        given(inventoryRepository.findOptionSnapshots(100L, List.of(1001L))).willReturn(List.of(
+                lockedOption(1001L, 129000, 2, 1, 0, 0, true, "블랙 / M")
+        ));
+        given(orderRepository.saveAndFlush(any(Order.class))).willAnswer(invocation -> {
+            Order order = invocation.getArgument(0);
+            ReflectionTestUtils.setField(order, "id", 1L);
+            return order;
+        });
         given(inventoryRepository.tryReserveOption(100L, 1001L, 2)).willReturn(java.util.Optional.empty());
         given(inventoryRepository.lockOptions(100L, List.of(1001L))).willReturn(List.of(
                 lockedOption(1001L, 129000, 2, 1, 0, 0, true, "블랙 / M")
@@ -113,7 +124,6 @@ class OrderCreateTransactionServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .satisfies(exception -> assertThat(((BusinessException) exception).getErrorCode())
                         .isEqualTo(OrderErrorCode.INSUFFICIENT_STOCK));
-        verify(orderRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -139,6 +149,9 @@ class OrderCreateTransactionServiceTest {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         given(inventoryRepository.findDrop(100L)).willReturn(java.util.Optional.of(
                 dropSnapshot(100L, "WISH", "한정판", "판매자", 3000, now.minusMinutes(1), now.plusHours(1))
+        ));
+        given(inventoryRepository.findOptionSnapshots(100L, List.of(1001L))).willReturn(List.of(
+                lockedOption(1001L, 129000, 10, 0, 0, 0, true, "블랙 / M")
         ));
         given(inventoryRepository.tryReserveOption(100L, 1001L, 1)).willReturn(java.util.Optional.of(
                 lockedOption(1001L, 129000, 10, 0, 0, 0, true, "블랙 / M")

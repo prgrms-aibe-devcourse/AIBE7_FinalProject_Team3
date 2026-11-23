@@ -25,6 +25,23 @@ public interface OrderInventoryRepository extends Repository<Order, Long> {
             """, nativeQuery = true)
     Optional<DropSnapshot> findDrop(@Param("dropId") Long dropId);
 
+    /** 락 없이 옵션 메타정보(단가·활성 여부·옵션명)를 조회해 INSERT 선행에 사용한다. */
+    @Query(value = """
+            SELECT o.id AS "id", o.unit_price AS "unitPrice", o.total_quantity AS "totalQuantity",
+                   o.reserved_quantity AS "reservedQuantity", o.sold_quantity AS "soldQuantity",
+                   o.withheld_quantity AS "withheldQuantity", o.is_active AS "active",
+                   COALESCE((
+                       SELECT string_agg(v.value, ' / ' ORDER BY g.sort_order)
+                       FROM drop_option_value_maps m
+                       JOIN drop_option_groups g ON g.id = m.group_id
+                       JOIN drop_option_values v ON v.id = m.value_id
+                       WHERE m.option_id = o.id
+                   ), '기본') AS "optionName"
+            FROM drop_options o
+            WHERE o.drop_id = :dropId AND o.id IN (:optionIds)
+            """, nativeQuery = true)
+    List<LockedOption> findOptionSnapshots(@Param("dropId") Long dropId, @Param("optionIds") List<Long> optionIds);
+
     /** 옵션 행을 항상 PK 오름차순으로 잠가 서로 다른 옵션 조합 주문 사이의 데드락을 방지한다. */
     @Query(value = """
             SELECT o.id AS "id", o.unit_price AS "unitPrice", o.total_quantity AS "totalQuantity",

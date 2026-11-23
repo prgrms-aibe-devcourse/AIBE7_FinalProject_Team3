@@ -63,19 +63,28 @@ public class OrderCreateTransactionService {
             throw new BusinessException(OrderErrorCode.OPTION_NOT_FOUND);
         }
 
-        // 옵션 행을 항상 PK 오름차순으로 잠가(= 조건부 UPDATE로 락을 걸어) 서로 다른 옵션 조합 주문 사이의 데드락을 방지한다.
+        // 1. 락 없이 옵션 단가·옵션명·활성 여부만 먼저 읽어 주문/항목 INSERT에 사용한다.
+        List<LockedOption> snapshots = inventoryRepository.findOptionSnapshots(drop.getId(), optionIds);
         Map<Long, LockedOption> optionsById = new LinkedHashMap<>();
-        long itemsAmount = 0;
-        for (Long optionId : optionIds) {
-            OrderCreateRequest.Item item = request.items().stream()
-                    .filter(i -> i.optionId().equals(optionId)).findFirst().orElseThrow();
-            LockedOption option = inventoryRepository
-                    .tryReserveOption(drop.getId(), optionId, item.quantity())
-                    .orElseGet(() -> diagnoseReserveFailure(drop.getId(), optionId, item.quantity()));
-            optionsById.put(optionId, option);
-            itemsAmount = Math.addExact(itemsAmount, Math.multiplyExact(option.getUnitPrice(), item.quantity()));
+        for (LockedOption snapshot : snapshots) {
+            if (!snapshot.isActive()) {
+                throw new BusinessException(OrderErrorCode.OPTION_NOT_FOUND);
+            }
+            optionsById.put(snapshot.getId(), snapshot);
+        }
+        if (optionsById.size() != optionIds.size()) {
+            throw new BusinessException(OrderErrorCode.OPTION_NOT_FOUND);
         }
 
+        Map<Long, Integer> quantityByOptionId = new LinkedHashMap<>();
+        long itemsAmount = 0;
+        for (OrderCreateRequest.Item requestItem : request.items()) {
+            quantityByOptionId.put(requestItem.optionId(), requestItem.quantity());
+            LockedOption option = optionsById.get(requestItem.optionId());
+            itemsAmount = Math.addExact(itemsAmount, Math.multiplyExact(option.getUnitPrice(), requestItem.quantity()));
+        }
+
+        // 2. 경합 없는 주문·배송지·주문항목·예약 INSERT를 락 획득 전에 먼저 수행한다.
         OffsetDateTime paymentExpiresAt = now.plusMinutes(PAYMENT_WAIT_MINUTES);
         Order order = orderRepository.saveAndFlush(Order.create(
                 orderNumberGenerator.generate(),
@@ -107,6 +116,15 @@ public class OrderCreateTransactionService {
         stockReservationRepository.saveAll(orderItems.stream()
                 .map(item -> StockReservation.hold(item, paymentExpiresAt))
                 .toList());
+
+        // 3. 커밋 직전 맨 마지막에 옵션 PK 오름차순으로 재고 행 잠금·차감을 실행해 락 보유 시간을 최소화한다.
+        for (Long optionId : optionIds) {
+            int quantity = quantityByOptionId.get(optionId);
+            inventoryRepository
+                    .tryReserveOption(drop.getId(), optionId, quantity)
+                    .orElseGet(() -> diagnoseReserveFailure(drop.getId(), optionId, quantity));
+        }
+
         stockChangePublisher.publish(order.getDropId(), StockChange.STOCK);
         return order;
     }

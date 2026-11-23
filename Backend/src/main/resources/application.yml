@@ -233,7 +233,7 @@ grab:
   # 값은 1차 추정치라 운영 트래픽을 보며 조정이 필요하다 — HikariCP 풀 크기(기본 10)보다 넉넉히 둔다.
   # 자리가 없으면 acquire-timeout까지 기다리고, 그 안에 차례가 오지 않으면 503 ORDER_CREATION_TEMPORARILY_UNAVAILABLE로 거부한다
   order-creation:
-    max-concurrent: 20
+    max-concurrent: 10
     acquire-timeout: 3s
     retry-after: 3s
   cors:
